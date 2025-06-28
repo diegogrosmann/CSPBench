@@ -11,7 +11,7 @@ from typing import List, Tuple, Dict, Any
 from Bio import Entrez, SeqIO
 import random
 import logging
-from config import ENTREZ_DEFAULTS
+from utils.config import ENTREZ_DEFAULTS
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +54,6 @@ def fetch_dataset() -> Tuple[List[str], Dict[str, Any]]:
 
     rng = random.Random(0)
 
-    print("Buscando no NCBI...")
     logger.debug("Iniciando ESearch...")
     handle = Entrez.esearch(db=db, term=term, retmax=50000)
     search_result = Entrez.read(handle)
@@ -69,7 +68,6 @@ def fetch_dataset() -> Tuple[List[str], Dict[str, Any]]:
         raise RuntimeError("A busca não retornou nenhum registro. Verifique seu termo de busca.")
 
     if len(ids) < n:
-        print(f"\nAviso: A busca retornou apenas {len(ids)} registros (solicitado {n}). Usando todos os encontrados.")
         logger.warning(f"A busca retornou {len(ids)} IDs, menos que os {n} solicitados. Usando todos os IDs encontrados.")
         params['n'] = len(ids)
         sample_ids = ids
@@ -77,13 +75,15 @@ def fetch_dataset() -> Tuple[List[str], Dict[str, Any]]:
         sample_ids = rng.sample(ids, n)
     logger.debug(f"IDs amostrados (primeiros 5): {sample_ids[:5]} ...")
 
-    print("Baixando sequências...")
     logger.debug("Iniciando EFetch...")
     fetch_handle = Entrez.efetch(db=db, id=",".join(sample_ids),
                                 rettype="fasta", retmode="text")
     records = list(SeqIO.parse(fetch_handle, "fasta"))
     logger.debug(f"{len(records)} seqüências baixadas")
 
+    seqs = [str(rec.seq).upper() for rec in records]
+    logger.info(f"Dataset Entrez obtido: n={len(seqs)}, L={len(seqs[0])}")
+    return seqs, params
     seqs = [str(rec.seq).upper() for rec in records]
     print(f"Dataset Entrez obtido: n={len(seqs)}, L={len(seqs[0])}")
     return seqs, params

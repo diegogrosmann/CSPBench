@@ -13,13 +13,13 @@ import logging
 logger = logging.getLogger(__name__)
 
 def ensure_datasets_folder():
-    """Garante que a pasta datasets/ existe."""
-    datasets_path = Path("datasets")
+    """Garante que a pasta saved_datasets/ existe."""
+    datasets_path = Path("saved_datasets")
     datasets_path.mkdir(exist_ok=True)
     return datasets_path
 
 def save_dataset_fasta(sequences: List[str], filename: str, description: str = ""):
-    """Salva um dataset no formato FASTA na pasta datasets/."""
+    """Salva um dataset no formato FASTA na pasta saved_datasets/."""
     datasets_path = ensure_datasets_folder()
     filepath = datasets_path / filename
     

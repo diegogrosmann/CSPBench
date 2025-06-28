@@ -1,15 +1,7 @@
-# baseline.py
-"""
-baseline.py
-===========
-
-Implementa o algoritmo de consenso guloso usado como baseline
-(Berman & Karpinski, 2001). Mantém assinatura simples para comparação.
-"""
-
 from collections import Counter
 from typing import List
 import logging
+from utils.distance import max_hamming_parallel
 
 logger = logging.getLogger(__name__)
 
@@ -25,3 +17,8 @@ def greedy_consensus(strings: List[str], alphabet: str) -> str:
     result = "".join(consensus_chars)
     logger.debug(f"Consenso final: {result}")
     return result
+
+def max_distance(center: str, strings: List[str]) -> int:
+    """Wrapper para manter compatibilidade com código existente."""
+    # Usa implementação paralela para performance em conjuntos grandes
+    return max_hamming_parallel(center, strings)

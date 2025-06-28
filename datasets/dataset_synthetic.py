@@ -10,7 +10,7 @@ Chamado pelo main.py quando o usuário opta por geração.
 import random
 from typing import List, Tuple, Dict, Any
 import logging
-from config import SYNTHETIC_DEFAULTS
+from utils.config import SYNTHETIC_DEFAULTS
 
 logger = logging.getLogger(__name__)
 
@@ -48,5 +48,5 @@ def generate_dataset() -> Tuple[List[str], Dict[str, Any]]:
         data.append(new_s)
         if idx < 3:
             logger.debug(f"String gerada {idx}: {new_s}")
-    print(f"Dataset sintético gerado: n={n}, L={L}, |Σ|={len(alphabet)}")
+    logger.info(f"Dataset sintético gerado: n={n}, L={L}, |Σ|={len(alphabet)}")
     return data, params

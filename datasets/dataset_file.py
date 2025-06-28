@@ -11,20 +11,20 @@ from typing import List, Tuple, Dict, Any
 from pathlib import Path
 from Bio import SeqIO
 import logging
-from config import FILE_DEFAULTS
-from dataset_utils import ensure_datasets_folder
+from datasets.dataset_utils import ensure_datasets_folder
+from utils.config import FILE_DEFAULTS
 
 logger = logging.getLogger(__name__)
 
 def load_dataset() -> Tuple[List[str], Dict[str, Any]]:
     defaults = FILE_DEFAULTS
     
-    # Mostrar arquivos disponíveis na pasta datasets
+    # Mostrar arquivos disponíveis na pasta saved_datasets
     datasets_path = ensure_datasets_folder()
     available_files = list(datasets_path.glob("*.fasta")) + list(datasets_path.glob("*.fa")) + list(datasets_path.glob("*.txt"))
     
     if available_files:
-        print(f"\nArquivos disponíveis na pasta datasets/:")
+        print(f"\nArquivos disponíveis na pasta saved_datasets/:")
         for i, file in enumerate(available_files, 1):
             print(f"  {i}. {file.name}")
         
@@ -51,7 +51,7 @@ def load_dataset() -> Tuple[List[str], Dict[str, Any]]:
             # Usar padrão
             path_str = defaults['filepath']
     else:
-        print(f"\nNenhum arquivo encontrado na pasta datasets/")
+        print(f"\nNenhum arquivo encontrado na pasta saved_datasets/")
         path_input = input(f"Caminho do arquivo (.txt ou .fasta) [{defaults['filepath']}]: ").strip()
         path_str = path_input if path_input else defaults['filepath']
     
@@ -68,6 +68,6 @@ def load_dataset() -> Tuple[List[str], Dict[str, Any]]:
         logger.debug("Detectado texto simples; lendo linha a linha")
         seqs = [line.strip().upper() for line in path.open() if line.strip()]
 
-    print(f"Dataset carregado: n={len(seqs)}, L={len(seqs[0])}")
+    logger.info(f"Dataset carregado: n={len(seqs)}, L={len(seqs[0])}")
     params = {'filepath': path_str}
     return seqs, params

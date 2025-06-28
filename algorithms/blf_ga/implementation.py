@@ -12,10 +12,11 @@ import random
 import sys
 import time
 from collections import Counter
-from typing import List, Tuple
+from typing import List, Tuple, Callable, Optional
 import logging
 
 import numpy as np
+from utils.distance import hamming_distance, max_hamming
 
 logger = logging.getLogger(__name__)
 
@@ -23,15 +24,12 @@ String     = str
 Population = List[String]
 
 def hamming_dist(a: String, b: String) -> int:
-    """Distância de Hamming entre strings de mesmo tamanho."""
-    d = sum(ch1 != ch2 for ch1, ch2 in zip(a, b))
-    return d
+    """Wrapper para manter compatibilidade."""
+    return hamming_distance(a, b)
 
 def max_distance(center: String, strings: List[String]) -> int:
-    """Maior Hamming entre o centro e cada string."""
-    vals = [hamming_dist(center, s) for s in strings]
-    m = max(vals) if vals else 0
-    return m
+    """Wrapper para manter compatibilidade."""
+    return max_hamming(center, strings)
 
 class BLFGA:
     def __init__(
@@ -64,8 +62,13 @@ class BLFGA:
         self.max_gens       = max_gens
         self.max_time       = max_time
         self.rng            = random.Random(seed)
+        self.progress_callback: Optional[Callable[[str], None]] = None
 
         self.blocks = self._initial_blocking()
+
+    def set_progress_callback(self, callback: Callable[[str], None]) -> None:
+        """Define um callback para relatar o progresso."""
+        self.progress_callback = callback
 
     def run(self) -> Tuple[String,int]:
         logger.debug("run() iniciado")
@@ -73,16 +76,23 @@ class BLFGA:
         pop = self._init_population()
         best     = min(pop, key=lambda s: max_distance(s, self.strings))
         best_val = max_distance(best, self.strings)
-        print(f"Avaliação inicial: melhor dist={best_val}")
 
         for gen in range(1, self.max_gens+1):
             elapsed = time.time() - start
             if elapsed >= self.max_time:
-                print("\nTempo esgotado.")
+                if self.progress_callback:
+                    self.progress_callback(f" timeout após {elapsed:.1f}s")
+                else:
+                    print(f" timeout após {elapsed:.1f}s", end="")
                 break
 
-            print(f"\rGeração {gen}/{self.max_gens} | Melhor dist: {best_val}   ", end="")
-            sys.stdout.flush()
+            # Progresso via callback
+            if self.progress_callback:
+                progress_msg = f"Geração {gen}/{self.max_gens}, melhor={best_val}"
+                self.progress_callback(progress_msg)
+            else: # Fallback se não houver callback
+                progress = f" gen {gen}/{self.max_gens}, melhor={best_val}, tempo={elapsed:.1f}s"
+                print(f"\r{progress}", end="", flush=True)
 
             repo = self._learn_blocks(pop)
             pop = self._next_generation(pop, repo)
@@ -94,13 +104,13 @@ class BLFGA:
             cur_best = pop[0]
             cur_val  = max_distance(cur_best, self.strings)
             if cur_val < best_val:
-                print(f"\nMelhoria na geração {gen}: {best_val} -> {cur_val}")
                 best, best_val = cur_best, cur_val
             
             logger.debug(f"Fim da Geração {gen}: melhor_dist_geral={best_val}, melhor_dist_atual={cur_val}")
 
             if best_val == 0:
-                print("\nSolução ótima encontrada!")
+                if not self.progress_callback:
+                    print(f" solução ótima!", end="")
                 break
             if gen % self.rediv_freq == 0:
                 self.blocks = self._adaptive_blocking(pop)
@@ -223,4 +233,5 @@ class BLFGA:
             length = self.min_block_len if ent[cur]>thr else self.min_block_len*2
             blocks.append((cur, min(self.L, cur+length)))
             cur += length
+        return blocks
         return blocks
