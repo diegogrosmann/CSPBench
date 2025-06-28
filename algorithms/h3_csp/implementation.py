@@ -236,31 +236,44 @@ class H3CSP:
     # ---------------------------------------------------------------------
 
     def run(self) -> Tuple[String, int]:
-        start_time   = time.time()
-        if self.progress_callback: self.progress_callback("Processando blocos...")
-        block_cands  = self._smart_core()
+        start_time = time.time()
+        
+        try:
+            if self.progress_callback: 
+                self.progress_callback("Analisando blocos...")
+            block_cands = self._smart_core()
 
-        # ----------------- ILP global (substituído por heurística gulosa) --
-        if self.progress_callback: self.progress_callback("Fusão de blocos...")
-        best_by_block = [cands[0] for cands in block_cands]
-        center        = self._fuse_blocks(best_by_block)
-        best_val      = max_hamming(center, self.strings)
+            if self.progress_callback: 
+                self.progress_callback("Fusão de blocos...")
+            best_by_block = [cands[0] for cands in block_cands]
+            center = self._fuse_blocks(best_by_block)
+            best_val = max_hamming(center, self.strings)
 
-        logger.info(f"[Fusão inicial] dist={best_val}")
+            logger.info(f"[Fusão inicial] dist={best_val}")
 
-        # ----------------- Busca local global -----------------------------
-        if self.progress_callback: self.progress_callback("Refinamento global...")
-        for it in range(self.params['local_iters']):
-            center = _local_search(center, self.strings)
-            new_val = max_hamming(center, self.strings)
-            if new_val < best_val:
-                logger.info(f"[Local] it={it+1}  {best_val}->{new_val}")
-                best_val = new_val
-            else:
-                break
+            if self.progress_callback: 
+                self.progress_callback("Refinamento global...")
+            for it in range(self.params['local_iters']):
+                center = _local_search(center, self.strings)
+                new_val = max_hamming(center, self.strings)
+                if new_val < best_val:
+                    logger.info(f"[Local] it={it+1}  {best_val}->{new_val}")
+                    best_val = new_val
+                    if self.progress_callback:
+                        self.progress_callback(f"Melhoria encontrada: distância={best_val}")
+                else:
+                    break
 
-            if time.time() - start_time >= self.params['max_time']:
-                logger.warning("Tempo máximo atingido no H3CSP")
-                break
+                if time.time() - start_time >= self.params['max_time']:
+                    logger.warning("Tempo máximo atingido no H3CSP")
+                    if self.progress_callback:
+                        self.progress_callback("Timeout atingido")
+                    break
 
-        return center, best_val
+            return center, best_val
+            
+        except Exception as e:
+            logger.error(f"Erro no H3CSP: {e}")
+            if self.progress_callback:
+                self.progress_callback(f"Erro: {str(e)}")
+            raise e  # Re-raise para ser capturado no wrapper

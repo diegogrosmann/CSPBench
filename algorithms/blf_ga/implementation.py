@@ -73,6 +73,10 @@ class BLFGA:
     def run(self) -> Tuple[String,int]:
         logger.debug("run() iniciado")
         start = time.time()
+        
+        if self.progress_callback:
+            self.progress_callback("Criando população inicial...")
+        
         pop = self._init_population()
         best     = min(pop, key=lambda s: max_distance(s, self.strings))
         best_val = max_distance(best, self.strings)
@@ -81,18 +85,13 @@ class BLFGA:
             elapsed = time.time() - start
             if elapsed >= self.max_time:
                 if self.progress_callback:
-                    self.progress_callback(f" timeout após {elapsed:.1f}s")
-                else:
-                    print(f" timeout após {elapsed:.1f}s", end="")
+                    self.progress_callback(f"Timeout após {elapsed:.1f}s")
                 break
 
             # Progresso via callback
             if self.progress_callback:
                 progress_msg = f"Geração {gen}/{self.max_gens}, melhor={best_val}"
                 self.progress_callback(progress_msg)
-            else: # Fallback se não houver callback
-                progress = f" gen {gen}/{self.max_gens}, melhor={best_val}, tempo={elapsed:.1f}s"
-                print(f"\r{progress}", end="", flush=True)
 
             repo = self._learn_blocks(pop)
             pop = self._next_generation(pop, repo)
@@ -109,10 +108,13 @@ class BLFGA:
             logger.debug(f"Fim da Geração {gen}: melhor_dist_geral={best_val}, melhor_dist_atual={cur_val}")
 
             if best_val == 0:
-                if not self.progress_callback:
-                    print(f" solução ótima!", end="")
+                if self.progress_callback:
+                    self.progress_callback("Solução ótima encontrada!")
                 break
+                
             if gen % self.rediv_freq == 0:
+                if self.progress_callback:
+                    self.progress_callback("Redivisão adaptativa de blocos...")
                 self.blocks = self._adaptive_blocking(pop)
                 logger.debug(f"Geração {gen}: Blocos redivididos para {len(self.blocks)} blocos.")
 
@@ -233,5 +235,4 @@ class BLFGA:
             length = self.min_block_len if ent[cur]>thr else self.min_block_len*2
             blocks.append((cur, min(self.L, cur+length)))
             cur += length
-        return blocks
         return blocks

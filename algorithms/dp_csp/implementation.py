@@ -89,7 +89,8 @@ def _dp_decision(strings: Sequence[String],
 def exact_dp_closest_string(strings: List[String],
                             alphabet: str,
                             max_d: Optional[int] = None,
-                            progress_callback: Optional[Callable[[str], None]] = None
+                            progress_callback: Optional[Callable[[str], None]] = None,
+                            warning_callback: Optional[Callable[[str], None]] = None
                             ) -> Tuple[String, int]:
     """
     Busca o menor raio d* ≤ max_d tal que exista string-centro.
@@ -102,10 +103,11 @@ def exact_dp_closest_string(strings: List[String],
     n = len(strings)
     state_count_est = (max_d + 1) ** n
     if state_count_est > 10 ** DPCSP_DEFAULTS['warn_threshold']:
-        logger.warning(
-            f"(d+1)^n = {state_count_est:,} estados potenciais – "
-            "execução pode ser lenta e usar muita memória."
-        )
+        if warning_callback:
+            warning_callback(
+                f"(d+1)^n = {state_count_est:,} estados potenciais – "
+                "execução pode ser lenta e usar muita memória."
+            )
 
     for d in range(max_d + 1):
         if progress_callback:

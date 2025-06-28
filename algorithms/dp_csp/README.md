@@ -6,7 +6,7 @@ O DP-CSP é um algoritmo de **programação dinâmica exata** que garante encont
 ## Funcionamento
 
 ### Estratégia Principal
-O algoritmo implementa uma **busca exata por programação dinâmica** que explora sistematicamente o espaço de soluções, mantendo estados que representam "orçamentos de erro" restantes para cada string de entrada.
+O algoritmo implementa uma **busca exata por programação dinâmica** que explora sistematicamente o espaço de soluções, mantendo estados que representam "orçamentos de erro" restantes para cada string de entrada. A execução é **não-interativa** - todo o progresso é reportado via callback sem interromper o fluxo do algoritmo.
 
 ### Arquitetura do Algoritmo
 

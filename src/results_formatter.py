@@ -41,26 +41,31 @@ class ResultsFormatter:
         headers = [
             "Execução",
             "Tempo (s)",
-            "Iterações",
             "Distância",
-            "Solução Ótima",
-            "String Encontrada"
+            "Status"
         ]
         
         # Dados da tabela
         table_data = []
         for i, exec_data in enumerate(executions, 1):
             distancia = exec_data.get('distancia', exec_data.get('melhor_distancia', '-'))
-            otima = "✅ Sim" if distancia == 0 else "❌ Não"
-            string_result = exec_data.get('melhor_string', exec_data.get('string_resultado', ''))
+            status = "✓ OK"
+            
+            # Verifica se houve erro
+            if exec_data.get('erro'):
+                status = f"✗ {exec_data['erro']}"
+                distancia = "-"
+            elif exec_data.get('timeout'):
+                status = "⏰ Timeout"
+            elif distancia == float('inf'):
+                status = "∞ Sem solução"
+                distancia = "∞"
             
             row = [
                 i,
                 f"{exec_data['tempo']:.4f}",
-                exec_data.get('iteracoes', exec_data.get('num_iteracoes', 0)),
                 distancia,
-                otima,
-                string_result[:20] + "..." if len(string_result) > 20 else string_result
+                status
             ]
             table_data.append(row)
         
@@ -73,32 +78,34 @@ class ResultsFormatter:
         """Formata estatísticas detalhadas de um algoritmo"""
         executions = self.results[algorithm_name]
         
-        # Extrair dados para análise com interface padronizada
-        tempos = [exec_data['tempo'] for exec_data in executions]
-        iteracoes = [exec_data.get('iteracoes', exec_data.get('num_iteracoes', 0)) for exec_data in executions]
-        distancias = [exec_data.get('distancia', exec_data.get('melhor_distancia', float('inf'))) 
-                     for exec_data in executions if exec_data.get('distancia', exec_data.get('melhor_distancia')) != '-']
-        solucoes_otimas = [exec_data.get('distancia', exec_data.get('melhor_distancia', float('inf'))) == 0 
-                          for exec_data in executions if exec_data.get('distancia', exec_data.get('melhor_distancia')) != '-']
+        # Filtrar apenas execuções válidas
+        valid_executions = [
+            exec_data for exec_data in executions 
+            if not exec_data.get('erro') and 
+               exec_data.get('distancia', exec_data.get('melhor_distancia')) not in ['-', float('inf')]
+        ]
         
         output = [f"\n📈 ESTATÍSTICAS DETALHADAS - {algorithm_name.upper()}"]
         output.append("-" * 60)
         
+        if not valid_executions:
+            output.append("❌ Nenhuma execução válida para calcular estatísticas.")
+            return "\n".join(output)
+        
+        # Extrair dados para análise
+        tempos = [exec_data['tempo'] for exec_data in valid_executions]
+        distancias = [exec_data.get('distancia', exec_data.get('melhor_distancia', float('inf'))) 
+                     for exec_data in valid_executions]
+        
         # Estatísticas de tempo
         stats_data = [
             ["TEMPO DE EXECUÇÃO", ""],
+            ["Execuções Válidas", f"{len(valid_executions)}/{len(executions)}"],
             ["Média", f"{statistics.mean(tempos):.4f} s"],
             ["Mediana", f"{statistics.median(tempos):.4f} s"],
             ["Desvio Padrão", f"{statistics.stdev(tempos) if len(tempos) > 1 else 0:.4f} s"],
             ["Mínimo", f"{min(tempos):.4f} s"],
             ["Máximo", f"{max(tempos):.4f} s"],
-            ["", ""],
-            ["ITERAÇÕES", ""],
-            ["Média", f"{statistics.mean(iteracoes):.2f}"],
-            ["Mediana", f"{statistics.median(iteracoes):.2f}"],
-            ["Desvio Padrão", f"{statistics.stdev(iteracoes) if len(iteracoes) > 1 else 0:.2f}"],
-            ["Mínimo", f"{min(iteracoes)}"],
-            ["Máximo", f"{max(iteracoes)}"],
         ]
         
         if distancias:
@@ -110,11 +117,6 @@ class ResultsFormatter:
                 ["Desvio Padrão", f"{statistics.stdev(distancias) if len(distancias) > 1 else 0:.2f}"],
                 ["Melhor (Mínima)", f"{min(distancias)}"],
                 ["Pior (Máxima)", f"{max(distancias)}"],
-                ["", ""],
-                ["DESEMPENHO", ""],
-                ["Taxa de Sucesso", f"{sum(solucoes_otimas)}/{len(solucoes_otimas)} ({sum(solucoes_otimas)/len(solucoes_otimas)*100:.1f}%)"],
-                ["Soluções Ótimas", f"{sum(solucoes_otimas)}"],
-                ["Soluções Sub-ótimas", f"{len(solucoes_otimas) - sum(solucoes_otimas)}"],
             ])
         
         table = tabulate(stats_data, headers=["Métrica", "Valor"], tablefmt="grid", stralign="left")
@@ -134,12 +136,15 @@ class ResultsFormatter:
             string_result = exec_data.get('melhor_string', exec_data.get('string_resultado', ''))
             iteracoes = exec_data.get('iteracoes', exec_data.get('num_iteracoes', 0))
             
-            status = "✅ SOLUÇÃO ÓTIMA" if distancia == 0 else "⚠️ SOLUÇÃO SUB-ÓTIMA"
-            output.append(f"Execução {i:2d} ({status}):")
-            output.append(f"  String: '{string_result}'")
-            output.append(f"  Distância: {distancia}")
-            output.append(f"  Iterações: {iteracoes}")
-            output.append(f"  Tempo: {exec_data['tempo']:.4f}s")
+            output.append(f"Execução {i:2d}:")
+            if exec_data.get('erro'):
+                output.append(f"  ❌ Erro: {exec_data['erro']}")
+                output.append(f"  Tempo: {exec_data['tempo']:.4f}s")
+            else:
+                output.append(f"  String: '{string_result}'")
+                output.append(f"  Distância: {distancia}")
+                output.append(f"  Iterações: {iteracoes}")
+                output.append(f"  Tempo: {exec_data['tempo']:.4f}s")
             output.append("")
         
         return "\n".join(output)
@@ -157,47 +162,64 @@ class ResultsFormatter:
         headers = [
             "Algoritmo",
             "Tempo Médio (s)",
-            "Iterações Médias",
+            "Desvio Tempo",
             "Melhor Distância",
-            "Distância Média",
-            "Taxa Sucesso (%)",
-            "Desvio Tempo"
+            "Distância Média", 
+            "Desvio Distancia",
+            "Taxa Sucesso (%)"
         ]
         
         # Calcular métricas comparativas
         comparative_data = []
         for algorithm_name, executions in self.results.items():
-            tempos = [exec_data['tempo'] for exec_data in executions]
-            iteracoes = [exec_data.get('iteracoes', exec_data.get('num_iteracoes', 0)) for exec_data in executions]
-            distancias = [exec_data.get('distancia', exec_data.get('melhor_distancia', float('inf'))) 
-                         for exec_data in executions if exec_data.get('distancia', exec_data.get('melhor_distancia')) != '-']
-            solucoes_otimas = [exec_data.get('distancia', exec_data.get('melhor_distancia', float('inf'))) == 0 
-                              for exec_data in executions if exec_data.get('distancia', exec_data.get('melhor_distancia')) != '-']
+            # Filtrar execuções válidas
+            valid_executions = [
+                exec_data for exec_data in executions 
+                if not exec_data.get('erro') and 
+                   exec_data.get('distancia', exec_data.get('melhor_distancia')) not in ['-', float('inf')]
+            ]
             
-            if distancias:
+            if not valid_executions:
+                # Algoritmo falhou em todas as execuções
+                tempos = [exec_data['tempo'] for exec_data in executions]
                 row = [
                     algorithm_name,
                     f"{statistics.mean(tempos):.4f}",
-                    f"{statistics.mean(iteracoes):.1f}",
-                    f"{min(distancias)}",
-                    f"{statistics.mean(distancias):.2f}",
-                    f"{sum(solucoes_otimas)/len(solucoes_otimas)*100:.1f}",
-                    f"{statistics.stdev(tempos) if len(tempos) > 1 else 0:.4f}"
+                    f"{statistics.stdev(tempos) if len(tempos) > 1 else 0:.4f}",
+                    "ERRO",
+                    "ERRO", 
+                    "ERRO",
+                    "0.0"
                 ]
             else:
+                tempos = [exec_data['tempo'] for exec_data in valid_executions]
+                distancias = [exec_data.get('distancia', exec_data.get('melhor_distancia', float('inf'))) 
+                             for exec_data in valid_executions]
+                
+                # Taxa de sucesso: execuções válidas / total de execuções
+                taxa_sucesso = len(valid_executions) / len(executions) * 100
+                solucoes_otimas = sum(1 for d in distancias if d == 0)
+                taxa_otima = solucoes_otimas / len(distancias) * 100 if distancias else 0
+                
                 row = [
                     algorithm_name,
                     f"{statistics.mean(tempos):.4f}",
-                    f"{statistics.mean(iteracoes):.1f}",
-                    "-",
-                    "-",
-                    "0.0",
-                    f"{statistics.stdev(tempos) if len(tempos) > 1 else 0:.4f}"
+                    f"{statistics.stdev(tempos) if len(tempos) > 1 else 0:.4f}",
+                    f"{min(distancias)}",
+                    f"{statistics.mean(distancias):.2f}",
+                    f"{statistics.stdev(distancias) if len(distancias) > 1 else 0:.2f}",
+                    f"{taxa_sucesso:.1f}"
                 ]
+            
             comparative_data.append(row)
         
-        # Ordenar por melhor distância (crescente), depois por tempo médio
-        comparative_data.sort(key=lambda x: (float('inf') if x[3] == '-' else float(x[3]), float(x[1])))
+        # Ordenar: algoritmos com erro no final, outros por melhor distância
+        def sort_key(row):
+            if row[3] == "ERRO":
+                return (float('inf'), float(row[1]))  # Erro vai para o final
+            return (float(row[3]), float(row[1]))    # Melhor distância, depois tempo
+        
+        comparative_data.sort(key=sort_key)
         
         table = tabulate(comparative_data, headers=headers, tablefmt="grid", stralign="center")
         output.append(table)
@@ -206,8 +228,13 @@ class ResultsFormatter:
         output.append("\n🥇 RANKING POR PERFORMANCE:")
         output.append("-" * 40)
         for i, row in enumerate(comparative_data, 1):
-            medal = "🥇" if i == 1 else "🥈" if i == 2 else "🥉" if i == 3 else f"{i}°"
-            output.append(f"{medal} {row[0]} - Distância: {row[3]} | Tempo: {row[1]}s | Sucesso: {row[5]}%")
+            if row[3] == "ERRO":
+                medal = "❌"
+                info = f"Falha em execução | Tempo: {row[1]}s"
+            else:
+                medal = "🥇" if i == 1 else "🥈" if i == 2 else "🥉" if i == 3 else f"{i}°"
+                info = f"Distância: {row[3]} | Tempo: {row[1]}s | Sucesso: {row[6]}%"
+            output.append(f"{medal} {row[0]} - {info}")
         
         return "\n".join(output)
     
@@ -219,3 +246,5 @@ class ResultsFormatter:
         
         with open(filepath, 'w', encoding='utf-8') as f:
             f.write(self.format_detailed_results())
+
+

@@ -3,6 +3,8 @@
 ## Visão Geral
 O BLF-GA é uma metaheurística híbrida que combina **aprendizado por blocos** com **algoritmo genético** para resolver o Closest String Problem. A abordagem divide o problema em segmentos menores, aplica aprendizado local em cada bloco e usa evolução genética para otimização global.
 
+O algoritmo **reporta progresso continuamente** via callback, permitindo acompanhamento detalhado sem interromper a execução.
+
 ## Funcionamento
 
 ### Arquitetura Híbrida
@@ -91,6 +93,25 @@ Para cada geração g = 1 até max_gens:
 ### Controle de Execução
 - **max_time**: Tempo limite em segundos (padrão: 600s)
 - **seed**: Semente para reprodutibilidade
+
+## Interface de Progresso
+
+### Callback de Progresso
+O algoritmo usa **callback não-bloqueante** para reportar estado:
+- **Inicialização**: "Criando população inicial..."
+- **Evolução**: "Geração X/Y, melhor=Z"
+- **Blocos**: "Redivisão adaptativa..."
+- **Refinamento**: "Refinando elite..."
+- **Timeout**: "Timeout atingido"
+
+### Estrutura de Retorno
+```python
+center, distance, info = algorithm.run()
+# info contém:
+# - 'iteracoes': número de gerações executadas
+# - 'melhor_string': string resultado
+# - 'erro': mensagem de erro (se aplicável)
+```
 
 ## Características Avançadas
 

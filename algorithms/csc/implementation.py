@@ -3,6 +3,7 @@ from sklearn.cluster import DBSCAN
 from collections import Counter
 import logging
 from itertools import combinations, product
+from typing import Callable, Optional
 from utils.distance import hamming_distance, max_hamming
 
 logger = logging.getLogger(__name__)
@@ -102,7 +103,7 @@ def cluster_strings(strings, d, min_samples=2):
 
 # ---------- Etapa 3: Consenso local e recombinação ----------
 
-def heuristic_closest_string(strings, d=None, n_blocks=None):
+def heuristic_closest_string(strings, d=None, n_blocks=None, progress_callback: Optional[Callable[[str], None]] = None):
     if d is None or n_blocks is None:
         d_auto, n_blocks_auto = auto_parameters(strings)
         if d is None:
@@ -111,14 +112,28 @@ def heuristic_closest_string(strings, d=None, n_blocks=None):
             n_blocks = n_blocks_auto
 
     logger.info(f"Iniciando heuristic_closest_string com d={d}, n_blocks={n_blocks}")
+    
+    if progress_callback:
+        progress_callback("Clusterizando strings...")
+    
     clusters = cluster_strings(strings, d)
     if not clusters:
-        logger.warning("Nenhum cluster encontrado (tente aumentar o parâmetro d)")
-        return None
+        if progress_callback:
+            progress_callback("⚠️ Nenhum cluster encontrado, usando consenso global")
+        # Retorna o consenso global como fallback
+        best_candidate = consensus_string(strings)
+        best_candidate = local_search(best_candidate, strings)
+        return best_candidate
+
+    if progress_callback:
+        progress_callback(f"Encontrados {len(clusters)} clusters")
 
     # Consenso local de cada cluster
     consensos = [consensus_string(cluster) for cluster in clusters]
     logger.debug(f"Consensos locais: {consensos}")
+
+    if progress_callback:
+        progress_callback("Gerando candidatos por recombinação...")
 
     # Recomposição de blocos
     L = len(strings[0])
@@ -137,23 +152,33 @@ def heuristic_closest_string(strings, d=None, n_blocks=None):
 
     logger.info(f"{len(candidates)} candidatos gerados por recombinação de blocos")
 
+    if progress_callback:
+        progress_callback(f"Avaliando {len(candidates)} candidatos...")
+
     # Avalia os candidatos e escolhe o melhor (menor raio máximo)
     best_candidate = min(candidates, key=lambda cand: max_hamming(cand, strings))
     logger.info(f"Melhor candidato antes da busca local: {best_candidate}")
 
+    if progress_callback:
+        progress_callback("Executando busca local...")
+
     # Busca local simples: tenta melhorar cada posição
-    best_candidate = local_search(best_candidate, strings)
+    best_candidate = local_search(best_candidate, strings, progress_callback)
     logger.info(f"Melhor candidato após busca local: {best_candidate}")
 
     return best_candidate
 
-def local_search(candidate, strings):
+def local_search(candidate, strings, progress_callback: Optional[Callable[[str], None]] = None):
     candidate = list(candidate)
     improved = True
     iterations = 0
     while improved and iterations < 50:  # Limite para evitar loops longos
         improved = False
         iterations += 1
+        
+        if progress_callback and iterations % 10 == 0:
+            progress_callback(f"Busca local: iteração {iterations}")
+            
         for i in range(len(candidate)):
             current_char = candidate[i]
             chars = set(s[i] for s in strings)
@@ -166,5 +191,6 @@ def local_search(candidate, strings):
                 if max_hamming(new_candidate_str, strings) < max_hamming(''.join(candidate), strings):
                     candidate[i] = alt
                     improved = True
+    
     logger.debug(f"Resultado da busca local: {''.join(candidate)}")
     return ''.join(candidate)

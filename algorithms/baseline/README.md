@@ -8,6 +8,8 @@ O algoritmo Baseline implementa uma solução simples e eficiente para o Closest
 ### Estratégia Principal
 O algoritmo utiliza **consenso por maioria**: para cada posição, escolhe o símbolo que aparece com maior frequência naquela posição entre todas as strings de entrada.
 
+A execução é **instantânea e determinística** - não requer callback de progresso devido à sua simplicidade computacional.
+
 ### Fluxo de Execução
 
 1. **Análise Posicional**
