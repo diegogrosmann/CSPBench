@@ -88,7 +88,7 @@ class BLFGA:
                     self.progress_callback(f"Timeout após {elapsed:.1f}s")
                 break
 
-            # Progresso via callback
+            # Progresso via callback (que pode lançar exceção se cancelado)
             if self.progress_callback:
                 progress_msg = f"Geração {gen}/{self.max_gens}, melhor={best_val}"
                 self.progress_callback(progress_msg)

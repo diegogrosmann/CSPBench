@@ -110,6 +110,7 @@ def exact_dp_closest_string(strings: List[String],
             )
 
     for d in range(max_d + 1):
+        # Verificar cancelamento via callback
         if progress_callback:
             progress_callback(f"Testando d={d}")
         else:

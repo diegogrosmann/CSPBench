@@ -1,5 +1,14 @@
 from algorithms.base import global_registry
 from src.console_manager import console
+from utils.config import safe_input
+
+"""
+Menu interativo para seleção de dataset e algoritmos.
+
+Funções:
+    menu(): Exibe menu de datasets e retorna escolha.
+    select_algorithms(): Exibe menu de algoritmos e retorna lista selecionada.
+"""
 
 def menu() -> str:
     console.print("\n=== Closest String Problem ===")
@@ -7,15 +16,10 @@ def menu() -> str:
     console.print("2) Carregar dataset de arquivo")
     console.print("3) Baixar dataset via NCBI")
     while True:
-        try:
-            c = input("Escolha [1/2/3]: ").strip()
-            if c in {'1', '2', '3'}:
-                return c
-            console.print("Inválido.")
-        except KeyboardInterrupt:
-            console.print("\nOperação cancelada pelo usuário.")
-            import sys
-            sys.exit(0)
+        c = safe_input("Escolha [1/2/3]: ")
+        if c in {'1', '2', '3'}:
+            return c
+        console.print("Inválido.")
 
 def select_algorithms() -> list[str]:
     all_algs = list(global_registry.keys())
@@ -25,14 +29,18 @@ def select_algorithms() -> list[str]:
     for idx, name in enumerate(algs, 1):
         console.print(f" {idx}) {name}")
     selected = []
-    try:
-        raw = input("Escolha (ex.: 1,3 ou 0 para todos) [padrão 1]: ").strip()
-    except KeyboardInterrupt:
-        console.print("\nOperação cancelada pelo usuário.")
-        import sys
-        sys.exit(0)
+    
+    raw = safe_input("Escolha (ex.: 1,3 ou 0 para todos) [padrão 1]: ")
     if not raw:
         return [algs[0]] if algs else []
+    if raw == '0':
+        return algs
+    for part in raw.split(','):
+        if part.strip().isdigit():
+            i = int(part)
+            if 1 <= i <= len(algs):
+                selected.append(algs[i-1])
+    return selected
     if raw == '0':
         return algs
     for part in raw.split(','):

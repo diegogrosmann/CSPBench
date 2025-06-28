@@ -3,12 +3,30 @@ config.py
 =========
 
 Parâmetros padrão e configurações centrais do projeto.
+
+Atributos:
+    DEBUG_DEFAULT (str): Modo debug padrão ('n' = desabilitado).
+    ALGORITHM_TIMEOUT (int): Tempo limite em segundos para execução de algoritmos.
+    SYNTHETIC_DEFAULTS (dict): Parâmetros padrão para datasets sintéticos.
+    FILE_DEFAULTS (dict): Parâmetros padrão para datasets de arquivo.
+    ENTREZ_DEFAULTS (dict): Parâmetros padrão para datasets NCBI.
 """
+
+import sys
 
 # --------------------------------------------------
 # Geral
 # --------------------------------------------------
 DEBUG_DEFAULT = 'n'            # Modo debug desabilitado por padrão
+ALGORITHM_TIMEOUT = 300        # Timeout padrão de 5 minutos para algoritmos
+
+def safe_input(prompt: str, default: str = "") -> str:
+    """Input seguro que trata KeyboardInterrupt de forma consistente."""
+    try:
+        return input(prompt).strip()
+    except (KeyboardInterrupt, EOFError):
+        print("\nOperação cancelada pelo usuário.")
+        sys.exit(0)
 
 # --------------------------------------------------
 # Dataset sintético

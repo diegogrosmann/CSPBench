@@ -1,6 +1,19 @@
 from abc import ABC, abstractmethod
 from typing import Callable
 
+"""
+Base e registry global para algoritmos CSP.
+
+Classes:
+    Algorithm: Interface abstrata para algoritmos CSP.
+
+Funções:
+    register_algorithm(cls): Decorador para registrar algoritmos no registry global.
+
+Atributos:
+    global_registry (dict): Registry global de algoritmos disponíveis.
+"""
+
 # Registry for all algorithms
 global_registry: dict[str, type] = {}
 

@@ -10,7 +10,7 @@ Chamado pelo main.py quando o usuário opta por geração.
 import random
 from typing import List, Tuple, Dict, Any
 import logging
-from utils.config import SYNTHETIC_DEFAULTS
+from utils.config import SYNTHETIC_DEFAULTS, safe_input
 
 logger = logging.getLogger(__name__)
 
@@ -18,16 +18,16 @@ def generate_dataset() -> Tuple[List[str], Dict[str, Any]]:
     """Interatividade completa via prompt."""
     defaults = SYNTHETIC_DEFAULTS
     
-    n_input = input(f"Quantas strings (n)? [{defaults['n']}]: ").strip()
+    n_input = safe_input(f"Quantas strings (n)? [{defaults['n']}]: ")
     n = int(n_input) if n_input else defaults['n']
     
-    L_input = input(f"Comprimento das strings (L)? [{defaults['L']}]: ").strip()
+    L_input = safe_input(f"Comprimento das strings (L)? [{defaults['L']}]: ")
     L = int(L_input) if L_input else defaults['L']
     
-    alpha_input = input(f"Alfabeto (ex.: ACGT ou ABCDE...)? [{defaults['alphabet']}]: ").strip().upper()
+    alpha_input = safe_input(f"Alfabeto (ex.: ACGT ou ABCDE...)? [{defaults['alphabet']}]: ").upper()
     alphabet = alpha_input if alpha_input else defaults['alphabet']
     
-    noise_input = input(f"Taxa de ruído por posição (0–1) [{defaults['noise']}]: ").strip()
+    noise_input = safe_input(f"Taxa de ruído por posição (0–1) [{defaults['noise']}]: ")
     noise = float(noise_input) if noise_input else defaults['noise']
     
     params = {'n': n, 'L': L, 'alphabet': alphabet, 'noise': noise}

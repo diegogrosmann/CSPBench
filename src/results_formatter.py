@@ -3,6 +3,18 @@ from typing import List, Dict, Any
 from tabulate import tabulate
 from pathlib import Path
 
+"""
+Formatação e salvamento de resultados de execuções de algoritmos CSP.
+
+Classes:
+    ResultsFormatter: Armazena, formata e salva resultados detalhados e comparativos.
+
+Métodos:
+    add_algorithm_results(...): Adiciona resultados de um algoritmo.
+    format_detailed_results(): Formata resultados detalhados.
+    save_detailed_report(...): Salva relatório em arquivo.
+"""
+
 class ResultsFormatter:
     def __init__(self):
         self.results = {}

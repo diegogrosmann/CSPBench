@@ -1,7 +1,21 @@
+"""
+Arquivo principal de execução da aplicação Closest String Problem (CSP).
+
+Fluxo principal:
+    1. Seleção e leitura/geração do dataset.
+    2. Seleção dos algoritmos a executar.
+    3. Execução do Baseline e dos algoritmos selecionados.
+    4. Exibição e salvamento dos resultados.
+
+Funções:
+    main(): Executa o fluxo principal da aplicação.
+"""
+
 from datetime import datetime
 import uuid
 import sys
 import traceback
+import signal
 
 from src.menu import menu, select_algorithms
 from src.runner import execute_algorithm_runs
@@ -12,8 +26,18 @@ from algorithms.base import global_registry
 from datasets.dataset_utils import ask_save_dataset
 from src.results_formatter import ResultsFormatter
 from src.console_manager import console
+from utils.config import safe_input, ALGORITHM_TIMEOUT
+
+def signal_handler(signum, frame):
+    """Handler para sinais de interrupção."""
+    print("\n\nOperação cancelada pelo usuário. Encerrando.")
+    sys.exit(0)
 
 def main():
+    # Configurar handlers de sinal para saída limpa
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
+    
     try:
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
         uid = uuid.uuid4().hex[:8]
@@ -40,9 +64,6 @@ def main():
                 seqs, p = fetch_dataset()
                 params.update(p)
                 ask_save_dataset(seqs, "entrez", p)
-        except KeyboardInterrupt:
-            console.print("\nOperação cancelada pelo usuário.")
-            return
         except Exception as exc:
             console.print(f"Erro: {exc}")
             import logging
@@ -61,8 +82,14 @@ def main():
         if not algs:
             console.print("Nenhum algoritmo selecionado além do Baseline.")
 
-        runs = input("\nNº execuções p/ algoritmo [3]: ").strip()
+        runs = safe_input("\nNº execuções p/ algoritmo [3]: ")
         num_execs = int(runs) if runs.isdigit() and int(runs) > 0 else 3
+
+        # Configurar timeout
+        timeout_input = safe_input(f"\nTimeout por execução em segundos [{ALGORITHM_TIMEOUT}]: ")
+        timeout = int(timeout_input) if timeout_input.isdigit() and int(timeout_input) > 0 else ALGORITHM_TIMEOUT
+        
+        console.print(f"Timeout configurado: {timeout}s por execução")
 
         # Baseline
         console.print("\n" + "="*50)
@@ -80,7 +107,7 @@ def main():
         baseline_time = time.time() - t0
         
         baseline_spinner.stop()
-        console.print(f"\rBaseline                 ... dist={baseline_val}, tempo={baseline_time:.3f}s")
+        console.print(f"Baseline                 ... dist={baseline_val}, tempo={baseline_time:.3f}s")
 
         formatter = ResultsFormatter()
         baseline_executions = [{
@@ -100,7 +127,7 @@ def main():
                 continue
             AlgClass = global_registry[alg_name]
             executions = execute_algorithm_runs(
-                alg_name, AlgClass, seqs, alphabet, num_execs, baseline_val, console
+                alg_name, AlgClass, seqs, alphabet, num_execs, baseline_val, console, timeout
             )
             formatter.add_algorithm_results(alg_name, executions)
             valid_results = [e for e in executions if 'distancia' in e and e['distancia'] != float('inf')]
@@ -125,9 +152,6 @@ def main():
         console.print(f"\n📄 Gerando relatório detalhado...")
         save_detailed_report(formatter, f"{base_name}.txt")
 
-    except KeyboardInterrupt:
-        console.print("\n\nExecução interrompida pelo usuário. Encerrando.")
-        sys.exit(0)
     except Exception as e:
         console.print(f"\nERRO FATAL: {e}")
         traceback.print_exc()

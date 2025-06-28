@@ -1,6 +1,21 @@
 import threading
 import time
 import itertools
+import signal
+import sys
+
+from src.algorithm_executor import AlgorithmExecutor, TimeoutException
+from utils.config import ALGORITHM_TIMEOUT
+
+"""
+Utilitários para execução de algoritmos e exibição de progresso (spinner).
+
+Classes:
+    Spinner: Exibe animação de progresso durante execução de algoritmos.
+
+Funções:
+    execute_algorithm_runs(...): Executa múltiplas execuções de um algoritmo, coletando resultados.
+"""
 
 def _gap(baseline: int, val):
     return 100 * (baseline - val) / baseline if (baseline and val is not None) else 0.0
@@ -18,19 +33,20 @@ class Spinner:
         if self.thread and self.thread.is_alive():
             return
         self.stop_event.clear()
-        if self.console:
-            self.console.set_spinner(self.prefix, self.spinner)
+        self.progress_override = False  # Reset override flag
         self.thread = threading.Thread(target=self._animate)
         self.thread.daemon = True
         self.thread.start()
 
     def _animate(self):
-        if self.console:
-            self.console.start_spinner()
         while not self.stop_event.is_set():
             # Só mostrar spinner se não houver progresso específico
             if not self.progress_override:
-                print(f"\r{self.prefix:<25s}{next(self.spinner)}", end="", flush=True)
+                # Usar console.print_inline para ser thread-safe
+                if self.console:
+                    self.console.print_inline(f"{self.prefix:<25s}{next(self.spinner)}")
+                else:
+                    print(f"\r{self.prefix:<25s}{next(self.spinner)}", end="", flush=True)
             time.sleep(0.3)
 
     def set_progress_override(self, value: bool):
@@ -39,63 +55,184 @@ class Spinner:
     def stop(self):
         self.stop_event.set()
         if self.thread and self.thread.is_alive():
-            self.thread.join(timeout=1.0)
+            self.thread.join(timeout=0.5)  # Timeout mais curto para saída rápida
+        # Limpar a linha após parar o spinner
         if self.console:
-            self.console.stop_spinner()
+            self.console.print_inline(f"{' ' * 70}\r")
+        else:
+            print(f"\r{' ' * 70}\r", end="", flush=True)
 
-def execute_algorithm_runs(alg_name, AlgClass, seqs, alphabet, num_execs, baseline_val, console=None):
+def execute_algorithm_runs(alg_name, AlgClass, seqs, alphabet, num_execs, baseline_val, console=None, timeout=None):
+    """
+    Executa múltiplas execuções de um algoritmo em threads isoladas com timeout.
+    
+    Args:
+        alg_name: Nome do algoritmo
+        AlgClass: Classe do algoritmo
+        seqs: Sequências de entrada
+        alphabet: Alfabeto
+        num_execs: Número de execuções
+        baseline_val: Valor baseline para cálculo de gap
+        console: Console para output
+        timeout: Tempo limite em segundos (padrão: ALGORITHM_TIMEOUT)
+    """
+    if timeout is None:
+        timeout = ALGORITHM_TIMEOUT
+        
     is_deterministic = getattr(AlgClass, 'is_deterministic', False)
     actual_execs = 1 if is_deterministic else num_execs
     executions = []
+    
     for i in range(actual_execs):
         exec_prefix = f"{alg_name}"
         if actual_execs > 1:
             exec_prefix += f" ({i+1}/{actual_execs})"
+        
         spinner = Spinner(exec_prefix, console)
-        result_holder = {}
-        exc_holder = {}
+        executor = AlgorithmExecutor(timeout)
+        
         warning_holder = []
+        
+        def warning_callback(msg):
+            warning_holder.append(msg)
+        
+        # Criar uma função de progresso que funciona com o spinner
+        progress_shown = threading.Event()
+        last_progress_time = [0.0]  # Lista para permitir modificação dentro da closure, usando float
+        
+        def progress_callback(msg: str):
+            # Primeira chamada de progresso - parar o spinner
+            if not progress_shown.is_set():
+                spinner.set_progress_override(True)
+                progress_shown.set()
+            
+            # Mostrar progresso na mesma linha usando console
+            progress_text = f"{msg:<40s}"
+            if console:
+                console.print_inline(f"{exec_prefix:<25s}... {progress_text}")
+            else:
+                print(f"\r{exec_prefix:<25s}... {progress_text}", end="", flush=True)
+                
+            # Atualizar timestamp da última mensagem de progresso
+            last_progress_time[0] = time.time()
 
-        def run_algorithm():
-            try:
-                def warning_callback(msg):
-                    warning_holder.append(msg)
-                instance = AlgClass(seqs, alphabet)
-                if hasattr(instance, 'set_warning_callback'):
-                    instance.set_warning_callback(warning_callback)
-                if hasattr(instance, 'set_progress_callback'):
-                    def progress_callback(msg: str):
-                        # Parar spinner e mostrar progresso na mesma linha
-                        spinner.set_progress_override(True)
-                        progress_text = f"{msg:<40s}"
-                        print(f"\r{exec_prefix:<25s}... {progress_text}", end="", flush=True)
-                    instance.set_progress_callback(progress_callback)
-                center, val = instance.run()
-                result_holder['center'] = center
-                result_holder['val'] = val
-                if hasattr(instance, 'geracao'):
-                    result_holder['iteracoes'] = instance.geracao
-                elif hasattr(instance, 'iterations'):
-                    result_holder['iteracoes'] = instance.iterations
-                elif hasattr(instance, 'num_iteracoes'):
-                    result_holder['iteracoes'] = instance.num_iteracoes
-                else:
-                    result_holder['iteracoes'] = 1
-            except Exception as e:
-                exc_holder['exc'] = e
+        # Thread para monitorar inatividade do progresso e reativar o spinner
+        def monitor_progress_activity():
+            while not spinner.stop_event.is_set():
+                if progress_shown.is_set() and time.time() - last_progress_time[0] > 0.5:
+                    # Se passou mais de 0.5 segundos sem mensagem de progresso, voltar ao spinner
+                    spinner.set_progress_override(False)
+                    progress_shown.clear()
+                time.sleep(0.5)
+                
+        # Iniciar thread de monitoramento
+        monitor_thread = threading.Thread(target=monitor_progress_activity)
+        monitor_thread.daemon = True
+        monitor_thread.start()
 
         t0 = time.time()
-        algo_thread = threading.Thread(target=run_algorithm)
+        
+        # Iniciar spinner antes da execução
         spinner.start()
-        algo_thread.start()
-        while algo_thread.is_alive():
-            time.sleep(0.1)
-        spinner.stop()
-        tempo_execucao = time.time() - t0
-
-        if 'exc' in exc_holder:
-            error_msg = str(exc_holder['exc'])[:50]
-            print(f"\r{exec_prefix:<25s}... ERRO: {error_msg}")
+        
+        try:
+            # Criar instância do algoritmo
+            instance = AlgClass(seqs, alphabet)
+            
+            # Executar com timeout em thread isolada
+            center, val, info = executor.execute_with_timeout(
+                instance, 
+                progress_callback=progress_callback,
+                warning_callback=warning_callback
+            )
+            
+            tempo_execucao = time.time() - t0
+            
+            if 'erro' in info:
+                if info['erro'] == 'timeout':
+                    # Parar spinner e mostrar timeout
+                    spinner.stop()
+                    if console:
+                        console.print(f"{exec_prefix:<25s}... TIMEOUT ({timeout}s)")
+                    else:
+                        print(f"\r{exec_prefix:<25s}... TIMEOUT ({timeout}s)")
+                    executions.append({
+                        'tempo': tempo_execucao,
+                        'iteracoes': 0,
+                        'distancia': float('inf'),
+                        'melhor_string': '',
+                        'erro': f'Timeout ({timeout}s)'
+                    })
+                else:
+                    error_msg = info['erro'][:50]
+                    spinner.stop()
+                    if console:
+                        console.print(f"{exec_prefix:<25s}... ERRO: {error_msg}")
+                    else:
+                        print(f"\r{exec_prefix:<25s}... ERRO: {error_msg}")
+                    executions.append({
+                        'tempo': tempo_execucao,
+                        'iteracoes': 0,
+                        'distancia': float('inf'),
+                        'melhor_string': '',
+                        'erro': error_msg
+                    })
+            else:
+                iteracoes = info.get('iteracoes', 1)
+                gap = _gap(baseline_val, val)
+                
+                # Parar spinner e mostrar resultado final
+                spinner.stop()
+                if console:
+                    console.print(f"{exec_prefix:<25s}... dist={val}, tempo={tempo_execucao:.3f}s, gap={gap:.1f}%")
+                else:
+                    print(f"\r{exec_prefix:<25s}... dist={val}, tempo={tempo_execucao:.3f}s, gap={gap:.1f}%")
+                
+                for warning_msg in warning_holder:
+                    if console:
+                        console.print(f"  AVISO: {warning_msg}")
+                        
+                executions.append({
+                    'tempo': tempo_execucao,
+                    'iteracoes': iteracoes,
+                    'distancia': val,
+                    'melhor_string': center,
+                    'gap': gap
+                })
+                
+        except TimeoutException:
+            tempo_execucao = time.time() - t0
+            spinner.stop()
+            if console:
+                console.print(f"{exec_prefix:<25s}... TIMEOUT ({timeout}s)")
+            else:
+                print(f"\r{exec_prefix:<25s}... TIMEOUT ({timeout}s)")
+            executions.append({
+                'tempo': tempo_execucao,
+                'iteracoes': 0,
+                'distancia': float('inf'),
+                'melhor_string': '',
+                'erro': f'Timeout ({timeout}s)'
+            })
+            
+        except KeyboardInterrupt:
+            # Cancelar executor e parar spinner
+            executor.cancel()
+            spinner.stop()
+            if console:
+                console.print("\nExecução interrompida pelo usuário. Encerrando.")
+            else:
+                print(f"\nExecução interrompida pelo usuário. Encerrando.")
+            sys.exit(0)
+            
+        except Exception as e:
+            tempo_execucao = time.time() - t0
+            spinner.stop()
+            error_msg = str(e)[:50]
+            if console:
+                console.print(f"{exec_prefix:<25s}... ERRO: {error_msg}")
+            else:
+                print(f"\r{exec_prefix:<25s}... ERRO: {error_msg}")
             executions.append({
                 'tempo': tempo_execucao,
                 'iteracoes': 0,
@@ -103,21 +240,10 @@ def execute_algorithm_runs(alg_name, AlgClass, seqs, alphabet, num_execs, baseli
                 'melhor_string': '',
                 'erro': error_msg
             })
-        else:
-            center = result_holder['center']
-            val = result_holder['val']
-            iteracoes = result_holder.get('iteracoes', 1)
-            gap = _gap(baseline_val, val)
-            # Substituir o conteúdo da linha atual com o resultado final
-            print(f"\r{exec_prefix:<25s}... dist={val}, tempo={tempo_execucao:.3f}s, gap={gap:.1f}%")
-            for warning_msg in warning_holder:
-                if console:
-                    console.print(f"  AVISO: {warning_msg}")
-            executions.append({
-                'tempo': tempo_execucao,
-                'iteracoes': iteracoes,
-                'distancia': val,
-                'melhor_string': center,
-                'gap': gap
-            })
+        
+        finally:
+            # Garantir que spinner pare em qualquer caso
+            if spinner.thread and spinner.thread.is_alive():
+                spinner.stop()
+    
     return executions

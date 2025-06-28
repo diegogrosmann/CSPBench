@@ -122,7 +122,7 @@ def heuristic_closest_string(strings, d=None, n_blocks=None, progress_callback: 
             progress_callback("⚠️ Nenhum cluster encontrado, usando consenso global")
         # Retorna o consenso global como fallback
         best_candidate = consensus_string(strings)
-        best_candidate = local_search(best_candidate, strings)
+        best_candidate = local_search(best_candidate, strings, progress_callback)
         return best_candidate
 
     if progress_callback:
@@ -176,6 +176,7 @@ def local_search(candidate, strings, progress_callback: Optional[Callable[[str],
         improved = False
         iterations += 1
         
+        # Verificar cancelamento periodicamente
         if progress_callback and iterations % 10 == 0:
             progress_callback(f"Busca local: iteração {iterations}")
             

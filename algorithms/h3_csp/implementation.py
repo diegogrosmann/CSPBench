@@ -254,6 +254,10 @@ class H3CSP:
             if self.progress_callback: 
                 self.progress_callback("Refinamento global...")
             for it in range(self.params['local_iters']):
+                # Verificar se callback foi chamado (indica possível cancelamento)
+                if self.progress_callback:
+                    self.progress_callback(f"Refinamento: iteração {it+1}")
+                
                 center = _local_search(center, self.strings)
                 new_val = max_hamming(center, self.strings)
                 if new_val < best_val:

@@ -36,16 +36,24 @@ MEU_ALGORITMO_DEFAULTS = {
 ```python
 # Sua implementação real do algoritmo
 def meu_algoritmo_funcao(strings, alphabet, progress_callback=None, **params):
-    # Use progress_callback para reportar progresso
+    """
+    Exemplo de função de implementação de algoritmo customizado.
+
+    Args:
+        strings (list[str]): Lista de strings de entrada.
+        alphabet (str): Alfabeto utilizado.
+        progress_callback (callable, opcional): Callback de progresso.
+        **params: Parâmetros customizados.
+
+    Returns:
+        str: String centro encontrada.
+    """
     if progress_callback:
         progress_callback("Iniciando processamento...")
-    
     # Sua lógica aqui
     center = "ACGT"  # exemplo
-    
     if progress_callback:
         progress_callback("Finalizando...")
-    
     return center
 ```
 
@@ -96,45 +104,12 @@ class MeuAlgoritmo(Algorithm):
             return None, float('inf'), {'erro': str(e)}
 ```
 
-### 5. Criar o `__init__.py`
+### 5. Expor no `__init__.py`
 ```python
 from .algorithm import MeuAlgoritmo
 ```
 
-## Interface Obrigatória
-
-### Método `run()`
-Deve retornar uma tupla com 3 elementos:
-- **center** (str): String centro encontrada (ou None em caso de erro)
-- **distance** (int): Distância máxima (ou float('inf') em caso de erro)  
-- **info** (dict): Informações adicionais incluindo:
-  - `iteracoes`: Número de iterações realizadas
-  - `melhor_string`: String resultado (mesmo que center)
-  - `erro`: Mensagem de erro (se aplicável)
-
-### Callback de Progresso
-- **Método `set_progress_callback(callback)`**: Define função para reportar progresso
-- **Uso**: Chame `callback(mensagem)` para enviar updates de progresso
-- **Importante**: NUNCA use `print()` diretamente nos algoritmos
-
-### Tratamento de Erros
-- **Capture todas as exceções** no método `run()`
-- **Retorne erros estruturados** via campo `erro` no dict info
-- **Não deixe exceções escaparem** do algoritmo
-
-## Importante
-
-- **O decorator `@register_algorithm`** é obrigatório para que o algoritmo apareça no menu
-- **O nome do algoritmo** será exibido no menu de seleção
-- **Callback de progresso** deve ser usado em vez de prints diretos
-- **Tratamento de erro** deve ser feito internamente e retornado estruturado
-- **Configurações específicas** devem ficar no `config.py` do algoritmo, não no `utils/config.py`
-
-## Exemplo Completo
-
-Veja os algoritmos existentes em:
-- `algorithms/baseline/` - Exemplo mais simples
-- `algorithms/blf_ga/` - Exemplo mais complexo com progresso
-- `algorithms/csc/` - Exemplo com lógica de fallback
-
-Após criar seu algoritmo seguindo essa estrutura, ele aparecerá automaticamente no menu principal sem necessidade de modificar o `main.py`.
+## Dicas
+- Use o decorador `@register_algorithm` para registro automático.
+- O algoritmo aparecerá no menu sem necessidade de alterar o main.
+- Veja exemplos em `algorithms/baseline/`, `algorithms/blf_ga/`, etc.

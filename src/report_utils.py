@@ -1,3 +1,11 @@
+"""
+Utilitários para exibição de resumo e salvamento de relatórios detalhados.
+
+Funções:
+    print_quick_summary(...): Exibe resumo rápido dos resultados no console.
+    save_detailed_report(...): Salva relatório detalhado usando ResultsFormatter.
+"""
+
 def print_quick_summary(baseline_val, baseline_time, results, console):
     console.print("\n" + "="*50)
     console.print("RESUMO RÁPIDO")

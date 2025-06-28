@@ -3,12 +3,18 @@ dataset_utils.py
 ================
 
 Utilitários para salvar e gerenciar datasets.
+
+Funções:
+    ensure_datasets_folder(): Garante existência da pasta de datasets.
+    save_dataset_fasta(sequences, filename, description): Salva dataset em formato FASTA.
+    ask_save_dataset(sequences, dataset_type, params): Pergunta ao usuário e salva dataset se desejado.
 """
 
 import os
 from pathlib import Path
 from typing import List
 import logging
+from utils.config import safe_input
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +41,7 @@ def save_dataset_fasta(sequences: List[str], filename: str, description: str = "
 
 def ask_save_dataset(sequences: List[str], dataset_type: str, params: dict) -> bool:
     """Pergunta se o usuário deseja salvar o dataset e salva se confirmado."""
-    save_choice = input(f"\nDeseja salvar este dataset para uso futuro? [s/N]: ").strip().lower()
+    save_choice = safe_input(f"\nDeseja salvar este dataset para uso futuro? [s/N]: ").lower()
     
     if save_choice == 's':
         # Gerar nome do arquivo baseado no tipo e parâmetros

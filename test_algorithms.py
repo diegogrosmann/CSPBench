@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """
-Teste simples da estrutura de algoritmos
+Teste simples da estrutura de algoritmos registrados.
+
+Funções:
+    test_algorithms(): Executa todos os algoritmos do registry em um dataset de teste.
 """
 from algorithms.base import global_registry
 import algorithms

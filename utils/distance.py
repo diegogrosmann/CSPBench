@@ -1,5 +1,10 @@
 """
 Funções de distância compartilhadas entre algoritmos.
+
+Funções:
+    hamming_distance(s1, s2): Calcula a distância de Hamming entre duas strings.
+    max_hamming(candidate, strings): Maior distância de Hamming do candidato para o conjunto.
+    max_hamming_parallel(candidate, strings): Versão paralela para conjuntos grandes.
 """
 
 import concurrent.futures

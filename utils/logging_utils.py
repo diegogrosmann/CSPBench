@@ -1,7 +1,20 @@
 # logging_utils.py
+"""
+Utilitários para configuração de logging da aplicação.
+
+Funções:
+    setup_logging(debug_mode, log_file): Configura logging global.
+"""
 import logging
 
 def setup_logging(debug_mode: bool = False, log_file: str = 'debug.log'):
+    """
+    Configura o logging global da aplicação.
+
+    Args:
+        debug_mode (bool): Se True, ativa modo debug detalhado.
+        log_file (str): Caminho do arquivo de log.
+    """
     if debug_mode:
         logging.basicConfig(
             level=logging.DEBUG,

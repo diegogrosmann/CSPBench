@@ -11,7 +11,7 @@ from typing import List, Tuple, Dict, Any
 from Bio import Entrez, SeqIO
 import random
 import logging
-from utils.config import ENTREZ_DEFAULTS
+from utils.config import ENTREZ_DEFAULTS, safe_input
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +21,7 @@ def fetch_dataset() -> Tuple[List[str], Dict[str, Any]]:
 
     # Carregar email do config se não estiver definido
     if not getattr(Entrez, "email", None):
-        email_input = input(f"Informe seu e-mail para o NCBI [{defaults['email']}]: ").strip()
+        email_input = safe_input(f"Informe seu e-mail para o NCBI [{defaults['email']}]: ")
         Entrez.email = email_input or defaults['email']
         if not Entrez.email:
             raise ValueError("É necessário fornecer um e-mail para acessar o NCBI")
@@ -32,7 +32,7 @@ def fetch_dataset() -> Tuple[List[str], Dict[str, Any]]:
 
     # Carregar API key do config se não estiver definida
     if not getattr(Entrez, "api_key", None):
-        api_key_input = input(f"Informe sua NCBI API key (opcional) [{defaults.get('api_key','')}]: ").strip()
+        api_key_input = safe_input(f"Informe sua NCBI API key (opcional) [{defaults.get('api_key','')}]: ")
         Entrez.api_key = api_key_input or defaults.get('api_key', '')
         if Entrez.api_key:
             logger.debug("Entrez.api_key definida.")
@@ -40,13 +40,13 @@ def fetch_dataset() -> Tuple[List[str], Dict[str, Any]]:
         # Se já estiver definida, não faz nada
         pass
 
-    db_input = input(f"Base (nucleotide / protein) [{defaults['db']}]: ").strip()
+    db_input = safe_input(f"Base (nucleotide / protein) [{defaults['db']}]: ")
     db = db_input or defaults['db']
     
-    term_input = input(f"Termo de busca Entrez [{defaults['term']}]: ").strip()
+    term_input = safe_input(f"Termo de busca Entrez [{defaults['term']}]: ")
     term = term_input or defaults['term']
     
-    n_input = input(f"Quantos registros deseja baixar? [{defaults['n']}]: ").strip()
+    n_input = safe_input(f"Quantos registros deseja baixar? [{defaults['n']}]: ")
     n = int(n_input) if n_input else defaults['n']
     
     params = {'db': db, 'term': term, 'n': n}
