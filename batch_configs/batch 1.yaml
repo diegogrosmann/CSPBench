@@ -1,0 +1,944 @@
+# Arquivo de configuração para execução em lote
+# Cada item na lista 'execucoes' representa uma execução independente
+
+batch_info:
+  nome: "Experimento Comparativo CSP"
+  descricao: "Comparação de algoritmos em diferentes datasets"
+  timeout_global: 10800  # 3 horas por execução
+
+execucoes:
+  # Execução 1-3: Dataset sintético pequeno (n=7, L=70) - noise 0.1
+  - nome: "Sintético Pequeno - 1"
+    dataset:
+      tipo: "synthetic"  # synthetic, file, entrez
+      parametros:
+        n: 7
+        L: 70
+        alphabet: "ACGT"
+        noise: 0.1
+    algoritmos:
+      - "Baseline"
+      - "BLF-GA"
+      - "H³-CSP"
+      - "DP-CSP"
+      - "CSC"
+    execucoes_por_algoritmo: 30
+    timeout: 180
+    
+  - nome: "Sintético Pequeno - 2"
+    dataset:
+      tipo: "synthetic"
+      parametros:
+        n: 7
+        L: 70
+        alphabet: "ACGT"
+        noise: 0.1
+    algoritmos:
+      - "Baseline"
+      - "BLF-GA"
+      - "H³-CSP"
+      - "DP-CSP"
+      - "CSC"
+    execucoes_por_algoritmo: 30
+    timeout: 180
+
+  - nome: "Sintético Pequeno - 3"
+    dataset:
+      tipo: "synthetic"
+      parametros:
+        n: 7
+        L: 70
+        alphabet: "ACGT"
+        noise: 0.1
+    algoritmos:
+      - "Baseline"
+      - "BLF-GA"
+      - "H³-CSP"
+      - "DP-CSP"
+      - "CSC"
+    execucoes_por_algoritmo: 30
+    timeout: 180
+
+  # Execução 4-6: Dataset sintético pequeno (n=7, L=70) - noise 0.2
+  - nome: "Sintético Pequeno - 4"
+    dataset:
+      tipo: "synthetic"
+      parametros:
+        n: 7
+        L: 70
+        alphabet: "ACGT"
+        noise: 0.2
+    algoritmos:
+      - "Baseline"
+      - "BLF-GA"
+      - "H³-CSP"
+      - "DP-CSP"
+      - "CSC"
+    execucoes_por_algoritmo: 30
+    timeout: 180
+    
+  - nome: "Sintético Pequeno - 5"
+    dataset:
+      tipo: "synthetic"
+      parametros:
+        n: 7
+        L: 70
+        alphabet: "ACGT"
+        noise: 0.2
+    algoritmos:
+      - "Baseline"
+      - "BLF-GA"
+      - "H³-CSP"
+      - "DP-CSP"
+      - "CSC"
+    execucoes_por_algoritmo: 30
+    timeout: 180
+
+  - nome: "Sintético Pequeno - 6"
+    dataset:
+      tipo: "synthetic"
+      parametros:
+        n: 7
+        L: 70
+        alphabet: "ACGT"
+        noise: 0.2
+    algoritmos:
+      - "Baseline"
+      - "BLF-GA"
+      - "H³-CSP"
+      - "DP-CSP"
+      - "CSC"
+    execucoes_por_algoritmo: 50
+    timeout: 180
+
+  # Execução 7-9: Dataset sintético pequeno (n=7, L=70) - noise 0.4
+  - nome: "Sintético Pequeno - 7"
+    dataset:
+      tipo: "synthetic"
+      parametros:
+        n: 7
+        L: 70
+        alphabet: "ACGT"
+        noise: 0.4
+    algoritmos:
+      - "Baseline"
+      - "BLF-GA"
+      - "H³-CSP"
+      - "DP-CSP"
+      - "CSC"
+    execucoes_por_algoritmo: 30
+    timeout: 180
+    
+  - nome: "Sintético Pequeno - 8"
+    dataset:
+      tipo: "synthetic"
+      parametros:
+        n: 7
+        L: 70
+        alphabet: "ACGT"
+        noise: 0.4
+    algoritmos:
+      - "Baseline"
+      - "BLF-GA"
+      - "H³-CSP"
+      - "DP-CSP"
+      - "CSC"
+    execucoes_por_algoritmo: 30
+    timeout: 600
+
+  - nome: "Sintético Pequeno - 9"
+    dataset:
+      tipo: "synthetic"
+      parametros:
+        n: 7
+        L: 70
+        alphabet: "ACGT"
+        noise: 0.4
+    algoritmos:
+      - "Baseline"
+      - "BLF-GA"
+      - "H³-CSP"
+      - "DP-CSP"
+      - "CSC"
+    execucoes_por_algoritmo: 30
+    timeout: 180
+
+  # Execução 10-12: Dataset sintético micro (n=10, L=20) - noise 0.1
+  - nome: "Sintético Micro - 1"
+    dataset:
+      tipo: "synthetic"
+      parametros:
+        n: 10
+        L: 20
+        alphabet: "ACGT"
+        noise: 0.1
+    algoritmos:
+      - "Baseline"
+      - "BLF-GA"
+      - "H³-CSP"
+      - "DP-CSP"
+      - "CSC"
+    execucoes_por_algoritmo: 30
+    timeout: 120
+
+  - nome: "Sintético Micro - 2"
+    dataset:
+      tipo: "synthetic"
+      parametros:
+        n: 10
+        L: 20
+        alphabet: "ACGT"
+        noise: 0.1
+    algoritmos:
+      - "Baseline"
+      - "BLF-GA"
+      - "H³-CSP"
+      - "DP-CSP"
+      - "CSC"
+    execucoes_por_algoritmo: 30
+    timeout: 120
+
+  - nome: "Sintético Micro - 3"
+    dataset:
+      tipo: "synthetic"
+      parametros:
+        n: 10
+        L: 20
+        alphabet: "ACGT"
+        noise: 0.1
+    algoritmos:
+      - "Baseline"
+      - "BLF-GA"
+      - "H³-CSP"
+      - "DP-CSP"
+      - "CSC"
+    execucoes_por_algoritmo: 30
+    timeout: 120
+
+  # Execução 13-15: Dataset sintético micro (n=10, L=20) - noise 0.2
+  - nome: "Sintético Micro - 4"
+    dataset:
+      tipo: "synthetic"
+      parametros:
+        n: 10
+        L: 20
+        alphabet: "ACGT"
+        noise: 0.2
+    algoritmos:
+      - "Baseline"
+      - "BLF-GA"
+      - "H³-CSP"
+      - "DP-CSP"
+      - "CSC"
+    execucoes_por_algoritmo: 30
+    timeout: 120
+
+  - nome: "Sintético Micro - 5"
+    dataset:
+      tipo: "synthetic"
+      parametros:
+        n: 10
+        L: 20
+        alphabet: "ACGT"
+        noise: 0.2
+    algoritmos:
+      - "Baseline"
+      - "BLF-GA"
+      - "H³-CSP"
+      - "DP-CSP"
+      - "CSC"
+    execucoes_por_algoritmo: 30
+    timeout: 120
+
+  - nome: "Sintético Micro - 6"
+    dataset:
+      tipo: "synthetic"
+      parametros:
+        n: 10
+        L: 20
+        alphabet: "ACGT"
+        noise: 0.2
+    algoritmos:
+      - "Baseline"
+      - "BLF-GA"
+      - "H³-CSP"
+      - "DP-CSP"
+      - "CSC"
+    execucoes_por_algoritmo: 30
+    timeout: 120
+
+  # Execução 16-18: Dataset sintético micro (n=10, L=20) - noise 0.4
+  - nome: "Sintético Micro - 7"
+    dataset:
+      tipo: "synthetic"
+      parametros:
+        n: 10
+        L: 20
+        alphabet: "ACGT"
+        noise: 0.4
+    algoritmos:
+      - "Baseline"
+      - "BLF-GA"
+      - "H³-CSP"
+      - "DP-CSP"
+      - "CSC"
+    execucoes_por_algoritmo: 30
+    timeout: 120
+
+  - nome: "Sintético Micro - 8"
+    dataset:
+      tipo: "synthetic"
+      parametros:
+        n: 10
+        L: 20
+        alphabet: "ACGT"
+        noise: 0.4
+    algoritmos:
+      - "Baseline"
+      - "BLF-GA"
+      - "H³-CSP"
+      - "DP-CSP"
+      - "CSC"
+    execucoes_por_algoritmo: 30
+    timeout: 120
+
+  - nome: "Sintético Micro - 9"
+    dataset:
+      tipo: "synthetic"
+      parametros:
+        n: 10
+        L: 20
+        alphabet: "ACGT"
+        noise: 0.4
+    algoritmos:
+      - "Baseline"
+      - "BLF-GA"
+      - "H³-CSP"
+      - "DP-CSP"
+      - "CSC"
+    execucoes_por_algoritmo: 30
+    timeout: 120
+
+  # Execução 19-21: Dataset sintético médio (n=10, L=100) - noise 0.1
+  - nome: "Sintético Médio - 1"
+    dataset:
+      tipo: "synthetic"
+      parametros:
+        n: 10
+        L: 100
+        alphabet: "ACGT"
+        noise: 0.1
+    algoritmos:
+      - "Baseline"
+      - "BLF-GA"
+      - "H³-CSP"
+      - "DP-CSP"
+      - "CSC"
+    execucoes_por_algoritmo: 30
+    timeout: 300
+
+  - nome: "Sintético Médio - 2"
+    dataset:
+      tipo: "synthetic"
+      parametros:
+        n: 10
+        L: 100
+        alphabet: "ACGT"
+        noise: 0.1
+    algoritmos:
+      - "Baseline"
+      - "BLF-GA"
+      - "H³-CSP"
+      - "DP-CSP"
+      - "CSC"
+    execucoes_por_algoritmo: 30
+    timeout: 300
+
+  - nome: "Sintético Médio - 3"
+    dataset:
+      tipo: "synthetic"
+      parametros:
+        n: 10
+        L: 100
+        alphabet: "ACGT"
+        noise: 0.1
+    algoritmos:
+      - "Baseline"
+      - "BLF-GA"
+      - "H³-CSP"
+      - "DP-CSP"
+      - "CSC"
+    execucoes_por_algoritmo: 30
+    timeout: 300
+
+  # Execução 22-24: Dataset sintético médio (n=10, L=100) - noise 0.2
+  - nome: "Sintético Médio - 4"
+    dataset:
+      tipo: "synthetic"
+      parametros:
+        n: 10
+        L: 100
+        alphabet: "ACGT"
+        noise: 0.2
+    algoritmos:
+      - "Baseline"
+      - "BLF-GA"
+      - "H³-CSP"
+      - "DP-CSP"
+      - "CSC"
+    execucoes_por_algoritmo: 30
+    timeout: 300
+
+  - nome: "Sintético Médio - 5"
+    dataset:
+      tipo: "synthetic"
+      parametros:
+        n: 10
+        L: 100
+        alphabet: "ACGT"
+        noise: 0.2
+    algoritmos:
+      - "Baseline"
+      - "BLF-GA"
+      - "H³-CSP"
+      - "DP-CSP"
+      - "CSC"
+    execucoes_por_algoritmo: 30
+    timeout: 300
+
+  - nome: "Sintético Médio - 6"
+    dataset:
+      tipo: "synthetic"
+      parametros:
+        n: 10
+        L: 100
+        alphabet: "ACGT"
+        noise: 0.2
+    algoritmos:
+      - "Baseline"
+      - "BLF-GA"
+      - "H³-CSP"
+      - "DP-CSP"
+      - "CSC"
+    execucoes_por_algoritmo: 30
+    timeout: 300
+
+  # Execução 25-27: Dataset sintético médio (n=10, L=100) - noise 0.4
+  - nome: "Sintético Médio - 7"
+    dataset:
+      tipo: "synthetic"
+      parametros:
+        n: 10
+        L: 100
+        alphabet: "ACGT"
+        noise: 0.4
+    algoritmos:
+      - "Baseline"
+      - "BLF-GA"
+      - "H³-CSP"
+      - "DP-CSP"
+      - "CSC"
+    execucoes_por_algoritmo: 30
+    timeout: 300
+
+  - nome: "Sintético Médio - 8"
+    dataset:
+      tipo: "synthetic"
+      parametros:
+        n: 10
+        L: 100
+        alphabet: "ACGT"
+        noise: 0.4
+    algoritmos:
+      - "Baseline"
+      - "BLF-GA"
+      - "H³-CSP"
+      - "DP-CSP"
+      - "CSC"
+    execucoes_por_algoritmo: 30
+    timeout: 300
+
+  - nome: "Sintético Médio - 9"
+    dataset:
+      tipo: "synthetic"
+      parametros:
+        n: 10
+        L: 100
+        alphabet: "ACGT"
+        noise: 0.4
+    algoritmos:
+      - "Baseline"
+      - "BLF-GA"
+      - "H³-CSP"
+      - "DP-CSP"
+      - "CSC"
+    execucoes_por_algoritmo: 30
+    timeout: 300
+
+  # Execução 28-30: Dataset sintético grande (n=20, L=200) - noise 0.1
+  - nome: "Sintético Grande - 1"
+    dataset:
+      tipo: "synthetic"
+      parametros:
+        n: 20
+        L: 200
+        alphabet: "ACGT"
+        noise: 0.1
+    algoritmos:
+      - "Baseline"
+      - "BLF-GA"
+      - "H³-CSP"
+      - "DP-CSP"
+      - "CSC"
+    execucoes_por_algoritmo: 30
+    timeout: 900
+
+  - nome: "Sintético Grande - 2"
+    dataset:
+      tipo: "synthetic"
+      parametros:
+        n: 20
+        L: 200
+        alphabet: "ACGT"
+        noise: 0.1
+    algoritmos:
+      - "Baseline"
+      - "BLF-GA"
+      - "H³-CSP"
+      - "DP-CSP"
+      - "CSC"
+    execucoes_por_algoritmo: 30
+    timeout: 900
+
+  - nome: "Sintético Grande - 3"
+    dataset:
+      tipo: "synthetic"
+      parametros:
+        n: 20
+        L: 200
+        alphabet: "ACGT"
+        noise: 0.1
+    algoritmos:
+      - "Baseline"
+      - "BLF-GA"
+      - "H³-CSP"
+      - "DP-CSP"
+      - "CSC"
+    execucoes_por_algoritmo: 30
+    timeout: 900
+
+  # Execução 31-33: Dataset sintético grande (n=20, L=200) - noise 0.2
+  - nome: "Sintético Grande - 4"
+    dataset:
+      tipo: "synthetic"
+      parametros:
+        n: 20
+        L: 200
+        alphabet: "ACGT"
+        noise: 0.2
+    algoritmos:
+      - "Baseline"
+      - "BLF-GA"
+      - "H³-CSP"
+      - "DP-CSP"
+      - "CSC"
+    execucoes_por_algoritmo: 30
+    timeout: 900
+
+  - nome: "Sintético Grande - 5"
+    dataset:
+      tipo: "synthetic"
+      parametros:
+        n: 20
+        L: 200
+        alphabet: "ACGT"
+        noise: 0.2
+    algoritmos:
+      - "Baseline"
+      - "BLF-GA"
+      - "H³-CSP"
+      - "DP-CSP"
+      - "CSC"
+    execucoes_por_algoritmo: 30
+    timeout: 900
+
+  - nome: "Sintético Grande - 6"
+    dataset:
+      tipo: "synthetic"
+      parametros:
+        n: 20
+        L: 200
+        alphabet: "ACGT"
+        noise: 0.2
+    algoritmos:
+      - "Baseline"
+      - "BLF-GA"
+      - "H³-CSP"
+      - "DP-CSP"
+      - "CSC"
+    execucoes_por_algoritmo: 30
+    timeout: 900
+
+  # Execução 34-36: Dataset sintético grande (n=20, L=200) - noise 0.4
+  - nome: "Sintético Grande - 7"
+    dataset:
+      tipo: "synthetic"
+      parametros:
+        n: 20
+        L: 200
+        alphabet: "ACGT"
+        noise: 0.4
+    algoritmos:
+      - "Baseline"
+      - "BLF-GA"
+      - "H³-CSP"
+      - "DP-CSP"
+      - "CSC"
+    execucoes_por_algoritmo: 30
+    timeout: 900
+
+  - nome: "Sintético Grande - 8"
+    dataset:
+      tipo: "synthetic"
+      parametros:
+        n: 20
+        L: 200
+        alphabet: "ACGT"
+        noise: 0.4
+    algoritmos:
+      - "Baseline"
+      - "BLF-GA"
+      - "H³-CSP"
+      - "DP-CSP"
+      - "CSC"
+    execucoes_por_algoritmo: 30
+    timeout: 900
+
+  - nome: "Sintético Grande - 9"
+    dataset:
+      tipo: "synthetic"
+      parametros:
+        n: 20
+        L: 200
+        alphabet: "ACGT"
+        noise: 0.4
+    algoritmos:
+      - "Baseline"
+      - "BLF-GA"
+      - "H³-CSP"
+      - "DP-CSP"
+      - "CSC"
+    execucoes_por_algoritmo: 30
+    timeout: 900
+
+  # Execução 37-39: Dataset sintético muito grande (n=25, L=250) - noise 0.1
+  - nome: "Sintético Muito Grande - 1"
+    dataset:
+      tipo: "synthetic"
+      parametros:
+        n: 25
+        L: 250
+        alphabet: "ACGT"
+        noise: 0.1
+    algoritmos:
+      - "Baseline"
+      - "BLF-GA"
+      - "H³-CSP"
+      - "DP-CSP"
+      - "CSC"
+    execucoes_por_algoritmo: 30
+    timeout: 1200
+
+  - nome: "Sintético Muito Grande - 2"
+    dataset:
+      tipo: "synthetic"
+      parametros:
+        n: 25
+        L: 250
+        alphabet: "ACGT"
+        noise: 0.1
+    algoritmos:
+      - "Baseline"
+      - "BLF-GA"
+      - "H³-CSP"
+      - "DP-CSP"
+      - "CSC"
+    execucoes_por_algoritmo: 30
+    timeout: 1200
+
+  - nome: "Sintético Muito Grande - 3"
+    dataset:
+      tipo: "synthetic"
+      parametros:
+        n: 25
+        L: 250
+        alphabet: "ACGT"
+        noise: 0.1
+    algoritmos:
+      - "Baseline"
+      - "BLF-GA"
+      - "H³-CSP"
+      - "DP-CSP"
+      - "CSC"
+    execucoes_por_algoritmo: 30
+    timeout: 1200
+
+  # Execução 40-42: Dataset sintético muito grande (n=25, L=250) - noise 0.2
+  - nome: "Sintético Muito Grande - 4"
+    dataset:
+      tipo: "synthetic"
+      parametros:
+        n: 25
+        L: 250
+        alphabet: "ACGT"
+        noise: 0.2
+    algoritmos:
+      - "Baseline"
+      - "BLF-GA"
+      - "H³-CSP"
+      - "DP-CSP"
+      - "CSC"
+    execucoes_por_algoritmo: 30
+    timeout: 1200
+
+  - nome: "Sintético Muito Grande - 5"
+    dataset:
+      tipo: "synthetic"
+      parametros:
+        n: 25
+        L: 250
+        alphabet: "ACGT"
+        noise: 0.2
+    algoritmos:
+      - "Baseline"
+      - "BLF-GA"
+      - "H³-CSP"
+      - "DP-CSP"
+      - "CSC"
+    execucoes_por_algoritmo: 30
+    timeout: 1200
+
+  - nome: "Sintético Muito Grande - 6"
+    dataset:
+      tipo: "synthetic"
+      parametros:
+        n: 25
+        L: 250
+        alphabet: "ACGT"
+        noise: 0.2
+    algoritmos:
+      - "Baseline"
+      - "BLF-GA"
+      - "H³-CSP"
+      - "DP-CSP"
+      - "CSC"
+    execucoes_por_algoritmo: 30
+    timeout: 1200
+
+  # Execução 43-45: Dataset sintético muito grande (n=25, L=250) - noise 0.4
+  - nome: "Sintético Muito Grande - 7"
+    dataset:
+      tipo: "synthetic"
+      parametros:
+        n: 25
+        L: 250
+        alphabet: "ACGT"
+        noise: 0.4
+    algoritmos:
+      - "Baseline"
+      - "BLF-GA"
+      - "H³-CSP"
+      - "DP-CSP"
+      - "CSC"
+    execucoes_por_algoritmo: 30
+    timeout: 1200
+
+  - nome: "Sintético Muito Grande - 8"
+    dataset:
+      tipo: "synthetic"
+      parametros:
+        n: 25
+        L: 250
+        alphabet: "ACGT"
+        noise: 0.4
+    algoritmos:
+      - "Baseline"
+      - "BLF-GA"
+      - "H³-CSP"
+      - "DP-CSP"
+      - "CSC"
+    execucoes_por_algoritmo: 30
+    timeout: 1200
+
+  - nome: "Sintético Muito Grande - 9"
+    dataset:
+      tipo: "synthetic"
+      parametros:
+        n: 25
+        L: 250
+        alphabet: "ACGT"
+        noise: 0.4
+    algoritmos:
+      - "Baseline"
+      - "BLF-GA"
+      - "H³-CSP"
+      - "DP-CSP"
+      - "CSC"
+    execucoes_por_algoritmo: 30
+    timeout: 1200
+
+  # Execução 46-48: Dataset sintético extra grande (n=30, L=300) - noise 0.1
+  - nome: "Sintético Extra Grande - 1"
+    dataset:
+      tipo: "synthetic"
+      parametros:
+        n: 30
+        L: 300
+        alphabet: "ACGT"
+        noise: 0.1
+    algoritmos:
+      - "Baseline"
+      - "BLF-GA"
+      - "H³-CSP"
+      - "DP-CSP"
+      - "CSC"
+    execucoes_por_algoritmo: 30
+    timeout: 1500
+
+  - nome: "Sintético Extra Grande - 2"
+    dataset:
+      tipo: "synthetic"
+      parametros:
+        n: 30
+        L: 300
+        alphabet: "ACGT"
+        noise: 0.1
+    algoritmos:
+      - "Baseline"
+      - "BLF-GA"
+      - "H³-CSP"
+      - "DP-CSP"
+      - "CSC"
+    execucoes_por_algoritmo: 30
+    timeout: 1500
+
+  - nome: "Sintético Extra Grande - 3"
+    dataset:
+      tipo: "synthetic"
+      parametros:
+        n: 30
+        L: 300
+        alphabet: "ACGT"
+        noise: 0.1
+    algoritmos:
+      - "Baseline"
+      - "BLF-GA"
+      - "H³-CSP"
+      - "DP-CSP"
+      - "CSC"
+    execucoes_por_algoritmo: 30
+    timeout: 1500
+
+  # Execução 49-51: Dataset sintético extra grande (n=30, L=300) - noise 0.2
+  - nome: "Sintético Extra Grande - 4"
+    dataset:
+      tipo: "synthetic"
+      parametros:
+        n: 30
+        L: 300
+        alphabet: "ACGT"
+        noise: 0.2
+    algoritmos:
+      - "Baseline"
+      - "BLF-GA"
+      - "H³-CSP"
+      - "DP-CSP"
+      - "CSC"
+    execucoes_por_algoritmo: 30
+    timeout: 1500
+
+  - nome: "Sintético Extra Grande - 5"
+    dataset:
+      tipo: "synthetic"
+      parametros:
+        n: 30
+        L: 300
+        alphabet: "ACGT"
+        noise: 0.2
+    algoritmos:
+      - "Baseline"
+      - "BLF-GA"
+      - "H³-CSP"
+      - "DP-CSP"
+      - "CSC"
+    execucoes_por_algoritmo: 30
+    timeout: 1500
+
+  - nome: "Sintético Extra Grande - 6"
+    dataset:
+      tipo: "synthetic"
+      parametros:
+        n: 30
+        L: 300
+        alphabet: "ACGT"
+        noise: 0.2
+    algoritmos:
+      - "Baseline"
+      - "BLF-GA"
+      - "H³-CSP"
+      - "DP-CSP"
+      - "CSC"
+    execucoes_por_algoritmo: 30
+    timeout: 1500
+
+  # Execução 52-54: Dataset sintético extra grande (n=30, L=300) - noise 0.4
+  - nome: "Sintético Extra Grande - 7"
+    dataset:
+      tipo: "synthetic"
+      parametros:
+        n: 30
+        L: 300
+        alphabet: "ACGT"
+        noise: 0.4
+    algoritmos:
+      - "Baseline"
+      - "BLF-GA"
+      - "H³-CSP"
+      - "DP-CSP"
+      - "CSC"
+    execucoes_por_algoritmo: 30
+    timeout: 1500
+
+  - nome: "Sintético Extra Grande - 8"
+    dataset:
+      tipo: "synthetic"
+      parametros:
+        n: 30
+        L: 300
+        alphabet: "ACGT"
+        noise: 0.4
+    algoritmos:
+      - "Baseline"
+      - "BLF-GA"
+      - "H³-CSP"
+      - "DP-CSP"
+      - "CSC"
+    execucoes_por_algoritmo: 30
+    timeout: 1500
+
+  - nome: "Sintético Extra Grande - 9"
+    dataset:
+      tipo: "synthetic"
+      parametros:
+        n: 30
+        L: 300
+        alphabet: "ACGT"
+        noise: 0.4
+    algoritmos:
+      - "Baseline"
+      - "BLF-GA"
+      - "H³-CSP"
+      - "DP-CSP"
+      - "CSC"
+    execucoes_por_algoritmo: 30
+    timeout: 1500

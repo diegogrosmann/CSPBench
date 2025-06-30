@@ -1,36 +1,36 @@
 # BLF-GA: Blockwise Learning Fusion + Genetic Algorithm
 
-## Visão Geral
-O BLF-GA é uma metaheurística híbrida que combina **aprendizado por blocos** com **algoritmo genético** para resolver o Closest String Problem. A abordagem divide o problema em segmentos menores, aplica aprendizado local em cada bloco e usa evolução genética para otimização global.
+O BLF-GA é uma metaheurística híbrida que combina aprendizado por blocos e algoritmo genético para resolver o Closest String Problem.
 
-O algoritmo **reporta progresso continuamente** via callback, permitindo acompanhamento detalhado sem interromper a execução.
+## Estratégia
 
-## Funcionamento
+- Divide as strings em blocos (B-Splitter).
+- Aplica aprendizado local em cada bloco (Block Learning).
+- Usa evolução genética para otimização global (Genetic Evolution).
+- Reporta progresso via callback.
 
-### Arquitetura Híbrida
-O algoritmo opera em **três camadas principais**:
-1. **B-Splitter**: Divisão adaptativa em blocos
-2. **Block Learning**: Aprendizado local por segmento  
-3. **Genetic Evolution**: Evolução populacional global
+## Heurísticas
 
-### Fluxo de Execução Detalhado
+- **Learning Fusion**: Combina conhecimento local e busca global.
+- **Adaptive Blocking**: Redefine blocos dinamicamente.
+- **Elite Refinement**: Busca local intensiva nos melhores indivíduos.
 
-#### 1. Inicialização
-- **População Inicial**: Cria população diversificada incluindo consenso ganancioso
-- **Blocking Inicial**: Divide strings em √L blocos aproximadamente iguais
-- **Avaliação Base**: Calcula fitness inicial (distância máxima) para cada indivíduo
+## Parâmetros
 
-#### 2. Ciclo Evolutivo Principal
-```
-Para cada geração g = 1 até max_gens:
-  ├── Block Learning Phase
-  ├── Genetic Operations  
-  ├── Population Update
-  ├── Adaptive Blocking
-  └── Convergence Check
-```
+- Tamanho da população, número de gerações, taxa de elitismo, etc.
+- Blocos iniciais, tamanho mínimo de bloco, frequência de redivisão.
 
-#### 3. Block Learning Phase
+## Uso Ideal
+
+- Instâncias médias a grandes (n > 20, L > 100).
+- Dados com padrões locais.
+- Quando qualidade próxima do ótimo é prioritária.
+
+## Limitações
+
+- Muitos parâmetros.
+- Pode ser lento para instâncias pequenas.
+- Pode estagnar em ótimos locais.
 - **Análise por Bloco**: Para cada bloco [i,j), identifica padrões locais
 - **Consensus Learning**: Gera consenso ótimo para o bloco atual
 - **Pattern Mining**: Extrai subsequências promissoras da população

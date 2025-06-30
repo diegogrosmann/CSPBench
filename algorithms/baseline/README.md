@@ -1,26 +1,26 @@
 # Baseline Algorithm
 
-## Visão Geral
-O algoritmo Baseline implementa uma solução simples e eficiente para o Closest String Problem usando consenso ganancioso. Serve como ponto de referência para comparar a performance de outros algoritmos mais sofisticados.
+O algoritmo Baseline implementa uma solução simples e eficiente para o Closest String Problem usando consenso ganancioso. Serve como referência para comparação com métodos mais sofisticados.
 
-## Funcionamento
+## Estratégia
 
-### Estratégia Principal
-O algoritmo utiliza **consenso por maioria**: para cada posição, escolhe o símbolo que aparece com maior frequência naquela posição entre todas as strings de entrada.
+- Para cada posição, escolhe o símbolo mais frequente entre todas as strings.
+- Constrói a string consenso e calcula a distância máxima de Hamming em relação às entradas.
 
-A execução é **instantânea e determinística** - não requer callback de progresso devido à sua simplicidade computacional.
+## Características
 
-### Fluxo de Execução
+- **Determinístico** e **instantâneo**.
+- Complexidade linear: O(n × L × |Σ|).
+- Não requer callback de progresso.
 
-1. **Análise Posicional**
-   - Para cada posição i (0 ≤ i < L):
-   - Conta a frequência de cada símbolo nessa posição
-   - Seleciona o símbolo mais frequente
+## Limitações
 
-2. **Construção do Consenso**
-   - Concatena os símbolos mais frequentes de cada posição
-   - Forma a string consenso final
+- Não considera dependências entre posições.
+- Pode não encontrar o ótimo global em casos de empate ou alta diversidade.
 
+## Uso
+
+Ideal como baseline para benchmarking e validação de instâncias simples ou bem estruturadas.
 3. **Cálculo da Distância**
    - Calcula a distância de Hamming máxima entre o consenso e todas as strings
    - Retorna o par (string_consenso, distância_máxima)

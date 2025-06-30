@@ -1,35 +1,35 @@
 # H³-CSP: Hybrid Hierarchical Hamming Search
 
-## Visão Geral
-O H³-CSP (Hybrid Hierarchical Hamming Search) é um algoritmo híbrido de três camadas que combina **decomposição hierárquica**, **técnicas especializadas por bloco** e **refinamento global**. A estratégia central é dividir o problema em subproblemas menores, aplicar a técnica mais adequada para cada subproblema e reunir as soluções em uma otimização global.
+O H³-CSP é um algoritmo híbrido de três camadas que combina decomposição hierárquica, técnicas especializadas por bloco e refinamento global.
 
-## Funcionamento
+## Arquitetura
 
-### Arquitetura Hierárquica de Três Camadas
+1. **B-Splitter**: Divide as strings em blocos contíguos (~√L).
+2. **Smart-Core**: Seleciona técnica ótima por bloco (busca exaustiva ou beam search).
+3. **Global Refine**: Combina blocos e aplica hill-climbing global.
 
-#### 1. B-Splitter (Block Splitter)
-**Função**: Decomposição inteligente do problema
-- Divide cada string em aproximadamente √L blocos
-- Mantém blocos contíguos para preservar correlações locais
-- Balanceia granularidade vs. eficiência computacional
+## Heurísticas
 
-#### 2. Smart-Core (Intelligent Core Selection)
-**Função**: Escolha adaptativa de técnica por bloco
-- Analisa características de cada bloco (tamanho, diversidade)
-- Seleciona a técnica mais apropriada dentre as disponíveis
-- Gera k candidatos promissores por bloco
+- Decomposição adaptativa (√L Rule).
+- Seleção inteligente de técnica por bloco.
+- Geração de candidatos diversos.
+- Refinamento global por busca local.
 
-#### 3. Global Refine (Global Optimization)
-**Função**: Integração e refinamento das soluções locais
-- Combina blocos ótimos em soluções candidatas completas
-- Aplica hill-climbing global para refinamento
-- Retorna a melhor solução encontrada
+## Parâmetros
 
-### Fluxo de Execução Detalhado
+- Número de blocos, limites para busca exaustiva, largura do beam, candidatos por bloco, iterações de refinamento.
 
-#### Fase 1: Decomposição Hierárquica
-```
-L = comprimento das strings
+## Uso Ideal
+
+- Instâncias de tamanho médio (L entre 50-500).
+- Dados com padrões locais.
+- Quando se busca equilíbrio entre qualidade e eficiência.
+
+## Limitações
+
+- Mais complexo que algoritmos simples.
+- Overhead para instâncias pequenas.
+- Vários parâmetros para ajuste fino.
 B = ⌈√L⌉  // número de blocos
 block_size = ⌈L/B⌉
 

@@ -55,3 +55,13 @@ ENTREZ_DEFAULTS = {
     'n':      20,
     'api_key': '40aff1a7f51fc7e0711203ea3b2f5ae37c09',
 }
+
+# --------------------------------------------------
+# Execução em lote
+# --------------------------------------------------
+BATCH_DEFAULTS = {
+    'timeout_global': 1800,  # 30 minutos por execução
+    'max_concurrent': 1,     # Execuções paralelas (futuro)
+    'save_individual_reports': True,
+    'save_consolidated_report': True,
+}

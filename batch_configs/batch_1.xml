@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<batch_config>
+    <batch_info>
+        <nome>Experimento Comparativo CSP</nome>
+        <descricao>Comparação de algoritmos em diferentes datasets</descricao>
+        <timeout_global>1800</timeout_global>  <!-- 30 minutos por execução -->
+    </batch_info>
+    
+    <execucoes>
+        <!-- Execução 1: Dataset sintético pequeno -->
+        <execucao>
+            <nome>Sintético Pequeno - 1</nome>
+            <dataset>
+                <tipo>synthetic</tipo>  <!-- synthetic, file, entrez -->
+                <parametros>
+                    <n>7</n>
+                    <L>50</L>
+                    <alphabet>ACGT</alphabet>
+                    <noise>0.1</noise>
+                </parametros>
+            </dataset>
+            <algoritmos>
+                <algoritmo>Baseline</algoritmo>
+                <algoritmo>BLF-GA</algoritmo>
+                <algoritmo>H³-CSP</algoritmo>
+                <algoritmo>DP-CSP</algoritmo>
+                <algoritmo>CSC</algoritmo>
+            </algoritmos>
+            <execucoes_por_algoritmo>30</execucoes_por_algoritmo>
+            <timeout>300</timeout>
+        </execucao>
+    </execucoes>
+</batch_config>

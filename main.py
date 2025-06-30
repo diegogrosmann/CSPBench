@@ -26,7 +26,9 @@ from algorithms.base import global_registry
 from datasets.dataset_utils import ask_save_dataset
 from src.results_formatter import ResultsFormatter
 from src.console_manager import console
+from utils.resource_monitor import get_safe_memory_limit, check_algorithm_feasibility, ResourceMonitor
 from utils.config import safe_input, ALGORITHM_TIMEOUT
+import logging
 
 def signal_handler(signum, frame):
     """Handler para sinais de interrupção."""
@@ -46,6 +48,34 @@ def main():
 
         # Dataset
         choice = menu()
+        
+        # Nova opção: Execução em lote
+        if choice == '4':
+            from src.batch_executor import BatchExecutor, select_batch_config
+            
+            # Menu de seleção de arquivo de configuração
+            config_file = select_batch_config()
+            
+            if not config_file:
+                console.print("❌ Nenhum arquivo de configuração selecionado.")
+                return
+            
+            try:
+                executor = BatchExecutor(config_file)
+                batch_result = executor.execute_batch()
+                
+                console.print(f"\n✅ Execução em lote concluída!")
+                console.print(f"Tempo total: {batch_result['tempo_total']:.1f}s")
+                console.print(f"Taxa de sucesso: {batch_result['resumo']['taxa_sucesso']:.1f}%")
+                
+            except Exception as e:
+                console.print(f"❌ Erro na execução em lote: {e}")
+                logging.exception("Erro na execução em lote")
+                return
+            
+            return  # Sair após execução em lote
+        
+        # Fluxo normal para opções 1, 2, 3
         params = {'dataset_source': choice}
         seqs = []
 
@@ -66,8 +96,7 @@ def main():
                 ask_save_dataset(seqs, "entrez", p)
         except Exception as exc:
             console.print(f"Erro: {exc}")
-            import logging
-            logging.exception(exc)
+            logging.exception("Erro ao carregar dataset", exc_info=exc)
             return
 
         if not seqs:
@@ -75,22 +104,45 @@ def main():
             return
 
         alphabet = ''.join(sorted(set(''.join(seqs))))
-        console.print(f"\nDataset: n={len(seqs)}, L={len(seqs[0])}, |Σ|={len(alphabet)}")
-
+        n, L = len(seqs), len(seqs[0])
+        console.print(f"\nDataset: n={n}, L={L}, |Σ|={len(alphabet)}")
+        
+        # Verificação de recursos do sistema
+        safe_memory = get_safe_memory_limit()
+        console.print(f"Limite seguro de memória: {safe_memory:.1f}%")
+        
         # Algoritmos
         algs = select_algorithms()
         if not algs:
             console.print("Nenhum algoritmo selecionado além do Baseline.")
 
+        # Verificar viabilidade dos algoritmos selecionados
+        viable_algs = []
+        for alg_name in algs:
+            is_viable, msg = check_algorithm_feasibility(n, L, alg_name)
+            if is_viable:
+                viable_algs.append(alg_name)
+                console.print(f"✓ {alg_name}: {msg}")
+            else:
+                console.print(f"⚠ {alg_name}: {msg} (será pulado)")
+        
+        if not viable_algs:
+            console.print("Nenhum algoritmo viável. Executando apenas Baseline.")
+        
         runs = safe_input("\nNº execuções p/ algoritmo [3]: ")
         num_execs = int(runs) if runs.isdigit() and int(runs) > 0 else 3
 
-        # Configurar timeout
-        timeout_input = safe_input(f"\nTimeout por execução em segundos [{ALGORITHM_TIMEOUT}]: ")
-        timeout = int(timeout_input) if timeout_input.isdigit() and int(timeout_input) > 0 else ALGORITHM_TIMEOUT
+        # Configurar timeout com recomendações baseadas nos algoritmos
+        default_timeout = ALGORITHM_TIMEOUT
+        if 'DP-CSP' in viable_algs and n >= 8:
+            default_timeout = max(ALGORITHM_TIMEOUT, 120)  # Mínimo 2 minutos para DP-CSP complexo
+            console.print("⚠ DP-CSP detectado em dataset complexo - timeout mínimo aumentado")
+        
+        timeout_input = safe_input(f"\nTimeout por execução em segundos [{default_timeout}]: ")
+        timeout = int(timeout_input) if timeout_input.isdigit() and int(timeout_input) > 0 else default_timeout
         
         console.print(f"Timeout configurado: {timeout}s por execução")
-
+        
         # Baseline
         console.print("\n" + "="*50)
         console.print("EXECUTANDO ALGORITMOS")
@@ -119,9 +171,9 @@ def main():
         }]
         formatter.add_algorithm_results("Baseline", baseline_executions)
 
-        # Execução dos algoritmos
+        # Execução dos algoritmos (usando viable_algs em vez de algs)
         results = {}
-        for alg_name in algs:
+        for alg_name in viable_algs:
             if alg_name not in global_registry:
                 console.print(f"ERRO: Algoritmo '{alg_name}' não encontrado!")
                 continue
@@ -130,6 +182,7 @@ def main():
                 alg_name, AlgClass, seqs, alphabet, num_execs, baseline_val, console, timeout
             )
             formatter.add_algorithm_results(alg_name, executions)
+            
             valid_results = [e for e in executions if 'distancia' in e and e['distancia'] != float('inf')]
             if valid_results:
                 best_exec = min(valid_results, key=lambda e: e['distancia'])

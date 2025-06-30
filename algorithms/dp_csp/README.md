@@ -1,34 +1,34 @@
 # DP-CSP: Dynamic Programming for Closest String Problem
 
-## Visão Geral
-O DP-CSP é um algoritmo de **programação dinâmica exata** que garante encontrar a solução ótima para o Closest String Problem. Utiliza uma abordagem decisória que testa incrementalmente valores de raio d até encontrar o menor raio para o qual existe uma solução, garantindo optimalidade global.
+O DP-CSP é um algoritmo exato baseado em programação dinâmica para encontrar a solução ótima do Closest String Problem.
 
-## Funcionamento
+## Estratégia
 
-### Estratégia Principal
-O algoritmo implementa uma **busca exata por programação dinâmica** que explora sistematicamente o espaço de soluções, mantendo estados que representam "orçamentos de erro" restantes para cada string de entrada. A execução é **não-interativa** - todo o progresso é reportado via callback sem interromper o fluxo do algoritmo.
+- Busca incremental pelo menor raio d viável.
+- Mantém estados representando orçamentos de erro por string.
+- Reconstrói a solução ótima via tabela de transições.
 
-### Arquitetura do Algoritmo
+## Garantias
 
-#### 1. Abordagem Decisória
-Em vez de buscar diretamente a string ótima, o algoritmo responde à pergunta:
-> "Existe uma string-centro com raio máximo ≤ d?"
+- Sempre encontra o ótimo global.
+- Determinístico e completo.
 
-#### 2. Estados da Programação Dinâmica
-Cada estado é representado por um **vetor de erros restantes**:
-```
-Estado = (r₁, r₂, ..., rₙ)
-onde rᵢ = erros restantes permitidos para string i
-```
+## Limitações
 
-#### 3. Busca Incremental
-```
-Para d = 0, 1, 2, ..., max_d:
-  ├── Executa DP decisório para raio d
-  ├── Se encontrar solução: RETORNA (centro, d)
-  └── Senão: incrementa d e tenta novamente
-```
+- Complexidade exponencial em n (número de strings).
+- Prático apenas para n ≤ 10 e d pequeno.
+- Uso intensivo de memória.
 
+## Uso Ideal
+
+- Instâncias pequenas.
+- Validação de heurísticas.
+- Benchmark de qualidade.
+
+## Parâmetros
+
+- Limite superior para raio.
+- Threshold para alertas de complexidade.
 ### Fluxo de Execução Detalhado
 
 #### 1. Pré-computação

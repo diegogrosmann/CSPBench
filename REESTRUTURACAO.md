@@ -1,33 +1,33 @@
 # Reestruturação da Aplicação CSP - Sumário
 
-## O que foi implementado
+## Arquitetura Modular
 
-### 1. Interface Padronizada de Algoritmos
 - **Classe base abstrata** `Algorithm` em `algorithms/base.py`
-- **Sistema de registro automático** com decorator `@register_algorithm`
-- **Registry global** que mantém todos os algoritmos disponíveis
+- **Registro automático** de algoritmos via decorador
+- **Cada algoritmo** em sua própria pasta, com configuração e implementação isoladas
 
-### 2. Estrutura Modular por Algoritmo
-Cada algoritmo agora possui sua própria pasta com:
-```
-algorithms/
-├── {nome_algoritmo}/
-│   ├── __init__.py          # Expõe o algoritmo
-│   ├── algorithm.py         # Wrapper com interface padronizada
-│   ├── config.py            # Configurações específicas
-│   └── implementation.py    # Implementação original
-```
+## Benefícios
 
-### 3. Algoritmos Migrados
-- ✅ **Baseline** - `algorithms/baseline/`
-- ✅ **BLF-GA** - `algorithms/blf_ga/`
-- ✅ **CSC** - `algorithms/csc/`
-- ✅ **DP-CSP** - `algorithms/dp_csp/`
-- ✅ **H³-CSP** - `algorithms/h3_csp/`
+- Modularidade total: cada algoritmo é independente
+- Facilidade de expansão: novos algoritmos sem alterar o main
+- Manutenção simplificada: responsabilidades bem separadas
+- Compatibilidade: preserva todas as implementações existentes
 
-### 4. Separação de Configurações
-- **Configurações da aplicação** permanecem em `utils/config.py`
-- **Configurações específicas** de cada algoritmo estão em suas respectivas pastas
+## Como Adicionar Algoritmos
+
+1. Crie a pasta `algorithms/meu_algoritmo/`
+2. Adicione os arquivos: `config.py`, `implementation.py`, `algorithm.py`, `__init__.py`
+3. Use `@register_algorithm` no wrapper
+4. O algoritmo aparece automaticamente no menu
+
+## Testes
+
+- Todos os algoritmos existentes migrados e funcionando
+- Registry automático operacional
+- Novo algoritmo pode ser adicionado em minutos
+- Main.py completamente genérico
+
+A aplicação agora é extensível, robusta e pronta para experimentação avançada!
 - Removidas dependências cruzadas entre algoritmos e config global
 
 ### 5. Main.py Dinâmico

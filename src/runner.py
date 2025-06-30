@@ -4,7 +4,9 @@ import itertools
 import signal
 import sys
 
-from src.algorithm_executor import AlgorithmExecutor, TimeoutException
+from utils.resource_monitor import check_algorithm_feasibility, get_safe_memory_limit, force_garbage_collection
+from src.algorithm_executor import AlgorithmExecutor, TimeoutException, ResourceLimitException
+
 from utils.config import ALGORITHM_TIMEOUT
 
 """
@@ -64,7 +66,7 @@ class Spinner:
 
 def execute_algorithm_runs(alg_name, AlgClass, seqs, alphabet, num_execs, baseline_val, console=None, timeout=None):
     """
-    Executa múltiplas execuções de um algoritmo em threads isoladas com timeout.
+    Executa múltiplas execuções de um algoritmo em threads isoladas com timeout e monitoramento de recursos.
     
     Args:
         alg_name: Nome do algoritmo
@@ -78,6 +80,34 @@ def execute_algorithm_runs(alg_name, AlgClass, seqs, alphabet, num_execs, baseli
     """
     if timeout is None:
         timeout = ALGORITHM_TIMEOUT
+    
+    # Força garbage collection antes de começar
+    force_garbage_collection()
+    
+    # Verificar viabilidade do algoritmo antes da execução
+    n, L = len(seqs), len(seqs[0])
+    is_feasible, feasibility_msg = check_algorithm_feasibility(n, L, alg_name)
+    
+    if not is_feasible:
+        if console:
+            console.print(f"{alg_name:<25s}... INVIÁVEL: {feasibility_msg}")
+        else:
+            print(f"\r{alg_name:<25s}... INVIÁVEL: {feasibility_msg}")
+        
+        return [{
+            'tempo': 0.0,
+            'iteracoes': 0,
+            'distancia': float('inf'),
+            'melhor_string': '',
+            'erro': f'Inviável: {feasibility_msg}'
+        }]
+    
+    # Ajustar timeout baseado na complexidade estimada
+    if alg_name == 'DP-CSP' and timeout < 60:
+        adjusted_timeout = min(timeout * 3, 300)  # Máximo 5 minutos para DP-CSP
+        if console:
+            console.print(f"Timeout ajustado para {alg_name}: {adjusted_timeout}s")
+        timeout = adjusted_timeout
         
     is_deterministic = getattr(AlgClass, 'is_deterministic', False)
     actual_execs = 1 if is_deterministic else num_execs
@@ -149,7 +179,7 @@ def execute_algorithm_runs(alg_name, AlgClass, seqs, alphabet, num_execs, baseli
             tempo_execucao = time.time() - t0
             
             if 'erro' in info:
-                if info['erro'] == 'timeout':
+                if info['erro'] == 'timeout' or 'timeout' in info['erro'].lower():
                     # Parar spinner e mostrar timeout
                     spinner.stop()
                     if console:
@@ -162,6 +192,19 @@ def execute_algorithm_runs(alg_name, AlgClass, seqs, alphabet, num_execs, baseli
                         'distancia': float('inf'),
                         'melhor_string': '',
                         'erro': f'Timeout ({timeout}s)'
+                    })
+                elif 'recurso' in info['erro'].lower() or 'resource' in info['erro'].lower():
+                    spinner.stop()
+                    if console:
+                        console.print(f"{exec_prefix:<25s}... RECURSOS LIMITADOS")
+                    else:
+                        print(f"\r{exec_prefix:<25s}... RECURSOS LIMITADOS")
+                    executions.append({
+                        'tempo': tempo_execucao,
+                        'iteracoes': 0,
+                        'distancia': float('inf'),
+                        'melhor_string': '',
+                        'erro': 'Limite de recursos atingido'
                     })
                 else:
                     error_msg = info['erro'][:50]
@@ -200,20 +243,34 @@ def execute_algorithm_runs(alg_name, AlgClass, seqs, alphabet, num_execs, baseli
                     'gap': gap
                 })
                 
-        except TimeoutException:
+        except (TimeoutException, ResourceLimitException) as e:
             tempo_execucao = time.time() - t0
             spinner.stop()
-            if console:
-                console.print(f"{exec_prefix:<25s}... TIMEOUT ({timeout}s)")
+            
+            if isinstance(e, ResourceLimitException):
+                if console:
+                    console.print(f"{exec_prefix:<25s}... RECURSOS LIMITADOS")
+                else:
+                    print(f"\r{exec_prefix:<25s}... RECURSOS LIMITADOS")
+                executions.append({
+                    'tempo': tempo_execucao,
+                    'iteracoes': 0,
+                    'distancia': float('inf'),
+                    'melhor_string': '',
+                    'erro': 'Limite de recursos atingido'
+                })
             else:
-                print(f"\r{exec_prefix:<25s}... TIMEOUT ({timeout}s)")
-            executions.append({
-                'tempo': tempo_execucao,
-                'iteracoes': 0,
-                'distancia': float('inf'),
-                'melhor_string': '',
-                'erro': f'Timeout ({timeout}s)'
-            })
+                if console:
+                    console.print(f"{exec_prefix:<25s}... TIMEOUT ({timeout}s)")
+                else:
+                    print(f"\r{exec_prefix:<25s}... TIMEOUT ({timeout}s)")
+                executions.append({
+                    'tempo': tempo_execucao,
+                    'iteracoes': 0,
+                    'distancia': float('inf'),
+                    'melhor_string': '',
+                    'erro': f'Timeout ({timeout}s)'
+                })
             
         except KeyboardInterrupt:
             # Cancelar executor e parar spinner
@@ -245,5 +302,7 @@ def execute_algorithm_runs(alg_name, AlgClass, seqs, alphabet, num_execs, baseli
             # Garantir que spinner pare em qualquer caso
             if spinner.thread and spinner.thread.is_alive():
                 spinner.stop()
+            # Força garbage collection após cada execução
+            force_garbage_collection()
     
     return executions

@@ -15,9 +15,10 @@ def menu() -> str:
     console.print("1) Gerar dataset sintético")
     console.print("2) Carregar dataset de arquivo")
     console.print("3) Baixar dataset via NCBI")
+    console.print("4) Execução em lote (batch)")
     while True:
-        c = safe_input("Escolha [1/2/3]: ")
-        if c in {'1', '2', '3'}:
+        c = safe_input("Escolha [1/2/3/4]: ")
+        if c in {'1', '2', '3', '4'}:
             return c
         console.print("Inválido.")
 
@@ -33,14 +34,6 @@ def select_algorithms() -> list[str]:
     raw = safe_input("Escolha (ex.: 1,3 ou 0 para todos) [padrão 1]: ")
     if not raw:
         return [algs[0]] if algs else []
-    if raw == '0':
-        return algs
-    for part in raw.split(','):
-        if part.strip().isdigit():
-            i = int(part)
-            if 1 <= i <= len(algs):
-                selected.append(algs[i-1])
-    return selected
     if raw == '0':
         return algs
     for part in raw.split(','):

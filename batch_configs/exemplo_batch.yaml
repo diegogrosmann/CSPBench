@@ -1,0 +1,88 @@
+# Arquivo de configuração para execução em lote
+# Cada item na lista 'execucoes' representa uma execução independente
+
+batch_info:
+  nome: "Experimento Comparativo CSP"
+  descricao: "Comparação de algoritmos em diferentes datasets"
+  timeout_global: 1800  # 30 minutos por execução
+
+execucoes:
+  # Execução 1: Dataset sintético pequeno
+  - nome: "Sintético Pequeno"
+    dataset:
+      tipo: "synthetic"  # synthetic, file, entrez
+      parametros:
+        n: 10
+        L: 50
+        alphabet: "ACGT"
+        noise: 0.1
+    algoritmos:
+      - "Baseline"
+      - "BLF-GA"
+      - "H³-CSP"
+      - "DP-CSP"
+    execucoes_por_algoritmo: 3
+    timeout: 300
+    
+  # Execução 2: Dataset sintético médio
+  - nome: "Sintético Médio"
+    dataset:
+      tipo: "synthetic"
+      parametros:
+        n: 20
+        L: 100
+        alphabet: "ACGT"
+        noise: 0.15
+    algoritmos:
+      - "Baseline"
+      - "BLF-GA"
+      - "H³-CSP"
+      - "CSC"
+    execucoes_por_algoritmo: 5
+    timeout: 600
+    
+  # Execução 3: Dataset de arquivo
+  - nome: "Dataset Real"
+    dataset:
+      tipo: "file"
+      parametros:
+        filepath: "saved_datasets/sequences.fasta"
+    algoritmos:
+      - "Baseline"
+      - "BLF-GA"
+      - "CSC"
+    execucoes_por_algoritmo: 3
+    timeout: 900
+    
+  # Execução 4: Dataset NCBI pequeno
+  - nome: "NCBI Pequeno"
+    dataset:
+      tipo: "entrez"
+      parametros:
+        email: "diegogrosmann@gmail.com"
+        db: "nucleotide"
+        term: "COI[Gene] AND 600:650[SLEN]"
+        n: 15
+        api_key: "40aff1a7f51fc7e0711203ea3b2f5ae37c09"
+    algoritmos:
+      - "Baseline"
+      - "BLF-GA"
+      - "H³-CSP"
+    execucoes_por_algoritmo: 3
+    timeout: 600
+    
+  # Execução 5: Teste de escalabilidade
+  - nome: "Escalabilidade"
+    dataset:
+      tipo: "synthetic"
+      parametros:
+        n: 50
+        L: 200
+        alphabet: "ACGT"
+        noise: 0.2
+    algoritmos:
+      - "Baseline"
+      - "BLF-GA"
+      # Evita DP-CSP para datasets grandes
+    execucoes_por_algoritmo: 1
+    timeout: 1200
