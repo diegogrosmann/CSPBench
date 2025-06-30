@@ -137,11 +137,14 @@ class BatchConfig:
         self.nome = config_dict.get('nome', 'Execução Sem Nome')
         self.dataset_config = config_dict.get('dataset', {})
         self.algoritmos = config_dict.get('algoritmos', ['Baseline'])
-        self.execucoes_por_algoritmo = config_dict.get('execucoes_por_algoritmo', 3)
+        # Mudança de execucoes_por_algoritmo para execucoes_por_algoritmo_por_base
+        self.execucoes_por_algoritmo_por_base = config_dict.get('execucoes_por_algoritmo_por_base', 
+                                                          config_dict.get('execucoes_por_algoritmo', 3))  # Retro-compatibilidade
+        self.num_bases = config_dict.get('num_bases', 1)
         self.timeout = config_dict.get('timeout', ALGORITHM_TIMEOUT)
         
     def __str__(self):
-        return f"BatchConfig({self.nome}, {len(self.algoritmos)} algoritmos, {self.execucoes_por_algoritmo} exec cada)"
+        return f"BatchConfig({self.nome}, {len(self.algoritmos)} algoritmos, {self.execucoes_por_algoritmo_por_base} exec por base, {self.num_bases} bases)"
 
 class BatchExecutor:
     """Executa uma sequência de configurações em lote."""
@@ -155,6 +158,11 @@ class BatchExecutor:
         
         # Identificador único para esta execução em lote
         self.batch_id = f"batch_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}"
+        
+        # Criar diretório dedicado para os resultados deste lote
+        self.results_dir = Path("results") / self.batch_id
+        self.results_dir.mkdir(parents=True, exist_ok=True)
+        console.print(f"📁 Diretório de resultados criado: {self.results_dir}")
         
         self._load_config()
         
@@ -248,10 +256,13 @@ class BatchExecutor:
                             algoritmos.append(alg_elem.text)
                     exec_config['algoritmos'] = algoritmos
                 
-                # Execuções por algoritmo
-                exec_per_alg_elem = exec_elem.find('execucoes_por_algoritmo')
+                # Execuções por algoritmo por base
+                exec_per_alg_elem = exec_elem.find('execucoes_por_algoritmo_por_base')
+                if exec_per_alg_elem is None:
+                    exec_per_alg_elem = exec_elem.find('execucoes_por_algoritmo')
+                
                 if exec_per_alg_elem is not None and exec_per_alg_elem.text is not None:
-                    exec_config['execucoes_por_algoritmo'] = int(exec_per_alg_elem.text)
+                    exec_config['execucoes_por_algoritmo_por_base'] = int(exec_per_alg_elem.text)
                 
                 # Timeout
                 timeout_elem = exec_elem.find('timeout')
@@ -295,125 +306,161 @@ class BatchExecutor:
             'inicio': datetime.now().isoformat(),
             'algoritmos_executados': {},
             'erro': None,
-            'tempo_total': 0.0
+            'tempo_total': 0.0,
+            'num_bases': config.num_bases,
+            'execucoes_por_algoritmo_por_base': config.execucoes_por_algoritmo_por_base
         }
         
         try:
-            # Gerar/carregar dataset
-            console.print(f"📊 Gerando dataset...")
-            seqs, dataset_params = self._generate_dataset(config.dataset_config)
+            # Número total de bases a serem processadas
+            num_bases = config.num_bases
             
-            if not seqs:
-                raise ValueError("Dataset vazio gerado")
+            # Para cada base de dados
+            for base_idx in range(num_bases):
+                console.print(f"\n📊 Gerando base de dados {base_idx + 1}/{num_bases}...")
                 
-            alphabet = ''.join(sorted(set(''.join(seqs))))
-            n, L = len(seqs), len(seqs[0])
-            
-            console.print(f"Dataset: n={n}, L={L}, |Σ|={len(alphabet)}")
-            result['dataset_info'] = {
-                'n': n, 'L': L, 'alphabet_size': len(alphabet),
-                'params': dataset_params
-            }
-            
-            # Verificar viabilidade dos algoritmos
-            viable_algs = []
-            for alg_name in config.algoritmos:
-                is_viable, msg = check_algorithm_feasibility(n, L, alg_name)
-                if is_viable:
-                    viable_algs.append(alg_name)
-                    console.print(f"✓ {alg_name}: viável")
-                else:
-                    console.print(f"⚠ {alg_name}: {msg} (pulado)")
-            
-            if not viable_algs:
-                console.print("❌ Nenhum algoritmo viável")
-                result['erro'] = "Nenhum algoritmo viável para este dataset"
-                return result
-            
-            # Baseline
-            console.print(f"\n🎯 Executando Baseline...")
-            baseline_start = time.time()
-            baseline_center = greedy_consensus(seqs, alphabet)
-            baseline_val = max_distance(baseline_center, seqs)
-            baseline_time = time.time() - baseline_start
-            
-            console.print(f"Baseline: dist={baseline_val}, tempo={baseline_time:.3f}s")
-            
-            # Criar formatter para esta execução
-            exec_formatter = ResultsFormatter()
-            baseline_executions = [{
-                'tempo': baseline_time,
-                'iteracoes': 1,
-                'distancia': baseline_val,
-                'melhor_string': baseline_center,
-                'gap': 0.0
-            }]
-            exec_formatter.add_algorithm_results("Baseline", baseline_executions)
-            
-            # Adicionar ao formatter consolidado
-            exec_key = f"{config.nome}_Baseline"
-            self.consolidated_formatter.add_algorithm_results(exec_key, baseline_executions)
-            
-            # Executar outros algoritmos
-            for alg_name in viable_algs:
-                if alg_name == "Baseline":
-                    continue
-                    
-                console.print(f"\n🔄 Executando {alg_name}...")
+                # Gerar/carregar dataset para esta base
+                seqs, dataset_params = self._generate_dataset(config.dataset_config)
                 
-                if alg_name not in global_registry:
-                    console.print(f"❌ Algoritmo '{alg_name}' não encontrado!")
-                    continue
+                if not seqs:
+                    raise ValueError(f"Dataset vazio gerado para base {base_idx + 1}")
                     
-                AlgClass = global_registry[alg_name]
+                alphabet = ''.join(sorted(set(''.join(seqs))))
+                n, L = len(seqs), len(seqs[0])
                 
-                try:
-                    executions = execute_algorithm_runs(
-                        alg_name, AlgClass, seqs, alphabet, 
-                        config.execucoes_por_algoritmo, baseline_val, 
-                        console, config.timeout
-                    )
+                console.print(f"Base {base_idx + 1}: n={n}, L={L}, |Σ|={len(alphabet)}")
+                
+                # Armazenar informações da base de dados
+                if 'bases_info' not in result:
+                    result['bases_info'] = []
                     
-                    exec_formatter.add_algorithm_results(alg_name, executions)
-                    
-                    # Adicionar ao formatter consolidado com chave única
-                    exec_key = f"{config.nome}_{alg_name}"
-                    self.consolidated_formatter.add_algorithm_results(exec_key, executions)
-                    
-                    # Extrair melhor resultado
-                    valid_results = [e for e in executions if 'distancia' in e and e['distancia'] != float('inf')]
-                    if valid_results:
-                        best_exec = min(valid_results, key=lambda e: e['distancia'])
-                        result['algoritmos_executados'][alg_name] = {
-                            'dist': best_exec['distancia'],
-                            'time': best_exec['tempo'],
-                            'gap': best_exec.get('gap', 0.0),
-                            'status': 'sucesso'
-                        }
+                result['bases_info'].append({
+                    'base_idx': base_idx + 1,
+                    'n': n, 'L': L, 'alphabet_size': len(alphabet),
+                    'params': dataset_params
+                })
+                
+                # Verificar viabilidade dos algoritmos
+                viable_algs = []
+                for alg_name in config.algoritmos:
+                    is_viable, msg = check_algorithm_feasibility(n, L, alg_name)
+                    if is_viable:
+                        viable_algs.append(alg_name)
+                        console.print(f"✓ {alg_name}: viável")
                     else:
-                        error_exec = next((e for e in executions if 'erro' in e), executions[0])
-                        result['algoritmos_executados'][alg_name] = {
+                        console.print(f"⚠ {alg_name}: {msg} (pulado)")
+                
+                if not viable_algs:
+                    console.print(f"❌ Nenhum algoritmo viável para a base {base_idx + 1}")
+                    continue
+                
+                # Baseline
+                console.print(f"\n🎯 Executando Baseline para base {base_idx + 1}...")
+                baseline_start = time.time()
+                baseline_center = greedy_consensus(seqs, alphabet)
+                baseline_val = max_distance(baseline_center, seqs)
+                baseline_time = time.time() - baseline_start
+                
+                console.print(f"Baseline: dist={baseline_val}, tempo={baseline_time:.3f}s")
+                
+                # Criar formatter para esta execução
+                exec_formatter = ResultsFormatter()
+                baseline_executions = [{
+                    'tempo': baseline_time,
+                    'iteracoes': 1,
+                    'distancia': baseline_val,
+                    'melhor_string': baseline_center,
+                    'gap': 0.0
+                }]
+                exec_formatter.add_algorithm_results("Baseline", baseline_executions)
+                
+                # Adicionar ao formatter consolidado
+                exec_key = f"{config.nome}_Base{base_idx+1}_Baseline"
+                self.consolidated_formatter.add_algorithm_results(exec_key, baseline_executions)
+                
+                # Executar outros algoritmos
+                for alg_name in viable_algs:
+                    if alg_name == "Baseline":
+                        continue
+                        
+                    console.print(f"\n🔄 Executando {alg_name} para base {base_idx + 1}...")
+                    
+                    if alg_name not in global_registry:
+                        console.print(f"❌ Algoritmo '{alg_name}' não encontrado!")
+                        continue
+                        
+                    AlgClass = global_registry[alg_name]
+                    
+                    # Execute cada algoritmo o número de vezes definido por base
+                    execucoes_por_algoritmo = config.execucoes_por_algoritmo_por_base
+                    
+                    try:
+                        executions = execute_algorithm_runs(
+                            alg_name, AlgClass, seqs, alphabet, 
+                            execucoes_por_algoritmo, baseline_val, 
+                            console, config.timeout
+                        )
+                        
+                        exec_formatter.add_algorithm_results(alg_name, executions)
+                        
+                        # Adicionar ao formatter consolidado com chave única
+                        exec_key = f"{config.nome}_Base{base_idx+1}_{alg_name}"
+                        self.consolidated_formatter.add_algorithm_results(exec_key, executions)
+                        
+                        # Extrair melhor resultado
+                        valid_results = [e for e in executions if 'distancia' in e and e['distancia'] != float('inf')]
+                        if valid_results:
+                            best_exec = min(valid_results, key=lambda e: e['distancia'])
+                            
+                            # Armazenar resultados para esta base
+                            base_key = f"base_{base_idx+1}"
+                            if alg_name not in result['algoritmos_executados']:
+                                result['algoritmos_executados'][alg_name] = {}
+                                
+                            result['algoritmos_executados'][alg_name][base_key] = {
+                                'dist': best_exec['distancia'],
+                                'time': best_exec['tempo'],
+                                'gap': best_exec.get('gap', 0.0),
+                                'status': 'sucesso'
+                            }
+                            
+                        else:
+                            error_exec = next((e for e in executions if 'erro' in e), executions[0])
+                            
+                            # Armazenar resultados para esta base
+                            base_key = f"base_{base_idx+1}"
+                            if alg_name not in result['algoritmos_executados']:
+                                result['algoritmos_executados'][alg_name] = {}
+                                
+                            result['algoritmos_executados'][alg_name][base_key] = {
+                                'dist': float('inf'),
+                                'time': error_exec['tempo'],
+                                'gap': float('inf'),
+                                'status': 'erro',
+                                'erro': error_exec.get('erro', 'Erro desconhecido')
+                            }
+                            
+                    except Exception as e:
+                        console.print(f"❌ Erro executando {alg_name} na base {base_idx+1}: {e}")
+                        
+                        # Armazenar erro
+                        base_key = f"base_{base_idx+1}"
+                        if alg_name not in result['algoritmos_executados']:
+                            result['algoritmos_executados'][alg_name] = {}
+                            
+                        result['algoritmos_executados'][alg_name][base_key] = {
                             'dist': float('inf'),
-                            'time': error_exec['tempo'],
+                            'time': 0.0,
                             'gap': float('inf'),
                             'status': 'erro',
-                            'erro': error_exec.get('erro', 'Erro desconhecido')
+                            'erro': str(e)
                         }
-                        
-                except Exception as e:
-                    console.print(f"❌ Erro executando {alg_name}: {e}")
-                    result['algoritmos_executados'][alg_name] = {
-                        'dist': float('inf'),
-                        'time': 0.0,
-                        'gap': float('inf'),
-                        'status': 'erro',
-                        'erro': str(e)
-                    }
-            
-            # Salvar relatório individual
-            report_filename = f"{self.batch_id}_{exec_index+1}_{config.nome.replace(' ', '_')}.txt"
-            exec_formatter.save_detailed_report(report_filename)
-            console.print(f"📄 Relatório salvo: {report_filename}")
+                
+                # Salvar relatório individual para esta base
+                report_filename = f"{exec_index+1}_base{base_idx+1}_{config.nome.replace(' ', '_')}.txt"
+                report_path = self.results_dir / report_filename
+                exec_formatter.save_detailed_report(str(report_path))
+                console.print(f"📄 Relatório para base {base_idx+1} salvo: {report_filename}")
             
         except Exception as e:
             console.print(f"❌ Erro na execução: {e}")
@@ -440,7 +487,7 @@ class BatchExecutor:
             'inicio': datetime.now().isoformat(),
             'execucoes': [],
             'resumo': {},
-            'tempo_total': 0.0
+            'tempo_total': 0.0,
         }
         
         # Executar cada configuração
@@ -474,7 +521,7 @@ class BatchExecutor:
         
         return batch_result
     
-    def _generate_batch_summary(self, batch_result: Dict[str, Any]):
+    def _generate_batch_summary(self, batch_result: Dict[str, Any], num_bases_sinteticas=None, execs_por_base_str=None):
         """Gera resumo consolidado do lote."""
         total_execucoes = len(batch_result['execucoes'])
         execucoes_com_sucesso = len([e for e in batch_result['execucoes'] if not e.get('erro')])
@@ -488,21 +535,28 @@ class BatchExecutor:
         
         # Resumo por algoritmo
         alg_stats = {}
+        
+        # Para cada configuração de execução
         for exec_result in batch_result['execucoes']:
             if exec_result.get('erro'):
                 continue
-            for alg_name, alg_result in exec_result.get('algoritmos_executados', {}).items():
+            
+            # Para cada algoritmo em cada base
+            for alg_name, base_results in exec_result.get('algoritmos_executados', {}).items():
                 if alg_name not in alg_stats:
-                    alg_stats[alg_name] = {'sucessos': 0, 'total': 0, 'tempo_medio': 0.0}
-                alg_stats[alg_name]['total'] += 1
-                if alg_result.get('status') == 'sucesso':
-                    alg_stats[alg_name]['sucessos'] += 1
-                    alg_stats[alg_name]['tempo_medio'] += alg_result.get('time', 0.0)
+                    alg_stats[alg_name] = {'sucessos': 0, 'total': 0, 'tempo_total': 0.0}
+                
+                # Para cada base processada neste algoritmo
+                for base_key, result in base_results.items():
+                    alg_stats[alg_name]['total'] += 1
+                    if result.get('status') == 'sucesso':
+                        alg_stats[alg_name]['sucessos'] += 1
+                        alg_stats[alg_name]['tempo_total'] += result.get('time', 0.0)
         
         console.print(f"\n📈 Estatísticas por algoritmo:")
         for alg_name, stats in alg_stats.items():
             taxa = 100 * stats['sucessos'] / stats['total'] if stats['total'] > 0 else 0
-            tempo_med = stats['tempo_medio'] / stats['sucessos'] if stats['sucessos'] > 0 else 0
+            tempo_med = stats['tempo_total'] / stats['sucessos'] if stats['sucessos'] > 0 else 0
             console.print(f"  {alg_name}: {stats['sucessos']}/{stats['total']} sucessos ({taxa:.1f}%), tempo médio: {tempo_med:.3f}s")
         
         batch_result['resumo'] = {
@@ -515,16 +569,64 @@ class BatchExecutor:
     def _save_batch_report(self, batch_result: Dict[str, Any]):
         """Salva relatório consolidado do lote."""
         # Relatório JSON detalhado
-        json_filename = f"{self.batch_id}_batch_results.json"
-        json_path = Path("results") / json_filename
-        json_path.parent.mkdir(exist_ok=True)
+        json_filename = f"batch_results.json"
+        json_path = self.results_dir / json_filename
         
-        with open(json_path, 'w', encoding='utf-8') as f:
-            json.dump(batch_result, f, indent=2, ensure_ascii=False)
+        # Corrigir a serialização JSON do relatório do batch, convertendo chaves de dicionários para string antes de salvar
+        def convert_keys_to_str(obj):
+            if isinstance(obj, dict):
+                return {str(k): convert_keys_to_str(v) for k, v in obj.items()}
+            elif isinstance(obj, list):
+                return [convert_keys_to_str(i) for i in obj]
+            else:
+                return obj
+
+        # Converter todas as chaves para string e salvar uma única vez
+        batch_result_str_keys = convert_keys_to_str(batch_result)
+        with open(json_path, "w", encoding="utf-8") as f:
+            json.dump(batch_result_str_keys, f, indent=2, ensure_ascii=False)
         
-        console.print(f"💾 Relatório JSON salvo: {json_filename}")
+        console.print(f"💾 Relatório JSON salvo: {self.results_dir / json_filename}")
         
         # Relatório consolidado de algoritmos
-        consolidated_filename = f"{self.batch_id}_consolidated_algorithms.txt"
-        self.consolidated_formatter.save_detailed_report(consolidated_filename)
-        console.print(f"📄 Relatório consolidado salvo: {consolidated_filename}")
+        consolidated_filename = f"consolidated_algorithms.txt"
+        consolidated_path = self.results_dir / consolidated_filename
+        self.consolidated_formatter.save_detailed_report(str(consolidated_path))
+        console.print(f"📄 Relatório consolidado salvo: {self.results_dir / consolidated_filename}")
+
+        # Salvamento de arquivo README com metadados do lote
+        readme_path = self.results_dir / "README.md"
+        with open(readme_path, "w", encoding="utf-8") as f:
+            f.write(f"# Resultados do Lote: {self.batch_info.get('nome', 'Sem nome')}\n\n")
+            f.write(f"**Descrição**: {self.batch_info.get('descricao', 'Sem descrição')}\n\n")
+            f.write(f"**Data de execução**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+            f.write(f"**ID do lote**: {self.batch_id}\n")
+            f.write(f"**Tempo total**: {batch_result['tempo_total']:.1f} segundos\n")
+            f.write(f"**Taxa de sucesso**: {batch_result['resumo']['taxa_sucesso']:.1f}%\n\n")
+            f.write("## Arquivos\n\n")
+            f.write(f"- `{json_filename}`: Resultados detalhados em formato JSON\n")
+            f.write(f"- `{consolidated_filename}`: Relatório consolidado de todos algoritmos\n")
+            f.write(f"- Arquivos individuais: Relatórios por base de dados\n")
+        
+        console.print(f"📝 README criado: {self.results_dir / 'README.md'}")
+        # Relatório consolidado de algoritmos
+        consolidated_filename = f"consolidated_algorithms.txt"
+        consolidated_path = self.results_dir / consolidated_filename
+        self.consolidated_formatter.save_detailed_report(str(consolidated_path))
+        console.print(f"📄 Relatório consolidado salvo: {self.results_dir / consolidated_filename}")
+
+        # Salvamento de arquivo README com metadados do lote
+        readme_path = self.results_dir / "README.md"
+        with open(readme_path, "w", encoding="utf-8") as f:
+            f.write(f"# Resultados do Lote: {self.batch_info.get('nome', 'Sem nome')}\n\n")
+            f.write(f"**Descrição**: {self.batch_info.get('descricao', 'Sem descrição')}\n\n")
+            f.write(f"**Data de execução**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+            f.write(f"**ID do lote**: {self.batch_id}\n")
+            f.write(f"**Tempo total**: {batch_result['tempo_total']:.1f} segundos\n")
+            f.write(f"**Taxa de sucesso**: {batch_result['resumo']['taxa_sucesso']:.1f}%\n\n")
+            f.write("## Arquivos\n\n")
+            f.write(f"- `{json_filename}`: Resultados detalhados em formato JSON\n")
+            f.write(f"- `{consolidated_filename}`: Relatório consolidado de todos algoritmos\n")
+            f.write(f"- Arquivos individuais: Relatórios por base de dados\n")
+        
+        console.print(f"📝 README criado: {self.results_dir / 'README.md'}")

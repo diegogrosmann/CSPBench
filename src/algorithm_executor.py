@@ -35,6 +35,7 @@ class AlgorithmExecutor:
             max_iterations=min(100000, timeout_seconds * 1000),  # Baseado no timeout
             check_interval=min(2.0, timeout_seconds / 10)  # Verificar mais frequentemente em timeouts curtos
         )
+        logger.info(f"AlgorithmExecutor criado: timeout={timeout_seconds}s, limites={limits}")
         self.resource_monitor = ResourceMonitor(limits)
         self.resource_violation = False
         
@@ -44,9 +45,7 @@ class AlgorithmExecutor:
         progress_callback: Optional[Callable[[str], None]] = None,
         warning_callback: Optional[Callable[[str], None]] = None
     ) -> Tuple[Optional[Any], Union[int, float], dict]:
-        """
-        Executa um algoritmo em thread isolada com timeout e monitoramento de recursos.
-        """
+        logger.info(f"Executando algoritmo {algorithm_instance.__class__.__name__} com timeout={self.timeout}s")
         result_queue = queue.Queue()
         self.stop_event.clear()
         self.resource_violation = False
@@ -67,13 +66,16 @@ class AlgorithmExecutor:
         def run_algorithm():
             """Função executada na thread do algoritmo."""
             try:
+                logger.info(f"Iniciando thread do algoritmo {algorithm_instance.__class__.__name__}")
                 # Configurar callbacks se disponíveis
                 if hasattr(algorithm_instance, 'set_progress_callback') and progress_callback is not None:
                     def monitored_progress(msg: str):
                         if self.stop_event.is_set():
                             if self.resource_violation:
+                                logger.warning("Execução interrompida por limite de recursos")
                                 raise ResourceLimitException("Algoritmo cancelado por limite de recursos")
                             else:
+                                logger.warning("Execução interrompida por timeout")
                                 raise TimeoutException("Algoritmo cancelado por timeout")
                         if progress_callback is not None:
                             progress_callback(msg)
@@ -98,14 +100,16 @@ class AlgorithmExecutor:
                 else:
                     info['iteracoes'] = 1
                 
+                logger.info(f"Algoritmo finalizado: dist={distance}, info={info}")
                 result_queue.put(('success', center, distance, info))
                 
             except (TimeoutException, ResourceLimitException) as e:
                 error_type = 'resource_limit' if isinstance(e, ResourceLimitException) else 'timeout'
+                logger.warning(f"Execução interrompida ({error_type}): {e}")
                 result_queue.put((error_type, None, float('inf'), {'erro': str(e)}))
             except Exception as e:
                 error_msg = str(e)
-                logger.error(f"Erro na execução do algoritmo: {error_msg}")
+                logger.error(f"Erro na execução do algoritmo: {error_msg}", exc_info=True)
                 result_queue.put(('error', None, float('inf'), {'erro': error_msg}))
         
         # Iniciar monitoramento de recursos
@@ -124,6 +128,7 @@ class AlgorithmExecutor:
             elapsed = time.time() - start_time
             
             if elapsed >= self.timeout:
+                logger.warning("Timeout atingido, sinalizando parada")
                 # Timeout atingido - sinalizar parada
                 self.stop_event.set()
                 
@@ -142,6 +147,7 @@ class AlgorithmExecutor:
                 status, center, distance, info = result
                 
                 self.resource_monitor.stop_monitoring()
+                logger.info(f"Resultado recebido da thread: status={status}")
                 
                 if status == 'timeout':
                     raise TimeoutException("Algoritmo cancelado por timeout durante execução")
@@ -161,11 +167,14 @@ class AlgorithmExecutor:
         try:
             result = result_queue.get_nowait()
             status, center, distance, info = result
+            logger.info(f"Thread terminou: status={status}")
             return center, distance, info
         except queue.Empty:
+            logger.error("Thread terminou sem resultado")
             return None, float('inf'), {'erro': 'Thread terminou sem resultado'}
     
     def cancel(self):
+        logger.info("Cancelando execução atual")
         """Cancela a execução atual."""
         self.stop_event.set()
         self.resource_monitor.stop_monitoring()

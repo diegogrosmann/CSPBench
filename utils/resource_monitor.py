@@ -11,16 +11,17 @@ import gc
 import sys
 from typing import Optional, Callable
 from dataclasses import dataclass
+from .resource_limits_config import RESOURCE_LIMITS_DEFAULTS
 
 logger = logging.getLogger(__name__)
 
 @dataclass
 class ResourceLimits:
     """Limites de recursos do sistema."""
-    max_memory_mb: int = 2048        # MB máximo de RAM para o processo
-    max_iterations: int = 100000     # Máximo de iterações para algoritmos
-    check_interval: float = 2.0      # Intervalo de verificação em segundos
-    gc_threshold: int = 1000         # Threshold para garbage collection
+    max_memory_mb: int = RESOURCE_LIMITS_DEFAULTS['max_memory_mb']
+    max_iterations: int = RESOURCE_LIMITS_DEFAULTS['max_iterations']
+    check_interval: float = RESOURCE_LIMITS_DEFAULTS['check_interval']
+    gc_threshold: int = RESOURCE_LIMITS_DEFAULTS['gc_threshold']
 
 class ResourceMonitor:
     """Monitor de recursos do sistema com limites automáticos."""
@@ -239,7 +240,7 @@ def check_algorithm_feasibility(n: int, L: int, algorithm_name: str) -> tuple[bo
     
     else:
         # Algoritmos desconhecidos - assumir viáveis
-        return True, "Algoritmo não reconhecido - assumindo viável"
+        return True, "Viável (algoritmo desconhecido)"
 
 def force_garbage_collection():
     """Força garbage collection para liberar memória."""

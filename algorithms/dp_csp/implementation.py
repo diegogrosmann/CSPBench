@@ -14,7 +14,7 @@ import logging
 from typing import Dict, List, Optional, Sequence, Tuple, cast, Callable
 
 from utils.distance import max_hamming
-from .config import DPCSP_DEFAULTS
+from .config import DP_CSP_DEFAULTS
 
 logger = logging.getLogger(__name__)
 
@@ -102,7 +102,7 @@ def exact_dp_closest_string(strings: List[String],
 
     n = len(strings)
     state_count_est = (max_d + 1) ** n
-    if state_count_est > 10 ** DPCSP_DEFAULTS['warn_threshold']:
+    if state_count_est > 10 ** DP_CSP_DEFAULTS['warn_threshold']:
         if warning_callback:
             warning_callback(
                 f"(d+1)^n = {state_count_est:,} estados potenciais – "

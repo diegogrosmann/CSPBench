@@ -17,6 +17,7 @@ import logging
 
 import numpy as np
 from utils.distance import hamming_distance, max_hamming
+from .config import BLF_GA_DEFAULTS
 
 logger = logging.getLogger(__name__)
 
@@ -36,32 +37,46 @@ class BLFGA:
         self,
         strings: List[String],
         alphabet: str,
-        pop_size: int     = 50,
-        initial_blocks: int = 5,
-        min_block_len: int  = 3,
-        cross_prob: float   = 0.9,
-        mut_prob: float     = 0.5,
-        elite_rate: float   = 0.05,
-        rediv_freq: int     = 10,
-        max_gens: int       = 300,
-        max_time: float     = 60.0,
-        seed: int | None    = None,
+        pop_size: Optional[int]       = None,
+        initial_blocks: Optional[int] = None,
+        min_block_len: Optional[int]  = None,
+        cross_prob: Optional[float]   = None,
+        mut_prob: Optional[float]     = None,
+        elite_rate: Optional[float]   = None,
+        rediv_freq: Optional[int]     = None,
+        max_gens: Optional[int]       = None,
+        max_time: Optional[float]     = None,
+        seed: Optional[int]           = None,
     ):
         logger.debug("__init__ BLFGA")
         self.strings        = strings
         self.n              = len(strings)
         self.L              = len(strings[0])
         self.alphabet       = alphabet
-        self.pop_size       = pop_size
-        self.initial_blocks = initial_blocks
-        self.min_block_len  = min_block_len
-        self.cross_prob     = cross_prob
-        self.mut_prob       = mut_prob
-        self.elite_rate     = elite_rate
-        self.rediv_freq     = rediv_freq
-        self.max_gens       = max_gens
-        self.max_time       = max_time
-        self.rng            = random.Random(seed)
+
+        # Carrega parâmetros do dicionário de defaults, permite sobrescrever via argumentos
+        params = {**BLF_GA_DEFAULTS}
+        if pop_size is not None: params['pop_size'] = pop_size
+        if initial_blocks is not None: params['initial_blocks'] = initial_blocks
+        if min_block_len is not None: params['min_block_len'] = min_block_len
+        if cross_prob is not None: params['cross_prob'] = cross_prob
+        if mut_prob is not None: params['mut_prob'] = mut_prob
+        if elite_rate is not None: params['elite_rate'] = elite_rate
+        if rediv_freq is not None: params['rediv_freq'] = rediv_freq
+        if max_gens is not None: params['max_gens'] = max_gens
+        if max_time is not None: params['max_time'] = max_time
+        if seed is not None: params['seed'] = seed
+
+        self.pop_size       = params['pop_size']
+        self.initial_blocks = params['initial_blocks']
+        self.min_block_len  = params['min_block_len']
+        self.cross_prob     = params['cross_prob']
+        self.mut_prob       = params['mut_prob']
+        self.elite_rate     = params['elite_rate']
+        self.rediv_freq     = params['rediv_freq']
+        self.max_gens       = params['max_gens']
+        self.max_time       = params['max_time']
+        self.rng            = random.Random(params['seed'])
         self.progress_callback: Optional[Callable[[str], None]] = None
 
         self.blocks = self._initial_blocking()

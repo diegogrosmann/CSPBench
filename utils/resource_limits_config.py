@@ -1,0 +1,6 @@
+RESOURCE_LIMITS_DEFAULTS = {
+    'max_memory_mb': 2048,
+    'max_iterations': 100000,
+    'check_interval': 2.0,
+    'gc_threshold': 1000,
+}

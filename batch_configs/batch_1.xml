@@ -26,7 +26,7 @@
                 <algoritmo>DP-CSP</algoritmo>
                 <algoritmo>CSC</algoritmo>
             </algoritmos>
-            <execucoes_por_algoritmo>30</execucoes_por_algoritmo>
+            <execucoes_por_algoritmo_por_base>30</execucoes_por_algoritmo_por_base>
             <timeout>300</timeout>
         </execucao>
     </execucoes>

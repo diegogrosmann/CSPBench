@@ -5,6 +5,7 @@ import logging
 from itertools import combinations, product
 from typing import Callable, Optional
 from utils.distance import hamming_distance, max_hamming
+from .config import CSC_DEFAULTS
 
 logger = logging.getLogger(__name__)
 
@@ -70,14 +71,11 @@ def auto_parameters(strings):
     maximo = np.max(distancias)
     
     # Critério prático para DBSCAN:
-    # - Valor um pouco abaixo da média para formar clusters não triviais
-    d = max(2, int(np.floor(media * 0.8)))
-    
+    d = max(CSC_DEFAULTS['min_d'], int(np.floor(media * CSC_DEFAULTS['d_factor'])))
     # Critério prático para n_blocks:
-    # - Proporcional ao log(n) e ao tamanho do cluster (min(n, L//25, 4)), mas sempre pelo menos 2
     n = len(strings)
     L = len(strings[0])
-    n_blocks = max(2, min(4, n // 6, L // 25))
+    n_blocks = max(CSC_DEFAULTS['min_blocks'], min(CSC_DEFAULTS['max_blocks'], n // CSC_DEFAULTS['n_div'], L // CSC_DEFAULTS['l_div']))
     
     logger.info(f"[auto_parameters] Hamming média={media:.2f}, min={minimo}, max={maximo} | d(auto)={d} | n_blocks(auto)={n_blocks}")
     return d, n_blocks

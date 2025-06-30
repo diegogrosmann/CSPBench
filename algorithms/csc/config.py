@@ -1,5 +1,9 @@
 # CSC Configuration
 CSC_DEFAULTS = {
-    'd': 2,
-    'n_blocks': 2,
+    'min_d': 2,
+    'd_factor': 0.8,
+    'min_blocks': 2,
+    'max_blocks': 4,
+    'n_div': 6,
+    'l_div': 25,
 }

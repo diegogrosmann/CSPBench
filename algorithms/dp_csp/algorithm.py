@@ -1,6 +1,6 @@
 from typing import Callable
 from algorithms.base import Algorithm, register_algorithm
-from .config import DPCSP_DEFAULTS
+from .config import DP_CSP_DEFAULTS
 from .implementation import exact_dp_closest_string
 from utils.distance import max_hamming
 
@@ -8,7 +8,7 @@ from utils.distance import max_hamming
 class DPCSPAlgorithm(Algorithm):
     """DP-CSP: Dynamic Programming exact solution for CSP"""
     name = "DP-CSP"
-    default_params = DPCSP_DEFAULTS
+    default_params = DP_CSP_DEFAULTS
     is_deterministic = True
 
     def __init__(self, strings: list[str], alphabet: str, **params):

@@ -148,27 +148,38 @@ def main():
         console.print("EXECUTANDO ALGORITMOS")
         console.print("="*50)
         
-        from src.runner import Spinner
+        from src.runner import Spinner, execute_algorithm_runs
+
+        # Executa o Baseline usando o mesmo executor isolado dos demais algoritmos
         baseline_spinner = Spinner("Baseline", console)
         baseline_spinner.start()
-        
-        import time
-        t0 = time.time()
-        baseline_center = greedy_consensus(seqs, alphabet)
-        baseline_val = max_distance(baseline_center, seqs)
-        baseline_time = time.time() - t0
-        
+
+        baseline_executions = execute_algorithm_runs(
+            "Baseline",
+            # Wrapper para Baseline: precisa de uma classe compatível
+            lambda seqs, alphabet: type(
+                "BaselineWrapper",
+                (),
+                {
+                    "is_deterministic": True,
+                    "set_progress_callback": lambda self, cb: None,
+                    "run": lambda self: (greedy_consensus(seqs, alphabet), max_distance(greedy_consensus(seqs, alphabet), seqs), {'iteracoes': 1, 'melhor_string': greedy_consensus(seqs, alphabet)})
+                }
+            )(seqs, alphabet),
+            seqs,
+            alphabet,
+            1,
+            None,
+            console,
+            timeout=30  # Timeout curto, pois é rápido
+        )
+
         baseline_spinner.stop()
+        baseline_val = baseline_executions[0]['distancia'] if baseline_executions and 'distancia' in baseline_executions[0] else float('inf')
+        baseline_time = baseline_executions[0]['tempo'] if baseline_executions and 'tempo' in baseline_executions[0] else 0.0
         console.print(f"Baseline                 ... dist={baseline_val}, tempo={baseline_time:.3f}s")
 
         formatter = ResultsFormatter()
-        baseline_executions = [{
-            'tempo': baseline_time,
-            'iteracoes': 1,
-            'distancia': baseline_val,
-            'melhor_string': baseline_center,
-            'gap': 0.0
-        }]
         formatter.add_algorithm_results("Baseline", baseline_executions)
 
         # Execução dos algoritmos (usando viable_algs em vez de algs)

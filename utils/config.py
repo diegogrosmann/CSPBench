@@ -13,6 +13,11 @@ Atributos:
 """
 
 import sys
+from algorithms.blf_ga.config import BLF_GA_DEFAULTS
+from algorithms.csc.config import CSC_DEFAULTS
+from algorithms.h3_csp.config import H3_CSP_DEFAULTS
+from algorithms.dp_csp.config import DP_CSP_DEFAULTS
+from algorithms.baseline.config import BASELINE_DEFAULTS
 
 # --------------------------------------------------
 # Geral

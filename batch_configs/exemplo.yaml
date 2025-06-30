@@ -1,5 +1,4 @@
-# Arquivo de configuração para execução em lote
-# Cada item na lista 'execucoes' representa uma execução independente
+# Arquivo de configuração para execução em lote (estrutura agrupada)
 
 batch_info:
   nome: "Experimento Comparativo CSP"
@@ -7,24 +6,25 @@ batch_info:
   timeout_global: 1800  # 30 minutos por execução
 
 execucoes:
-  # Execução 1: Dataset sintético pequeno
+  # Bloco 1: Dataset sintético pequeno (1 base)
   - nome: "Sintético Pequeno"
     dataset:
-      tipo: "synthetic"  # synthetic, file, entrez
+      tipo: "synthetic"
       parametros:
         n: 10
         L: 50
         alphabet: "ACGT"
         noise: 0.1
+    num_bases: 1
     algoritmos:
       - "Baseline"
       - "BLF-GA"
       - "H³-CSP"
       - "DP-CSP"
-    execucoes_por_algoritmo: 3
+    execucoes_por_algoritmo_por_base: 3
     timeout: 300
-    
-  # Execução 2: Dataset sintético médio
+
+  # Bloco 2: Dataset sintético médio (1 base)
   - nome: "Sintético Médio"
     dataset:
       tipo: "synthetic"
@@ -33,28 +33,29 @@ execucoes:
         L: 100
         alphabet: "ACGT"
         noise: 0.15
+    num_bases: 1
     algoritmos:
       - "Baseline"
       - "BLF-GA"
-      - "H³-CSP"
       - "CSC"
-    execucoes_por_algoritmo: 5
+    execucoes_por_algoritmo: 3
     timeout: 600
-    
-  # Execução 3: Dataset de arquivo
+
+  # Bloco 3: Dataset de arquivo (1 base)
   - nome: "Dataset Real"
     dataset:
       tipo: "file"
       parametros:
         filepath: "saved_datasets/sequences.fasta"
+    num_bases: 1
     algoritmos:
       - "Baseline"
       - "BLF-GA"
       - "CSC"
     execucoes_por_algoritmo: 3
     timeout: 900
-    
-  # Execução 4: Dataset NCBI pequeno
+
+  # Bloco 4: Dataset NCBI pequeno (1 base)
   - nome: "NCBI Pequeno"
     dataset:
       tipo: "entrez"
@@ -64,14 +65,15 @@ execucoes:
         term: "COI[Gene] AND 600:650[SLEN]"
         n: 15
         api_key: "40aff1a7f51fc7e0711203ea3b2f5ae37c09"
+    num_bases: 1
     algoritmos:
       - "Baseline"
       - "BLF-GA"
       - "H³-CSP"
     execucoes_por_algoritmo: 3
     timeout: 600
-    
-  # Execução 5: Teste de escalabilidade
+
+  # Bloco 5: Teste de escalabilidade (1 base)
   - nome: "Escalabilidade"
     dataset:
       tipo: "synthetic"
@@ -80,9 +82,9 @@ execucoes:
         L: 200
         alphabet: "ACGT"
         noise: 0.2
+    num_bases: 1
     algoritmos:
       - "Baseline"
       - "BLF-GA"
-      # Evita DP-CSP para datasets grandes
     execucoes_por_algoritmo: 1
     timeout: 1200

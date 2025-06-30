@@ -1,13 +1,13 @@
 from typing import Callable
 from algorithms.base import Algorithm, register_algorithm
-from .config import H3CSP_DEFAULTS
+from .config import H3_CSP_DEFAULTS
 from .implementation import H3CSP
 
 @register_algorithm
 class H3CSPAlgorithm(Algorithm):
     """H³-CSP: Hybrid Hierarchical Hamming Search"""
     name = "H³-CSP"
-    default_params = H3CSP_DEFAULTS
+    default_params = H3_CSP_DEFAULTS
 
     def __init__(self, strings: list[str], alphabet: str, **params):
         self.strings = strings

@@ -170,20 +170,31 @@ class ResultsFormatter:
             output.append("Nenhum resultado disponível para comparação.")
             return "\n".join(output)
         
-        # Cabeçalhos
-        headers = [
-            "Algoritmo",
-            "Tempo Médio (s)",
-            "Desvio Tempo",
-            "Melhor Distância",
-            "Distância Média", 
-            "Desvio Distancia",
-            "Taxa Sucesso (%)"
-        ]
-        
-        # Calcular métricas comparativas
+        # Extrair informações das bases e algoritmos
         comparative_data = []
-        for algorithm_name, executions in self.results.items():
+        base_algorithms = {}  # Para armazenar algoritmos agrupados por base
+        
+        for algorithm_full_name, executions in self.results.items():
+            # Inicializar variáveis para evitar erros "unbound"
+            distancias = []
+            tempos = []
+            taxa_sucesso = 0.0
+            
+            # Extrair informação da base e nome do algoritmo
+            # Exemplo: "Sintético Pequeno_Base1_CSC" -> Base: "Sintético Pequeno (Base1)", Algoritmo: "CSC"
+            parts = algorithm_full_name.split('_')
+            
+            if len(parts) >= 3 and 'Base' in parts[-2]:
+                # Formato: Nome_Base#_Algoritmo
+                base_name = '_'.join(parts[:-2])
+                base_num = parts[-2]
+                algo_name = parts[-1]
+                base_display = f"{base_name} ({base_num})"
+            else:
+                # Formato padrão ou desconhecido
+                base_display = "N/A"
+                algo_name = algorithm_full_name
+            
             # Filtrar execuções válidas
             valid_executions = [
                 exec_data for exec_data in executions 
@@ -195,8 +206,9 @@ class ResultsFormatter:
                 # Algoritmo falhou em todas as execuções
                 tempos = [exec_data['tempo'] for exec_data in executions]
                 row = [
-                    algorithm_name,
-                    f"{statistics.mean(tempos):.4f}",
+                    base_display,
+                    algo_name,
+                    f"{statistics.mean(tempos) if tempos else 0:.4f}",
                     f"{statistics.stdev(tempos) if len(tempos) > 1 else 0:.4f}",
                     "ERRO",
                     "ERRO", 
@@ -209,54 +221,101 @@ class ResultsFormatter:
                              for exec_data in valid_executions]
                 
                 # Taxa de sucesso: execuções válidas / total de execuções
-                taxa_sucesso = len(valid_executions) / len(executions) * 100
-                solucoes_otimas = sum(1 for d in distancias if d == 0)
-                taxa_otima = solucoes_otimas / len(distancias) * 100 if distancias else 0
+                taxa_sucesso = len(valid_executions) / len(executions) * 100 if len(executions) > 0 else 0
                 
                 row = [
-                    algorithm_name,
-                    f"{statistics.mean(tempos):.4f}",
+                    base_display,
+                    algo_name,
+                    f"{statistics.mean(tempos) if tempos else 0:.4f}",
                     f"{statistics.stdev(tempos) if len(tempos) > 1 else 0:.4f}",
-                    f"{min(distancias)}",
-                    f"{statistics.mean(distancias):.2f}",
-                    f"{statistics.stdev(distancias) if len(distancias) > 1 else 0:.2f}",
+                    f"{min(distancias) if distancias else 'ERRO'}",
+                    f"{statistics.mean(distancias):.2f}" if distancias else "ERRO",
+                    f"{statistics.stdev(distancias) if len(distancias) > 1 else 0:.2f}" if distancias else "ERRO",
                     f"{taxa_sucesso:.1f}"
                 ]
             
             comparative_data.append(row)
+            
+            # Agrupar por base para o ranking
+            if base_display not in base_algorithms:
+                base_algorithms[base_display] = []
+            
+            if valid_executions:
+                base_algorithms[base_display].append({
+                    'name': algo_name,
+                    'dist': min(distancias) if distancias else float('inf'),  # Verificação de segurança
+                    'time': statistics.mean(tempos) if tempos else 0,
+                    'success_rate': taxa_sucesso if isinstance(taxa_sucesso, (int, float)) else 0  # Garantir que é número
+                })
+            else:
+                base_algorithms[base_display].append({
+                    'name': algo_name,
+                    'dist': float('inf'),
+                    'time': statistics.mean(tempos) if tempos else 0,
+                    'success_rate': 0
+                })
         
-        # Ordenar: algoritmos com erro no final, outros por melhor distância
+        # Cabeçalhos com base e algoritmo como colunas separadas
+        headers = [
+            "Base",
+            "Algoritmo",
+            "Tempo Médio (s)",
+            "Desvio Tempo",
+            "Melhor Distância",
+            "Distância Média", 
+            "Desvio Distancia",
+            "Taxa Sucesso (%)"
+        ]
+        
+        # Ordenação da tabela: primeiro por base, depois por melhor distância
         def sort_key(row):
-            if row[3] == "ERRO":
-                return (float('inf'), float(row[1]))  # Erro vai para o final
-            return (float(row[3]), float(row[1]))    # Melhor distância, depois tempo
+            base_name = row[0]
+            if row[4] == "ERRO":
+                dist = float('inf')
+            else:
+                dist = float(row[4])
+            return (base_name, dist, float(row[2]))  # Base, distância, tempo
         
         comparative_data.sort(key=sort_key)
         
         table = tabulate(comparative_data, headers=headers, tablefmt="grid", stralign="center")
         output.append(table)
         
-        # Adicionar ranking
-        output.append("\n🥇 RANKING POR PERFORMANCE:")
-        output.append("-" * 40)
-        for i, row in enumerate(comparative_data, 1):
-            if row[3] == "ERRO":
-                medal = "❌"
-                info = f"Falha em execução | Tempo: {row[1]}s"
-            else:
-                medal = "🥇" if i == 1 else "🥈" if i == 2 else "🥉" if i == 3 else f"{i}°"
-                info = f"Distância: {row[3]} | Tempo: {row[1]}s | Sucesso: {row[6]}%"
-            output.append(f"{medal} {row[0]} - {info}")
+        # Adicionar ranking POR BASE
+        output.append("\n🥇 RANKING POR BASE:")
+        output.append("-" * 60)
+        
+        for base_name, algorithms in sorted(base_algorithms.items()):
+            output.append(f"\n💠 BASE: {base_name}")
+            output.append("-" * 40)
+            
+            # Ordenar algoritmos para esta base
+            sorted_algorithms = sorted(algorithms, key=lambda x: (x['dist'], x['time']))
+            
+            # Mostrar ranking por base
+            for i, alg in enumerate(sorted_algorithms, 1):
+                if alg['dist'] == float('inf'):
+                    medal = "❌"
+                    info = f"Falha na execução | Tempo: {alg['time']:.4f}s"
+                else:
+                    medal = "🥇" if i == 1 else "🥈" if i == 2 else "🥉" if i == 3 else f"{i}°"
+                    info = f"Distância: {alg['dist']} | Tempo: {alg['time']:.4f}s | Sucesso: {alg['success_rate']:.1f}%"
+                output.append(f"{medal} {alg['name']} - {info}")
         
         return "\n".join(output)
     
-    def save_detailed_report(self, filename: str = "relatorio_detalhado.txt"):
-        """Salva relatório detalhado em arquivo"""
-        results_dir = Path(__file__).parent.parent / "results"
-        results_dir.mkdir(exist_ok=True)
-        filepath = results_dir / filename
+    def save_detailed_report(self, filename: str):
+        """
+        Salva o relatório detalhado em um arquivo.
         
-        with open(filepath, 'w', encoding='utf-8') as f:
+        Args:
+            filename: Nome do arquivo ou caminho completo
+        """
+        file_path = Path(filename)
+        # Garantir que o diretório existe
+        file_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        with open(file_path, "w", encoding="utf-8") as f:
             f.write(self.format_detailed_results())
 
 

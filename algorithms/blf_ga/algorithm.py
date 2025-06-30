@@ -1,13 +1,13 @@
 from typing import Callable
 from algorithms.base import Algorithm, register_algorithm
-from .config import BLFGA_DEFAULTS
+from .config import BLF_GA_DEFAULTS
 from .implementation import BLFGA
 
 @register_algorithm
 class BLFGAAlgorithm(Algorithm):
     """BLF-GA: Blockwise Learning Fusion + Genetic Algorithm"""
     name = "BLF-GA"
-    default_params = BLFGA_DEFAULTS
+    default_params = BLF_GA_DEFAULTS
 
     def __init__(self, strings: list[str], alphabet: str, **params):
         self.strings = strings
