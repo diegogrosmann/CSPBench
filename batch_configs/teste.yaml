@@ -12,14 +12,12 @@ execucoes:
     dataset:
       tipo: "synthetic"
       parametros:
-        n: 7
-        L: 70
+        n: 10
+        L: 20
         alphabet: "ACGT"
-        noise: 0.4
+        noise: null
     num_bases: 2
     algoritmos:
-      - "Baseline"
-      - "H³-CSP"
-      - "CSC"
+      - "DP-CSP"
     execucoes_por_algoritmo_por_base: 2
     timeout: 30

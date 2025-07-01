@@ -36,6 +36,10 @@ def signal_handler(signum, frame):
     sys.exit(0)
 
 def main():
+    # Mostrar o número do processo (PID) logo no início
+    import os
+    print(f"[PID] Processo em execução: {os.getpid()}")
+
     # Configurar handlers de sinal para saída limpa
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)

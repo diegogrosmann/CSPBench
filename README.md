@@ -50,6 +50,38 @@ batch_configs/      # Configurações de execução em lote
 
 ## Como Executar
 
+### 1. Instale o Python 3.10+ (recomendado: 3.10 ou 3.11)
+
+No Ubuntu/Debian:
+```bash
+sudo apt update
+sudo apt install python3.10 python3.10-venv python3.10-dev
+```
+No Windows:  
+Baixe em https://www.python.org/downloads/
+
+### 2. Crie um ambiente virtual
+
+No terminal (Linux/macOS):
+```bash
+python3.10 -m venv .venv
+source .venv/bin/activate
+```
+No Windows (cmd):
+```cmd
+python -m venv .venv
+.venv\Scripts\activate
+```
+
+### 3. Instale as dependências
+
+```bash
+pip install --upgrade pip
+pip install -r requirements.txt
+```
+
+### 4. Execute a aplicação
+
 ```bash
 python main.py
 ```

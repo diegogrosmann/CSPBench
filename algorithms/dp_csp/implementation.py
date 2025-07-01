@@ -104,21 +104,14 @@ def exact_dp_closest_string(strings: List[String],
         max_d = baseline_val
 
     n = len(strings)
-    state_count_est = (max_d + 1) ** n
-    if state_count_est > 10 ** DP_CSP_DEFAULTS['warn_threshold']:
-        if warning_callback:
-            warning_callback(
-                f"(d+1)^n = {state_count_est:,} estados potenciais – "
-                "execução pode ser lenta e usar muita memória."
-            )
 
     # --- Monitoramento de recursos ---
     safe_mem_mb = get_safe_memory_limit()
     max_time = DP_CSP_DEFAULTS.get('max_time', 300)
     t0 = time.time()
 
-    def check_limits():
-        # Checa memória e tempo
+    def check_limits(d):
+        # Checa memória, tempo e viabilidade incrementalmente
         import os, gc
         gc.collect()
         mem_mb = 0.0
@@ -133,6 +126,14 @@ def exact_dp_closest_string(strings: List[String],
         except Exception:
             pass
         elapsed = time.time() - t0
+        # Limite prático para (d+1)^n: ~2e9 (16GB RAM, 8 bytes/estado)
+        state_count_est = (d + 1) ** n
+        if state_count_est > 2_000_000_000:
+            msg = (f"DP-CSP interrompido: (d+1)^n = {state_count_est:,} excede limite prático "
+                   "(~2e9 estados, ~16GB RAM). Tente reduzir n ou d.")
+            if warning_callback:
+                warning_callback(msg)
+            raise RuntimeError(msg)
         if mem_mb > safe_mem_mb * 0.95:
             msg = f"DP-CSP interrompido: uso de memória {mem_mb:.1f}MB excedeu limite seguro ({safe_mem_mb:.1f}MB)"
             if warning_callback:
@@ -145,13 +146,12 @@ def exact_dp_closest_string(strings: List[String],
             raise RuntimeError(msg)
 
     for d in range(max_d + 1):
-        # Verificar cancelamento via callback
+        # Checar limites antes de cada iteração principal
+        check_limits(d)
         if progress_callback:
             progress_callback(f"Testando d={d}")
         else:
             logger.debug(f"DP-CSP tentando d={d}")
-        # Checar limites antes de cada iteração principal
-        check_limits()
         center = _dp_decision(strings, alphabet, d)
         if center is not None:
             logger.info(f"DP-CSP encontrou solução com d={d}")
