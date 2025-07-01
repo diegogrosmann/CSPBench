@@ -40,7 +40,7 @@ execucoes:
       - "Baseline"
       - "BLF-GA"
       - "H³-CSP"
-#     - "DP-CSP"
+      - "DP-CSP"
       - "CSC"
     execucoes_por_algoritmo_por_base: 30
     timeout: 120
