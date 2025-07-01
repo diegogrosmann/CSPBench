@@ -1,6 +1,14 @@
 """
 Sistema de monitoramento de recursos para evitar travamento do sistema.
-Implementação usando apenas bibliotecas padrão do Python.
+
+Classes:
+    ResourceLimits: Limites de recursos do sistema.
+    ResourceMonitor: Monitor de recursos com limites automáticos.
+
+Funções:
+    get_safe_memory_limit(): Retorna limite seguro de uso de memória.
+    check_algorithm_feasibility(...): Verifica viabilidade de execução.
+    force_garbage_collection(): Força coleta de lixo.
 """
 
 import threading

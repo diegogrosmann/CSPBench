@@ -1,3 +1,15 @@
+"""
+Implementação do algoritmo Consensus String Clustering (CSC) para CSP.
+
+Funções auxiliares:
+    consensus_string(strings): Calcula consenso por maioria.
+    split_blocks(s, n_blocks): Divide string em blocos.
+    recombine_blocks(blocks_list): Recombina blocos em string.
+    strings_to_array(strings): Converte lista de strings em array numpy.
+    auto_parameters(strings): Define parâmetros automáticos.
+    heuristic_closest_string(...): Heurística principal do CSC.
+"""
+
 import numpy as np
 from sklearn.cluster import DBSCAN
 from collections import Counter

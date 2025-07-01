@@ -1,3 +1,10 @@
+"""
+Leitura de arquivos de texto ou FASTA para extração de sequências.
+
+Funções:
+    load_dataset(): Lê um arquivo e retorna as sequências e parâmetros.
+"""
+
 # dataset_file.py
 """
 dataset_file.py

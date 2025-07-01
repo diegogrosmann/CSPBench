@@ -1,16 +1,13 @@
-# h3_csp.py
 """
-H³-CSP: Hybrid Hierarchical Hamming Search
-=========================================
+Implementação do H³-CSP (Hybrid Hierarchical Hamming Search) para CSP.
 
-Implementa a solução híbrida em três camadas descrita na proposta:
+Classes:
+    H3CSP: Implementa o algoritmo H³-CSP.
 
-  1)  B-Splitter  – divide cada string em √L blocos aproximadamente iguais
-  2)  Smart-Core  – escolhe a melhor técnica por bloco e gera k candidatos
-  3)  Global Refine – funde os blocos, aplica hill-climbing global
-
-Versão inicial 100 % em Python puro (sem solvers externos) – suficiente
-para integrar, validar e, depois, otimizar partes críticas em C++/IP.
+Funções auxiliares:
+    split_in_blocks(L): Divide posições em blocos.
+    consensus_block(strings, l, r): Consenso por bloco.
+    ... (demais funções auxiliares)
 """
 
 from __future__ import annotations
@@ -75,7 +72,7 @@ def _exhaustive_block(strings: Sequence[String],
     bests: list[tuple[int, String]] = []
 
     if lim <= 10_000:
-        logger.debug(f"[FPT] Bloco {l}:{r} |Σ|^{m}={lim}")
+        # Bloco processado silenciosamente
         for cand_tuple in itertools.product(alphabet, repeat=m):
             cand = ''.join(cand_tuple)
             dist = max_hamming(cand, [s[l:r] for s in strings])
@@ -85,7 +82,7 @@ def _exhaustive_block(strings: Sequence[String],
                 bests = bests[:k]
     else:
         # Limita-se a candidatos vindos do próprio dataset
-        logger.debug(f"[Data] Bloco grande {l}:{r}; usando dataset")
+        # Bloco grande processado silenciosamente
         seen: set[String] = set()
         for s in strings:
             blk = s[l:r]
@@ -150,14 +147,14 @@ def _local_search(candidate: String, strings: Sequence[String]) -> String:
     improved = True
     while improved:
         improved = False
-        base_val = max_hamming(''.join(cand_list), strings)
+        base_val = max_hamming(''.join(cand_list), list(strings))
         for i in range(L):
             cur_char = cand_list[i]
             for alt in alphabet_by_pos[i]:
                 if alt == cur_char:
                     continue
                 cand_list[i] = alt
-                new_val = max_hamming(''.join(cand_list), strings)
+                new_val = max_hamming(''.join(cand_list), list(strings))
                 if new_val < base_val:
                     base_val = new_val
                     improved = True
@@ -190,7 +187,7 @@ class H3CSP:
         self.progress_callback: Optional[Callable[[str], None]] = None
 
         self.blocks = split_in_blocks(self.L)
-        logger.debug(f"H3CSP inicializado com {len(self.blocks)} blocos")
+        # H3CSP inicializado silenciosamente
 
     def set_progress_callback(self, callback: Callable[[str], None]) -> None:
         """Define um callback para relatar o progresso."""
@@ -224,7 +221,7 @@ class H3CSP:
                                             beam_width, k)
 
             block_cands.append(cands)
-            logger.debug(f"Bloco {l}:{r} | d_b={d_b} | {len(cands)} cand.")
+            # Processamento silencioso de candidatos
         return block_cands
 
     # ---------------------------------------------------------------------
@@ -247,7 +244,7 @@ class H3CSP:
                 self.progress_callback("Fusão de blocos...")
             best_by_block = [cands[0] for cands in block_cands]
             center = self._fuse_blocks(best_by_block)
-            best_val = max_hamming(center, self.strings)
+            best_val = max_hamming(center, list(self.strings))
 
             logger.info(f"[Fusão inicial] dist={best_val}")
 
@@ -259,7 +256,7 @@ class H3CSP:
                     self.progress_callback(f"Refinamento: iteração {it+1}")
                 
                 center = _local_search(center, self.strings)
-                new_val = max_hamming(center, self.strings)
+                new_val = max_hamming(center, list(self.strings))
                 if new_val < best_val:
                     logger.info(f"[Local] it={it+1}  {best_val}->{new_val}")
                     best_val = new_val

@@ -5,3 +5,4 @@ logs
 results
 saved_datasets
 batch_configs
+.pytest_cache

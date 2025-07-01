@@ -1,3 +1,14 @@
+"""
+Implementação da heurística BLF-GA (Blockwise Learning Fusion + Genetic Algorithm) para CSP.
+
+Classes:
+    BLFGA: Implementa o algoritmo BLF-GA.
+
+Funções auxiliares:
+    hamming_dist(a, b): Wrapper para distância de Hamming.
+    max_distance(center, strings): Wrapper para distância máxima.
+"""
+
 # blf_ga.py
 """
 blf_ga.py
@@ -48,7 +59,7 @@ class BLFGA:
         max_time: Optional[float]     = None,
         seed: Optional[int]           = None,
     ):
-        logger.debug("__init__ BLFGA")
+
         self.strings        = strings
         self.n              = len(strings)
         self.L              = len(strings[0])
@@ -86,7 +97,7 @@ class BLFGA:
         self.progress_callback = callback
 
     def run(self) -> Tuple[String,int]:
-        logger.debug("run() iniciado")
+
         start = time.time()
         
         if self.progress_callback:
@@ -120,7 +131,9 @@ class BLFGA:
             if cur_val < best_val:
                 best, best_val = cur_best, cur_val
             
-            logger.debug(f"Fim da Geração {gen}: melhor_dist_geral={best_val}, melhor_dist_atual={cur_val}")
+            # Log apenas a cada 50 gerações ou na última
+            if gen % 50 == 0 or gen == self.max_gens or best_val == 0:
+                logger.debug(f"Geração {gen}: melhor_dist={best_val}")
 
             if best_val == 0:
                 if self.progress_callback:
@@ -128,10 +141,8 @@ class BLFGA:
                 break
                 
             if gen % self.rediv_freq == 0:
-                if self.progress_callback:
-                    self.progress_callback("Redivisão adaptativa de blocos...")
+                # Redivisão adaptativa (log apenas quando necessário)
                 self.blocks = self._adaptive_blocking(pop)
-                logger.debug(f"Geração {gen}: Blocos redivididos para {len(self.blocks)} blocos.")
 
         return best, best_val
 

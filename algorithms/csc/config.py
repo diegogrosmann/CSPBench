@@ -1,3 +1,10 @@
+"""
+Configurações padrão para o algoritmo CSC.
+
+Atributos:
+    CSC_DEFAULTS (dict): Parâmetros padrão do CSC.
+"""
+
 # CSC Configuration
 CSC_DEFAULTS = {
     'min_d': 2,

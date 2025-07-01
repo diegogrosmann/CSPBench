@@ -15,10 +15,20 @@ O BLF-GA é uma metaheurística híbrida que combina aprendizado por blocos e al
 - **Adaptive Blocking**: Redefine blocos dinamicamente.
 - **Elite Refinement**: Busca local intensiva nos melhores indivíduos.
 
-## Parâmetros
+## Parâmetros Principais
 
-- Tamanho da população, número de gerações, taxa de elitismo, etc.
-- Blocos iniciais, tamanho mínimo de bloco, frequência de redivisão.
+- `pop_size`: Tamanho da população
+- `initial_blocks`: Número inicial de blocos
+- `min_block_len`: Tamanho mínimo de bloco
+- `cross_prob`: Probabilidade de crossover
+- `mut_prob`: Probabilidade de mutação
+- `elite_rate`: Taxa de elitismo
+- `rediv_freq`: Frequência de redivisão dos blocos
+- `max_gens`: Número máximo de gerações
+- `max_time`: Tempo máximo de execução (segundos)
+- `seed`: Semente aleatória
+
+Veja `config.py` para todos os parâmetros e valores padrão.
 
 ## Uso Ideal
 
@@ -31,128 +41,16 @@ O BLF-GA é uma metaheurística híbrida que combina aprendizado por blocos e al
 - Muitos parâmetros.
 - Pode ser lento para instâncias pequenas.
 - Pode estagnar em ótimos locais.
-- **Análise por Bloco**: Para cada bloco [i,j), identifica padrões locais
-- **Consensus Learning**: Gera consenso ótimo para o bloco atual
-- **Pattern Mining**: Extrai subsequências promissoras da população
-- **Repository Update**: Armazena melhores blocos encontrados
 
-#### 4. Genetic Operations
-- **Seleção por Torneio**: Escolhe pais via competição (k=3)
-- **Crossover Blocks**: Troca blocos inteiros entre pais
-- **Mutação Adaptativa**: Modifica posições com taxa baseada na diversidade
-- **Elitismo**: Preserva melhores indivíduos (5% da população)
+## Exemplo de Uso
 
-#### 5. Adaptive Blocking
-- **Entropy Analysis**: Calcula entropia por posição
-- **Dynamic Segmentation**: Redefine blocos com base na variabilidade
-- **Block Refinement**: Ajusta tamanho de blocos conforme necessário
-
-## Heurísticas Principais
-
-### Learning Fusion
-**Princípio**: Combinar conhecimento local (blocos) com busca global (GA)
-- **Bloco Consensus**: Cada bloco aprende independentemente seu melhor padrão
-- **Cross-Block Exchange**: Blocos bons são propagados entre indivíduos
-- **Global Optimization**: GA refina a combinação de blocos
-
-### Adaptive Blocking Strategy
-**Critério de Divisão**: Balancear granularidade vs. eficiência
-- **Inicial**: √L blocos para começar com granularidade moderada
-- **Entropy-Based**: Redividir baseado na variabilidade observada
-- **Minimum Size**: Manter blocos ≥ 3 posições para aprendizado efetivo
-
-### Evolutionary Pressure
-**Multi-Level Selection**: Pressão seletiva em diferentes granularidades
-- **Individual Level**: Seleção baseada em fitness total
-- **Block Level**: Blocos bons se espalham independentemente
-- **Population Level**: Rediversificação periódica para evitar convergência prematura
-
-### Elite Refinement
-**Local Search Intensification**: Melhoria iterativa dos melhores
-- **Hillclimbing**: Tenta melhorar posição por posição
-- **Neighborhood Search**: Explora vizinhança de Hamming
-- **Greedy Refinement**: Aplica mudanças que reduzem distância máxima
-
-## Parâmetros de Configuração
-
-### População e Evolução
-- **pop_size**: Tamanho da população (padrão: 100)
-- **max_gens**: Gerações máximas (padrão: 100)  
-- **elite_rate**: Taxa de elitismo (padrão: 5%)
-
-### Operadores Genéticos
-- **cross_prob**: Probabilidade de crossover (padrão: 90%)
-- **mut_prob**: Probabilidade de mutação (padrão: 80%)
-- **tournament_size**: Tamanho do torneio (fixo: 3)
-
-### Blocking e Aprendizado
-- **initial_blocks**: Blocos iniciais (padrão: 10)
-- **min_block_len**: Tamanho mínimo de bloco (padrão: 3)
-- **rediv_freq**: Frequência de redivisão (padrão: 10 gerações)
-
-### Controle de Execução
-- **max_time**: Tempo limite em segundos (padrão: 600s)
-- **seed**: Semente para reprodutibilidade
-
-## Interface de Progresso
-
-### Callback de Progresso
-O algoritmo usa **callback não-bloqueante** para reportar estado:
-- **Inicialização**: "Criando população inicial..."
-- **Evolução**: "Geração X/Y, melhor=Z"
-- **Blocos**: "Redivisão adaptativa..."
-- **Refinamento**: "Refinando elite..."
-- **Timeout**: "Timeout atingido"
-
-### Estrutura de Retorno
 ```python
-center, distance, info = algorithm.run()
-# info contém:
-# - 'iteracoes': número de gerações executadas
-# - 'melhor_string': string resultado
-# - 'erro': mensagem de erro (se aplicável)
+from algorithms.blf_ga.algorithm import BLFGAAlgorithm
+alg = BLFGAAlgorithm(strings, alphabet, pop_size=100, max_gens=50)
+center, dist = alg.run()
 ```
 
-## Características Avançadas
+## Documentação
 
-### Convergence Management
-- **Diversity Tracking**: Monitora diversidade populacional
-- **Rediversification**: Introduz novos indivíduos quando necessário
-- **Early Stopping**: Para quando não há melhoria por N gerações
-
-### Memory Management  
-- **Block Repository**: Cache de melhores blocos descobertos
-- **Elite History**: Mantém histórico de melhores soluções
-- **Pattern Database**: Armazena padrões recorrentes promissores
-
-### Parallel-Ready Design
-- **Block Independence**: Blocos podem ser processados paralelamente
-- **Population Chunks**: População pode ser dividida para processamento paralelo
-- **Fitness Caching**: Evita recálculos desnecessários
-
-## Performance e Escalabilidade
-
-### Complexidade Temporal
-- **Por Geração**: O(pop_size × n × L + block_operations)
-- **Total**: O(max_gens × pop_size × n × L)
-- **Block Learning**: O(num_blocks × L/num_blocks × search_complexity)
-
-### Cenários de Uso Ideal
-- **Instâncias Médias a Grandes**: n > 20, L > 100
-- **Dados com Estrutura Local**: Padrões regionais conservados
-- **Tempo Disponível**: Quando se pode aguardar otimização iterativa
-- **Qualidade Prioritária**: Quando resultado próximo do ótimo é crucial
-
-### Vantagens Competitivas
-- **Hibridização Efetiva**: Combina busca local e global
-- **Adaptabilidade**: Ajusta estratégia durante execução
-- **Robustez**: Funciona bem em diferentes tipos de instância
-- **Escalabilidade**: Performance se mantém em problemas maiores
-
-### Limitações
-- **Complexidade Paramétrica**: Muitos parâmetros para ajustar
-- **Tempo de Execução**: Pode ser lento para instâncias muito pequenas
-- **Convergência**: Pode estagnar em ótimos locais
-- **Memória**: Usa mais memória que algoritmos simples
-
-O BLF-GA representa uma abordagem sofisticada que combina o melhor dos mundos do aprendizado local e otimização global, sendo especialmente efetivo para instâncias complexas onde métodos mais simples falham.
+- Consulte o código para docstrings detalhadas (Google style).
+- Integração automática com o framework CSP via decorador `@register_algorithm`.

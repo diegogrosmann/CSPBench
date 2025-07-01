@@ -1,3 +1,11 @@
+"""
+Implementação do algoritmo de consenso ganancioso (Baseline) para CSP.
+
+Funções:
+    greedy_consensus(strings, alphabet): Gera string consenso pelo método guloso.
+    max_distance(center, strings): Calcula a maior distância de Hamming.
+"""
+
 from collections import Counter
 from typing import List
 import logging
@@ -7,36 +15,60 @@ logger = logging.getLogger(__name__)
 
 def greedy_consensus(strings: List[str], alphabet: str) -> str:
     """
-    Obtém a string consenso (símbolo mais frequente por posição).
+    Constrói uma string consenso usando a estratégia greedy posição por posição.
+    Para cada posição, escolhe o símbolo que minimiza a distância máxima.
 
     Args:
         strings (List[str]): Lista de strings de entrada.
         alphabet (str): Alfabeto utilizado.
-
     Returns:
-        str: String consenso.
+        str: String consenso gerada.
     """
-    logger.debug("Iniciando greedy_consensus")
+    
+    if not strings:
+        return ""
+    
     L = len(strings[0])
-    consensus_chars = []
-    for i in range(L):
-        freq = Counter(s[i] for s in strings if i < len(s))
-        most, count = freq.most_common(1)[0]
-        consensus_chars.append(most)
-    result = "".join(consensus_chars)
-    logger.debug(f"Consenso final: {result}")
+    consensus = []
+    
+    for pos in range(L):
+        best_char = None
+        best_max_dist = float('inf')
+        
+        # Testar cada símbolo do alfabeto
+        for char in alphabet:
+            # Calcular distância máxima se usarmos este char na posição
+            max_dist = 0
+            for s in strings:
+                dist = sum(1 for i in range(pos + 1) 
+                          if (consensus + [char])[i] != s[i])
+                max_dist = max(max_dist, dist)
+            
+            if max_dist < best_max_dist:
+                best_max_dist = max_dist
+                best_char = char
+        
+        consensus.append(best_char)
+    
+    result = ''.join(consensus)
+    
+    # VALIDAÇÃO: Verificar a distância do consenso
+    from utils.distance import max_distance
+    final_distance = max_distance(result, strings)
+    logger.info(f"[CONSENSUS] Consenso: {result}, distância: {final_distance}")
+    
     return result
 
 def max_distance(center: str, strings: List[str]) -> int:
     """
-    Calcula a maior distância de Hamming do centro para o conjunto.
+    Calcula a distância máxima de Hamming entre o centro e as strings.
 
     Args:
-        center (str): String centro.
+        center (str): String central.
         strings (List[str]): Lista de strings de entrada.
-
     Returns:
-        int: Maior distância de Hamming.
+        int: Maior distância de Hamming encontrada.
     """
-    # Usa implementação paralela para performance em conjuntos grandes
-    return max_hamming_parallel(center, strings)
+    from utils.distance import hamming_distance
+    distances = [hamming_distance(center, s) for s in strings]
+    return max(distances)

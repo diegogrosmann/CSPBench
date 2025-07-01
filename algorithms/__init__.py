@@ -1,3 +1,9 @@
+"""
+Pacote de algoritmos CSP.
+
+Este módulo inicializa o pacote algorithms e expõe o registry global.
+"""
+
 # algorithms package
 
 from .base import global_registry, register_algorithm

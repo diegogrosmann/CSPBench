@@ -21,6 +21,7 @@ class ConsoleManager:
     Métodos:
         print(message, end, flush): Imprime mensagem thread-safe.
         print_warning(prefix, message): Imprime aviso formatado.
+        print_inline(message, flush): Imprime mensagem na mesma linha.
     """
     _instance: Optional['ConsoleManager'] = None
     _lock = threading.Lock()
@@ -28,6 +29,9 @@ class ConsoleManager:
     def __new__(cls) -> 'ConsoleManager':
         """
         Garante singleton thread-safe.
+
+        Returns:
+            ConsoleManager: Instância única da classe.
         """
         if cls._instance is None:
             with cls._lock:
@@ -56,6 +60,10 @@ class ConsoleManager:
     def print_inline(self, message: str, flush: bool = True) -> None:
         """
         Imprime mensagem na mesma linha (inline), thread-safe.
+
+        Args:
+            message (str): Mensagem a ser impressa.
+            flush (bool): Força flush imediato.
         """
         with self._lock:
             sys.stdout.write(f"\r{message}")

@@ -1,3 +1,9 @@
+"""
+Configurações padrão para o algoritmo H³-CSP.
+
+Atributos:
+    H3_CSP_DEFAULTS (dict): Parâmetros padrão do H³-CSP.
+"""
 # H³-CSP Configuration
 H3_CSP_DEFAULTS = {
     'auto_blocks': True,

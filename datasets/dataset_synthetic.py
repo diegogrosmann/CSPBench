@@ -1,3 +1,10 @@
+"""
+Geração de datasets sintéticos para CSP.
+
+Funções:
+    generate_dataset(): Gera dataset sintético via prompt.
+"""
+
 # dataset_synthetic.py
 """
 dataset_synthetic.py
@@ -36,36 +43,53 @@ def generate_dataset() -> Tuple[List[str], Dict[str, Any]]:
     # Pergunta por semente para reprodutibilidade (opcional)
     seed_input = safe_input(f"Semente aleatória (int) [None]: ")
     seed = int(seed_input) if seed_input else None
+    
+    # Gerar semente automaticamente se não fornecida
+    if seed is None:
+        import time
+        seed = int(time.time() * 1000000) % (2**32)  # Gerar semente baseada no timestamp
+        logger.info(f"Semente gerada automaticamente: {seed}")
+    
     params = {'n': n, 'L': L, 'alphabet': alphabet, 'noise': noise, 'fully_random': fully_random}
     params['seed'] = seed
+    logger.info("Iniciando geração do dataset sintético")
     logger.debug(f"Gerando dataset sintético com n={n}, L={L}, |Σ|={len(alphabet)}, noise={noise}, fully_random={fully_random}, seed={seed}")
     rng = random.Random(seed)
     data = []
     
-    if fully_random:
-        # Geração completamente aleatória
-        for idx in range(n):
-            new_s = "".join(rng.choice(alphabet) for _ in range(L))
-            data.append(new_s)
-            if idx < 3:
-                logger.debug(f"String aleatória {idx}: {new_s}")
-    else:
-        # Geração baseada em uma string + ruído
-        base = "".join(rng.choice(alphabet) for _ in range(L))
-        logger.debug(f"String base: {base}")
+    # Geração da string centro
+    base_string = ''.join(rng.choices(alphabet, k=L))
+    logger.info(f"String centro gerada para aplicar ruído")
 
-        for idx in range(n):
-            s = list(base)
-            for i in range(L):
-                if rng.random() < noise:
-                    old = s[i]
-                    s[i] = rng.choice([c for c in alphabet if c != old])
-            new_s = "".join(s)
-            data.append(new_s)
-            if idx < 3:
-                logger.debug(f"String gerada {idx}: {new_s}")
-                
-    logger.info(f"Dataset sintético gerado: n={n}, L={L}, |Σ|={len(alphabet)}, geração {'aleatória' if fully_random else 'base+ruído'}")
+    # Definição do noise
+    if noise is None:
+        noise = rng.uniform(0.1, 0.5)
+        logger.info(f"Noise não informado, sorteado aleatoriamente: {noise:.3f}")
+    else:
+        logger.info(f"Noise informado: {noise}")
+
+    # Geração das strings com noise
+    for _ in range(n):
+        s = list(base_string)
+        num_mut = int(round(noise * L))
+        mut_pos = rng.sample(range(L), num_mut) if num_mut > 0 else []
+        for pos in mut_pos:
+            orig = s[pos]
+            alt = rng.choice([c for c in alphabet if c != orig])
+            s[pos] = alt
+        new_s = ''.join(s)
+        data.append(new_s)
+
+    params = {
+        'n': n,
+        'L': L,
+        'alphabet': alphabet,
+        'fully_random': fully_random,
+        'noise': noise,
+        'seed': seed,
+        'base_string': base_string
+    }
+    logger.info(f"Parâmetros retornados pelo gerador: {params}")
     return data, params
 
 def generate_dataset_with_params(params: dict) -> Tuple[List[str], Dict[str, Any]]:
@@ -88,9 +112,16 @@ def generate_dataset_with_params(params: dict) -> Tuple[List[str], Dict[str, Any
     # Aceita tanto fully_random quanto aleatorio_total
     fully_random = merged_params.get('fully_random', merged_params.get('aleatorio_total', False))
     seed = merged_params.get('seed', None)
+    
+    # Gerar semente automaticamente se não fornecida
+    if seed is None:
+        import time
+        seed = int(time.time() * 1000000) % (2**32)  # Gerar semente baseada no timestamp
+        logger.info(f"Semente gerada automaticamente: {seed}")
+    
     noise = merged_params.get('noise', None)  # Pode ser None agora
 
-    console.print(f"Gerando dataset sintético: n={n}, L={L}, alphabet='{alphabet}', noise={noise}, fully_random={fully_random}")
+    console.print(f"Gerando dataset sintético: n={n}, L={L}, alphabet='{alphabet}', noise={noise}, fully_random={fully_random}, seed={seed}")
 
     rng = random.Random(seed)
     sequences = []
@@ -101,6 +132,12 @@ def generate_dataset_with_params(params: dict) -> Tuple[List[str], Dict[str, Any
         'fully_random': fully_random
     }
 
+    # Geração da string centro
+    base_string = ''.join(rng.choices(alphabet, k=L))
+    
+    # Incluir a string base nos parâmetros usados
+    used_params['base_string'] = base_string
+
     if fully_random:
         # Geração completamente aleatória
         for _ in range(n):
@@ -108,10 +145,7 @@ def generate_dataset_with_params(params: dict) -> Tuple[List[str], Dict[str, Any
             sequences.append(seq)
         used_params['noise'] = None
     else:
-        # Geração baseada em string base + ruído
-        base_string = ''.join(rng.choice(alphabet) for _ in range(L))
-        used_params['base_string'] = base_string
-
+        # Definição do noise
         if noise is not None:
             used_params['noise'] = noise
             for i in range(n):
@@ -125,7 +159,7 @@ def generate_dataset_with_params(params: dict) -> Tuple[List[str], Dict[str, Any
                 sequences.append(''.join(seq))
         else:
             # Noise aleatório para cada string
-            noises = [rng.uniform(0.01, 0.5) for _ in range(n)]
+            noises = [rng.uniform(0.1, 0.5) for _ in range(n)]
             used_params['noise'] = noises
             for i in range(n):
                 seq = list(base_string)
@@ -137,5 +171,50 @@ def generate_dataset_with_params(params: dict) -> Tuple[List[str], Dict[str, Any
                         if other_chars:
                             seq[pos] = rng.choice(other_chars)
                 sequences.append(''.join(seq))
-
+    used_params['seed'] = seed
     return sequences, used_params
+
+def generate_perturbations(base_string: str, n_strings: int, max_distance: int, alphabet: str, rng) -> List[str]:
+    """Gera strings com distância exata igual a max_distance da string base."""
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    # Geração silenciosa de strings
+    
+    strings = []
+    L = len(base_string)
+    
+    for i in range(n_strings):
+        # Criar string com exatamente max_distance diferenças
+        new_string = list(base_string)
+        positions = rng.choice(L, size=max_distance, replace=False)
+        
+        logger.debug(f"[GENERATOR] String {i}: posições alteradas: {positions}")
+        
+        for pos in positions:
+            # Escolher um símbolo diferente do atual
+            current_char = base_string[pos]
+            available_chars = [c for c in alphabet if c != current_char]
+            if available_chars:  # Verificação de segurança
+                chosen_char = rng.choice(available_chars)
+                new_string[pos] = chosen_char
+                logger.debug(f"[GENERATOR] String {i}: pos {pos}: {current_char} -> {chosen_char}")
+        
+        result_string = ''.join(new_string)
+        strings.append(result_string)
+        
+        # VALIDAÇÃO: Verificar se a distância está correta
+        from utils.distance import hamming_distance
+        actual_distance = hamming_distance(base_string, result_string)
+        # String gerada silenciosamente
+        
+        if actual_distance != max_distance:
+            logger.error(f"[GENERATOR] ERRO: String {i} tem distância {actual_distance}, esperado {max_distance}")
+    
+    # VALIDAÇÃO FINAL: Verificar todas as distâncias
+    from utils.distance import hamming_distance
+    all_distances = [hamming_distance(base_string, s) for s in strings]
+    logger.info(f"[GENERATOR] Todas as distâncias geradas: {all_distances}")
+    logger.info(f"[GENERATOR] Máxima: {max(all_distances)}, Mínima: {min(all_distances)}")
+    
+    return strings

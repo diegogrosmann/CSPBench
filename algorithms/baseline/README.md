@@ -12,85 +12,36 @@ O algoritmo Baseline implementa uma solução simples e eficiente para o Closest
 - **Determinístico** e **instantâneo**.
 - Complexidade linear: O(n × L × |Σ|).
 - Não requer callback de progresso.
+- Documentação detalhada no estilo Google disponível no código-fonte.
+
+## Parâmetros
+
+- Não possui parâmetros ajustáveis além do dataset.
+
+## Uso
+
+Ideal como baseline para benchmarking e validação de instâncias simples ou bem estruturadas.
+
+### Exemplo de Uso
+
+```python
+from algorithms.baseline.algorithm import BaselineAlg
+alg = BaselineAlg(strings, alphabet)
+center, dist = alg.run()
+```
 
 ## Limitações
 
 - Não considera dependências entre posições.
 - Pode não encontrar o ótimo global em casos de empate ou alta diversidade.
 
-## Uso
+## Cenários de Uso Ideal
+- Benchmark para comparação com algoritmos mais complexos
+- Solução rápida quando tempo é limitado
+- Pré-processamento para outros algoritmos
+- Dados com forte consenso por posição
 
-Ideal como baseline para benchmarking e validação de instâncias simples ou bem estruturadas.
-3. **Cálculo da Distância**
-   - Calcula a distância de Hamming máxima entre o consenso e todas as strings
-   - Retorna o par (string_consenso, distância_máxima)
+## Documentação
 
-### Heurísticas Utilizadas
-
-#### Princípio da Maioria Local
-- **Premissa**: O símbolo mais comum em cada posição provavelmente minimiza os conflitos
-- **Vantagem**: Simples e rápido de calcular
-- **Limitação**: Não considera dependências entre posições
-
-#### Estratégia Gananciosa
-- **Abordagem**: Toma decisões localmente ótimas posição por posição
-- **Benefício**: Complexidade linear O(n×L)
-- **Trade-off**: Pode não encontrar o ótimo global
-
-## Características
-
-### Complexidade
-- **Temporal**: O(n × L × |Σ|) onde n=número de strings, L=comprimento, |Σ|=tamanho do alfabeto
-- **Espacial**: O(|Σ|) para contadores de frequência
-
-### Garantias
-- **Cota Superior**: Sempre produz uma solução válida
-- **Qualidade**: Frequentemente próxima do ótimo para instâncias bem estruturadas
-- **Determinismo**: Sempre produz o mesmo resultado para a mesma entrada
-
-### Cenários de Uso Ideal
-- **Baseline para comparação** com algoritmos mais complexos
-- **Solução rápida** quando tempo é limitado
-- **Pré-processamento** para outros algoritmos
-- **Dados com forte consenso** por posição
-
-## Limitações
-
-### Casos Problemáticos
-- **Empates**: Quando múltiplos símbolos têm a mesma frequência máxima
-- **Distribuição Uniforme**: Quando não há consenso claro por posição
-- **Correlações Posicionais**: Não considera padrões entre posições adjacentes
-
-### Exemplo de Limitação
-```
-Strings: ["AB", "BA"]
-Consenso: "AA" ou "BB" (dependendo do critério de desempate)
-Ótimo real: qualquer string de entrada teria distância 1
-Resultado baseline: distância 2
-```
-
-## Variações Possíveis
-
-### Critérios de Desempate
-- **Lexicográfico**: Escolhe o menor símbolo alfabeticamente
-- **Aleatório**: Escolha randômica entre empatados
-- **Primeiro Encontrado**: Mantém a ordem de processamento
-
-### Extensões
-- **Consenso Ponderado**: Dar pesos diferentes a strings
-- **Consenso por Blocos**: Aplicar o princípio a subsequências
-- **Múltiplos Consensos**: Gerar várias opções e escolher a melhor
-
-## Performance Típica
-
-### Instâncias Favoráveis
-- Dados biológicos com conservação posicional
-- Strings com ruído baixo (<20%)
-- Alfabetos pequenos (DNA: 4 símbolos)
-
-### Gap Médio do Ótimo
-- **Dados sintéticos**: 0-15% acima do ótimo
-- **Dados reais**: 5-25% acima do ótimo
-- **Pior caso teórico**: Pode ser arbitrariamente distante
-
-O algoritmo Baseline é fundamental como ponto de partida e referência, oferecendo uma solução rápida e interpretável que frequentemente serve como excelente aproximação inicial.
+- Consulte o código para docstrings detalhadas (Google style).
+- Integração automática com o framework CSP via decorador `@register_algorithm`.

@@ -1,3 +1,10 @@
+"""
+Download de sequências do NCBI via Bio.Entrez.
+
+Funções:
+    fetch_dataset(): Baixa dataset do NCBI e retorna sequências e parâmetros.
+"""
+
 # dataset_entrez.py
 """
 dataset_entrez.py

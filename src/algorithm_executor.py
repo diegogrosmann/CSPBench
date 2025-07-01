@@ -1,8 +1,10 @@
 """
-algorithm_executor.py
-=====================
-
 Executor de algoritmos em threads isoladas com timeout e monitoramento de recursos.
+
+Classes:
+    TimeoutException: Exceção para timeout de execução.
+    ResourceLimitException: Exceção para violação de recursos.
+    AlgorithmExecutor: Executor de algoritmos com timeout e monitoramento.
 """
 
 import threading
@@ -15,17 +17,35 @@ from utils.resource_monitor import ResourceMonitor, ResourceLimits, force_garbag
 logger = logging.getLogger(__name__)
 
 class TimeoutException(Exception):
-    """Exceção lançada quando um algoritmo excede o tempo limite."""
+    """
+    Exceção lançada quando um algoritmo excede o tempo limite de execução.
+    """
     pass
 
 class ResourceLimitException(Exception):
-    """Exceção lançada quando recursos do sistema são excedidos."""
+    """
+    Exceção lançada quando há violação dos limites de recursos do sistema.
+    """
     pass
 
 class AlgorithmExecutor:
-    """Executa algoritmos em threads isoladas com timeout e monitoramento de recursos."""
+    """
+    Executa algoritmos em threads isoladas com timeout e monitoramento de recursos.
+
+    Args:
+        timeout_seconds (int): Tempo limite de execução em segundos.
+
+    Métodos:
+        execute_with_timeout(...): Executa algoritmo com timeout e monitoração.
+    """
     
     def __init__(self, timeout_seconds: int):
+        """
+        Inicializa o executor com timeout e limites de recursos.
+
+        Args:
+            timeout_seconds (int): Tempo limite em segundos.
+        """
         self.timeout = timeout_seconds
         self.stop_event = threading.Event()
         
@@ -45,6 +65,17 @@ class AlgorithmExecutor:
         progress_callback: Optional[Callable[[str], None]] = None,
         warning_callback: Optional[Callable[[str], None]] = None
     ) -> Tuple[Optional[Any], Union[int, float], dict]:
+        """
+        Executa um algoritmo com limite de tempo e monitoramento de recursos.
+
+        Args:
+            algorithm_instance (Any): Instância do algoritmo a ser executado.
+            progress_callback (Optional[Callable[[str], None]]): Callback para atualizações de progresso.
+            warning_callback (Optional[Callable[[str], None]]): Callback para avisos.
+
+        Returns:
+            Tuple[Optional[Any], Union[int, float], dict]: Resultado da execução, incluindo centro, distância e informações adicionais.
+        """
         logger.info(f"Executando algoritmo {algorithm_instance.__class__.__name__} com timeout={self.timeout}s")
         result_queue = queue.Queue()
         self.stop_event.clear()
@@ -174,8 +205,10 @@ class AlgorithmExecutor:
             return None, float('inf'), {'erro': 'Thread terminou sem resultado'}
     
     def cancel(self):
+        """
+        Cancela a execução atual.
+        """
         logger.info("Cancelando execução atual")
-        """Cancela a execução atual."""
         self.stop_event.set()
         self.resource_monitor.stop_monitoring()
         self.resource_monitor.stop_monitoring()

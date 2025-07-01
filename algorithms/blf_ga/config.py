@@ -1,3 +1,10 @@
+"""
+Configurações padrão para o algoritmo BLF-GA.
+
+Atributos:
+    BLF_GA_DEFAULTS (dict): Parâmetros padrão do BLF-GA.
+"""
+
 # BLF-GA Configuration
 BLF_GA_DEFAULTS = {
     'pop_size': 50,
@@ -7,7 +14,7 @@ BLF_GA_DEFAULTS = {
     'mut_prob': 0.5,
     'elite_rate': 0.05,
     'rediv_freq': 10,
-    'max_gens': 100,
+    'max_gens': 30,
     'max_time': 60.0,
     'seed': None,
 }

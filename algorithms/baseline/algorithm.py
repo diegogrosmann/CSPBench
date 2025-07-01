@@ -1,3 +1,9 @@
+"""
+Algoritmo de consenso ganancioso (Baseline) para o Closest String Problem.
+
+Classes:
+    BaselineAlg: Implementação do algoritmo baseline.
+"""
 from algorithms.base import Algorithm, register_algorithm
 from .implementation import greedy_consensus, max_distance
 

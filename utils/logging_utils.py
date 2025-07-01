@@ -1,6 +1,6 @@
 # logging_utils.py
 """
-Utilitários para configuração de logging da aplicação.
+Utilitários para configuração de logging da aplicação CSP.
 
 Funções:
     setup_logging(debug_mode, log_file): Configura logging global.

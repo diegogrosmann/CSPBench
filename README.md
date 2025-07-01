@@ -10,6 +10,14 @@ A aplicação permite:
 - Relatórios detalhados e comparativos automáticos
 - Adição de novos algoritmos sem modificar o código principal
 
+## Fluxo Principal da Aplicação
+
+O fluxo principal do sistema é:
+1. **Seleção e leitura/geração do dataset**: O usuário pode escolher entre gerar um dataset sintético, carregar de arquivo, baixar do NCBI ou executar em lote.
+2. **Seleção dos algoritmos**: O usuário seleciona quais algoritmos deseja executar sobre o dataset.
+3. **Execução dos algoritmos**: Cada algoritmo é executado múltiplas vezes, com controle de timeout e monitoramento de recursos.
+4. **Exibição e salvamento dos resultados**: Os resultados são exibidos no console, salvos em relatórios detalhados e exportados em CSV.
+
 ## Estrutura do Projeto
 
 ```
@@ -57,7 +65,7 @@ No Ubuntu/Debian:
 sudo apt update
 sudo apt install python3.10 python3.10-venv python3.10-dev
 ```
-No Windows:  
+No Windows:
 Baixe em https://www.python.org/downloads/
 
 ### 2. Crie um ambiente virtual
@@ -127,3 +135,9 @@ pip install -r requirements.txt
 
 - Cada algoritmo possui README próprio explicando heurísticas, funcionamento e parâmetros.
 - Consulte `REESTRUTURACAO.md` para detalhes sobre a arquitetura e modularização.
+
+---
+
+### Observações sobre o main.py
+
+O arquivo `main.py` está totalmente documentado com docstrings no estilo Google, detalhando o fluxo, parâmetros e retornos de cada função. Consulte o código para detalhes de uso programático e integração.

@@ -15,9 +15,9 @@ O CSC resolve o Closest String Problem via clusterização, consenso local e rec
 - Robustez a outliers e ruído.
 - Exploração combinatorial controlada.
 
-## Parâmetros
+## Parâmetros Principais
 
-- Raio de clusterização, número de blocos, critérios automáticos.
+- `min_d`, `d_factor`, `min_blocks`, `max_blocks`, `n_div`, `l_div` (veja `config.py`)
 
 ## Uso Ideal
 
@@ -29,3 +29,16 @@ O CSC resolve o Closest String Problem via clusterização, consenso local e rec
 
 - Complexidade combinatorial pode crescer rápido.
 - Performance depende da existência de clusters naturais.
+
+## Exemplo de Uso
+
+```python
+from algorithms.csc.algorithm import CSCAlgorithm
+alg = CSCAlgorithm(strings, alphabet, min_blocks=3)
+center, dist = alg.run()
+```
+
+## Documentação
+
+- Consulte o código para docstrings detalhadas (Google style).
+- Integração automática com o framework CSP via decorador `@register_algorithm`.

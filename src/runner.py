@@ -3,6 +3,7 @@ import time
 import itertools
 import signal
 import sys
+import logging
 
 from utils.resource_monitor import check_algorithm_feasibility, get_safe_memory_limit, force_garbage_collection
 from src.algorithm_executor import AlgorithmExecutor, TimeoutException, ResourceLimitException
@@ -18,9 +19,6 @@ Classes:
 Funções:
     execute_algorithm_runs(...): Executa múltiplas execuções de um algoritmo, coletando resultados.
 """
-
-def _gap(baseline: int, val):
-    return 100 * (baseline - val) / baseline if (baseline and val is not None) else 0.0
 
 class Spinner:
     def __init__(self, prefix: str, console=None):
@@ -67,17 +65,10 @@ class Spinner:
 def execute_algorithm_runs(alg_name, AlgClass, seqs, alphabet, num_execs, baseline_val, console=None, timeout=None):
     """
     Executa múltiplas execuções de um algoritmo em threads isoladas com timeout e monitoramento de recursos.
-    
-    Args:
-        alg_name: Nome do algoritmo
-        AlgClass: Classe do algoritmo
-        seqs: Sequências de entrada
-        alphabet: Alfabeto
-        num_execs: Número de execuções
-        baseline_val: Valor baseline para cálculo de gap
-        console: Console para output
-        timeout: Tempo limite em segundos (padrão: ALGORITHM_TIMEOUT)
     """
+    logger = logging.getLogger(__name__)
+    logger.debug(f"[Runner] Iniciando {alg_name} (baseline_val={baseline_val})")
+    
     if timeout is None:
         timeout = ALGORITHM_TIMEOUT
     
@@ -222,14 +213,15 @@ def execute_algorithm_runs(alg_name, AlgClass, seqs, alphabet, num_execs, baseli
                     })
             else:
                 iteracoes = info.get('iteracoes', 1)
-                gap = _gap(baseline_val, val)
+                
+                logger.debug(f"[Runner] {alg_name} exec {i+1}: dist={val}")
                 
                 # Parar spinner e mostrar resultado final
                 spinner.stop()
                 if console:
-                    console.print(f"{exec_prefix:<25s}... dist={val}, tempo={tempo_execucao:.3f}s, gap={gap:.1f}%")
+                    console.print(f"{exec_prefix:<25s}... dist={val}, tempo={tempo_execucao:.3f}s")
                 else:
-                    print(f"\r{exec_prefix:<25s}... dist={val}, tempo={tempo_execucao:.3f}s, gap={gap:.1f}%")
+                    print(f"\r{exec_prefix:<25s}... dist={val}, tempo={tempo_execucao:.3f}s")
                 
                 for warning_msg in warning_holder:
                     if console:
@@ -239,8 +231,7 @@ def execute_algorithm_runs(alg_name, AlgClass, seqs, alphabet, num_execs, baseli
                     'tempo': tempo_execucao,
                     'iteracoes': iteracoes,
                     'distancia': val,
-                    'melhor_string': center,
-                    'gap': gap
+                    'melhor_string': center
                 })
                 
         except (TimeoutException, ResourceLimitException) as e:
@@ -305,4 +296,5 @@ def execute_algorithm_runs(alg_name, AlgClass, seqs, alphabet, num_execs, baseli
             # Força garbage collection após cada execução
             force_garbage_collection()
     
+    logger.debug(f"[Runner] {alg_name} finalizado: {len(executions)} execuções")
     return executions

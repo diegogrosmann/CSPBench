@@ -1,23 +1,22 @@
 """
-config.py
-=========
-
-Parâmetros padrão e configurações centrais do projeto.
+Parâmetros padrão e configurações centrais do projeto CSP.
 
 Atributos:
     DEBUG_DEFAULT (str): Modo debug padrão ('n' = desabilitado).
-    ALGORITHM_TIMEOUT (int): Tempo limite em segundos para execução de algoritmos.
+    ALGORITHM_TIMEOUT (int): Timeout padrão para execução de algoritmos.
     SYNTHETIC_DEFAULTS (dict): Parâmetros padrão para datasets sintéticos.
     FILE_DEFAULTS (dict): Parâmetros padrão para datasets de arquivo.
     ENTREZ_DEFAULTS (dict): Parâmetros padrão para datasets NCBI.
+
+Funções:
+    safe_input(prompt, default): Entrada segura, compatível com modo automatizado.
 """
 
+# config.py
+# =========
+
+import os
 import sys
-from algorithms.blf_ga.config import BLF_GA_DEFAULTS
-from algorithms.csc.config import CSC_DEFAULTS
-from algorithms.h3_csp.config import H3_CSP_DEFAULTS
-from algorithms.dp_csp.config import DP_CSP_DEFAULTS
-from algorithms.baseline.config import BASELINE_DEFAULTS
 
 # --------------------------------------------------
 # Geral
@@ -26,12 +25,15 @@ DEBUG_DEFAULT = 'n'            # Modo debug desabilitado por padrão
 ALGORITHM_TIMEOUT = 300        # Timeout padrão de 5 minutos para algoritmos
 
 def safe_input(prompt: str, default: str = "") -> str:
-    """Input seguro que trata KeyboardInterrupt de forma consistente."""
+    if os.environ.get("CSP_AUTOMATED_TEST") == "1":
+        # Retorna sempre o default ou vazio para todos os prompts
+        return default
     try:
         return input(prompt).strip()
     except (KeyboardInterrupt, EOFError):
         print("\nOperação cancelada pelo usuário.")
         sys.exit(0)
+    return default  # Garante retorno em todos os caminhos
 
 # --------------------------------------------------
 # Dataset sintético

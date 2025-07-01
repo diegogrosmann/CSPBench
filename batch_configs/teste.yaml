@@ -4,10 +4,10 @@ batch_info:
   nome: "Experimento Comparativo CSP"
   descricao: "Comparação de algoritmos em diferentes datasets"
   timeout_global: 10800  # 3 horas por execução
-  aleatorio_total: true
+  aleatorio_total: false  # Mudança para gerar known_distance
 
 execucoes:
-  # Bloco 1: Dataset sintético pequeno (n=7, L=70) - noise 0.4 (1 base)
+  # Bloco 1: Dataset sintético pequeno com noise definido
   - nome: "Sintético Pequeno"
     dataset:
       tipo: "synthetic"
@@ -15,9 +15,13 @@ execucoes:
         n: 10
         L: 20
         alphabet: "ACGT"
-        noise: null
-    num_bases: 2
+        noise: 0.1
+    num_bases: 1
     algoritmos:
-      - "DP-CSP"
-    execucoes_por_algoritmo_por_base: 2
-    timeout: 30
+#      - "Baseline"
+#      - "BLF-GA"
+#       - "H³-CSP"
+       - "DP-CSP"
+#       - "CSC"
+    execucoes_por_algoritmo_por_base: 1
+    timeout: 300

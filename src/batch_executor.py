@@ -19,10 +19,10 @@ import logging
 from src.console_manager import console
 from src.runner import execute_algorithm_runs
 from src.results_formatter import ResultsFormatter
-from algorithms.baseline.implementation import greedy_consensus, max_distance
 from algorithms.base import global_registry
 from utils.resource_monitor import check_algorithm_feasibility
 from utils.config import safe_input, ALGORITHM_TIMEOUT
+from utils.distance import max_distance, hamming_distance
 
 logger = logging.getLogger(__name__)
 
@@ -136,7 +136,7 @@ class BatchConfig:
     def __init__(self, config_dict: Dict[str, Any]):
         self.nome = config_dict.get('nome', 'Execução Sem Nome')
         self.dataset_config = config_dict.get('dataset', {})
-        self.algoritmos = config_dict.get('algoritmos', ['Baseline'])
+        self.algoritmos = config_dict.get('algoritmos', [])
         # Mudança de execucoes_por_algoritmo para execucoes_por_algoritmo_por_base
         self.execucoes_por_algoritmo_por_base = config_dict.get('execucoes_por_algoritmo_por_base', 
                                                           config_dict.get('execucoes_por_algoritmo', 3))  # Retro-compatibilidade
@@ -328,6 +328,8 @@ class BatchExecutor:
                 # Gerar/carregar dataset para esta base
                 seqs, dataset_params = self._generate_dataset(config.dataset_config)
                 
+                logger.debug(f"[BatchExecutor] Base {base_idx+1}: {len(seqs)} seqs")
+                
                 if not seqs:
                     raise ValueError(f"Dataset vazio gerado para base {base_idx + 1}")
                     
@@ -335,6 +337,14 @@ class BatchExecutor:
                 n, L = len(seqs), len(seqs[0])
                 
                 console.print(f"Base {base_idx + 1}: n={n}, L={L}, |Σ|={len(alphabet)}")
+                
+                # Extrair informações extras do dataset
+                seed = dataset_params.get('seed')
+                
+                logger.debug(f"[BatchExecutor] seed: {seed}")
+
+                if seed is not None:
+                    console.print(f"� Semente utilizada: {seed}")
                 
                 # Armazenar informações da base de dados
                 if 'bases_info' not in result:
@@ -345,6 +355,11 @@ class BatchExecutor:
                     'n': n, 'L': L, 'alphabet_size': len(alphabet),
                     'params': dataset_params
                 })
+                
+                # Verificar se há algoritmos configurados
+                if not config.algoritmos:
+                    console.print(f"⚠ Nenhum algoritmo configurado para a base {base_idx + 1} - pulando")
+                    continue
                 
                 # Verificar viabilidade dos algoritmos
                 viable_algs = []
@@ -360,34 +375,26 @@ class BatchExecutor:
                     console.print(f"❌ Nenhum algoritmo viável para a base {base_idx + 1}")
                     continue
                 
-                # Baseline
-                console.print(f"\n🎯 Executando Baseline para base {base_idx + 1}...")
-                baseline_start = time.time()
-                baseline_center = greedy_consensus(seqs, alphabet)
-                baseline_val = max_distance(baseline_center, seqs)
-                baseline_time = time.time() - baseline_start
-                
-                console.print(f"Baseline: dist={baseline_val}, tempo={baseline_time:.3f}s")
-                
                 # Criar formatter para esta execução
                 exec_formatter = ResultsFormatter()
-                baseline_executions = [{
-                    'tempo': baseline_time,
-                    'iteracoes': 1,
-                    'distancia': baseline_val,
-                    'melhor_string': baseline_center,
-                    'gap': 0.0
-                }]
-                exec_formatter.add_algorithm_results("Baseline", baseline_executions)
                 
-                # Adicionar ao formatter consolidado
-                exec_key = f"{config.nome}_Base{base_idx+1}_Baseline"
-                self.consolidated_formatter.add_algorithm_results(exec_key, baseline_executions)
+                # Definir chave única para o extra_info do formatter individual
+                base_key_info = f"{config.nome}_Base{base_idx+1}"
+                exec_formatter.extra_info = {
+                    base_key_info: {
+                        'seed': seed,
+                        'params': dataset_params
+                    }
+                }
                 
-                # Executar outros algoritmos
+                logger.debug(f"[BatchExecutor] extra_info definido para {base_key_info}")
+                
+                # Atualizar informações extras no formatter consolidado
+                if not hasattr(self.consolidated_formatter, 'extra_info'):
+                    self.consolidated_formatter.extra_info = {}
+                
+                # Executar algoritmos
                 for alg_name in viable_algs:
-                    if alg_name == "Baseline":
-                        continue
                         
                     console.print(f"\n🔄 Executando {alg_name} para base {base_idx + 1}...")
                     
@@ -400,17 +407,49 @@ class BatchExecutor:
                     # Execute cada algoritmo o número de vezes definido por base
                     execucoes_por_algoritmo = config.execucoes_por_algoritmo_por_base
                     
+                    # Execução silenciosa do algoritmo
+                    pass
+                    
                     try:
                         executions = execute_algorithm_runs(
                             alg_name, AlgClass, seqs, alphabet, 
-                            execucoes_por_algoritmo, baseline_val, 
+                            execucoes_por_algoritmo, None, 
                             console, config.timeout
                         )
                         
+                        # Log resumido das execuções removido para reduzir verbosidade
+                        for i, exec_data in enumerate(executions):
+                            # Calcular distância da string base se a string foi gerada
+                            if 'melhor_string' in exec_data and exec_data['melhor_string'] and exec_data['melhor_string'] != '':
+                                try:
+                                    string_base = exec_data['melhor_string']
+                                    distancia_base = max_distance(string_base, seqs)
+                                    exec_data['distancia_string_base'] = distancia_base
+                                    
+                                    # Log silencioso para reduzir verbosidade
+                                        
+                                except Exception as e:
+                                    logger.warning(f"[BatchExecutor] Erro ao calcular distância da string base: {e}")
+                                    exec_data['distancia_string_base'] = None
+                        
+                        # Adicionar informações extras em cada execução
+                        for exec_data in executions:
+                            exec_data['seed'] = seed
+                            
+                        # Execuções atualizadas silenciosamente
                         exec_formatter.add_algorithm_results(alg_name, executions)
                         
                         # Adicionar ao formatter consolidado com chave única
                         exec_key = f"{config.nome}_Base{base_idx+1}_{alg_name}"
+                        
+                        # Armazenar informações específicas desta base
+                        self.consolidated_formatter.extra_info[exec_key] = {
+                            'seed': seed,
+                            'params': dataset_params
+                        }
+                        
+                        logger.debug(f"[BatchExecutor] Consolidado: {exec_key}")
+                        
                         self.consolidated_formatter.add_algorithm_results(exec_key, executions)
                         
                         # Extrair melhor resultado
@@ -418,22 +457,23 @@ class BatchExecutor:
                         if valid_results:
                             best_exec = min(valid_results, key=lambda e: e['distancia'])
                             
-                            # Armazenar resultados para esta base
+                            # Incluir distância da string base no resultado
+                            dist_base = best_exec.get('distancia_string_base', '-')
+                            
                             base_key = f"base_{base_idx+1}"
                             if alg_name not in result['algoritmos_executados']:
                                 result['algoritmos_executados'][alg_name] = {}
-                                
+                            
                             result['algoritmos_executados'][alg_name][base_key] = {
                                 'dist': best_exec['distancia'],
+                                'dist_base': dist_base,
                                 'time': best_exec['tempo'],
-                                'gap': best_exec.get('gap', 0.0),
                                 'status': 'sucesso'
                             }
                             
                         else:
                             error_exec = next((e for e in executions if 'erro' in e), executions[0])
                             
-                            # Armazenar resultados para esta base
                             base_key = f"base_{base_idx+1}"
                             if alg_name not in result['algoritmos_executados']:
                                 result['algoritmos_executados'][alg_name] = {}
@@ -441,11 +481,10 @@ class BatchExecutor:
                             result['algoritmos_executados'][alg_name][base_key] = {
                                 'dist': float('inf'),
                                 'time': error_exec['tempo'],
-                                'gap': float('inf'),
                                 'status': 'erro',
                                 'erro': error_exec.get('erro', 'Erro desconhecido')
                             }
-                            
+                        
                     except Exception as e:
                         console.print(f"❌ Erro executando {alg_name} na base {base_idx+1}: {e}")
                         
@@ -457,7 +496,6 @@ class BatchExecutor:
                         result['algoritmos_executados'][alg_name][base_key] = {
                             'dist': float('inf'),
                             'time': 0.0,
-                            'gap': float('inf'),
                             'status': 'erro',
                             'erro': str(e)
                         }
