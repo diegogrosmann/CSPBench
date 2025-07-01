@@ -4,6 +4,7 @@ batch_info:
   nome: "Experimento Comparativo CSP"
   descricao: "Comparação de algoritmos em diferentes datasets"
   timeout_global: 1800  # 30 minutos por execução
+  aleatorio_total: true
 
 execucoes:
   # Bloco 1: Dataset sintético pequeno (1 base)
@@ -85,6 +86,9 @@ execucoes:
     num_bases: 1
     algoritmos:
       - "Baseline"
+      - "BLF-GA"
+    execucoes_por_algoritmo: 1
+    timeout: 1200
       - "BLF-GA"
     execucoes_por_algoritmo: 1
     timeout: 1200

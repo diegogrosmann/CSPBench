@@ -278,7 +278,13 @@ class BatchExecutor:
         """Gera ou carrega dataset baseado na configuração."""
         dataset_type = dataset_config.get('tipo', 'synthetic')
         params = dataset_config.get('parametros', {})
-        
+
+        # Checar aleatorio_total global
+        aleatorio_total_global = self.batch_info.get('aleatorio_total', None)
+        if aleatorio_total_global is not None and 'fully_random' not in params and 'aleatorio_total' not in params:
+            # Para compatibilidade, repassa como fully_random para o gerador
+            params['fully_random'] = aleatorio_total_global
+
         if dataset_type == 'synthetic':
             from datasets.dataset_synthetic import generate_dataset_with_params
             return generate_dataset_with_params(params)

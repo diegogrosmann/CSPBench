@@ -10,7 +10,7 @@ H3_CSP_DEFAULTS = {
     'max_time': 300,
     'diversity_threshold': 1,
     'fallback_enabled': True,
-    'seed': 42,
+    'seed': None,
     # Adicionados para evitar KeyError e garantir tipos corretos
     'block_medium': 4,
     'block_large': 8,

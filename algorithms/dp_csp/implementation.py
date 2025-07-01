@@ -14,6 +14,7 @@ import logging
 from typing import Dict, List, Optional, Sequence, Tuple, cast, Callable
 
 from utils.distance import max_hamming
+from utils.resource_monitor import get_safe_memory_limit, force_garbage_collection
 from .config import DP_CSP_DEFAULTS
 
 logger = logging.getLogger(__name__)
@@ -95,7 +96,9 @@ def exact_dp_closest_string(strings: List[String],
     """
     Busca o menor raio d* ≤ max_d tal que exista string-centro.
     Retorna (centro, d*).  Levanta RuntimeError se não encontrar.
+    Monitora memória e tempo para evitar travamento.
     """
+    import time
     baseline_val = max_hamming(strings[0], strings)  # cota superior simples
     if max_d is None:
         max_d = baseline_val
@@ -109,12 +112,46 @@ def exact_dp_closest_string(strings: List[String],
                 "execução pode ser lenta e usar muita memória."
             )
 
+    # --- Monitoramento de recursos ---
+    safe_mem_mb = get_safe_memory_limit()
+    max_time = DP_CSP_DEFAULTS.get('max_time', 300)
+    t0 = time.time()
+
+    def check_limits():
+        # Checa memória e tempo
+        import os, gc
+        gc.collect()
+        mem_mb = 0.0
+        try:
+            if os.path.exists('/proc/self/status'):
+                with open('/proc/self/status', 'r') as f:
+                    for line in f:
+                        if line.startswith('VmRSS:'):
+                            kb = int(line.split()[1])
+                            mem_mb = kb / 1024.0
+                            break
+        except Exception:
+            pass
+        elapsed = time.time() - t0
+        if mem_mb > safe_mem_mb * 0.95:
+            msg = f"DP-CSP interrompido: uso de memória {mem_mb:.1f}MB excedeu limite seguro ({safe_mem_mb:.1f}MB)"
+            if warning_callback:
+                warning_callback(msg)
+            raise RuntimeError(msg)
+        if elapsed > max_time:
+            msg = f"DP-CSP interrompido: tempo de execução excedeu {max_time}s"
+            if warning_callback:
+                warning_callback(msg)
+            raise RuntimeError(msg)
+
     for d in range(max_d + 1):
         # Verificar cancelamento via callback
         if progress_callback:
             progress_callback(f"Testando d={d}")
         else:
             logger.debug(f"DP-CSP tentando d={d}")
+        # Checar limites antes de cada iteração principal
+        check_limits()
         center = _dp_decision(strings, alphabet, d)
         if center is not None:
             logger.info(f"DP-CSP encontrou solução com d={d}")

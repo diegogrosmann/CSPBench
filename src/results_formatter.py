@@ -149,6 +149,13 @@ class ResultsFormatter:
             iteracoes = exec_data.get('iteracoes', exec_data.get('num_iteracoes', 0))
             
             output.append(f"Execução {i:2d}:")
+            # Adiciona informações de semente e parâmetros, se existirem
+            params = exec_data.get('params')
+            seed = exec_data.get('seed')
+            if params is not None:
+                output.append(f"  Parâmetros de geração: {params}")
+            if seed is not None:
+                output.append(f"  Semente utilizada: {seed}")
             if exec_data.get('erro'):
                 output.append(f"  ❌ Erro: {exec_data['erro']}")
                 output.append(f"  Tempo: {exec_data['tempo']:.4f}s")

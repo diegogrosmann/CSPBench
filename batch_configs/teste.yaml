@@ -4,6 +4,7 @@ batch_info:
   nome: "Experimento Comparativo CSP"
   descricao: "Comparação de algoritmos em diferentes datasets"
   timeout_global: 10800  # 3 horas por execução
+  aleatorio_total: true
 
 execucoes:
   # Bloco 1: Dataset sintético pequeno (n=7, L=70) - noise 0.4 (1 base)
