@@ -142,8 +142,10 @@ def main():
         seed = params.get('seed')
         logging.debug(f"[main] seed: {seed}")
 
-        if seed is not None:
-            console.print(f"Semente utilizada: {seed}")
+        # Exibir distância da string base se disponível
+        distancia_base = params.get('distancia_string_base')
+        if distancia_base is not None:
+            console.print(f"Distância da string base: {distancia_base}")
 
         if not seqs:
             console.print("Nenhuma sequência lida.")
@@ -165,8 +167,9 @@ def main():
         console.print(f"Limite seguro de memória: {safe_memory:.1f}%")
         
         # Algoritmos
-        if automated:
-            algs = [list(global_registry.keys())[0]]  # Executa o primeiro algoritmo
+        algs = []
+        if automated or not algs:
+            algs = [list(global_registry.keys())[0]]  # Executa o primeiro algoritmo automaticamente
         else:
             algs = select_algorithms()
         if not algs:
@@ -187,19 +190,23 @@ def main():
             console.print("Nenhum algoritmo viável.")
             return
         
-        runs = safe_input("\nNº execuções p/ algoritmo [3]: ")
-        num_execs = int(runs) if runs.isdigit() and int(runs) > 0 else 3
+        # Configurar número de execuções e timeout
+        if automated:
+            num_execs = 1
+            timeout = ALGORITHM_TIMEOUT
+            console.print(f"Timeout configurado: {timeout}s por execução")
+        else:
+            runs = safe_input("\nNº execuções p/ algoritmo [3]: ")
+            num_execs = int(runs) if runs.isdigit() and int(runs) > 0 else 3
 
-        # Configurar timeout com recomendações baseadas nos algoritmos
-        default_timeout = ALGORITHM_TIMEOUT
-        if 'DP-CSP' in viable_algs and n >= 8:
-            default_timeout = max(ALGORITHM_TIMEOUT, 120)  # Mínimo 2 minutos para DP-CSP complexo
-            console.print("⚠ DP-CSP detectado em dataset complexo - timeout mínimo aumentado")
-        
-        timeout_input = safe_input(f"\nTimeout por execução em segundos [{default_timeout}]: ")
-        timeout = int(timeout_input) if timeout_input.isdigit() and int(timeout_input) > 0 else default_timeout
-        
-        console.print(f"Timeout configurado: {timeout}s por execução")
+            # Configurar timeout com recomendações baseadas nos algoritmos
+            default_timeout = ALGORITHM_TIMEOUT
+            if 'DP-CSP' in viable_algs and n >= 8:
+                default_timeout = max(ALGORITHM_TIMEOUT, 120)  # Mínimo 2 minutos para DP-CSP complexo
+                console.print("⚠ DP-CSP detectado em dataset complexo - timeout mínimo aumentado")
+            timeout_input = safe_input(f"\nTimeout por execução em segundos [{default_timeout}]: ")
+            timeout = int(timeout_input) if timeout_input.isdigit() and int(timeout_input) > 0 else default_timeout
+            console.print(f"Timeout configurado: {timeout}s por execução")
         
         # Execução dos algoritmos
         console.print("\n" + "="*50)
@@ -227,21 +234,7 @@ def main():
             # Log resumido das execuções
             logging.debug(f"[ALG_EXEC] {alg_name} concluído: {len(executions)} execuções")
             for i, exec_data in enumerate(executions):
-                # Calcular distância da string base se a string foi gerada
-                if 'melhor_string' in exec_data and exec_data['melhor_string'] and exec_data['melhor_string'] != '':
-                    try:
-                        string_base = exec_data['melhor_string']
-                        distancia_base = max_distance(string_base, seqs)
-                        exec_data['distancia_string_base'] = distancia_base
-                        
-                        # Log simplificado da string base
-                        logging.debug(f"[ALG_EXEC] {alg_name} exec {i+1}: string='{string_base}', dist_max={distancia_base}")
-                            
-                    except Exception as e:
-                        logging.warning(f"[ALG_EXEC] Erro ao calcular distância da string base: {e}")
-                        exec_data['distancia_string_base'] = None
-                
-                logging.debug(f"[ALG_EXEC] {alg_name} exec {i+1} finalizada")
+                # Não calcular mais distancia_string_base aqui, apenas usar seed
                 exec_data['seed'] = seed
             
             formatter.add_algorithm_results(alg_name, executions)
@@ -251,7 +244,7 @@ def main():
                 logging.debug(f"[ALG_EXEC] {alg_name} melhor: dist={best_exec['distancia']}")
                 
                 # Adicionar distância da string base ao resultado
-                dist_base = best_exec.get('distancia_string_base', '-')
+                dist_base = params.get('distancia_string_base', '-')
                 
                 results[alg_name] = {
                     'dist': best_exec['distancia'],
@@ -274,10 +267,20 @@ def main():
         console.print(f"\n📄 Gerando relatório detalhado...")
         # Adicionar informações básicas ao formatter para o relatório
         if hasattr(formatter, '__dict__'):
+            # Captura todas as strings base e suas distâncias
+            base_strings_info = []
+            for alg_name, execs in formatter.results.items():
+                for exec_data in execs:
+                    if exec_data.get('melhor_string'):
+                        base_strings_info.append({
+                            'base_string': exec_data['melhor_string'],
+                            'distancia_string_base': params.get('distancia_string_base', '-')
+                        })
             formatter.extra_info = {
                 'seed': seed,
                 'params': params,
-                'dataset_strings': seqs
+                'dataset_strings': seqs,
+                'base_strings_info': base_strings_info
             }
             logging.debug(f"[main] formatter configurado")
         save_detailed_report(formatter, f"{base_name}.txt")

@@ -67,109 +67,72 @@ class ResultsFormatter:
         return "\n".join(output)
 
     def _format_algorithm_table(self, algorithm_name: str) -> str:
-        """Formata tabela individual de um algoritmo"""
+        """Formata tabela individual de um algoritmo (simplificado)"""
         executions = self.results[algorithm_name]
-        output = [f"\n📊 TABELA DE EXECUÇÕES - {algorithm_name.upper()}"]
-        output.append("-" * 60)
-        
-        # Cabeçalhos da tabela
-        headers = [
-            "Execução",
-            "Tempo (s)",
-            "Distância",
-            "Status"
-        ]
-        # Dados da tabela
-        table_data = []
-        for i, exec_data in enumerate(executions, 1):
+        output = [f"\n📊 TABELA DE EXECUÇÕES - {algorithm_name.upper()}", "-" * 60]
+        headers = ["Execução", "Tempo (s)", "Distância", "Status"]
+        def format_row(i, exec_data):
             distancia = exec_data.get('distancia', exec_data.get('melhor_distancia', '-'))
-            status = "✓ OK"
             if exec_data.get('erro'):
-                status = f"✗ {exec_data['erro']}"
-                distancia = "-"
-            elif exec_data.get('timeout'):
-                status = "⏰ Timeout"
-            elif distancia == float('inf'):
-                status = "∞ Sem solução"
-                distancia = "∞"
-            row = [
-                i,
-                f"{exec_data['tempo']:.4f}",
-                distancia,
-                status
-            ]
-            table_data.append(row)
+                return [i, f"{exec_data['tempo']:.4f}", "-", f"✗ {exec_data['erro']}"]
+            if exec_data.get('timeout'):
+                return [i, f"{exec_data['tempo']:.4f}", distancia, "⏰ Timeout"]
+            if distancia == float('inf'):
+                return [i, f"{exec_data['tempo']:.4f}", "∞", "∞ Sem solução"]
+            return [i, f"{exec_data['tempo']:.4f}", distancia, "✓ OK"]
+        table_data = [format_row(i, exec_data) for i, exec_data in enumerate(executions, 1)]
         table = tabulate(table_data, headers=headers, tablefmt="grid", stralign="center")
         output.append(table)
         return "\n".join(output)
-    
+
     def _format_algorithm_statistics(self, algorithm_name: str) -> str:
-        """Formata estatísticas detalhadas de um algoritmo"""
+        """Formata estatísticas detalhadas de um algoritmo (simplificado)"""
         executions = self.results[algorithm_name]
-        valid_executions = [
-            exec_data for exec_data in executions 
-            if not exec_data.get('erro') and 
-               exec_data.get('distancia', exec_data.get('melhor_distancia')) not in ['-', float('inf')]
-        ]
-        output = [f"\n📈 ESTATÍSTICAS DETALHADAS - {algorithm_name.upper()}"]
-        output.append("-" * 60)
-        
-        if not valid_executions:
+        valid = [e for e in executions if not e.get('erro') and e.get('distancia', e.get('melhor_distancia')) not in ['-', float('inf')]]
+        output = [f"\n📈 ESTATÍSTICAS DETALHADAS - {algorithm_name.upper()}", "-" * 60]
+        if not valid:
             output.append("❌ Nenhuma execução válida para calcular estatísticas.")
             return "\n".join(output)
-
-        tempos = [exec_data['tempo'] for exec_data in valid_executions]
-        distancias = [exec_data.get('distancia', exec_data.get('melhor_distancia', float('inf'))) 
-                     for exec_data in valid_executions]
-
+        tempos = [e['tempo'] for e in valid]
+        distancias = [e.get('distancia', e.get('melhor_distancia', float('inf'))) for e in valid]
+        def stat_line(label, val, sufixo=""): return [label, f"{val}{sufixo}"]
         stats_data = [
-            ["TEMPO DE EXECUÇÃO", ""],
-            ["Execuções Válidas", f"{len(valid_executions)}/{len(executions)}"],
-            ["Média", f"{statistics.mean(tempos):.4f} s"],
-            ["Mediana", f"{statistics.median(tempos):.4f} s"],
-            ["Desvio Padrão", f"{statistics.stdev(tempos) if len(tempos) > 1 else 0:.4f} s"],
-            ["Mínimo", f"{min(tempos):.4f} s"],
-            ["Máximo", f"{max(tempos):.4f} s"],
+            stat_line("Execuções Válidas", f"{len(valid)}/{len(executions)}"),
+            stat_line("Média", f"{statistics.mean(tempos):.4f}", " s"),
+            stat_line("Mediana", f"{statistics.median(tempos):.4f}", " s"),
+            stat_line("Desvio Padrão", f"{statistics.stdev(tempos) if len(tempos) > 1 else 0:.4f}", " s"),
+            stat_line("Mínimo", f"{min(tempos):.4f}", " s"),
+            stat_line("Máximo", f"{max(tempos):.4f}", " s"),
+            ["", ""],
+            stat_line("Média Distância", f"{statistics.mean(distancias):.2f}"),
+            stat_line("Mediana Distância", f"{statistics.median(distancias):.2f}"),
+            stat_line("Desvio Padrão Distância", f"{statistics.stdev(distancias) if len(distancias) > 1 else 0:.2f}"),
+            stat_line("Melhor (Mínima)", min(distancias)),
+            stat_line("Pior (Máxima)", max(distancias)),
         ]
-        if distancias:
-            stats_data.extend([
-                ["", ""],
-                ["DISTÂNCIA (em relação à string centro)", ""],
-                ["Média", f"{statistics.mean(distancias):.2f}"],
-                ["Mediana", f"{statistics.median(distancias):.2f}"],
-                ["Desvio Padrão", f"{statistics.stdev(distancias) if len(distancias) > 1 else 0:.2f}"],
-                ["Melhor (Mínima)", f"{min(distancias)}"],
-                ["Pior (Máxima)", f"{max(distancias)}"],
-            ])
-        
         table = tabulate(stats_data, headers=["Métrica", "Valor"], tablefmt="grid", stralign="left")
         output.append(table)
         return "\n".join(output)
-    
+
     def _format_algorithm_strings(self, algorithm_name: str) -> str:
-        """Formata strings encontradas para auditoria"""
+        """Formata strings encontradas para auditoria (simplificado)"""
         executions = self.results[algorithm_name]
-        output = [f"\n🔍 STRINGS PARA AUDITORIA - {algorithm_name.upper()}"]
-        output.append("-" * 60)
-        for i, exec_data in enumerate(executions, 1):
-            distancia = exec_data.get('distancia', exec_data.get('melhor_distancia', '-'))
-            string_result = exec_data.get('melhor_string', exec_data.get('string_resultado', ''))
-            iteracoes = exec_data.get('iteracoes', exec_data.get('num_iteracoes', 0))
+        output = [f"\n🔍 STRINGS PARA AUDITORIA - {algorithm_name.upper()}", "-" * 60]
+        for i, e in enumerate(executions, 1):
+            distancia = e.get('distancia', e.get('melhor_distancia', '-'))
+            string_result = e.get('melhor_string', e.get('string_resultado', ''))
+            iteracoes = e.get('iteracoes', e.get('num_iteracoes', 0))
             output.append(f"Execução {i:2d}:")
-            params = exec_data.get('params')
-            seed = exec_data.get('seed')
-            if params is not None:
-                output.append(f"  Parâmetros de geração: {params}")
-            if seed is not None:
-                output.append(f"  Semente utilizada: {seed}")
-            if exec_data.get('erro'):
-                output.append(f"  ❌ Erro: {exec_data['erro']}")
-                output.append(f"  Tempo: {exec_data['tempo']:.4f}s")
+            if e.get('params') is not None:
+                output.append(f"  Parâmetros de geração: {e['params']}")
+            if e.get('erro'):
+                output.append(f"  ❌ Erro: {e['erro']}")
+                output.append(f"  Tempo: {e['tempo']:.4f}s")
             else:
                 output.append(f"  String Centro (Base): '{string_result}'")
                 output.append(f"  Distância (algoritmo): {distancia}")
                 output.append(f"  Iterações: {iteracoes}")
-                output.append(f"  Tempo: {exec_data['tempo']:.4f}s")
+                output.append(f"  Tempo: {e['tempo']:.4f}s")
             output.append("")
         return "\n".join(output)
     
@@ -328,83 +291,45 @@ class ResultsFormatter:
             'results': self.results
         }
     
-    def _format_individual_report(self, algorithm_name, executions, base_name=None):
-        """Formata relatório individual para um algoritmo específico"""
-        output = []
-        
-        # Cabeçalho com destaque para algoritmo
-        output.append(f"\n📊 RESULTADOS PARA {algorithm_name}")
-        output.append("=" * 80)
-        
-        # Adicionar informações sobre a base/dataset
-        if base_name:
-            output.append(f"Base de Dados: {base_name}")
-            
-        # Verificar se há informações específicas sobre o centro/base string
-        if hasattr(self, 'extra_info') and self.extra_info:
-            # Outras informações opcionais
-            seed = self.extra_info.get('seed')
-            if seed:
-                output.append(f"Seed: {seed}")
-                
     def _format_dataset_info(self) -> str:
-        """Formata informações do dataset incluindo string base de geração"""
-        output = ["\n📊 INFORMAÇÕES DO DATASET"]
-        output.append("-" * 60)
-        
+        """Formata informações de todos os datasets presentes em extra_info, iterando sobre cada um."""
+        output = ["\n📊 INFORMAÇÕES DO DATASET", "-" * 60]
+
         if not hasattr(self, 'extra_info') or not self.extra_info:
             output.append("❌ Nenhuma informação do dataset disponível.")
             return "\n".join(output)
-        
-        # Extrair informações do dataset
-        dataset_info = {}
-        base_strings = set()
-        
-        for key, info in self.extra_info.items():
-            if isinstance(info, dict):
-                params = info.get('params', {})
-                if params:
-                    # Atualizar informações do dataset
-                    for param_key, param_value in params.items():
-                        if param_key not in dataset_info:
-                            dataset_info[param_key] = param_value
-                    
-                    # Coletar string base se disponível
-                    base_string = params.get('base_string')
-                    if base_string:
-                        base_strings.add(base_string)
-        
-        # Exibir informações básicas do dataset
-        if dataset_info:
-            output.append("📋 Parâmetros do Dataset:")
-            for key, value in dataset_info.items():
-                if key != 'base_string':  # Trataremos a base_string separadamente
-                    if key == 'n':
-                        output.append(f"  • Número de strings: {value}")
-                    elif key == 'L':
-                        output.append(f"  • Comprimento das strings: {value}")
-                    elif key == 'alphabet':
-                        output.append(f"  • Alfabeto: '{value}' (|Σ| = {len(str(value))})")
-                    elif key == 'noise':
-                        if isinstance(value, list):
-                            output.append(f"  • Taxa de ruído: variável (min: {min(value):.3f}, max: {max(value):.3f})")
-                        else:
-                            output.append(f"  • Taxa de ruído: {value}")
-                    elif key == 'seed':
-                        output.append(f"  • Semente: {value}")
-                    elif key == 'fully_random':
-                        output.append(f"  • Modo: {'Totalmente aleatório' if value else 'Base + ruído'}")
-        
-        # Exibir string(s) base para auditoria
-        if base_strings:
-            output.append("")
-            output.append("🎯 STRING BASE PARA AUDITORIA:")
-            for i, base_string in enumerate(sorted(base_strings), 1):
-                output.append(f"  Base {i}: ")
-                output.append(f"    • String: '{base_string}'")
-                dist = self.extra_info.get('distancia_string_base', '')
-                output.append(f"    • Distância da string base: {dist}")
-        else:
-            output.append("❌ String base não disponível (dataset não sintético ou informação não capturada).")
-        
+
+        encontrou = False
+        for nome, params in self.extra_info.items():
+            if not isinstance(params, dict):
+                continue
+            encontrou = True
+            output.append(f"\n📋 Parâmetros do Dataset: {nome}")
+            if 'n' in params:
+                output.append(f"  • Número de strings: {params['n']}")
+            if 'L' in params:
+                output.append(f"  • Comprimento das strings: {params['L']}")
+            if 'alphabet' in params:
+                value = params['alphabet']
+                output.append(f"  • Alfabeto: '{value}' (|Σ| = {len(str(value))})")
+            if 'noise' in params:
+                value = params['noise']
+                if isinstance(value, list):
+                    output.append(f"  • Taxa de ruído: variável (min: {min(value):.3f}, max: {max(value):.3f})")
+                else:
+                    output.append(f"  • Taxa de ruído: {value}")
+            if 'seed' in params:
+                output.append(f"  • Semente: {params['seed']}")
+            if 'fully_random' in params:
+                output.append(f"  • Modo: {'Totalmente aleatório' if params['fully_random'] else 'Base + ruído'}")
+            if 'base_string' in params or 'distancia_string_base' in params:
+                output.append("")
+                output.append("🎯 STRING BASE PARA AUDITORIA:")
+                if 'base_string' in params:
+                    output.append(f"  • String base: '{params['base_string']}'")
+                if 'distancia_string_base' in params:
+                    output.append(f"  • Distância da string base: {params['distancia_string_base']}")
+
+        if not encontrou:
+            output.append("❌ Nenhum parâmetro de dataset encontrado.")
         return "\n".join(output)

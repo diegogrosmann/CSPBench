@@ -24,13 +24,16 @@ def test_main_integration(monkeypatch, tmp_path):
     ]) + '\n'
 
     # Executa o main.py como subprocesso
+    env = os.environ.copy()
+    env["CSP_AUTOMATED_TEST"] = "1"
     result = subprocess.run(
         [sys.executable, 'main.py'],
         input=entradas.encode(),
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         cwd=os.getcwd(),
-        timeout=60
+        timeout=60,
+        env=env
     )
     # Checa se rodou sem erro fatal
     assert result.returncode == 0

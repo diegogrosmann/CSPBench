@@ -46,8 +46,12 @@ class BLFGAAlgorithm(Algorithm):
     def run(self) -> tuple[str, int]:
         """
         Executa o BLF-GA e retorna a string central e a distância máxima.
+        """
+        best, best_val, _ = self.blf_ga_instance.run()
+        return best, best_val
 
-        Returns:
-            tuple[str, int]: (string_central, distancia_maxima)
+    def run_with_history(self) -> tuple[str, int, list]:
+        """
+        Executa o BLF-GA e retorna a string central, a distância máxima e o histórico de distâncias.
         """
         return self.blf_ga_instance.run()

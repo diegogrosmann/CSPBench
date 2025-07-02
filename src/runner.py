@@ -92,13 +92,6 @@ def execute_algorithm_runs(alg_name, AlgClass, seqs, alphabet, num_execs, baseli
             'melhor_string': '',
             'erro': f'Inviável: {feasibility_msg}'
         }]
-    
-    # Ajustar timeout baseado na complexidade estimada
-    if alg_name == 'DP-CSP' and timeout < 60:
-        adjusted_timeout = min(timeout * 3, 300)  # Máximo 5 minutos para DP-CSP
-        if console:
-            console.print(f"Timeout ajustado para {alg_name}: {adjusted_timeout}s")
-        timeout = adjusted_timeout
         
     is_deterministic = getattr(AlgClass, 'is_deterministic', False)
     actual_execs = 1 if is_deterministic else num_execs

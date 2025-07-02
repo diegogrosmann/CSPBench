@@ -335,16 +335,8 @@ class BatchExecutor:
                     
                 alphabet = ''.join(sorted(set(''.join(seqs))))
                 n, L = len(seqs), len(seqs[0])
-                
-                console.print(f"Base {base_idx + 1}: n={n}, L={L}, |Σ|={len(alphabet)}")
-                
-                # Extrair informações extras do dataset
                 seed = dataset_params.get('seed')
-                
-                logger.debug(f"[BatchExecutor] seed: {seed}")
-
-                if seed is not None:
-                    console.print(f"� Semente utilizada: {seed}")
+                distancia_string_base = dataset_params.get('distancia_string_base', None)
                 
                 # Armazenar informações da base de dados
                 if 'bases_info' not in result:
@@ -381,10 +373,7 @@ class BatchExecutor:
                 # Definir chave única para o extra_info do formatter individual
                 base_key_info = f"{config.nome}_Base{base_idx+1}"
                 exec_formatter.extra_info = {
-                    base_key_info: {
-                        'seed': seed,
-                        'params': dataset_params
-                    }
+                    base_key_info: dataset_params
                 }
                 
                 logger.debug(f"[BatchExecutor] extra_info definido para {base_key_info}")
@@ -392,108 +381,59 @@ class BatchExecutor:
                 # Atualizar informações extras no formatter consolidado
                 if not hasattr(self.consolidated_formatter, 'extra_info'):
                     self.consolidated_formatter.extra_info = {}
+                # Armazenar os params diretamente na chave da base
+                base_key = f"{config.nome}_Base{base_idx+1}"
+                self.consolidated_formatter.extra_info[base_key] = dataset_params
                 
                 # Executar algoritmos
                 for alg_name in viable_algs:
-                        
                     console.print(f"\n🔄 Executando {alg_name} para base {base_idx + 1}...")
-                    
                     if alg_name not in global_registry:
                         console.print(f"❌ Algoritmo '{alg_name}' não encontrado!")
                         continue
-                        
                     AlgClass = global_registry[alg_name]
-                    
-                    # Execute cada algoritmo o número de vezes definido por base
                     execucoes_por_algoritmo = config.execucoes_por_algoritmo_por_base
-                    
-                    # Execução silenciosa do algoritmo
-                    pass
-                    
                     try:
                         executions = execute_algorithm_runs(
                             alg_name, AlgClass, seqs, alphabet, 
                             execucoes_por_algoritmo, None, 
                             console, config.timeout
                         )
-                        
-                        # Log resumido das execuções removido para reduzir verbosidade
-                        for i, exec_data in enumerate(executions):
-                            # Calcular distância da string base se a string foi gerada
-                            if 'melhor_string' in exec_data and exec_data['melhor_string'] and exec_data['melhor_string'] != '':
-                                try:
-                                    string_base = exec_data['melhor_string']
-                                    distancia_base = max_distance(string_base, seqs)
-                                    exec_data['distancia_string_base'] = distancia_base
-                                    
-                                    # Log silencioso para reduzir verbosidade
-                                        
-                                except Exception as e:
-                                    logger.warning(f"[BatchExecutor] Erro ao calcular distância da string base: {e}")
-                                    exec_data['distancia_string_base'] = None
-                        
-                        # Adicionar informações extras em cada execução
-                        for exec_data in executions:
-                            exec_data['seed'] = seed
-                            
-                        # Execuções atualizadas silenciosamente
+
                         exec_formatter.add_algorithm_results(alg_name, executions)
-                        
-                        # Adicionar ao formatter consolidado com chave única
                         exec_key = f"{config.nome}_Base{base_idx+1}_{alg_name}"
-                        
-                        # Armazenar informações específicas desta base
-                        self.consolidated_formatter.extra_info[exec_key] = {
-                            'seed': seed,
-                            'params': dataset_params
-                        }
-                        
-                        logger.debug(f"[BatchExecutor] Consolidado: {exec_key}")
-                        
                         self.consolidated_formatter.add_algorithm_results(exec_key, executions)
-                        
-                        # Extrair melhor resultado
                         valid_results = [e for e in executions if 'distancia' in e and e['distancia'] != float('inf')]
                         if valid_results:
                             best_exec = min(valid_results, key=lambda e: e['distancia'])
-                            
-                            # Incluir distância da string base no resultado
-                            dist_base = best_exec.get('distancia_string_base', '-')
-                            
-                            base_key = f"base_{base_idx+1}"
+                            # Usar distancia da string base dos params
+                            dist_base = dataset_params.get('distancia_string_base', '-')
+                            base_key_result = f"base_{base_idx+1}"
                             if alg_name not in result['algoritmos_executados']:
                                 result['algoritmos_executados'][alg_name] = {}
-                            
-                            result['algoritmos_executados'][alg_name][base_key] = {
+                            result['algoritmos_executados'][alg_name][base_key_result] = {
                                 'dist': best_exec['distancia'],
                                 'dist_base': dist_base,
                                 'time': best_exec['tempo'],
                                 'status': 'sucesso'
                             }
-                            
                         else:
                             error_exec = next((e for e in executions if 'erro' in e), executions[0])
-                            
-                            base_key = f"base_{base_idx+1}"
+                            base_key_result = f"base_{base_idx+1}"
                             if alg_name not in result['algoritmos_executados']:
                                 result['algoritmos_executados'][alg_name] = {}
-                                
-                            result['algoritmos_executados'][alg_name][base_key] = {
+                            result['algoritmos_executados'][alg_name][base_key_result] = {
                                 'dist': float('inf'),
                                 'time': error_exec['tempo'],
                                 'status': 'erro',
                                 'erro': error_exec.get('erro', 'Erro desconhecido')
                             }
-                        
                     except Exception as e:
                         console.print(f"❌ Erro executando {alg_name} na base {base_idx+1}: {e}")
-                        
-                        # Armazenar erro
-                        base_key = f"base_{base_idx+1}"
+                        base_key_result = f"base_{base_idx+1}"
                         if alg_name not in result['algoritmos_executados']:
                             result['algoritmos_executados'][alg_name] = {}
-                            
-                        result['algoritmos_executados'][alg_name][base_key] = {
+                        result['algoritmos_executados'][alg_name][base_key_result] = {
                             'dist': float('inf'),
                             'time': 0.0,
                             'status': 'erro',

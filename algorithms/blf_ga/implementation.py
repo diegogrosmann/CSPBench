@@ -91,12 +91,13 @@ class BLFGA:
         self.progress_callback: Optional[Callable[[str], None]] = None
 
         self.blocks = self._initial_blocking()
+        self.history = []  # Histórico de distâncias por geração
 
     def set_progress_callback(self, callback: Callable[[str], None]) -> None:
         """Define um callback para relatar o progresso."""
         self.progress_callback = callback
 
-    def run(self) -> Tuple[String,int]:
+    def run(self) -> Tuple[String, int, list]:
 
         start = time.time()
         
@@ -106,7 +107,7 @@ class BLFGA:
         pop = self._init_population()
         best     = min(pop, key=lambda s: max_distance(s, self.strings))
         best_val = max_distance(best, self.strings)
-
+        self.history = [best_val]
         for gen in range(1, self.max_gens+1):
             elapsed = time.time() - start
             if elapsed >= self.max_time:
@@ -128,6 +129,7 @@ class BLFGA:
 
             cur_best = pop[0]
             cur_val  = max_distance(cur_best, self.strings)
+            self.history.append(cur_val)
             if cur_val < best_val:
                 best, best_val = cur_best, cur_val
             
@@ -144,7 +146,7 @@ class BLFGA:
                 # Redivisão adaptativa (log apenas quando necessário)
                 self.blocks = self._adaptive_blocking(pop)
 
-        return best, best_val
+        return best, best_val, self.history
 
     def _init_population(self) -> Population:
         consensus = "".join(Counter(pos).most_common(1)[0][0] for pos in zip(*self.strings))

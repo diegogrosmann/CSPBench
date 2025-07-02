@@ -1,19 +1,10 @@
 """
-Geração de datasets sintéticos para CSP.
-
-Funções:
-    generate_dataset(): Gera dataset sintético via prompt.
-"""
-
-# dataset_synthetic.py
-"""
 dataset_synthetic.py
 ====================
 
 Funções para gerar datasets sintéticos (aleatórios ou base + ruído).
 Chamado pelo main.py quando o usuário opta por geração.
 """
-
 import random
 from typing import List, Tuple, Dict, Any
 import logging
@@ -172,6 +163,12 @@ def generate_dataset_with_params(params: dict) -> Tuple[List[str], Dict[str, Any
                             seq[pos] = rng.choice(other_chars)
                 sequences.append(''.join(seq))
     used_params['seed'] = seed
+
+    # Calcular a distância da string base para o conjunto
+    from utils.distance import max_distance
+    distancia_base = max_distance(base_string, sequences)
+    used_params['distancia_string_base'] = distancia_base
+
     return sequences, used_params
 
 def generate_perturbations(base_string: str, n_strings: int, max_distance: int, alphabet: str, rng) -> List[str]:

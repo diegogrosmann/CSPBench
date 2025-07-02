@@ -12,16 +12,16 @@ execucoes:
     dataset:
       tipo: "synthetic"
       parametros:
-        n: 10
-        L: 20
+        n: 200
+        L: 100
         alphabet: "ACGT"
-        noise: 0.1
+        noise: Null
     num_bases: 1
     algoritmos:
 #      - "Baseline"
-#      - "BLF-GA"
+       - "BLF-GA"
 #       - "H³-CSP"
-       - "DP-CSP"
+#       - "DP-CSP"
 #       - "CSC"
-    execucoes_por_algoritmo_por_base: 1
+    execucoes_por_algoritmo_por_base: 2
     timeout: 300
