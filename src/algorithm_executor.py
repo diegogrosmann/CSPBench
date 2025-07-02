@@ -12,6 +12,7 @@ import time
 import queue
 from typing import Any, Callable, Optional, Tuple, Union
 import logging
+import multiprocessing
 from utils.resource_monitor import ResourceMonitor, ResourceLimits, force_garbage_collection
 
 logger = logging.getLogger(__name__)
@@ -77,7 +78,8 @@ class AlgorithmExecutor:
             Tuple[Optional[Any], Union[int, float], dict]: Resultado da execução, incluindo centro, distância e informações adicionais.
         """
         logger.info(f"Executando algoritmo {algorithm_instance.__class__.__name__} com timeout={self.timeout}s")
-        result_queue = queue.Queue()
+        result_queue = multiprocessing.Queue()
+        progress_queue = multiprocessing.Queue()
         self.stop_event.clear()
         self.resource_violation = False
         
@@ -94,28 +96,15 @@ class AlgorithmExecutor:
         
         self.resource_monitor.set_violation_callback(resource_violation_handler)
         
-        def run_algorithm():
-            """Função executada na thread do algoritmo."""
+        def run_algorithm_mp(result_queue, progress_queue):
+            """Função executada no processo do algoritmo."""
             try:
-                logger.info(f"Iniciando thread do algoritmo {algorithm_instance.__class__.__name__}")
-                # Configurar callbacks se disponíveis
-                if hasattr(algorithm_instance, 'set_progress_callback') and progress_callback is not None:
-                    def monitored_progress(msg: str):
-                        if self.stop_event.is_set():
-                            if self.resource_violation:
-                                logger.warning("Execução interrompida por limite de recursos")
-                                raise ResourceLimitException("Algoritmo cancelado por limite de recursos")
-                            else:
-                                logger.warning("Execução interrompida por timeout")
-                                raise TimeoutException("Algoritmo cancelado por timeout")
-                        if progress_callback is not None:
-                            progress_callback(msg)
-                    algorithm_instance.set_progress_callback(monitored_progress)
-                    
-                if hasattr(algorithm_instance, 'set_warning_callback') and warning_callback is not None:
-                    algorithm_instance.set_warning_callback(warning_callback)
+                def progress(msg):
+                    progress_queue.put(msg)
+                if hasattr(algorithm_instance, 'set_progress_callback'):
+                    algorithm_instance.set_progress_callback(progress)
+                logger.info(f"Iniciando processo do algoritmo {algorithm_instance.__class__.__name__}")
                 
-                # Executar algoritmo
                 center, distance = algorithm_instance.run()
                 
                 # Coletar informações adicionais
@@ -134,10 +123,6 @@ class AlgorithmExecutor:
                 logger.info(f"Algoritmo finalizado: dist={distance}, info={info}")
                 result_queue.put(('success', center, distance, info))
                 
-            except (TimeoutException, ResourceLimitException) as e:
-                error_type = 'resource_limit' if isinstance(e, ResourceLimitException) else 'timeout'
-                logger.warning(f"Execução interrompida ({error_type}): {e}")
-                result_queue.put((error_type, None, float('inf'), {'erro': str(e)}))
             except Exception as e:
                 error_msg = str(e)
                 logger.error(f"Erro na execução do algoritmo: {error_msg}", exc_info=True)
@@ -146,28 +131,36 @@ class AlgorithmExecutor:
         # Iniciar monitoramento de recursos
         self.resource_monitor.start_monitoring()
         
-        # Iniciar thread do algoritmo
-        algorithm_thread = threading.Thread(target=run_algorithm)
-        algorithm_thread.daemon = True
-        algorithm_thread.start()
+        # Iniciar processo do algoritmo
+        algorithm_process = multiprocessing.Process(target=run_algorithm_mp, args=(result_queue, progress_queue))
+        algorithm_process.daemon = True
+        algorithm_process.start()
         
         # Aguardar resultado ou timeout com verificações mais frequentes
         start_time = time.time()
         check_interval = 0.5  # Verificar a cada 0.5 segundos
         
-        while algorithm_thread.is_alive():
+        while algorithm_process.is_alive():
             elapsed = time.time() - start_time
+            
+            # Exibir progresso recebido do processo filho
+            try:
+                while True:
+                    msg = progress_queue.get_nowait()
+                    if progress_callback:
+                        progress_callback(msg)
+            except Exception:
+                pass
             
             if elapsed >= self.timeout:
                 logger.warning("Timeout atingido, sinalizando parada")
                 # Timeout atingido - sinalizar parada
                 self.stop_event.set()
+                algorithm_process.terminate()
+                algorithm_process.join(timeout=2.0)
                 
-                # Aguardar um pouco para thread terminar graciosamente
-                algorithm_thread.join(timeout=2.0)
-                
-                if algorithm_thread.is_alive():
-                    logger.warning("Thread do algoritmo não terminou graciosamente após timeout")
+                if algorithm_process.is_alive():
+                    logger.warning("Processo do algoritmo não terminou graciosamente após timeout")
                 
                 self.resource_monitor.stop_monitoring()
                 raise TimeoutException(f"Algoritmo excedeu tempo limite de {self.timeout}s")
@@ -178,7 +171,7 @@ class AlgorithmExecutor:
                 status, center, distance, info = result
                 
                 self.resource_monitor.stop_monitoring()
-                logger.info(f"Resultado recebido da thread: status={status}")
+                logger.info(f"Resultado recebido do processo: status={status}")
                 
                 if status == 'timeout':
                     raise TimeoutException("Algoritmo cancelado por timeout durante execução")
@@ -189,20 +182,20 @@ class AlgorithmExecutor:
                 else:
                     return center, distance, info
                     
-            except queue.Empty:
+            except Exception:
                 time.sleep(check_interval)
         
-        # Thread terminou - obter resultado final
+        # Processo terminou - obter resultado final
         self.resource_monitor.stop_monitoring()
         
         try:
             result = result_queue.get_nowait()
             status, center, distance, info = result
-            logger.info(f"Thread terminou: status={status}")
+            logger.info(f"Processo terminou: status={status}")
             return center, distance, info
-        except queue.Empty:
-            logger.error("Thread terminou sem resultado")
-            return None, float('inf'), {'erro': 'Thread terminou sem resultado'}
+        except Exception:
+            logger.error("Processo terminou sem resultado")
+            return None, float('inf'), {'erro': 'Processo terminou sem resultado'}
     
     def cancel(self):
         """
