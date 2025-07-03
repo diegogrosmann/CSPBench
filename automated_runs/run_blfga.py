@@ -2,6 +2,9 @@ import os
 import sys
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
+# NOTA: Para execução em paralelo, use run_blfga_parallel.py
+# que oferece speedup significativo em sistemas multi-core.
+
 import yaml
 import pandas as pd
 from itertools import product
