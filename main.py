@@ -116,7 +116,14 @@ def main():
                 params.update(p)
             elif args.dataset == 'batch':
                 from src.batch_executor import BatchExecutor, select_batch_config
-                config_file = ''
+                # Em modo silencioso, usar o arquivo de teste
+                if silent:
+                    config_file = 'batch_configs/teste.yaml'
+                else:
+                    config_file = select_batch_config()
+                    if not config_file:
+                        cprint("❌ Nenhum arquivo de configuração selecionado.")
+                        return
                 executor = BatchExecutor(config_file)
                 batch_result = executor.execute_batch()
                 cprint(f"\n✅ Execução em lote concluída!")

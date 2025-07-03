@@ -415,7 +415,8 @@ class BatchExecutor:
                                 'dist': best_exec['distancia'],
                                 'dist_base': dist_base,
                                 'time': best_exec['tempo'],
-                                'status': 'sucesso'
+                                'status': 'sucesso',
+                                'execucoes_detalhadas': executions  # Adicionar todas as execuções
                             }
                         else:
                             error_exec = next((e for e in executions if 'erro' in e), executions[0])
@@ -426,18 +427,27 @@ class BatchExecutor:
                                 'dist': float('inf'),
                                 'time': error_exec['tempo'],
                                 'status': 'erro',
-                                'erro': error_exec.get('erro', 'Erro desconhecido')
+                                'erro': error_exec.get('erro', 'Erro desconhecido'),
+                                'execucoes_detalhadas': executions  # Adicionar todas as execuções mesmo em caso de erro
                             }
                     except Exception as e:
                         console.print(f"❌ Erro executando {alg_name} na base {base_idx+1}: {e}")
                         base_key_result = f"base_{base_idx+1}"
                         if alg_name not in result['algoritmos_executados']:
                             result['algoritmos_executados'][alg_name] = {}
+                        # Criar execução de erro para manter consistência
+                        error_execution = [{
+                            'distancia': float('inf'),
+                            'tempo': 0.0,
+                            'status': 'erro',
+                            'erro': str(e)
+                        }]
                         result['algoritmos_executados'][alg_name][base_key_result] = {
                             'dist': float('inf'),
                             'time': 0.0,
                             'status': 'erro',
-                            'erro': str(e)
+                            'erro': str(e),
+                            'execucoes_detalhadas': error_execution
                         }
                 
                 # Salvar relatório individual para esta base
