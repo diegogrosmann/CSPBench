@@ -112,8 +112,7 @@ def generate_dataset_with_params(params: dict) -> Tuple[List[str], Dict[str, Any
     
     noise = merged_params.get('noise', None)  # Pode ser None agora
 
-    console.print(f"Gerando dataset sintético: n={n}, L={L}, alphabet='{alphabet}', noise={noise}, fully_random={fully_random}, seed={seed}")
-
+    console.print(f"Parâmetros usados: n={n}, L={L}, alphabet='{alphabet}', noise={noise}, fully_random={fully_random}")
     rng = random.Random(seed)
     sequences = []
     used_params = {
@@ -168,6 +167,8 @@ def generate_dataset_with_params(params: dict) -> Tuple[List[str], Dict[str, Any
     from utils.distance import max_distance
     distancia_base = max_distance(base_string, sequences)
     used_params['distancia_string_base'] = distancia_base
+
+    console.print(f"Distância da string base: {used_params['distancia_string_base']}, Semente: {seed}")
 
     return sequences, used_params
 

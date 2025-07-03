@@ -78,6 +78,7 @@ class BLFGA:
         restart_patience: Optional[int] = None,
         restart_ratio: Optional[float] = None,
         disable_elitism_gens: Optional[int] = None,
+        no_improve_patience: Optional[int] = None,
     ):
 
         self.strings        = strings
@@ -118,8 +119,9 @@ class BLFGA:
         self.restart_ratio = params['restart_ratio']
         self.disable_elitism_gens = params['disable_elitism_gens']
 
-        self.pop_size       = params['pop_size']
-        self.initial_blocks = params['initial_blocks']
+        # Conversão dinâmica de pop_size e initial_blocks se forem proporções
+        self.pop_size = self._resolve_dynamic_param(params['pop_size'], self.n, mode='multiplier')
+        self.initial_blocks = self._resolve_dynamic_param(params['initial_blocks'], self.L, mode='proportion')
         self.min_block_len  = params['min_block_len']
         self.cross_prob     = params['cross_prob']
         self.mut_prob       = params['mut_prob']
@@ -130,8 +132,35 @@ class BLFGA:
         self.rng            = random.Random(params['seed'])
         self.progress_callback: Optional[Callable[[str], None]] = None
 
+        # Inicializa os blocos após todos os parâmetros necessários
         self.blocks = self._initial_blocking()
         self.history = []  # Histórico de distâncias por geração
+
+        # Early stopping: converte no_improve_patience para int se for proporção
+        patience_param = params.get('no_improve_patience', 0)
+        if isinstance(patience_param, float) and 0 < patience_param < 1:
+            self.no_improve_patience = max(1, int(patience_param * self.max_gens))
+        else:
+            self.no_improve_patience = int(patience_param)
+
+    @staticmethod
+    def _resolve_dynamic_param(param, ref_value, mode='proportion'):
+        """
+        Para pop_size (mode='multiplier'):
+            - Se param for float >= 1, retorna int(param * ref_value)
+            - Se param for int, retorna param
+        Para initial_blocks (mode='proportion'):
+            - Se param for float entre 0 e 1, retorna int(param * ref_value)
+            - Se param for int, retorna param
+        """
+        if mode == 'multiplier':
+            if isinstance(param, float) and param >= 1:
+                return max(1, int(param * ref_value))
+            return int(param)
+        else:
+            if isinstance(param, float) and 0 < param <= 1:
+                return max(1, int(param * ref_value))
+            return int(param)
 
     def set_progress_callback(self, callback: Callable[[str], None]) -> None:
         """Define um callback para relatar o progresso."""
@@ -215,6 +244,12 @@ class BLFGA:
                 for i in range(n_restart):
                     pop[-(i+1)] = "".join(self.rng.choice(self.alphabet) for _ in range(self.L))
                 no_improve = 0
+
+            # --- Early stopping: encerra se não houver melhoria por X gerações ---
+            if self.no_improve_patience and no_improve >= self.no_improve_patience:
+                if self.progress_callback:
+                    self.progress_callback(f"Encerrando por early stopping após {no_improve} gerações sem melhoria.")
+                break
 
             # Log apenas a cada 50 gerações ou na última
             if gen % 50 == 0 or gen == self.max_gens or best_val == 0:
