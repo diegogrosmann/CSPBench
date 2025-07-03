@@ -91,19 +91,13 @@ def main():
                 args.timeout = ALGORITHM_TIMEOUT
 
         # Dataset
-        automated = os.environ.get("CSP_AUTOMATED_TEST") == "1"
-        if automated:
-            choice = '1'  # Gerar dataset sintético
-        elif args.dataset:
-            choice = args.dataset
-        else:
-            choice = menu()
-        params = {'dataset_source': choice}
+        params = {}
         seqs = []
         seed = None
 
         # Escolha do dataset
         if args.dataset:
+            choice = args.dataset
             if args.dataset == 'synthetic':
                 from datasets.dataset_synthetic import generate_dataset
                 seqs, p = generate_dataset(silent=silent)
@@ -144,8 +138,7 @@ def main():
             # Fluxo interativo
             choice = menu()
             params = {'dataset_source': choice}
-            seqs = []
-            seed = None
+            
             if choice == '4':
                 from src.batch_executor import BatchExecutor, select_batch_config
                 config_file = select_batch_config()
@@ -169,7 +162,7 @@ def main():
                 except Exception as e:
                     cprint(f"❌ Erro na execução em lote: {e}")
                     return
-            else:
+            elif choice in ['1', '2', '3']:
                 try:
                     if choice == '1':
                         from datasets.dataset_synthetic import generate_dataset
@@ -182,7 +175,7 @@ def main():
                         from datasets.dataset_file import load_dataset
                         seqs, p = load_dataset(silent=silent)
                         params.update(p)
-                    else:
+                    elif choice == '3':
                         from datasets.dataset_entrez import fetch_dataset
                         seqs, p = fetch_dataset()
                         params.update(p)
