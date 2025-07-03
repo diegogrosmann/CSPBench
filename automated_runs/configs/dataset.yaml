@@ -1,5 +1,5 @@
-n: [10, 15]
-L: [20, 30]
+n: [20]
+L: [300]
 alphabet: ["ACGT"]
-noise: [0.1]
-seed: [1]
+noise: Null
+seed: [42]

@@ -1,42 +1,42 @@
-# # === Parâmetros de População ===
-pop_size: [1.0, 1.5, 2.0]           # Adicionei 1.0 (n, padrão) 
-# seed: [1, 42]                       # 42 é tradicional em IA 
+# === Parâmetros de População ===
+pop_size: [1.0, 2.0]           # Mantém 2 opções
+seed: [42]                     # Valor fixo
 
-# # === Parâmetros de Blocos ===
-# initial_blocks: [0.1, 0.2, 0.4]  # 0.1 (mais poucos blocos, comum em instâncias pequenas), 8 fixo 
-# min_block_len: [1, 3]               # 3 é comum evitar blocos muito curtos 
-# rediv_freq: [5, 10, 20]             # 5 (mais frequente), 20 (menos frequente) 
+# === Parâmetros de Blocos ===
+initial_blocks: [0.2]          # Valor padrão
+min_block_len: [3]             # Valor comum
+rediv_freq: [10]               # Valor intermediário
 
-# # === Operadores Genéticos ===
-# cross_prob: [0.7, 0.9]                      # 0.7 comum, menos crossover 
-# crossover_type: ['one_point', 'uniform']    # Uniform pode melhorar a recombinação 
-# mut_prob: [0.05, 0.1, 0.2]                  # 0.05 (baixo), 0.2 (alto) 
-# mutation_type: ['multi', 'inversion', 'transposition']  # inversion adicionada 
-# mutation_multi_n: [1, 2, 3]                 # 1 (mínimo), já vi em papers 
-# elite_rate: [0.02, 0.05, 0.1]               # 0.02 (mais exploratório), 0.1 (mais elitismo) 
-# tournament_k: [2, 3, 5]                     # 5 é comum para mais competição 
+# === Operadores Genéticos ===
+cross_prob: [0.7, 0.9]         # Mantém 2 opções
+crossover_type: ['uniform']    # Valor padrão
+mut_prob: [0.1]                # Valor intermediário
+mutation_type: ['multi', 'inversion']  # Mantém 2 opções
+mutation_multi_n: [2]          # Valor padrão
+elite_rate: [0.02, 0.1]        # Mantém 2 opções
+tournament_k: [3]              # Valor padrão
 
-# # === Diversidade e Imigrantes ===
-# immigrant_freq: [5, 10, 20]              # Frequências diferentes para ver impacto 
-# immigrant_ratio: [0.1, 0.2, 0.3]         # 0.1 (baixo), 0.3 (alto) 
-# diversity_threshold: [0.3, 0.4, 0.5]     # Diversidade mais ou menos permissiva 
-# mutation_adapt_N: [5, 10]                # Menor janela para adaptação 
-# mutation_adapt_factor: [1.5, 2.0, 3.0]   # 1.5 (menos agressivo) 
-# mutation_adapt_duration: [5, 10]         # 10 = mutação adaptada por mais tempo 
+# === Diversidade e Imigrantes ===
+immigrant_freq: [10]           # Valor padrão
+immigrant_ratio: [0.2]         # Valor padrão
+diversity_threshold: [0.4]     # Valor padrão
+mutation_adapt_N: [10]         # Valor padrão
+mutation_adapt_factor: [2.0]   # Valor padrão
+mutation_adapt_duration: [10]  # Valor padrão
 
-# # === Niching (Nichos) ===
-# niching: [False, True]
-# niching_radius: [3, 5]                   # Raio maior pode estimular mais diversidade 
+# === Niching (Nichos) ===
+niching: [False]               # Valor padrão
+niching_radius: [3]            # Valor padrão
 
-# # === Refinamento Local ===
-# refinement_type: ['greedy', 'swap']      # swap pode ajudar em instâncias complicadas 
-# refine_elites: ['all', 'best']           # "all" refina toda elite, útil p/ análise 
-# refine_iter_limit: [50, 100]             # Limite menor para acelerar execuções 
+# === Refinamento Local ===
+refinement_type: ['greedy']    # Valor padrão
+refine_elites: ['best']        # Valor padrão
+refine_iter_limit: [50]        # Valor padrão
 
-# # === Critérios de Parada e Reinício ===
-# max_gens: [200, 400]                     # 200 (menos gerações), 400 (padrão)
-# max_time: [600.0, 1200.0]                # 600s para rodar testes rápidos 
-# no_improve_patience: [0.1, 0.2, 0.3]     # Mais ou menos paciência para encerrar 
-# restart_patience: [10, 20]               # Restart mais cedo 
-# restart_ratio: [0.2, 0.3, 0.5]           # Reiniciar mais ou menos da população 
-# disable_elitism_gens: [0, 5]             # 5 gerações sem elitismo 
+# === Critérios de Parada e Reinício ===
+max_gens: [200, 400]           # Mantém 2 opções
+max_time: [600.0]              # Valor padrão
+no_improve_patience: [0.2]     # Valor padrão
+restart_patience: [10]         # Valor padrão
+restart_ratio: [0.3]           # Valor padrão
+disable_elitism_gens: [0]      # Valor padrão
