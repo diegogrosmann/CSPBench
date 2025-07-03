@@ -19,6 +19,7 @@ import sys
 import traceback
 import signal
 import os
+import argparse
 
 from src.menu import menu, select_algorithms
 from src.runner import execute_algorithm_runs
@@ -33,6 +34,11 @@ from utils.config import safe_input, ALGORITHM_TIMEOUT
 from utils.distance import max_distance, hamming_distance
 import logging
 
+RESULTS_DIR = "results"
+LOGS_DIR = "logs"
+os.makedirs(RESULTS_DIR, exist_ok=True)
+os.makedirs(LOGS_DIR, exist_ok=True)
+
 def signal_handler(signum, frame):
     """Handler para sinais de interrupção.
 
@@ -45,21 +51,22 @@ def signal_handler(signum, frame):
 
 
 def main():
-    """Executa o fluxo principal da aplicação CSP.
+    parser = argparse.ArgumentParser(description="Closest String Problem (CSP) - Execução principal")
+    parser.add_argument('--silent', action='store_true', help='Executa em modo silencioso (sem prints interativos)')
+    parser.add_argument('--dataset', type=str, choices=['synthetic', 'file', 'entrez', 'batch'], help='Fonte do dataset')
+    parser.add_argument('--algorithms', type=str, nargs='+', help='Algoritmos a executar (nomes separados por espaço)')
+    parser.add_argument('--num-execs', type=int, help='Número de execuções por algoritmo')
+    parser.add_argument('--timeout', type=int, help='Timeout por execução (segundos)')
+    args = parser.parse_args()
 
-    O fluxo inclui:
-        - Seleção/geração do dataset (sintético, arquivo, entrez ou batch).
-        - Seleção dos algoritmos a serem executados.
-        - Execução dos algoritmos selecionados, com controle de timeout e recursos.
-        - Exibição de resumo e exportação detalhada dos resultados.
+    silent = args.silent
+    def silent_print(*a, **k):
+        pass
+    p = print if not silent else silent_print
+    cprint = console.print if not silent else silent_print
 
-    Returns:
-        None
-    """
-    # Modo automatizado para testes
-    automated = os.environ.get("CSP_AUTOMATED_TEST") == "1"
     # Mostrar o número do processo (PID) logo no início
-    print(f"[PID] Processo em execução: {os.getpid()}")
+    p(f"[PID] Processo em execução: {os.getpid()}")
 
     # Configurar handlers de sinal para saída limpa
     signal.signal(signal.SIGINT, signal_handler)
@@ -69,35 +76,58 @@ def main():
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
         uid = uuid.uuid4().hex[:8]
         base_name = f"{ts}_{uid}"
-        setup_logging(base_name)
+        # Passa silent para setup_logging
+        setup_logging(base_name, silent=silent)
+
+        # Se modo silencioso, use defaults para qualquer parâmetro não informado
+        if silent:
+            if not args.dataset:
+                args.dataset = 'synthetic'
+            if not args.algorithms:
+                args.algorithms = ['BLF-GA']
+            if not args.num_execs:
+                args.num_execs = 1
+            if not args.timeout:
+                args.timeout = ALGORITHM_TIMEOUT
 
         # Dataset
+        automated = os.environ.get("CSP_AUTOMATED_TEST") == "1"
         if automated:
             choice = '1'  # Gerar dataset sintético
+        elif args.dataset:
+            choice = args.dataset
         else:
             choice = menu()
         params = {'dataset_source': choice}
         seqs = []
         seed = None
 
-        # Nova opção: Execução em lote
-        if choice == '4':
-            from src.batch_executor import BatchExecutor, select_batch_config
-            if automated:
+        # Escolha do dataset
+        if args.dataset:
+            if args.dataset == 'synthetic':
+                from datasets.dataset_synthetic import generate_dataset
+                seqs, p = generate_dataset(silent=silent)
+                logging.debug(f"[main] Parâmetros do dataset: {p}")
+                params = {'dataset_source': '1'}
+                params.update(p)
+            elif args.dataset == 'file':
+                from datasets.dataset_file import load_dataset
+                seqs, p = load_dataset(silent=silent)
+                params = {'dataset_source': '2'}
+                params.update(p)
+            elif args.dataset == 'entrez':
+                from datasets.dataset_entrez import fetch_dataset
+                seqs, p = fetch_dataset()
+                params = {'dataset_source': '3'}
+                params.update(p)
+            elif args.dataset == 'batch':
+                from src.batch_executor import BatchExecutor, select_batch_config
                 config_file = ''
-            else:
-                config_file = select_batch_config()
-            if not config_file:
-                console.print("❌ Nenhum arquivo de configuração selecionado.")
-                return
-            try:
                 executor = BatchExecutor(config_file)
                 batch_result = executor.execute_batch()
-                console.print(f"\n✅ Execução em lote concluída!")
-                console.print(f"Tempo total: {batch_result['tempo_total']:.1f}s")
-                console.print(f"Taxa de sucesso: {batch_result['resumo']['taxa_sucesso']:.1f}%")
-                
-                # Exportar CSV do batch após execução
+                cprint(f"\n✅ Execução em lote concluída!")
+                cprint(f"Tempo total: {batch_result['tempo_total']:.1f}s")
+                cprint(f"Taxa de sucesso: {batch_result['resumo']['taxa_sucesso']:.1f}%")
                 from src.export_csv_batch import export_batch_json_to_csv
                 batch_dir = executor.results_dir
                 import os as os_batch
@@ -105,28 +135,52 @@ def main():
                 csv_path = os_batch.path.join(batch_dir, "batch_results.csv")
                 if os_batch.path.exists(json_path):
                     export_batch_json_to_csv(json_path, csv_path)
-                    console.print(f"📄 Resultados detalhados do batch exportados para CSV: {csv_path}")
-                
-            except Exception as e:
-                console.print(f"❌ Erro na execução em lote: {e}")
+                    cprint(f"📄 Resultados detalhados do batch exportados para CSV: {csv_path}")
+                return
+            else:
+                cprint("❌ Fonte de dataset inválida.")
                 return
         else:
-            # Fluxo normal para opções 1, 2, 3
-            if automated:
-                from datasets.dataset_synthetic import generate_dataset
-                seqs, ds_params = generate_dataset_automated()
-                params.update(ds_params)
+            # Fluxo interativo
+            choice = menu()
+            params = {'dataset_source': choice}
+            seqs = []
+            seed = None
+            if choice == '4':
+                from src.batch_executor import BatchExecutor, select_batch_config
+                config_file = select_batch_config()
+                if not config_file:
+                    cprint("❌ Nenhum arquivo de configuração selecionado.")
+                    return
+                try:
+                    executor = BatchExecutor(config_file)
+                    batch_result = executor.execute_batch()
+                    cprint(f"\n✅ Execução em lote concluída!")
+                    cprint(f"Tempo total: {batch_result['tempo_total']:.1f}s")
+                    cprint(f"Taxa de sucesso: {batch_result['resumo']['taxa_sucesso']:.1f}%")
+                    from src.export_csv_batch import export_batch_json_to_csv
+                    batch_dir = executor.results_dir
+                    import os as os_batch
+                    json_path = os_batch.path.join(batch_dir, "batch_results.json")
+                    csv_path = os_batch.path.join(batch_dir, "batch_results.csv")
+                    if os_batch.path.exists(json_path):
+                        export_batch_json_to_csv(json_path, csv_path)
+                        cprint(f"📄 Resultados detalhados do batch exportados para CSV: {csv_path}")
+                except Exception as e:
+                    cprint(f"❌ Erro na execução em lote: {e}")
+                    return
             else:
                 try:
                     if choice == '1':
                         from datasets.dataset_synthetic import generate_dataset
-                        seqs, p = generate_dataset()
+                        seqs, p = generate_dataset(silent=silent)
                         logging.debug(f"[main] Parâmetros do dataset: {p}")
                         params.update(p)
-                        ask_save_dataset(seqs, "synthetic", p)
+                        if not silent:
+                            ask_save_dataset(seqs, "synthetic", p)
                     elif choice == '2':
                         from datasets.dataset_file import load_dataset
-                        seqs, p = load_dataset()
+                        seqs, p = load_dataset(silent=silent)
                         params.update(p)
                     else:
                         from datasets.dataset_entrez import fetch_dataset
@@ -134,7 +188,7 @@ def main():
                         params.update(p)
                         ask_save_dataset(seqs, "entrez", p)
                 except Exception as exc:
-                    console.print(f"Erro: {exc}")
+                    cprint(f"Erro: {exc}")
                     logging.exception("Erro ao carregar dataset", exc_info=exc)
                     return
 
@@ -145,15 +199,15 @@ def main():
         # Exibir distância da string base se disponível
         distancia_base = params.get('distancia_string_base')
         if distancia_base is not None:
-            console.print(f"Distância da string base: {distancia_base}")
+            cprint(f"Distância da string base: {distancia_base}")
 
         if not seqs:
-            console.print("Nenhuma sequência lida.")
+            cprint("Nenhuma sequência lida.")
             return
 
         alphabet = ''.join(sorted(set(''.join(seqs))))
         n, L = len(seqs), len(seqs[0])
-        console.print(f"\nDataset: n={n}, L={L}, |Σ|={len(alphabet)}")
+        cprint(f"\nDataset: n={n}, L={L}, |Σ|={len(alphabet)}")
         
         # Log simplificado do dataset
         logging.debug(f"[DATASET] n={n}, L={L}, |Σ|={len(alphabet)}")
@@ -164,16 +218,15 @@ def main():
         
         # Verificação de recursos do sistema
         safe_memory = get_safe_memory_limit()
-        console.print(f"Limite seguro de memória: {safe_memory:.1f}%")
+        cprint(f"Limite seguro de memória: {safe_memory:.1f}%")
         
         # Algoritmos
-        algs = []
-        if automated or not algs:
-            algs = [list(global_registry.keys())[0]]  # Executa o primeiro algoritmo automaticamente
+        if args.algorithms:
+            algs = args.algorithms
         else:
             algs = select_algorithms()
         if not algs:
-            console.print("Nenhum algoritmo selecionado.")
+            cprint("Nenhum algoritmo selecionado.")
             return
 
         # Verificar viabilidade dos algoritmos selecionados
@@ -182,36 +235,32 @@ def main():
             is_viable, msg = check_algorithm_feasibility(n, L, alg_name)
             if is_viable:
                 viable_algs.append(alg_name)
-                console.print(f"✓ {alg_name}: {msg}")
+                cprint(f"✓ {alg_name}: {msg}")
             else:
-                console.print(f"⚠ {alg_name}: {msg} (será pulado)")
+                cprint(f"⚠ {alg_name}: {msg} (será pulado)")
         
         if not viable_algs:
-            console.print("Nenhum algoritmo viável.")
+            cprint("Nenhum algoritmo viável.")
             return
         
-        # Configurar número de execuções e timeout
-        if automated:
-            num_execs = 1
-            timeout = ALGORITHM_TIMEOUT
-            console.print(f"Timeout configurado: {timeout}s por execução")
+        # Número de execuções e timeout
+        if args.num_execs:
+            num_execs = args.num_execs
         else:
             runs = safe_input("\nNº execuções p/ algoritmo [3]: ")
             num_execs = int(runs) if runs.isdigit() and int(runs) > 0 else 3
-
-            # Configurar timeout com recomendações baseadas nos algoritmos
+        if args.timeout:
+            timeout = args.timeout
+        else:
             default_timeout = ALGORITHM_TIMEOUT
-            if 'DP-CSP' in viable_algs and n >= 8:
-                default_timeout = max(ALGORITHM_TIMEOUT, 120)  # Mínimo 2 minutos para DP-CSP complexo
-                console.print("⚠ DP-CSP detectado em dataset complexo - timeout mínimo aumentado")
             timeout_input = safe_input(f"\nTimeout por execução em segundos [{default_timeout}]: ")
             timeout = int(timeout_input) if timeout_input.isdigit() and int(timeout_input) > 0 else default_timeout
-            console.print(f"Timeout configurado: {timeout}s por execução")
+        cprint(f"Timeout configurado: {timeout}s por execução")
         
         # Execução dos algoritmos
-        console.print("\n" + "="*50)
-        console.print("EXECUTANDO ALGORITMOS")
-        console.print("="*50)
+        cprint("\n" + "="*50)
+        cprint("EXECUTANDO ALGORITMOS")
+        cprint("="*50)
         
         from src.runner import Spinner, execute_algorithm_runs
 
@@ -220,7 +269,7 @@ def main():
 
         for alg_name in viable_algs:
             if alg_name not in global_registry:
-                console.print(f"ERRO: Algoritmo '{alg_name}' não encontrado!")
+                cprint(f"ERRO: Algoritmo '{alg_name}' não encontrado!")
                 continue
             
             # Log apenas início simplificado
@@ -264,7 +313,7 @@ def main():
         # Exibir resumo dos resultados
         print_quick_summary(results, console)
 
-        console.print(f"\n📄 Gerando relatório detalhado...")
+        cprint(f"\n📄 Gerando relatório detalhado...")
         # Adicionar informações básicas ao formatter para o relatório
         if hasattr(formatter, '__dict__'):
             # Captura todas as strings base e suas distâncias
@@ -283,13 +332,17 @@ def main():
                 'base_strings_info': base_strings_info
             }
             logging.debug(f"[main] formatter configurado")
-        save_detailed_report(formatter, f"{base_name}.txt")
+        
+        results_dir = "results"
+        txt_path = os.path.join(results_dir, f"{base_name}.txt")
+        csv_path = os.path.join(results_dir, f"{base_name}.csv")
+
+        save_detailed_report(formatter, txt_path)
 
         # Salvar resultados detalhados em CSV
         from src.export_csv import export_results_to_csv
-        csv_filename = f"{base_name}.csv"
-        export_results_to_csv(formatter, csv_filename)
-        console.print(f"📄 Resultados detalhados exportados para CSV: {csv_filename}")
+        export_results_to_csv(formatter, csv_path)
+        cprint(f"📄 Resultados detalhados exportados para CSV: {csv_path}")
 
     except Exception as e:
         console.print(f"\nERRO FATAL: {e}")

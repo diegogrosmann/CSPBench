@@ -13,27 +13,34 @@ from src.console_manager import console
 
 logger = logging.getLogger(__name__)
 
-def generate_dataset() -> Tuple[List[str], Dict[str, Any]]:
+def generate_dataset(silent: bool = False) -> Tuple[List[str], Dict[str, Any]]:
     """Interatividade completa via prompt."""
     defaults = SYNTHETIC_DEFAULTS
-    
-    n_input = safe_input(f"Quantas strings (n)? [{defaults['n']}]: ")
-    n = int(n_input) if n_input else defaults['n']
-    
-    L_input = safe_input(f"Comprimento das strings (L)? [{defaults['L']}]: ")
-    L = int(L_input) if L_input else defaults['L']
-    
-    alpha_input = safe_input(f"Alfabeto (ex.: ACGT ou ABCDE...)? [{defaults['alphabet']}]: ").upper()
-    alphabet = alpha_input if alpha_input else defaults['alphabet']
-    
-    noise_input = safe_input(f"Taxa de ruído por posição (0–1) [{defaults['noise']}]: ")
-    noise = float(noise_input) if noise_input else defaults['noise']
-    
-    fully_random_input = safe_input(f"Gerar strings totalmente aleatórias? (s/n) [n]: ").lower()
-    fully_random = fully_random_input.startswith('s')
-    # Pergunta por semente para reprodutibilidade (opcional)
-    seed_input = safe_input(f"Semente aleatória (int) [None]: ")
-    seed = int(seed_input) if seed_input else None
+    if silent:
+        n = defaults['n']
+        L = defaults['L']
+        alphabet = defaults['alphabet']
+        noise = defaults['noise']
+        fully_random = False
+        seed = None
+    else:
+        n_input = safe_input(f"Quantas strings (n)? [{defaults['n']}]: ")
+        n = int(n_input) if n_input else defaults['n']
+        
+        L_input = safe_input(f"Comprimento das strings (L)? [{defaults['L']}]: ")
+        L = int(L_input) if L_input else defaults['L']
+        
+        alpha_input = safe_input(f"Alfabeto (ex.: ACGT ou ABCDE...)? [{defaults['alphabet']}]: ").upper()
+        alphabet = alpha_input if alpha_input else defaults['alphabet']
+        
+        noise_input = safe_input(f"Taxa de ruído por posição (0–1) [{defaults['noise']}]: ")
+        noise = float(noise_input) if noise_input else defaults['noise']
+        
+        fully_random_input = safe_input(f"Gerar strings totalmente aleatórias? (s/n) [n]: ").lower()
+        fully_random = fully_random_input.startswith('s')
+        # Pergunta por semente para reprodutibilidade (opcional)
+        seed_input = safe_input(f"Semente aleatória (int) [None]: ")
+        seed = int(seed_input) if seed_input else None
     
     # Gerar semente automaticamente se não fornecida
     if seed is None:
@@ -83,6 +90,13 @@ def generate_dataset() -> Tuple[List[str], Dict[str, Any]]:
     logger.info(f"Parâmetros retornados pelo gerador: {params}")
     return data, params
 
+def _unpack_singleton_lists(params: dict) -> dict:
+    """
+    Converte valores que são listas de um elemento para o valor simples.
+    Exemplo: {'n': [80]} -> {'n': 80}
+    """
+    return {k: (v[0] if isinstance(v, list) and len(v) == 1 else v) for k, v in params.items()}
+
 def generate_dataset_with_params(params: dict) -> Tuple[List[str], Dict[str, Any]]:
     """
     Gera dataset sintético com parâmetros específicos fornecidos.
@@ -93,6 +107,8 @@ def generate_dataset_with_params(params: dict) -> Tuple[List[str], Dict[str, Any
     Returns:
         Tupla (sequências, parâmetros_usados)
     """
+    # Desempacotar listas singleton
+    params = _unpack_singleton_lists(params)
     # Merge com defaults
     merged_params = {**SYNTHETIC_DEFAULTS}
     merged_params.update(params)

@@ -7,28 +7,14 @@ import pytest
 
 def test_main_integration(monkeypatch, tmp_path):
     """
-    Executa o programa principal (main.py) simulando entradas para:
-    1. Habilitar modo debug? [n]
-    2. Gerar dataset sintético
-    3. Selecionar o primeiro algoritmo
-    4. Não salvar dataset
+    Executa o programa principal (main.py) em modo silencioso
+    para testar a integração completa sem necessidade de inputs.
     """
-    # Entradas simuladas: [n] debug, [1] gerar sintético, [enter] para defaults, [1] primeiro algoritmo, [n] não salvar
-    entradas = '\n'.join([
-        'n',    # modo debug
-        '1',    # menu: gerar dataset sintético
-        '', '', '', '', '',  # defaults para n, L, alfabeto, noise, fully_random
-        '',     # semente aleatória
-        '1',    # selecionar primeiro algoritmo
-        'n'     # não salvar dataset
-    ]) + '\n'
-
-    # Executa o main.py como subprocesso
+    # Executa o main.py em modo silencioso
     env = os.environ.copy()
     env["CSP_AUTOMATED_TEST"] = "1"
     result = subprocess.run(
-        [sys.executable, 'main.py'],
-        input=entradas.encode(),
+        [sys.executable, 'main.py', '--silent'],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         cwd=os.getcwd(),
@@ -39,12 +25,15 @@ def test_main_integration(monkeypatch, tmp_path):
     assert result.returncode == 0
     # Checa se houve saída indicando execução dos algoritmos
     saida = result.stdout.decode(errors='ignore')
-    assert 'Processo em execução' in saida or '[PID]' in saida
+    # No modo silencioso, procura por indicadores de execução do algoritmo
     assert (
-        'Execução concluída' in saida or
-        'centro' in saida or
-        'distância' in saida or
-        'resultado' in saida or
+        'BLF-GA' in saida or
+        'Criando população inicial' in saida or
+        'Geração' in saida or
+        'melhor=' in saida or
         'RESUMO RÁPIDO' in saida or
-        'Gerando relatório detalhado' in saida
+        'Algoritmo' in saida or
+        'Melhor Dist' in saida or
+        'tempo=' in saida or
+        'dist=' in saida
     )
