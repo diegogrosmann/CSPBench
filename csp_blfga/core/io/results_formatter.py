@@ -7,6 +7,8 @@ Classes:
 Métodos:
     add_algorithm_results(...): Adiciona resultados de um algoritmo.
     format_detailed_results(): Formata resultados detalhados.
+    format_quick_summary(): Formata resumo rápido dos resultados.
+    print_quick_summary(...): Exibe resumo rápido no console.
     save_detailed_report(...): Salva relatório em arquivo.
     export_to_csv(...): Exporta resultados para CSV usando CSPExporter.
 """
@@ -65,18 +67,18 @@ class ResultsFormatter:
 
         # Tabelas individuais por algoritmo
         for algorithm_name in self.results:
-            output.append(self._format_algorithm_table(algorithm_name))
-            output.append(self._format_algorithm_statistics(algorithm_name))
-            output.append(self._format_algorithm_strings(algorithm_name))
+            output.append(self._format_algorithm_executions_table(algorithm_name))
+            output.append(self._format_algorithm_summary_statistics(algorithm_name))
+            output.append(self._format_algorithm_best_strings(algorithm_name))
             output.append("\n" + "=" * 80 + "\n")
 
         # Tabela comparativa final
-        output.append(self._format_comparative_table())
+        output.append(self._format_algorithms_comparison())
 
         return "\n".join(output)
 
-    def _format_algorithm_table(self, algorithm_name: str) -> str:
-        """Formata tabela individual de um algoritmo (simplificado)"""
+    def _format_algorithm_executions_table(self, algorithm_name: str) -> str:
+        """Formata tabela individual de execuções de um algoritmo"""
         executions = self.results[algorithm_name]
         output = [f"\n📊 TABELA DE EXECUÇÕES - {algorithm_name.upper()}", "-" * 60]
         headers = ["Execução", "Tempo (s)", "Distância", "Status"]
@@ -102,8 +104,8 @@ class ResultsFormatter:
         output.append(table)
         return "\n".join(output)
 
-    def _format_algorithm_statistics(self, algorithm_name: str) -> str:
-        """Formata estatísticas detalhadas de um algoritmo (simplificado)"""
+    def _format_algorithm_summary_statistics(self, algorithm_name: str) -> str:
+        """Formata estatísticas resumidas de um algoritmo"""
         executions = self.results[algorithm_name]
         valid = [
             e
@@ -150,8 +152,8 @@ class ResultsFormatter:
         output.append(table)
         return "\n".join(output)
 
-    def _format_algorithm_strings(self, algorithm_name: str) -> str:
-        """Formata strings encontradas para auditoria (simplificado)"""
+    def _format_algorithm_best_strings(self, algorithm_name: str) -> str:
+        """Formata melhores strings encontradas para auditoria"""
         executions = self.results[algorithm_name]
         output = [f"\n🔍 STRINGS PARA AUDITORIA - {algorithm_name.upper()}", "-" * 60]
         for i, e in enumerate(executions, 1):
@@ -172,8 +174,8 @@ class ResultsFormatter:
             output.append("")
         return "\n".join(output)
 
-    def _format_comparative_table(self) -> str:
-        """Formata tabela comparativa entre algoritmos"""
+    def _format_algorithms_comparison(self) -> str:
+        """Formata tabela comparativa entre algoritmos (renomeado para clareza)"""
         output = ["\n🏆 TABELA COMPARATIVA FINAL"]
         output.append("=" * 80)
         if not self.results:
@@ -189,15 +191,8 @@ class ResultsFormatter:
             tempos = []
             taxa_sucesso = 0.0
 
-            parts = algorithm_full_name.split("_")
-            if len(parts) >= 3 and "Base" in parts[-2]:
-                base_name = "_".join(parts[:-2])
-                base_num = parts[-2]
-                algo_name = parts[-1]
-                base_display = f"{base_name} ({base_num})"
-            else:
-                base_display = "N/A"
-                algo_name = algorithm_full_name
+            # Simplificar parsing de algoritmo/base
+            algo_name, base_display = self._parse_algorithm_name(algorithm_full_name)
 
             valid_executions = [
                 exec_data
@@ -415,3 +410,138 @@ class ResultsFormatter:
         if not encontrou:
             output.append("❌ Nenhum parâmetro de dataset encontrado.")
         return "\n".join(output)
+
+    def format_quick_summary(self) -> str:
+        """
+        Formata um resumo rápido dos resultados dos algoritmos.
+
+        Returns:
+            String formatada com resumo dos algoritmos
+        """
+        if not self.results:
+            return "❌ Nenhum resultado disponível para resumo."
+
+        output = []
+        output.append("=" * 60)
+        output.append("RESUMO RÁPIDO DOS RESULTADOS")
+        output.append("=" * 60)
+
+        # Cabeçalho
+        header_format = f"{'Algoritmo':<15} {'Melhor Dist':<12} {'Dist. Base':<12} {'Tempo Médio':<12} {'Sucessos':<10}"
+        output.append(header_format)
+        output.append("-" * 70)
+
+        for alg_name, executions in self.results.items():
+            # Calcular estatísticas
+            successful_execs = [e for e in executions if not e.get("erro")]
+
+            if successful_execs:
+                # Melhor distância
+                distances = [e.get("distancia", float("inf")) for e in successful_execs]
+                valid_distances = [d for d in distances if d != float("inf")]
+                best_dist = min(valid_distances) if valid_distances else "∞"
+
+                # Tempo médio
+                times = [e.get("tempo", 0) for e in successful_execs]
+                avg_time = statistics.mean(times) if times else 0
+
+                # Distância da base (se disponível)
+                dist_base = successful_execs[0].get("dist_base", "-")
+
+                # Taxa de sucesso
+                success_rate = f"{len(successful_execs)}/{len(executions)}"
+
+                # Formatar valores
+                best_dist_str = str(best_dist) if best_dist != "∞" else "∞"
+                dist_base_str = str(dist_base) if dist_base != "-" else "-"
+                time_str = f"{avg_time:.3f}s"
+
+            else:
+                best_dist_str = "FALHOU"
+                dist_base_str = "-"
+                time_str = "-"
+                success_rate = f"0/{len(executions)}"
+
+            # Linha do algoritmo
+            row = f"{alg_name:<15} {best_dist_str:<12} {dist_base_str:<12} {time_str:<12} {success_rate:<10}"
+            output.append(row)
+
+        output.append("=" * 60)
+        return "\n".join(output)
+
+    def print_quick_summary(self, console=None):
+        """
+        Exibe um resumo rápido dos resultados no console.
+
+        Args:
+            console: Instância do gerenciador de console (opcional)
+        """
+        summary = self.format_quick_summary()
+
+        if console:
+            console.print("\n" + summary)
+        else:
+            print("\n" + summary)
+
+    def _parse_algorithm_name(self, algorithm_full_name: str) -> tuple[str, str]:
+        """
+        Simplifica o parsing de nomes de algoritmos e bases.
+
+        Args:
+            algorithm_full_name: Nome completo do algoritmo (pode incluir base)
+
+        Returns:
+            Tupla (nome_algoritmo, nome_base_formatado)
+        """
+        # Parsing simplificado: buscar padrões comuns
+        if "_Base" in algorithm_full_name:
+            # Formato: "DatasetName_Base123_AlgorithmName"
+            parts = algorithm_full_name.split("_")
+
+            # Encontrar índice do "Base"
+            base_index = -1
+            for i, part in enumerate(parts):
+                if "Base" in part:
+                    base_index = i
+                    break
+
+            if base_index >= 0 and base_index < len(parts) - 1:
+                # Dividir entre base e algoritmo
+                base_parts = parts[: base_index + 1]
+                algo_parts = parts[base_index + 1 :]
+
+                base_name = "_".join(base_parts[:-1])
+                base_num = base_parts[-1]
+                algo_name = "_".join(algo_parts)
+
+                base_display = f"{base_name} ({base_num})"
+            else:
+                # Fallback
+                algo_name = algorithm_full_name
+                base_display = "N/A"
+        else:
+            # Sem base identificável
+            algo_name = algorithm_full_name
+            base_display = "N/A"
+
+        return algo_name, base_display
+
+    def _simplify_algorithm_label(self, algorithm_name: str) -> str:
+        """
+        Simplifica rótulos de algoritmos para exibição.
+
+        Args:
+            algorithm_name: Nome do algoritmo
+
+        Returns:
+            Rótulo simplificado
+        """
+        # Remover prefixos comuns
+        if algorithm_name.startswith("Algorithm"):
+            algorithm_name = algorithm_name[9:]
+
+        # Substituir underscores por espaços
+        algorithm_name = algorithm_name.replace("_", " ")
+
+        # Capitalizar primeira letra
+        return algorithm_name.strip().title()
