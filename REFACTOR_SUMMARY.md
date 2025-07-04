@@ -42,15 +42,34 @@
 - ✅ Scripts de entrada configurados
 - ✅ Metadados do projeto definidos
 
+### T3-1: Remover arquivos originais movidos
+- ✅ Diretório `src/` completamente removido
+- ✅ Arquivos duplicados eliminados
+- ✅ Cache `.pyc` e `__pycache__` limpos com `git clean -Xdf`
+- ✅ Ambiente virtual recriado após limpeza
+
+### T3-2: Entry-point CLI único
+- ✅ `csp_blfga/ui/cli/app.py` criado como entry-point principal
+- ✅ Movido `cli.py` → `ui/cli/app.py`
+- ✅ Atualizado `pyproject.toml` para novo entry-point
+- ✅ Corrigidos imports no `menu.py`
+- ✅ Mantida compatibilidade com `main.py` na raiz
+
+### T3-3: Atualizar README com nova árvore
+- ✅ Estrutura de diretórios completamente atualizada
+- ✅ Emojis e descrições claras adicionados
+- ✅ Seções reorganizadas para refletir nova arquitetura
+- ✅ Documentação das responsabilidades de cada módulo
+
 ## 📁 Nova Estrutura do Projeto
 
 ```
 csp_blfga/
 ├── __init__.py              # Metadados do pacote
-├── main.py                  # Ponto de entrada
-├── cli.py                   # Interface CLI principal
+├── main.py                  # Ponto de entrada do pacote
 ├── ui/                      # Interface de usuário
 │   ├── cli/                 # Interface CLI
+│   │   ├── app.py          # **ENTRY-POINT PRINCIPAL** 🚀
 │   │   ├── console_manager.py
 │   │   └── menu.py
 │   └── widgets/             # Placeholder para GUI
@@ -92,16 +111,24 @@ csp_blfga/
 - ✅ Execução completa testada
 - ✅ Compatibilidade mantida
 
-## 📊 Estatísticas do Commit
+## 📊 Estatísticas dos Commits
 
+### Commit Principal (Estruturação)
 ```
 78 files changed, 5621 insertions(+), 2305 deletions(-)
 ```
 
-- Arquivos criados: 25 novos arquivos de pacote
-- Arquivos movidos: src/ → csp_blfga/
-- Configurações: pyproject.toml, pre-commit
-- Imports: Todos atualizados para absolutos
+### Commit de Limpeza (Finalização)
+```
+16 files changed, 171 insertions(+), 2101 deletions(-)
+```
+
+### Total Transformado
+- **94 arquivos modificados**
+- **5.792 inserções, 4.406 deleções**
+- **10 arquivos do diretório `src/` removidos**
+- **25 novos arquivos de pacote criados**
+- **Estrutura completamente reorganizada**
 
 ## 🚀 Próximos Passos
 
