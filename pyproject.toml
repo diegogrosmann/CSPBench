@@ -40,7 +40,7 @@ dev = [
 ]
 
 [project.scripts]
-csp-blfga = "csp_blfga.cli:main"
+csp-blfga = "csp_blfga.ui.cli.app:main"
 
 [project.urls]
 "Homepage" = "https://github.com/diego-grosmann/csp-blfga"

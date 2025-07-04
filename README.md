@@ -21,39 +21,52 @@ O fluxo principal do sistema é:
 ## Estrutura do Projeto
 
 ```
-algorithms/
-    baseline/         # Algoritmo de consenso ganancioso (baseline)
-    blf_ga/           # BLF-GA: Blockwise Learning Fusion + GA
-    csc/              # CSC: Consensus String Clustering
-    dp_csp/           # DP-CSP: Programação dinâmica exata
-    h3_csp/           # H³-CSP: Híbrido hierárquico
-    README.md         # Guia para adicionar novos algoritmos
+csp_blfga/                    # 📦 Pacote principal
+├── main.py                   # Ponto de entrada do pacote
+├── ui/                       # 🖥️ Interface de usuário
+│   ├── cli/                  # Interface de linha de comando
+│   │   ├── app.py           # Aplicação CLI principal
+│   │   ├── console_manager.py # Gerenciamento thread-safe do console
+│   │   └── menu.py          # Menus interativos
+│   └── widgets/             # Placeholder para futuras interfaces gráficas
+├── core/                     # ⚙️ Lógica principal do sistema
+│   ├── exec/                # Execução de algoritmos
+│   │   ├── algorithm_executor.py # Executor com controle de recursos
+│   │   ├── batch_executor.py     # Execução em lote
+│   │   └── runner.py            # Controle de execução e progresso
+│   ├── io/                  # Entrada/saída de dados
+│   │   ├── export_csv.py        # Exportação para CSV
+│   │   ├── export_csv_batch.py  # Exportação de lotes
+│   │   └── results_formatter.py # Formatação de relatórios
+│   └── report/              # Geração de relatórios
+│       └── report_utils.py      # Utilitários de relatórios
+└── utils/                    # 🔧 Utilitários gerais
+    ├── config.py            # Configurações globais
+    ├── distance.py          # Funções de distância
+    ├── logging_utils.py     # Sistema de logging
+    ├── resource_monitor.py  # Monitoramento de recursos
+    └── resource_limits_config.py # Configuração de limites
 
-datasets/
-    dataset_file.py      # Leitura de datasets de arquivo
-    dataset_entrez.py    # Download de datasets do NCBI
-    dataset_synthetic.py # Geração de datasets sintéticos
-    dataset_utils.py     # Utilitários para datasets
+algorithms/                   # 🧬 Implementações dos algoritmos
+├── baseline/                # Algoritmo de consenso ganancioso
+├── blf_ga/                  # BLF-GA: Blockwise Learning Fusion + GA
+├── csc/                     # CSC: Consensus String Clustering
+├── dp_csp/                  # DP-CSP: Programação dinâmica exata
+├── h3_csp/                  # H³-CSP: Híbrido hierárquico
+└── README.md               # Guia para adicionar novos algoritmos
 
-utils/
-    config.py        # Parâmetros e configurações globais
-    distance.py      # Funções de distância de Hamming
-    logging_utils.py # Logging customizado
-    resource_monitor.py # Monitoramento de recursos
+datasets/                     # 📊 Gerenciamento de datasets
+├── dataset_file.py          # Leitura de arquivos
+├── dataset_entrez.py        # Download do NCBI
+├── dataset_synthetic.py     # Geração sintética
+└── dataset_utils.py         # Utilitários
 
-src/
-    menu.py              # Menus interativos
-    runner.py            # Execução e controle de algoritmos
-    report_utils.py      # Relatórios e resumos rápidos
-    results_formatter.py # Formatação de relatórios detalhados
-    console_manager.py   # Saída thread-safe
-    batch_executor.py    # Execução em lote
-
-main.py             # Interface principal (ponto de entrada)
-results/            # Relatórios gerados
-logs/               # Logs de execução
-saved_datasets/     # Datasets salvos
-batch_configs/      # Configurações de execução em lote
+tests/                        # 🧪 Testes automatizados
+main.py                      # 🚀 Ponto de entrada principal
+results/                     # 📈 Relatórios gerados
+logs/                        # 📝 Logs de execução
+saved_datasets/              # 💾 Datasets salvos
+batch_configs/               # ⚙️ Configurações de lote
 ```
 
 ## Como Executar

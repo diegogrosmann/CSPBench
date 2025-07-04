@@ -9,8 +9,8 @@ Funções:
 import os
 
 from algorithms.base import global_registry
-from src.console_manager import console
-from utils.config import safe_input
+from csp_blfga.ui.cli.console_manager import console
+from csp_blfga.utils.config import safe_input
 
 
 def menu() -> str:
