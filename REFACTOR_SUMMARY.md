@@ -74,13 +74,17 @@
 ### T5-1 a T5-4: Refatoração do Sistema de Exportação
 - ✅ **T5-1**: Criado `core/io/exporter.py` com `CSPExporter` centralizado
 - ✅ **T5-2**: Refatorado `export_csv*` e `ResultsFormatter` para usar `CSPExporter`
-- ✅ **T5-3**: Eliminado `report_utils.save_detailed_report` (funcionalidade movida)
-- ✅ **T5-4**: Mantido `report_utils.py` com `print_quick_summary` (ainda em uso)
-- ✅ Arquivos `export_csv.py` e `export_csv_batch.py` convertidos para depreciação
-- ✅ `ResultsFormatter` integrado com `CSPExporter`
-- ✅ Todos os imports atualizados nos arquivos dependentes
-- ✅ Testes de exportação CSV e JSON validados
-- ✅ Sistema unificado e mais maintível
+- ✅ **T5-3**: Eliminado `report_utils.save_detailed_report`
+- ✅ **T5-4**: Mantido `report_utils.py` com `print_quick_summary`
+- ✅ Sistema de exportação unificado e centralizado
+- ✅ Suporte a múltiplos formatos (CSV, JSON, TXT)
+- ✅ Arquivos antigos convertidos para proxy/deprecated
+- ✅ Type annotations corrigidas (UP007)
+- ✅ Testes de exportação validados (CSV/JSON)
+- ✅ Pre-commit hooks aplicados (black, isort, ruff)
+- ✅ Testes validados (16 passed)
+- ✅ CLI funcionando corretamente
+- ✅ Commit realizado com sucesso
 
 ## 📁 Nova Estrutura do Projeto
 
