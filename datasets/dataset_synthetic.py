@@ -33,19 +33,13 @@ def generate_dataset(silent: bool = False) -> tuple[list[str], dict[str, Any]]:
         L_input = safe_input(f"Comprimento das strings (L)? [{defaults['L']}]: ")
         L = int(L_input) if L_input else defaults["L"]
 
-        alpha_input = safe_input(
-            f"Alfabeto (ex.: ACGT ou ABCDE...)? [{defaults['alphabet']}]: "
-        ).upper()
+        alpha_input = safe_input(f"Alfabeto (ex.: ACGT ou ABCDE...)? [{defaults['alphabet']}]: ").upper()
         alphabet = alpha_input if alpha_input else defaults["alphabet"]
 
-        noise_input = safe_input(
-            f"Taxa de ruído por posição (0–1) [{defaults['noise']}]: "
-        )
+        noise_input = safe_input(f"Taxa de ruído por posição (0–1) [{defaults['noise']}]: ")
         noise = float(noise_input) if noise_input else defaults["noise"]
 
-        fully_random_input = safe_input(
-            "Gerar strings totalmente aleatórias? (s/n) [n]: "
-        ).lower()
+        fully_random_input = safe_input("Gerar strings totalmente aleatórias? (s/n) [n]: ").lower()
         fully_random = fully_random_input.startswith("s")
         # Pergunta por semente para reprodutibilidade (opcional)
         seed_input = safe_input("Semente aleatória (int) [None]: ")
@@ -55,9 +49,7 @@ def generate_dataset(silent: bool = False) -> tuple[list[str], dict[str, Any]]:
     if seed is None:
         import time
 
-        seed = int(time.time() * 1000000) % (
-            2**32
-        )  # Gerar semente baseada no timestamp
+        seed = int(time.time() * 1000000) % (2**32)  # Gerar semente baseada no timestamp
         logger.info(f"Semente gerada automaticamente: {seed}")
 
     params = {
@@ -116,10 +108,7 @@ def _unpack_singleton_lists(params: dict) -> dict:
     Converte valores que são listas de um elemento para o valor simples.
     Exemplo: {'n': [80]} -> {'n': 80}
     """
-    return {
-        k: (v[0] if isinstance(v, list) and len(v) == 1 else v)
-        for k, v in params.items()
-    }
+    return {k: (v[0] if isinstance(v, list) and len(v) == 1 else v) for k, v in params.items()}
 
 
 def generate_dataset_with_params(params: dict) -> tuple[list[str], dict[str, Any]]:
@@ -142,25 +131,19 @@ def generate_dataset_with_params(params: dict) -> tuple[list[str], dict[str, Any
     L = merged_params["L"]
     alphabet = merged_params["alphabet"]
     # Aceita tanto fully_random quanto aleatorio_total
-    fully_random = merged_params.get(
-        "fully_random", merged_params.get("aleatorio_total", False)
-    )
+    fully_random = merged_params.get("fully_random", merged_params.get("aleatorio_total", False))
     seed = merged_params.get("seed", None)
 
     # Gerar semente automaticamente se não fornecida
     if seed is None:
         import time
 
-        seed = int(time.time() * 1000000) % (
-            2**32
-        )  # Gerar semente baseada no timestamp
+        seed = int(time.time() * 1000000) % (2**32)  # Gerar semente baseada no timestamp
         logger.info(f"Semente gerada automaticamente: {seed}")
 
     noise = merged_params.get("noise", None)  # Pode ser None agora
 
-    console.print(
-        f"Parâmetros usados: n={n}, L={L}, alphabet='{alphabet}', noise={noise}, fully_random={fully_random}"
-    )
+    console.print(f"Parâmetros usados: n={n}, L={L}, alphabet='{alphabet}', noise={noise}, fully_random={fully_random}")
     rng = random.Random(seed)
     sequences = []
     used_params = {"n": n, "L": L, "alphabet": alphabet, "fully_random": fully_random}
@@ -212,16 +195,12 @@ def generate_dataset_with_params(params: dict) -> tuple[list[str], dict[str, Any
     distancia_base = max_distance(base_string, sequences)
     used_params["distancia_string_base"] = distancia_base
 
-    console.print(
-        f"Distância da string base: {used_params['distancia_string_base']}, Semente: {seed}"
-    )
+    console.print(f"Distância da string base: {used_params['distancia_string_base']}, Semente: {seed}")
 
     return sequences, used_params
 
 
-def generate_perturbations(
-    base_string: str, n_strings: int, max_distance: int, alphabet: str, rng
-) -> list[str]:
+def generate_perturbations(base_string: str, n_strings: int, max_distance: int, alphabet: str, rng) -> list[str]:
     """Gera strings com distância exata igual a max_distance da string base."""
     import logging
 
@@ -246,9 +225,7 @@ def generate_perturbations(
             if available_chars:  # Verificação de segurança
                 chosen_char = rng.choice(available_chars)
                 new_string[pos] = chosen_char
-                logger.debug(
-                    f"[GENERATOR] String {i}: pos {pos}: {current_char} -> {chosen_char}"
-                )
+                logger.debug(f"[GENERATOR] String {i}: pos {pos}: {current_char} -> {chosen_char}")
 
         result_string = "".join(new_string)
         strings.append(result_string)
@@ -260,17 +237,13 @@ def generate_perturbations(
         # String gerada silenciosamente
 
         if actual_distance != max_distance:
-            logger.error(
-                f"[GENERATOR] ERRO: String {i} tem distância {actual_distance}, esperado {max_distance}"
-            )
+            logger.error(f"[GENERATOR] ERRO: String {i} tem distância {actual_distance}, esperado {max_distance}")
 
     # VALIDAÇÃO FINAL: Verificar todas as distâncias
     from csp_blfga.utils.distance import hamming_distance
 
     all_distances = [hamming_distance(base_string, s) for s in strings]
     logger.info(f"[GENERATOR] Todas as distâncias geradas: {all_distances}")
-    logger.info(
-        f"[GENERATOR] Máxima: {max(all_distances)}, Mínima: {min(all_distances)}"
-    )
+    logger.info(f"[GENERATOR] Máxima: {max(all_distances)}, Mínima: {min(all_distances)}")
 
     return strings

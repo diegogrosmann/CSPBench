@@ -143,7 +143,10 @@ class BatchConfig:
         self.timeout = config_dict.get("timeout", ALGORITHM_TIMEOUT)
 
     def __str__(self):
-        return f"BatchConfig({self.nome}, {len(self.algoritmos)} algoritmos, {self.execucoes_por_algoritmo_por_base} exec por base, {self.num_bases} bases)"
+        return (
+            f"BatchConfig({self.nome}, {len(self.algoritmos)} algoritmos, "
+            f"{self.execucoes_por_algoritmo_por_base} exec por base, {self.num_bases} bases)"
+        )
 
 
 class BatchExecutor:
@@ -157,9 +160,7 @@ class BatchExecutor:
         self.consolidated_formatter = ResultsFormatter()
 
         # Identificador único para esta execução em lote
-        self.batch_id = (
-            f"batch_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}"
-        )
+        self.batch_id = f"batch_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}"
 
         # Criar diretório dedicado para os resultados deste lote
         self.results_dir = Path("results") / self.batch_id
@@ -179,9 +180,7 @@ class BatchExecutor:
                 elif self.config_file.suffix.lower() == ".xml":
                     config = self._parse_xml(f)
                 else:
-                    raise ValueError(
-                        f"Formato de arquivo não suportado: {self.config_file.suffix}"
-                    )
+                    raise ValueError(f"Formato de arquivo não suportado: {self.config_file.suffix}")
 
             self.batch_info = config.get("batch_info", {})
             execucoes_raw = config.get("execucoes", [])
@@ -189,9 +188,7 @@ class BatchExecutor:
             # Converte para objetos BatchConfig
             self.execucoes = [BatchConfig(exec_config) for exec_config in execucoes_raw]
 
-            console.print(
-                f"✓ Configuração carregada: {len(self.execucoes)} execuções planejadas"
-            )
+            console.print(f"✓ Configuração carregada: {len(self.execucoes)} execuções planejadas")
 
         except Exception as e:
             console.print(f"❌ Erro ao carregar configuração: {e}")
@@ -268,9 +265,7 @@ class BatchExecutor:
                     exec_per_alg_elem = exec_elem.find("execucoes_por_algoritmo")
 
                 if exec_per_alg_elem is not None and exec_per_alg_elem.text is not None:
-                    exec_config["execucoes_por_algoritmo_por_base"] = int(
-                        exec_per_alg_elem.text
-                    )
+                    exec_config["execucoes_por_algoritmo_por_base"] = int(exec_per_alg_elem.text)
 
                 # Timeout
                 timeout_elem = exec_elem.find("timeout")
@@ -282,20 +277,14 @@ class BatchExecutor:
         config["execucoes"] = execucoes
         return config
 
-    def _generate_dataset(
-        self, dataset_config: dict[str, Any]
-    ) -> tuple[list[str], dict[str, Any]]:
+    def _generate_dataset(self, dataset_config: dict[str, Any]) -> tuple[list[str], dict[str, Any]]:
         """Gera ou carrega dataset baseado na configuração."""
         dataset_type = dataset_config.get("tipo", "synthetic")
         params = dataset_config.get("parametros", {})
 
         # Checar aleatorio_total global
         aleatorio_total_global = self.batch_info.get("aleatorio_total", None)
-        if (
-            aleatorio_total_global is not None
-            and "fully_random" not in params
-            and "aleatorio_total" not in params
-        ):
+        if aleatorio_total_global is not None and "fully_random" not in params and "aleatorio_total" not in params:
             # Para compatibilidade, repassa como fully_random para o gerador
             params["fully_random"] = aleatorio_total_global
 
@@ -317,9 +306,7 @@ class BatchExecutor:
         else:
             raise ValueError(f"Tipo de dataset não suportado: {dataset_type}")
 
-    def _execute_single_config(
-        self, config: BatchConfig, exec_index: int
-    ) -> dict[str, Any]:
+    def _execute_single_config(self, config: BatchConfig, exec_index: int) -> dict[str, Any]:
         """Executa uma configuração individual."""
         console.print(f"\n{'='*60}")
         console.print(f"EXECUÇÃO {exec_index + 1}/{len(self.execucoes)}: {config.nome}")
@@ -342,9 +329,7 @@ class BatchExecutor:
 
             # Para cada base de dados
             for base_idx in range(num_bases):
-                console.print(
-                    f"\n📊 Gerando base de dados {base_idx + 1}/{num_bases}..."
-                )
+                console.print(f"\n📊 Gerando base de dados {base_idx + 1}/{num_bases}...")
 
                 # Gerar/carregar dataset para esta base
                 seqs, dataset_params = self._generate_dataset(config.dataset_config)
@@ -357,9 +342,7 @@ class BatchExecutor:
                 alphabet = "".join(sorted(set("".join(seqs))))
                 n, L = len(seqs), len(seqs[0])
                 seed = dataset_params.get("seed")
-                distancia_string_base = dataset_params.get(
-                    "distancia_string_base", None
-                )
+                distancia_string_base = dataset_params.get("distancia_string_base", None)
 
                 # Armazenar informações da base de dados
                 if "bases_info" not in result:
@@ -377,9 +360,7 @@ class BatchExecutor:
 
                 # Verificar se há algoritmos configurados
                 if not config.algoritmos:
-                    console.print(
-                        f"⚠ Nenhum algoritmo configurado para a base {base_idx + 1} - pulando"
-                    )
+                    console.print(f"⚠ Nenhum algoritmo configurado para a base {base_idx + 1} - pulando")
                     continue
 
                 # Verificar viabilidade dos algoritmos
@@ -393,9 +374,7 @@ class BatchExecutor:
                         console.print(f"⚠ {alg_name}: {msg} (pulado)")
 
                 if not viable_algs:
-                    console.print(
-                        f"❌ Nenhum algoritmo viável para a base {base_idx + 1}"
-                    )
+                    console.print(f"❌ Nenhum algoritmo viável para a base {base_idx + 1}")
                     continue
 
                 # Criar formatter para esta execução
@@ -405,9 +384,7 @@ class BatchExecutor:
                 base_key_info = f"{config.nome}_Base{base_idx+1}"
                 exec_formatter.extra_info = {base_key_info: dataset_params}
 
-                logger.debug(
-                    f"[BatchExecutor] extra_info definido para {base_key_info}"
-                )
+                logger.debug(f"[BatchExecutor] extra_info definido para {base_key_info}")
 
                 # Atualizar informações extras no formatter consolidado
                 if not hasattr(self.consolidated_formatter, "extra_info"):
@@ -418,9 +395,7 @@ class BatchExecutor:
 
                 # Executar algoritmos
                 for alg_name in viable_algs:
-                    console.print(
-                        f"\n🔄 Executando {alg_name} para base {base_idx + 1}..."
-                    )
+                    console.print(f"\n🔄 Executando {alg_name} para base {base_idx + 1}...")
                     if alg_name not in global_registry:
                         console.print(f"❌ Algoritmo '{alg_name}' não encontrado!")
                         continue
@@ -440,14 +415,8 @@ class BatchExecutor:
 
                         exec_formatter.add_algorithm_results(alg_name, executions)
                         exec_key = f"{config.nome}_Base{base_idx+1}_{alg_name}"
-                        self.consolidated_formatter.add_algorithm_results(
-                            exec_key, executions
-                        )
-                        valid_results = [
-                            e
-                            for e in executions
-                            if "distancia" in e and e["distancia"] != float("inf")
-                        ]
+                        self.consolidated_formatter.add_algorithm_results(exec_key, executions)
+                        valid_results = [e for e in executions if "distancia" in e and e["distancia"] != float("inf")]
                         if valid_results:
                             best_exec = min(valid_results, key=lambda e: e["distancia"])
                             # Usar distancia da string base dos params
@@ -455,9 +424,7 @@ class BatchExecutor:
                             base_key_result = f"base_{base_idx+1}"
                             if alg_name not in result["algoritmos_executados"]:
                                 result["algoritmos_executados"][alg_name] = {}
-                            result["algoritmos_executados"][alg_name][
-                                base_key_result
-                            ] = {
+                            result["algoritmos_executados"][alg_name][base_key_result] = {
                                 "dist": best_exec["distancia"],
                                 "dist_base": dist_base,
                                 "time": best_exec["tempo"],
@@ -465,15 +432,11 @@ class BatchExecutor:
                                 "execucoes_detalhadas": executions,  # Adicionar todas as execuções
                             }
                         else:
-                            error_exec = next(
-                                (e for e in executions if "erro" in e), executions[0]
-                            )
+                            error_exec = next((e for e in executions if "erro" in e), executions[0])
                             base_key_result = f"base_{base_idx+1}"
                             if alg_name not in result["algoritmos_executados"]:
                                 result["algoritmos_executados"][alg_name] = {}
-                            result["algoritmos_executados"][alg_name][
-                                base_key_result
-                            ] = {
+                            result["algoritmos_executados"][alg_name][base_key_result] = {
                                 "dist": float("inf"),
                                 "time": error_exec["tempo"],
                                 "status": "erro",
@@ -481,9 +444,7 @@ class BatchExecutor:
                                 "execucoes_detalhadas": executions,  # Adicionar todas as execuções mesmo em caso de erro
                             }
                     except Exception as e:
-                        console.print(
-                            f"❌ Erro executando {alg_name} na base {base_idx+1}: {e}"
-                        )
+                        console.print(f"❌ Erro executando {alg_name} na base {base_idx+1}: {e}")
                         base_key_result = f"base_{base_idx+1}"
                         if alg_name not in result["algoritmos_executados"]:
                             result["algoritmos_executados"][alg_name] = {}
@@ -508,9 +469,7 @@ class BatchExecutor:
                 report_filename = f"{exec_index+1}_base{base_idx+1}_{config.nome.replace(' ', '_')}.txt"
                 report_path = self.results_dir / report_filename
                 exec_formatter.save_detailed_report(str(report_path))
-                console.print(
-                    f"📄 Relatório para base {base_idx+1} salvo: {report_filename}"
-                )
+                console.print(f"📄 Relatório para base {base_idx+1} salvo: {report_filename}")
 
         except Exception as e:
             console.print(f"❌ Erro na execução: {e}")
@@ -548,9 +507,7 @@ class BatchExecutor:
 
                 # Mostrar progresso
                 elapsed = time.time() - batch_start
-                console.print(
-                    f"\n⏱️ Execução {i+1} concluída em {exec_result['tempo_total']:.1f}s"
-                )
+                console.print(f"\n⏱️ Execução {i+1} concluída em {exec_result['tempo_total']:.1f}s")
                 console.print(f"Tempo decorrido total: {elapsed:.1f}s")
 
             except KeyboardInterrupt:
@@ -581,17 +538,13 @@ class BatchExecutor:
     ):
         """Gera resumo consolidado do lote."""
         total_execucoes = len(batch_result["execucoes"])
-        execucoes_com_sucesso = len(
-            [e for e in batch_result["execucoes"] if not e.get("erro")]
-        )
+        execucoes_com_sucesso = len([e for e in batch_result["execucoes"] if not e.get("erro")])
 
         console.print("\n📋 RESUMO DO LOTE")
         console.print(f"{'='*50}")
         console.print(f"Total de execuções: {total_execucoes}")
         console.print(f"Execuções com sucesso: {execucoes_com_sucesso}")
-        console.print(
-            f"Taxa de sucesso: {100 * execucoes_com_sucesso / total_execucoes:.1f}%"
-        )
+        console.print(f"Taxa de sucesso: {100 * execucoes_com_sucesso / total_execucoes:.1f}%")
         console.print(f"Tempo total: {batch_result['tempo_total']:.1f}s")
 
         # Resumo por algoritmo
@@ -603,9 +556,7 @@ class BatchExecutor:
                 continue
 
             # Para cada algoritmo em cada base
-            for alg_name, base_results in exec_result.get(
-                "algoritmos_executados", {}
-            ).items():
+            for alg_name, base_results in exec_result.get("algoritmos_executados", {}).items():
                 if alg_name not in alg_stats:
                     alg_stats[alg_name] = {
                         "sucessos": 0,
@@ -623,9 +574,7 @@ class BatchExecutor:
         console.print("\n📈 Estatísticas por algoritmo:")
         for alg_name, stats in alg_stats.items():
             taxa = 100 * stats["sucessos"] / stats["total"] if stats["total"] > 0 else 0
-            tempo_med = (
-                stats["tempo_total"] / stats["sucessos"] if stats["sucessos"] > 0 else 0
-            )
+            tempo_med = stats["tempo_total"] / stats["sucessos"] if stats["sucessos"] > 0 else 0
             console.print(
                 f"  {alg_name}: {stats['sucessos']}/{stats['total']} sucessos ({taxa:.1f}%), tempo médio: {tempo_med:.3f}s"
             )
@@ -633,11 +582,7 @@ class BatchExecutor:
         batch_result["resumo"] = {
             "total_execucoes": total_execucoes,
             "execucoes_com_sucesso": execucoes_com_sucesso,
-            "taxa_sucesso": (
-                100 * execucoes_com_sucesso / total_execucoes
-                if total_execucoes > 0
-                else 0
-            ),
+            "taxa_sucesso": (100 * execucoes_com_sucesso / total_execucoes if total_execucoes > 0 else 0),
             "algoritmo_stats": alg_stats,
         }
 
@@ -667,9 +612,7 @@ class BatchExecutor:
         consolidated_filename = "consolidated_algorithms.txt"
         consolidated_path = self.results_dir / consolidated_filename
         self.consolidated_formatter.save_detailed_report(str(consolidated_path))
-        console.print(
-            f"📄 Relatório consolidado salvo: {self.results_dir / consolidated_filename}"
-        )
+        console.print(f"📄 Relatório consolidado salvo: {self.results_dir / consolidated_filename}")
 
         # Salvamento de arquivo README com metadados do lote
         self._create_batch_readme(batch_result)
@@ -683,22 +626,12 @@ class BatchExecutor:
         """
         readme_path = self.results_dir / "README.md"
         with open(readme_path, "w", encoding="utf-8") as f:
-            f.write(
-                f"# Resultados do Lote: {self.batch_info.get('nome', 'Sem nome')}\n\n"
-            )
-            f.write(
-                f"**Descrição**: {self.batch_info.get('descricao', 'Sem descrição')}\n\n"
-            )
-            f.write(
-                f"**Data de execução**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
-            )
+            f.write(f"# Resultados do Lote: {self.batch_info.get('nome', 'Sem nome')}\n\n")
+            f.write(f"**Descrição**: {self.batch_info.get('descricao', 'Sem descrição')}\n\n")
+            f.write(f"**Data de execução**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
             f.write(f"**ID do lote**: {self.batch_id}\n")
             f.write(f"**Tempo total**: {batch_result['tempo_total']:.1f} segundos\n")
-            f.write(
-                f"**Configurações**: {len(batch_result['execucoes'])} configurações\n"
-            )
-            f.write(
-                f"**Algoritmos**: {len(self.consolidated_formatter.results)} algoritmos\n"
-            )
+            f.write(f"**Configurações**: {len(batch_result['execucoes'])} configurações\n")
+            f.write(f"**Algoritmos**: {len(self.consolidated_formatter.results)} algoritmos\n")
 
         console.print(f"📝 README criado: {self.results_dir / 'README.md'}")

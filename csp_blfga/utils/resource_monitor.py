@@ -179,9 +179,7 @@ class ResourceMonitor:
 
         # Verificação básica de limite
         if memory_mb > self.limits.max_memory_mb:
-            violations.append(
-                f"Memória: {memory_mb:.1f}MB > {self.limits.max_memory_mb}MB"
-            )
+            violations.append(f"Memória: {memory_mb:.1f}MB > {self.limits.max_memory_mb}MB")
 
         # Verificação de segurança de memória disponível
         if self.limits.memory_check_aggressive:
@@ -189,26 +187,18 @@ class ResourceMonitor:
             memory_usage_ratio = memory_mb / available_mb if available_mb > 0 else 1.0
 
             if memory_usage_ratio > self.limits.memory_usage_ratio:
-                violations.append(
-                    f"Uso de memória: {memory_usage_ratio:.1%} > {self.limits.memory_usage_ratio:.1%}"
-                )
+                violations.append(f"Uso de memória: {memory_usage_ratio:.1%} > {self.limits.memory_usage_ratio:.1%}")
 
             # Verificar se há memória livre mínima
             free_memory = available_mb - memory_mb
             if free_memory < self.limits.min_free_memory_mb:
-                violations.append(
-                    f"Memória livre baixa: {free_memory:.1f}MB < {self.limits.min_free_memory_mb}MB"
-                )
+                violations.append(f"Memória livre baixa: {free_memory:.1f}MB < {self.limits.min_free_memory_mb}MB")
 
         # T10-2: GC preventivo se aproximando do limite
         if self.limits.gc_force_on_limit:
-            threshold_memory = (
-                self.limits.max_memory_mb * self.limits.gc_threshold_ratio
-            )
+            threshold_memory = self.limits.max_memory_mb * self.limits.gc_threshold_ratio
             if memory_mb > threshold_memory:
-                logger.info(
-                    f"Executando GC preventivo: {memory_mb:.1f}MB > {threshold_memory:.1f}MB"
-                )
+                logger.info(f"Executando GC preventivo: {memory_mb:.1f}MB > {threshold_memory:.1f}MB")
                 force_garbage_collection()
 
         return len(violations) == 0, violations
@@ -226,14 +216,9 @@ class ResourceMonitor:
                 should_gc = False
 
                 # Verificar se deve fazer GC por frequência
-                if (
-                    self.limits.gc_auto_collect
-                    and self.gc_counter >= self.limits.gc_frequency
-                ):
+                if self.limits.gc_auto_collect and self.gc_counter >= self.limits.gc_frequency:
                     should_gc = True
-                    logger.debug(
-                        f"GC por frequência: {self.gc_counter} >= {self.limits.gc_frequency}"
-                    )
+                    logger.debug(f"GC por frequência: {self.gc_counter} >= {self.limits.gc_frequency}")
 
                 # Verificar se deve fazer GC por tempo (a cada 30 segundos)
                 current_time = time.time()
@@ -270,9 +255,7 @@ class ResourceMonitor:
             "current_memory_mb": current_memory,
             "available_memory_mb": available_memory,
             "memory_limit_mb": self.limits.max_memory_mb,
-            "memory_usage_ratio": current_memory / available_memory
-            if available_memory > 0
-            else 0,
+            "memory_usage_ratio": current_memory / available_memory if available_memory > 0 else 0,
             "gc_counter": self.gc_counter,
             "last_gc_time": self.last_gc_time,
             "memory_readings_count": len(self.memory_readings),
@@ -281,8 +264,7 @@ class ResourceMonitor:
         if self.memory_readings:
             stats.update(
                 {
-                    "memory_avg_mb": sum(self.memory_readings)
-                    / len(self.memory_readings),
+                    "memory_avg_mb": sum(self.memory_readings) / len(self.memory_readings),
                     "memory_max_mb": max(self.memory_readings),
                     "memory_min_mb": min(self.memory_readings),
                 }
@@ -352,9 +334,7 @@ def estimate_algorithm_memory(n: int, L: int, algorithm_name: str) -> float:
     return estimated
 
 
-def check_algorithm_feasibility(
-    n: int, L: int, algorithm_name: str
-) -> tuple[bool, str]:
+def check_algorithm_feasibility(n: int, L: int, algorithm_name: str) -> tuple[bool, str]:
     """
     Verifica se um algoritmo é viável para executar com os parâmetros dados.
 
@@ -366,9 +346,7 @@ def check_algorithm_feasibility(
         # Com d=baseline_distance, estados máximos = (d+1)^n
 
         # Estimar d baseado em n e L (heurística)
-        estimated_d = min(
-            15, max(3, int(L * 0.15))
-        )  # Entre 3 e 15, ~15% do comprimento
+        estimated_d = min(15, max(3, int(L * 0.15)))  # Entre 3 e 15, ~15% do comprimento
 
         # Estados estimados
         estimated_states = (estimated_d + 1) ** n
@@ -450,9 +428,7 @@ def force_garbage_collection():
 
         # Forçar limpeza adicional se muitos objetos foram coletados
         if collected_total > 1000:
-            logger.debug(
-                "Executando GC adicional devido ao alto número de objetos coletados"
-            )
+            logger.debug("Executando GC adicional devido ao alto número de objetos coletados")
             gc.collect()
 
     except Exception as e:

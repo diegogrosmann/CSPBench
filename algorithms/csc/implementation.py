@@ -209,9 +209,7 @@ def heuristic_closest_string(
     return best_candidate
 
 
-def local_search(
-    candidate, strings, progress_callback: Callable[[str], None] | None = None
-):
+def local_search(candidate, strings, progress_callback: Callable[[str], None] | None = None):
     candidate = list(candidate)
     improved = True
     iterations = 0
@@ -232,9 +230,7 @@ def local_search(
                 new_candidate = candidate.copy()
                 new_candidate[i] = alt
                 new_candidate_str = "".join(new_candidate)
-                if max_distance(new_candidate_str, strings) < max_distance(
-                    "".join(candidate), strings
-                ):
+                if max_distance(new_candidate_str, strings) < max_distance("".join(candidate), strings):
                     candidate[i] = alt
                     improved = True
 

@@ -61,9 +61,7 @@ def get_resource_limits_from_env() -> dict:
         if env_var in os.environ:
             try:
                 env_limits[config_key] = type_func(os.environ[env_var])
-                logger.info(
-                    f"Configuração de ambiente: {config_key} = {env_limits[config_key]}"
-                )
+                logger.info(f"Configuração de ambiente: {config_key} = {env_limits[config_key]}")
             except ValueError as e:
                 logger.warning(f"Valor inválido para {env_var}: {e}")
 

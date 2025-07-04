@@ -50,9 +50,7 @@ def split_in_blocks(L: int) -> list[Block]:
 def consensus_block(strings: Sequence[String], l: int, r: int) -> String:
     """Consenso (maioria) para o intervalo [l:r)."""
     counter_cols = [Counter(s[l:r]) for s in strings]
-    rep = "".join(
-        Counter(col).most_common(1)[0][0] for col in zip(*[s[l:r] for s in strings])
-    )
+    rep = "".join(Counter(col).most_common(1)[0][0] for col in zip(*[s[l:r] for s in strings]))
     return rep
 
 
@@ -61,9 +59,7 @@ def consensus_block(strings: Sequence[String], l: int, r: int) -> String:
 # ---------------------------------------------------------------------------
 
 
-def _exhaustive_block(
-    strings: Sequence[String], alphabet: str, l: int, r: int, k: int
-) -> list[String]:
+def _exhaustive_block(strings: Sequence[String], alphabet: str, l: int, r: int, k: int) -> list[String]:
     """
     Busca exaustiva dentro do intervalo se |Σ|^(r-l) < 10 000.
     Caso contrário, retorna os k melhores blocos existentes + consenso.
@@ -117,9 +113,7 @@ def _beam_search_block(
                 # avalia parcialmente: dist máx considerando prefixo
                 partial_dists = []
                 for s in strings:
-                    mismatch = sum(
-                        1 for i, c in enumerate(cand) if i < len(cand) and c != s[l + i]
-                    )
+                    mismatch = sum(1 for i, c in enumerate(cand) if i < len(cand) and c != s[l + i])
                     partial_dists.append(mismatch)
                 scored.append((max(partial_dists), cand))
         scored.sort(key=lambda x: x[0])
@@ -213,13 +207,9 @@ class H3CSP:
                 cands = _exhaustive_block(self.strings, self.alphabet, l, r, k)
             elif d_b <= medium_limit:
                 # para já, beam search médio
-                cands = _beam_search_block(
-                    self.strings, self.alphabet, l, r, beam_width // 2, k
-                )
+                cands = _beam_search_block(self.strings, self.alphabet, l, r, beam_width // 2, k)
             else:
-                cands = _beam_search_block(
-                    self.strings, self.alphabet, l, r, beam_width, k
-                )
+                cands = _beam_search_block(self.strings, self.alphabet, l, r, beam_width, k)
 
             block_cands.append(cands)
             # Processamento silencioso de candidatos
@@ -262,9 +252,7 @@ class H3CSP:
                     logger.info(f"[Local] it={it+1}  {best_val}->{new_val}")
                     best_val = new_val
                     if self.progress_callback:
-                        self.progress_callback(
-                            f"Melhoria encontrada: distância={best_val}"
-                        )
+                        self.progress_callback(f"Melhoria encontrada: distância={best_val}")
                 else:
                     break
 

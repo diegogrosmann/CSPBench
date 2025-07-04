@@ -1,11 +1,21 @@
 """
 Executor paralelo para múltiplos algoritmos CSP.
 
+Este módulo implementa execução paralela de algoritmos CSP com controle
+de recursos, monitoramento de progresso e encerramento gracioso.
+
 Classes:
     ParallelRunner: Gerencia execução paralela de algoritmos com tqdm.
 
 Funções:
     execute_algorithms_parallel(...): Executa múltiplos algoritmos em paralelo.
+
+Funcionalidades:
+    - Execução paralela com ProcessPoolExecutor
+    - Monitoramento de progresso com tqdm
+    - Controle de recursos e timeouts
+    - Encerramento gracioso via sinais
+    - Análise de resultados em tempo real
 """
 
 import logging
@@ -13,9 +23,10 @@ import time
 from typing import Any
 
 from algorithms.base import global_registry
-from csp_blfga.core.exec.algorithm_executor import ModernParallelExecutor
+from csp_blfga.core.exec.algorithm_executor import ParallelAlgorithmExecutor
 from csp_blfga.core.exec.runner import ProgressTracker
 from csp_blfga.utils.resource_monitor import force_garbage_collection
+from csp_blfga.utils.signal_manager import is_interrupted, register_shutdown_callback
 
 logger = logging.getLogger(__name__)
 
@@ -24,8 +35,25 @@ class ParallelRunner:
     """
     Gerenciador de execução paralela de algoritmos CSP.
 
-    Permite executar múltiplos algoritmos simultaneamente com
-    monitoramento de progresso e controle de recursos.
+    Esta classe implementa execução paralela robusta com:
+    - Controle de recursos e monitoramento
+    - Integração com sistema de sinais para encerramento gracioso
+    - Progresso em tempo real com tqdm
+    - Análise de resultados automática
+
+    Attributes:
+        max_workers: Número máximo de workers paralelos
+        timeout: Timeout por algoritmo em segundos
+        _shutdown_requested: Flag de shutdown solicitado
+        _current_executor: Referência ao executor atual
+
+    Examples:
+        >>> runner = ParallelRunner(max_workers=4, timeout=300)
+        >>> results = runner.execute_algorithms_parallel(
+        ...     algorithm_names=['BLF-GA', 'Baseline'],
+        ...     seqs=sequences,
+        ...     alphabet='ACGT'
+        ... )
     """
 
     def __init__(self, max_workers: int | None = None, timeout: int = 300):
@@ -36,8 +64,27 @@ class ParallelRunner:
             max_workers: Número máximo de workers paralelos
             timeout: Timeout por algoritmo em segundos
         """
-        self.executor = ModernParallelExecutor(max_workers, timeout)
+        self.max_workers = max_workers
         self.timeout = timeout
+        self._shutdown_requested = False
+        self._current_executor = None
+
+        # Registrar callback de shutdown para encerrar pool graciosamente
+        register_shutdown_callback(self._shutdown_callback)
+
+    def _shutdown_callback(self):
+        """Callback para encerramento gracioso do pool de processos."""
+        logger.info("ParallelRunner: Iniciando encerramento gracioso")
+        self._shutdown_requested = True
+
+        if self._current_executor:
+            logger.info("ParallelRunner: Encerrando pool de processos...")
+            try:
+                if hasattr(self._current_executor, "executor") and self._current_executor.executor:
+                    self._current_executor.executor.shutdown(wait=False)
+                logger.info("ParallelRunner: Pool de processos encerrado")
+            except Exception as e:
+                logger.error(f"Erro ao encerrar pool: {e}")
 
     def execute_algorithms_parallel(
         self,
@@ -72,9 +119,7 @@ class ParallelRunner:
         for alg_name in algorithm_names:
             if alg_name not in global_registry:
                 if console:
-                    console.print(
-                        f"⚠️ Algoritmo '{alg_name}' não encontrado no registry"
-                    )
+                    console.print(f"⚠️ Algoritmo '{alg_name}' não encontrado no registry")
                 continue
 
             alg_class = global_registry[alg_name]
@@ -95,9 +140,7 @@ class ParallelRunner:
             return {}
 
         # Criar tracker de progresso
-        progress_tracker = ProgressTracker(
-            f"Executando {len(tasks)} algoritmos", total=len(tasks), console=console
-        )
+        progress_tracker = ProgressTracker(f"Executando {len(tasks)} algoritmos", total=len(tasks), console=console)
         progress_tracker.start()
 
         results = {}
@@ -106,20 +149,34 @@ class ParallelRunner:
         start_time = time.time()
 
         try:
-            parallel_results = self.executor.execute_algorithm_batch(tasks)
-            execution_time = time.time() - start_time
+            # Verificar se shutdown foi solicitado
+            if self._shutdown_requested or is_interrupted():
+                logger.warning("Shutdown solicitado - cancelando execução")
+                if console:
+                    console.print("⚠️ Execução cancelada pelo usuário")
+                return {}
+
+            # Usar context manager para garantir limpeza
+            with ParallelAlgorithmExecutor(max_workers=self.max_workers, timeout_seconds=self.timeout) as executor:
+                # Guardar referência para callback de shutdown
+                self._current_executor = executor
+
+                parallel_results = executor.execute_parallel(tasks)
+                execution_time = time.time() - start_time
 
             # Processar resultados
             for i, result in enumerate(parallel_results):
+                # Verificar se houve interrupção durante o processamento
+                if self._shutdown_requested or is_interrupted():
+                    logger.warning("Interrupção detectada durante processamento dos resultados")
+                    break
+
                 alg_name = valid_algorithms[i]
 
                 if result.get("success", False):
                     # Sucesso
                     dist_status = ""
-                    if (
-                        baseline_val is not None
-                        and result.get("distance", float("inf")) <= baseline_val
-                    ):
+                    if baseline_val is not None and result.get("distance", float("inf")) <= baseline_val:
                         dist_status = " ✓"
 
                     progress_tracker.update(
@@ -155,6 +212,9 @@ class ParallelRunner:
             logger.error(f"Erro na execução paralela: {e}")
             progress_tracker.finish(f"Erro: {e}")
             return {}
+        finally:
+            # Limpar referência do executor
+            self._current_executor = None
 
         # Finalizar progresso
         successful_algs = len([r for r in results.values() if r["success"]])

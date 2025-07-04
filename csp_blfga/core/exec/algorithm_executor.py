@@ -62,17 +62,13 @@ class AlgorithmExecutor:
         self.timeout = timeout_seconds
         self.stop_event = threading.Event()
 
-        # Configurar limites baseados no timeout e dataset
-        limits = ResourceLimits(
-            max_memory_mb=2048,  # 2GB máximo
-            max_iterations=min(100000, timeout_seconds * 1000),  # Baseado no timeout
-            check_interval=min(
-                2.0, timeout_seconds / 10
-            ),  # Verificar mais frequentemente em timeouts curtos
-        )
-        logger.info(
-            f"AlgorithmExecutor criado: timeout={timeout_seconds}s, limites={limits}"
-        )
+        # Configurar limites usando o método from_config
+        limits = ResourceLimits.from_config()
+        # Ajustar limites baseados no timeout
+        limits.max_iterations = min(100000, timeout_seconds * 1000)
+        limits.check_interval = min(2.0, timeout_seconds / 10)
+
+        logger.info(f"AlgorithmExecutor criado: timeout={timeout_seconds}s")
         self.resource_monitor = ResourceMonitor(limits)
         self.resource_violation = False
 
@@ -93,9 +89,7 @@ class AlgorithmExecutor:
         Returns:
             Tuple[Optional[Any], Union[int, float], dict]: Resultado da execução, incluindo centro, distância e informações adicionais.
         """
-        logger.info(
-            f"Executando algoritmo {algorithm_instance.__class__.__name__} com timeout={self.timeout}s"
-        )
+        logger.info(f"Executando algoritmo {algorithm_instance.__class__.__name__} com timeout={self.timeout}s")
         result_queue = multiprocessing.Queue()
         progress_queue = multiprocessing.Queue()
         self.stop_event.clear()
@@ -123,9 +117,7 @@ class AlgorithmExecutor:
 
                 if hasattr(algorithm_instance, "set_progress_callback"):
                     algorithm_instance.set_progress_callback(progress)
-                logger.info(
-                    f"Iniciando processo do algoritmo {algorithm_instance.__class__.__name__}"
-                )
+                logger.info(f"Iniciando processo do algoritmo {algorithm_instance.__class__.__name__}")
 
                 # Executar algoritmo e processar resultado
                 result = algorithm_instance.run()
@@ -158,18 +150,14 @@ class AlgorithmExecutor:
 
             except Exception as e:
                 error_msg = str(e)
-                logger.error(
-                    f"Erro na execução do algoritmo: {error_msg}", exc_info=True
-                )
+                logger.error(f"Erro na execução do algoritmo: {error_msg}", exc_info=True)
                 result_queue.put(("error", None, float("inf"), {"erro": error_msg}))
 
         # Iniciar monitoramento de recursos
         self.resource_monitor.start_monitoring()
 
         # Iniciar processo do algoritmo
-        algorithm_process = multiprocessing.Process(
-            target=run_algorithm_mp, args=(result_queue, progress_queue)
-        )
+        algorithm_process = multiprocessing.Process(target=run_algorithm_mp, args=(result_queue, progress_queue))
         algorithm_process.daemon = True
         algorithm_process.start()
 
@@ -197,14 +185,10 @@ class AlgorithmExecutor:
                 algorithm_process.join(timeout=2.0)
 
                 if algorithm_process.is_alive():
-                    logger.warning(
-                        "Processo do algoritmo não terminou graciosamente após timeout"
-                    )
+                    logger.warning("Processo do algoritmo não terminou graciosamente após timeout")
 
                 self.resource_monitor.stop_monitoring()
-                raise TimeoutException(
-                    f"Algoritmo excedeu tempo limite de {self.timeout}s"
-                )
+                raise TimeoutException(f"Algoritmo excedeu tempo limite de {self.timeout}s")
 
             # Verificar se há resultado disponível
             try:
@@ -215,13 +199,9 @@ class AlgorithmExecutor:
                 logger.info(f"Resultado recebido do processo: status={status}")
 
                 if status == "timeout":
-                    raise TimeoutException(
-                        "Algoritmo cancelado por timeout durante execução"
-                    )
+                    raise TimeoutException("Algoritmo cancelado por timeout durante execução")
                 elif status == "resource_limit":
-                    raise ResourceLimitException(
-                        "Algoritmo cancelado por limite de recursos"
-                    )
+                    raise ResourceLimitException("Algoritmo cancelado por limite de recursos")
                 elif status == "error":
                     return center, distance, info
                 else:
@@ -382,9 +362,7 @@ class ParallelAlgorithmExecutor:
 
         return results
 
-    def execute_single_parallel(
-        self, alg_class, strings, alphabet, params=None, name=None
-    ):
+    def execute_single_parallel(self, alg_class, strings, alphabet, params=None, name=None):
         """
         Executa um único algoritmo em processo separado.
 
@@ -443,22 +421,16 @@ class ModernParallelExecutor:
         Returns:
             Lista de resultados
         """
-        logger.info(
-            f"Executando {len(tasks)} tarefas em paralelo com {self.max_workers} workers"
-        )
+        logger.info(f"Executando {len(tasks)} tarefas em paralelo com {self.max_workers} workers")
 
         with ProcessPoolExecutor(max_workers=self.max_workers) as executor:
             # Submeter todas as tarefas
-            future_to_task = {
-                executor.submit(self._execute_single_task, task): task for task in tasks
-            }
+            future_to_task = {executor.submit(self._execute_single_task, task): task for task in tasks}
 
             results = []
 
             # Coletar resultados conforme completam
-            for future in as_completed(
-                future_to_task, timeout=self.timeout * len(tasks)
-            ):
+            for future in as_completed(future_to_task, timeout=self.timeout * len(tasks)):
                 task = future_to_task[future]
                 try:
                     result = future.result(timeout=self.timeout)
@@ -528,9 +500,7 @@ class ModernParallelExecutor:
                 center, distance = result
                 metadata = {"iteracoes": getattr(algorithm, "geracao", 0)}
             else:
-                raise ValueError(
-                    f"Formato de resultado inesperado: {len(result)} elementos"
-                )
+                raise ValueError(f"Formato de resultado inesperado: {len(result)} elementos")
 
             execution_time = time.time() - start_time
 

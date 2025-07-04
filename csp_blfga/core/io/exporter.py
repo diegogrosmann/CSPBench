@@ -72,16 +72,13 @@ class CSPExporter:
                         "algoritmo": alg_name,
                         "execucao": idx,
                         "melhor_string": exec_data.get("melhor_string", ""),
-                        "distancia": exec_data.get(
-                            "distancia", exec_data.get("melhor_distancia", "")
-                        ),
+                        "distancia": exec_data.get("distancia", exec_data.get("melhor_distancia", "")),
                         "tempo": exec_data.get("tempo", ""),
                         "status": exec_data.get(
                             "status",
                             (
                                 "sucesso"
-                                if "distancia" in exec_data
-                                and exec_data["distancia"] != float("inf")
+                                if "distancia" in exec_data and exec_data["distancia"] != float("inf")
                                 else "erro"
                             ),
                         ),
@@ -91,16 +88,10 @@ class CSPExporter:
                             params.get("distancia_string_base", ""),
                         ),
                         "seed": exec_data.get("seed", params.get("seed", "")),
-                        "n": params.get(
-                            "n", len(dataset_strings) if dataset_strings else ""
-                        ),
+                        "n": params.get("n", len(dataset_strings) if dataset_strings else ""),
                         "L": params.get(
                             "L",
-                            (
-                                len(dataset_strings[0])
-                                if dataset_strings and len(dataset_strings) > 0
-                                else ""
-                            ),
+                            (len(dataset_strings[0]) if dataset_strings and len(dataset_strings) > 0 else ""),
                         ),
                         "alphabet": params.get("alphabet", ""),
                     }
@@ -173,9 +164,7 @@ class CSPExporter:
             "algoritmo": alg,
             "base_idx": base_idx,
             "execucao_idx": exec_idx,
-            "dist": exec_data.get(
-                "distancia", exec_data.get("melhor_distancia", result.get("dist", ""))
-            ),
+            "dist": exec_data.get("distancia", exec_data.get("melhor_distancia", result.get("dist", ""))),
             "dist_base": result.get("dist_base", ""),
             "tempo": exec_data.get("tempo", result.get("time", "")),
             "status": exec_data.get("status", result.get("status", "")),

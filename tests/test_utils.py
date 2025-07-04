@@ -43,9 +43,7 @@ def test_safe_input_keyboard_interrupt(monkeypatch):
     def raise_interrupt(prompt, default=""):
         raise KeyboardInterrupt
 
-    monkeypatch.setattr(
-        builtins, "input", lambda _: (_ for _ in ()).throw(KeyboardInterrupt)
-    )
+    monkeypatch.setattr(builtins, "input", lambda _: (_ for _ in ()).throw(KeyboardInterrupt))
     try:
         safe_input("Teste: ")
     except SystemExit:

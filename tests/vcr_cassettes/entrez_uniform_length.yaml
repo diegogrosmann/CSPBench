@@ -1,0 +1,308 @@
+interactions:
+- request:
+    body: null
+    headers:
+      Connection:
+      - close
+      Host:
+      - eutils.ncbi.nlm.nih.gov
+      User-Agent:
+      - Python-urllib/3.12
+    method: GET
+    uri: https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=nucleotide&term=ribosomal+RNA%5BTitle%5D&retmax=10&tool=biopython&email=test%40example.com&api_key=40aff1a7f51fc7e0711203ea3b2f5ae37c09
+  response:
+    body:
+      string: '<?xml version="1.0" encoding="UTF-8" ?>
+
+        <!DOCTYPE eSearchResult PUBLIC "-//NLM//DTD esearch 20060628//EN" "https://eutils.ncbi.nlm.nih.gov/eutils/dtd/20060628/esearch.dtd">
+
+        <eSearchResult><Count>13736214</Count><RetMax>10</RetMax><RetStart>0</RetStart><IdList>
+
+        <Id>3008863008</Id>
+
+        <Id>3008863006</Id>
+
+        <Id>3008863004</Id>
+
+        <Id>3008863002</Id>
+
+        <Id>3008863000</Id>
+
+        <Id>3008862998</Id>
+
+        <Id>3008862996</Id>
+
+        <Id>3008862994</Id>
+
+        <Id>3008862992</Id>
+
+        <Id>3008862990</Id>
+
+        </IdList><TranslationSet/><TranslationStack>   <TermSet>    <Term>ribosomal
+        RNA[Title]</Term>    <Field>Title</Field>    <Count>1</Count>    <Explode>N</Explode>   </TermSet>   <OP>GROUP</OP>  </TranslationStack><QueryTranslation>ribosomal
+        RNA[Title]</QueryTranslation></eSearchResult>
+
+        '
+    headers:
+      Access-Control-Allow-Origin:
+      - '*'
+      Access-Control-Expose-Headers:
+      - X-RateLimit-Limit,X-RateLimit-Remaining
+      Cache-Control:
+      - private
+      Connection:
+      - close
+      Content-Security-Policy:
+      - upgrade-insecure-requests
+      Content-Type:
+      - text/xml; charset=UTF-8
+      Date:
+      - Fri, 04 Jul 2025 18:13:37 GMT
+      NCBI-PHID:
+      - 939B4E7FD146E34500005A0D2C4D0F29.1.1.m_1
+      NCBI-SID:
+      - 7ADC9FA389B9A5C5_C78FSID
+      Referrer-Policy:
+      - origin-when-cross-origin
+      Server:
+      - Finatra
+      Set-Cookie:
+      - ncbi_sid=7ADC9FA389B9A5C5_C78FSID; domain=.nih.gov; path=/; expires=Sat, 04
+        Jul 2026 18:13:38 GMT
+      Strict-Transport-Security:
+      - max-age=31536000; includeSubDomains; preload
+      Transfer-Encoding:
+      - chunked
+      Vary:
+      - Accept-Encoding
+      X-RateLimit-Limit:
+      - '10'
+      X-RateLimit-Remaining:
+      - '9'
+      X-UA-Compatible:
+      - IE=Edge
+      X-XSS-Protection:
+      - 1; mode=block
+    status:
+      code: 200
+      message: OK
+- request:
+    body: null
+    headers:
+      Connection:
+      - close
+      Host:
+      - eutils.ncbi.nlm.nih.gov
+      User-Agent:
+      - Python-urllib/3.12
+    method: GET
+    uri: https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=nucleotide&id=3008863008%2C3008863006%2C3008863004%2C3008863002%2C3008863000%2C3008862998%2C3008862996%2C3008862994%2C3008862992%2C3008862990&rettype=fasta&retmode=text&tool=biopython&email=test%40example.com&api_key=40aff1a7f51fc7e0711203ea3b2f5ae37c09
+  response:
+    body:
+      string: '>PQ733531.1 Uranoscodon superciliosus voucher ITV42527 16S ribosomal
+        RNA gene, partial sequence; mitochondrial
+
+        CGGTATCCTAACCGTGCAAAGGTAGCGTAACCACTTGCCTCCTAAATAGAGGCTAGTATGAACGGCTAAA
+
+        TGAGGACTAACCTGTCTCCTTTAACCAATCAATGAAACTGATCTACCAGTCAAAAAGCTGGTATAAAACC
+
+        ATAAGACGAGAAGACCCTGTGGAGCTTCAAGCTTTGATCAACAATCCACCACACACCACGCCCTGATCCA
+
+        TAAAGCTTTAAGTTGGGGCGACTTCGGAAACAAACCAAACTTCCGAGCACAAGACCACAGTCTAACCACG
+
+        ACTAACATGTCTAGATATAATTGACCCAGTATCACTGATAAACGAACCAAGTTACCCCAGGGATAACAGC
+
+        GCAATCTTCTTCAAGAGTTCCTATCGACAAGAAGGTTTACGACCT
+
+
+        >PQ733530.1 Tropidurus oreadicus voucher ITV48901 16S ribosomal RNA gene,
+        partial sequence; mitochondrial
+
+        CGGTATCCTAACCGTGCAAAGGTAGCGTAATCATTTGTCCTCTAAATAAGGACCAGTATGAACGGCTAAA
+
+        TGAGGGCCAACCTGTCTCCCCTAACCTATCAGTGAAACTGATCTACCAGTACAAAAGCTGGTATAATCCT
+
+        ATAAGACGAGAAGACCCTGTGGAGCTTTAAATTAAAAGTCAACGGTAACCTACAATACTCCCGTCACTGA
+
+        CCCTAAATTTTTAGTTGGGGCGACTTCGGAACAAAACCAAACTTCCGAGCAAACGACCTTAAATCTTAAA
+
+        AAGACCTACAAGTCTAAACCAAATGACCCAGTAGAAACTGATAAACGAACCAAGTTACCCCAGGGATAAC
+
+        AGCGCAATCTTCTTCAAGAGTCCATATCGACAAGAAGGTTTACGACCT
+
+
+        >PQ733529.1 Tropidurus oreadicus voucher ITV42352 16S ribosomal RNA gene,
+        partial sequence; mitochondrial
+
+        CGGTATCCTAACCGTGCAAAGGTAGCGTAATCATTTGTCCTCTAAATAAGGACCAGTATGAACGGCTAAA
+
+        TGAGGGCCAACCTGTCTCCCCTAACCTATCAGTGAAACTGATCTACCAGTACAAAAGCTGGTATAATCCT
+
+        ATAAGACGAGAAGACCCTGTGGAGCTTTAAATTAAAAGTCAACGGTAACCTACAATACTCCCGTCACTGA
+
+        CCCTAAATTTTTAGTTGGGGCGACTTCGGAACAAAACCAAACTTCCGAGCAAACGACCTTAAATCTTAAA
+
+        AAGACCTACAAGTCTAAACCAAATGACCCAGTAGAAACTGATAAACGAACCAAGTTACCCCAGGGATAAC
+
+        AGCGCAATCTTCTTCAAGAGTCCATATCGACAAGAAGGTTTACGACCT
+
+
+        >PQ733528.1 Tropidurus oreadicus voucher ITV42319 16S ribosomal RNA gene,
+        partial sequence; mitochondrial
+
+        TCCTAACCGTGCAAAGGTAGCGTAATCATTTGTCCTCTAAATAAGGACCAGTATGAACGGCTAAATGAGG
+
+        GCCAACCTGTCTCCCCTAACCTATCAGTGAAACTGATCTACCAGTACAAAAGCTGGTATAATCCTATAAG
+
+        ACGAGAAGACCCTGTGGAGCTTTAAATTAAAAGCCAACGGTAACCTACAATACTCCCGTCACTGACCCTA
+
+        AATTTTTAGTTGGGGCGACTTCGGAACAAAACCAAACTTCCGAGCAAACGACCTTAAATCTTAAAAAGAC
+
+        CTACAAGTCTAAACCAAATGACCCAGTAGAAACTGATAAACGAACCAAGTTACCCCAGGGATAACAGCGC
+
+        AATCTTCTTCAAGAGTCCATATCGACAAGAAGGTTTACGACCT
+
+
+        >PQ733527.1 Tropidurus oreadicus voucher ITV36206 16S ribosomal RNA gene,
+        partial sequence; mitochondrial
+
+        AAGGTAGCGTAATCATTTGTCCTCTAAATAGGGACCAGTATGAACGGCTAAATGAGGGCCAACCTGTCTC
+
+        CCCTAACCTATCAGTGAAACTGATCTACCAGTACAAAAGCTGGTATAATCCTATAAGACGAGAAGACCCT
+
+        GTGGAGCTTTAAATTAAAAGTCAACGGTAACTTACAACACCCCCGTCGCTGACCCTAAATTTTTAGTTGG
+
+        GGCGACTTCGGAACAAAACCAAACTTCCGAGCAAACGACCTTAAATCTTAAAAAGACCAACAAGTCTAAA
+
+        CCAAATGACCCAGTAAAACTGATAAACGAACCAAGTTACCCCAGGGATAACAGCGCAATCTTCTTCAAGA
+
+        GTCCATATCGACAAGAAGGCTTACGACCT
+
+
+        >PQ733526.1 Tropidurus oreadicus voucher ITV42515 16S ribosomal RNA gene,
+        partial sequence; mitochondrial
+
+        CGGTATCCTAACCGTGCAAAGGTAGCGTAATCATTTGTCCTCTAAATAGGGACCAGTATGAACGGCTAAA
+
+        TGAGGGCCAACCTGTCTCCCCTAACCTATCAGTGAAACTGATCTACCAGTACAAAAGCTGGTATAATCCT
+
+        ATAAGACGAGAAGACCCTGTGGAGCTTTAAATTAAAAGTCAACGGTAACCTACAACACCCCCGTCACTGA
+
+        CCCTAAATTTTTAGTTGGGGCGACTTCGGAACAAAACTAAACTTCCGAGCAAACGACCTTAAATCTTAAA
+
+        AAGACCAACAAGTCTAAACCAAATGACCCAGTAAAACTGATAAACGAACCAAGTTACCCCAGGGATAACA
+
+        GCGCAATCTTCTTCAAGAGTCCATATCGACAAGAAGGTTTACGACCT
+
+
+        >PQ733525.1 Tropidurus oreadicus voucher ITV42478 16S ribosomal RNA gene,
+        partial sequence; mitochondrial
+
+        CGGTATCCTAACCGTGCAAAGGTAGCGTAATCATTTGTCCTCTAAATAGGGACCAGTATGAACGGCTAAA
+
+        TGAGGGCCAACCTGTCTCCCCTAACCTATCAGTGAAACTGATCTACCAGTACAAAAGCTGGTATAATCCT
+
+        ATAAGACGAGAAGACCCTGTGGAGCTTTAAATTAAAAGTCAACGGTAACCTACAACACCCCCGTCACTGA
+
+        CCCTAAATTTTTAGTTGGGGCGACTTCGGAACAAAACTAAACTTCCGAGCAAACGACCTTAAATCTTAAA
+
+        AAGACCAACAAGTCTAAACCAAATGACCCAGTAAAACTGATAAACGAACCAAGTTACCCCAGGGATAACA
+
+        GCGCAATCTTCTTCAAGAGTCCATATCGACAAGAAGGTTTACGACCT
+
+
+        >PQ733524.1 Trilepida macrolepis voucher ITV56066 16S ribosomal RNA gene,
+        partial sequence; mitochondrial
+
+        CTAACCGTGCAAAGGTAGCATAATCACTTGTCCACTAACTACGGACTAGCATGAAAGGCCTCATGAGAGT
+
+        CAAACTGTCTCTTATGGCCCATCAATGAAACTGATCTTACAGTCCAAAAGCTGTAATAAGCCTATAAGAC
+
+        GAGAAGACCCTGTGAAACTTCAACAACCCACTTAACTATCAACTAAGTGGTACTTTCGGTTGGGGCGACC
+
+        TTGGAACAAAACAAAACTTCCAAACATAGAGGCCTAACCCTCACCCACCAGGCCCACACGCCACAGTATG
+
+        ATCCAGTAAAACTGACAAATGAACTAAGCTACTCCAGGGATAACAGCGCCATCTTCTTCAAGAGCCCATA
+
+        TCAAAAAGAAGGTTTACGACCT
+
+
+        >PQ733523.1 Trachycephalus aff. typhonius voucher ITV42408 16S ribosomal RNA
+        gene, partial sequence; mitochondrial
+
+        ATCACTTGTTCTTTAAATGAGGACTAGTATGAATGGCACCACGAGGGTTATACTGTCTCCTTTTTCTAAT
+
+        CAGTGAAACTAATCTCCCCGTGAAGAAGCGGGGATTCAAATATAAGACGAGAAGACCCTATGGAGCTTTA
+
+        AACTTAATAACAAGTACTACCCTTTATTTAACTTTCAGAACATATACCTTTATTCTAGTATTATGATTAT
+
+        TAGTTTTAGGTTGGGGTGACCGCGGAGCAAAAATCAACCTCCACATTGAACGGAACTCATTCCTGAGCAA
+
+        AAAGCCACGACTTTAAGCACCAACAAATTGACATCAATTGACCCAATATTTTGATCAACGAACCAAGTTA
+
+        CCCTAGGGATAACAGCGCAATCCACTTCAAGAGCTCCTATCGACAAGTGGGTTTACGACCT
+
+
+        >PQ733522.1 Trachycephalus aff. typhonius voucher ITV42333 16S ribosomal RNA
+        gene, partial sequence; mitochondrial
+
+        ACTGTCTCCTTTTTCTAATCAGTGAAACTAATCTCCCCGTGAAGAAGCGGGGATTAAAATATAAGACGAG
+
+        AAGACCCTATGGAGCTTTAAACTTAATAACAAGTACTACCCTTTATTTAACTTTCAGAACATCTACCTTT
+
+        ATTCTAGTATTATGATTATTAGTTTTAGGTTGGGGTGACCGCGGAGCAAAAATCAACCTCCACATTGAAC
+
+        GGAACTCATTCCTGAGCAAAAAGCCACGACTTTAAGCACCAACAAATTGACATCAATTGACCCAATATTT
+
+        TGATCAACGAACCAAGTTACCCTAGGGATAACAGCGCAATCCACTTCAAGAGCTCCTATCGACAAGTGGG
+
+        TTTACGACCT
+
+
+        '
+    headers:
+      Access-Control-Allow-Origin:
+      - '*'
+      Access-Control-Expose-Headers:
+      - X-RateLimit-Limit,X-RateLimit-Remaining
+      Cache-Control:
+      - private
+      Connection:
+      - close
+      Content-Disposition:
+      - attachment; filename="sequence.fasta"
+      Content-Security-Policy:
+      - upgrade-insecure-requests
+      Content-Type:
+      - text/plain
+      Date:
+      - Fri, 04 Jul 2025 18:13:38 GMT
+      NCBI-PHID:
+      - 939B4E7FD146E3450000730D2E071343.1.1.m_7
+      NCBI-SID:
+      - AC4C0B93D51750A3_EEE1SID
+      Referrer-Policy:
+      - origin-when-cross-origin
+      Server:
+      - Finatra
+      Set-Cookie:
+      - ncbi_sid=AC4C0B93D51750A3_EEE1SID; domain=.nih.gov; path=/; expires=Sat, 04
+        Jul 2026 18:13:38 GMT
+      Strict-Transport-Security:
+      - max-age=31536000; includeSubDomains; preload
+      Transfer-Encoding:
+      - chunked
+      Vary:
+      - Accept-Encoding
+      X-RateLimit-Limit:
+      - '10'
+      X-RateLimit-Remaining:
+      - '8'
+      X-UA-Compatible:
+      - IE=Edge
+      X-XSS-Protection:
+      - 1; mode=block
+    status:
+      code: 200
+      message: OK
+version: 1

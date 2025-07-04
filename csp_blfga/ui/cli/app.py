@@ -53,9 +53,7 @@ def signal_handler(signum, frame):
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Closest String Problem (CSP) - Execução principal"
-    )
+    parser = argparse.ArgumentParser(description="Closest String Problem (CSP) - Execução principal")
     parser.add_argument(
         "--silent",
         action="store_true",
@@ -73,9 +71,7 @@ def main():
         nargs="+",
         help="Algoritmos a executar (nomes separados por espaço)",
     )
-    parser.add_argument(
-        "--num-execs", type=int, help="Número de execuções por algoritmo"
-    )
+    parser.add_argument("--num-execs", type=int, help="Número de execuções por algoritmo")
     parser.add_argument("--timeout", type=int, help="Timeout por execução (segundos)")
     args = parser.parse_args()
 
@@ -106,7 +102,7 @@ def main():
             if not args.dataset:
                 args.dataset = "synthetic"
             if not args.algorithms:
-                args.algorithms = ["BLF-GA"]
+                args.algorithms = ["Baseline"]  # Usar Baseline em vez de BLF-GA para testes
             if not args.num_execs:
                 args.num_execs = 1
             if not args.timeout:
@@ -157,9 +153,7 @@ def main():
                 batch_result = executor.execute_batch()
                 cprint("\n✅ Execução em lote concluída!")
                 cprint(f"Tempo total: {batch_result['tempo_total']:.1f}s")
-                cprint(
-                    f"Taxa de sucesso: {batch_result['resumo']['taxa_sucesso']:.1f}%"
-                )
+                cprint(f"Taxa de sucesso: {batch_result['resumo']['taxa_sucesso']:.1f}%")
                 from csp_blfga.core.io.exporter import CSPExporter
 
                 batch_dir = executor.results_dir
@@ -170,9 +164,7 @@ def main():
                 if os_batch.path.exists(json_path):
                     exporter = CSPExporter()
                     exporter.export_batch_json_to_csv(json_path, csv_path)
-                    cprint(
-                        f"📄 Resultados detalhados do batch exportados para CSV: {csv_path}"
-                    )
+                    cprint(f"📄 Resultados detalhados do batch exportados para CSV: {csv_path}")
                 return
             else:
                 cprint("❌ Fonte de dataset inválida.")
@@ -197,9 +189,7 @@ def main():
                     batch_result = executor.execute_batch()
                     cprint("\n✅ Execução em lote concluída!")
                     cprint(f"Tempo total: {batch_result['tempo_total']:.1f}s")
-                    cprint(
-                        f"Taxa de sucesso: {batch_result['resumo']['taxa_sucesso']:.1f}%"
-                    )
+                    cprint(f"Taxa de sucesso: {batch_result['resumo']['taxa_sucesso']:.1f}%")
                     from csp_blfga.core.io.exporter import CSPExporter
 
                     batch_dir = executor.results_dir
@@ -210,9 +200,7 @@ def main():
                     if os_batch.path.exists(json_path):
                         exporter = CSPExporter()
                         exporter.export_batch_json_to_csv(json_path, csv_path)
-                        cprint(
-                            f"📄 Resultados detalhados do batch exportados para CSV: {csv_path}"
-                        )
+                        cprint(f"📄 Resultados detalhados do batch exportados para CSV: {csv_path}")
                 except Exception as e:
                     cprint(f"❌ Erro na execução em lote: {e}")
                     return
@@ -303,14 +291,8 @@ def main():
             timeout = args.timeout
         else:
             default_timeout = ALGORITHM_TIMEOUT
-            timeout_input = safe_input(
-                f"\nTimeout por execução em segundos [{default_timeout}]: "
-            )
-            timeout = (
-                int(timeout_input)
-                if timeout_input.isdigit() and int(timeout_input) > 0
-                else default_timeout
-            )
+            timeout_input = safe_input(f"\nTimeout por execução em segundos [{default_timeout}]: ")
+            timeout = int(timeout_input) if timeout_input.isdigit() and int(timeout_input) > 0 else default_timeout
         cprint(f"Timeout configurado: {timeout}s por execução")
 
         # Execução dos algoritmos
@@ -332,29 +314,19 @@ def main():
             logging.debug(f"[ALG_EXEC] Iniciando {alg_name}")
             AlgClass = global_registry[alg_name]
 
-            executions = execute_algorithm_runs(
-                alg_name, AlgClass, seqs, alphabet, num_execs, None, console, timeout
-            )
+            executions = execute_algorithm_runs(alg_name, AlgClass, seqs, alphabet, num_execs, None, console, timeout)
 
             # Log resumido das execuções
-            logging.debug(
-                f"[ALG_EXEC] {alg_name} concluído: {len(executions)} execuções"
-            )
+            logging.debug(f"[ALG_EXEC] {alg_name} concluído: {len(executions)} execuções")
             for _, exec_data in enumerate(executions):
                 # Não calcular mais distancia_string_base aqui, apenas usar seed
                 exec_data["seed"] = seed
 
             formatter.add_algorithm_results(alg_name, executions)
-            valid_results = [
-                e
-                for e in executions
-                if "distancia" in e and e["distancia"] != float("inf")
-            ]
+            valid_results = [e for e in executions if "distancia" in e and e["distancia"] != float("inf")]
             if valid_results:
                 best_exec = min(valid_results, key=lambda e: e["distancia"])
-                logging.debug(
-                    f"[ALG_EXEC] {alg_name} melhor: dist={best_exec['distancia']}"
-                )
+                logging.debug(f"[ALG_EXEC] {alg_name} melhor: dist={best_exec['distancia']}")
 
                 # Adicionar distância da string base ao resultado
                 dist_base = params.get("distancia_string_base", "-")
@@ -388,9 +360,7 @@ def main():
                         base_strings_info.append(
                             {
                                 "base_string": exec_data["melhor_string"],
-                                "distancia_string_base": params.get(
-                                    "distancia_string_base", "-"
-                                ),
+                                "distancia_string_base": params.get("distancia_string_base", "-"),
                             }
                         )
             formatter.extra_info = {
@@ -411,9 +381,16 @@ def main():
         formatter.export_to_csv(csv_path)
         cprint(f"📄 Resultados detalhados exportados para CSV: {csv_path}")
 
+        # Sucesso - retornar 0 explicitamente
+        if silent:
+            sys.exit(0)
+
     except Exception as e:
-        console.print(f"\nERRO FATAL: {e}")
-        traceback.print_exc()
+        if not silent:
+            console.print(f"\nERRO FATAL: {e}")
+            traceback.print_exc()
+        else:
+            logging.exception("Erro fatal durante execução", exc_info=e)
         sys.exit(1)
 
 

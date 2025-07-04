@@ -19,9 +19,9 @@ from csp_blfga.utils.resource_monitor import (
 )
 
 try:
-    from tqdm import tqdm
+    import importlib.util
 
-    TQDM_AVAILABLE = True
+    TQDM_AVAILABLE = importlib.util.find_spec("tqdm") is not None
 except ImportError:
     TQDM_AVAILABLE = False
     print("⚠️ tqdm não disponível. Instale com: pip install tqdm")
@@ -47,6 +47,8 @@ class ProgressTracker:
             return
 
         if TQDM_AVAILABLE and self.total is not None:
+            from tqdm import tqdm  # Import local para evitar erro do Pylance
+
             self.pbar = tqdm(
                 total=self.total,
                 desc=self.description,
@@ -62,7 +64,7 @@ class ProgressTracker:
 
         self.started = True
 
-    def update(self, n: int = 1, message: str = None):
+    def update(self, n: int = 1, message: str | None = None):
         """
         Atualiza o progresso.
 
@@ -89,7 +91,7 @@ class ProgressTracker:
         if self.pbar:
             self.pbar.set_description(description)
 
-    def finish(self, final_message: str = None):
+    def finish(self, final_message: str | None = None):
         """Finaliza a barra de progresso."""
         if self.pbar:
             if final_message:
@@ -165,9 +167,7 @@ def execute_algorithm_runs(
     executions = []
 
     # Criar tracker de progresso para todas as execuções
-    progress_tracker = ProgressTracker(
-        f"{alg_name}", total=actual_execs, console=console
-    )
+    progress_tracker = ProgressTracker(f"{alg_name}", total=actual_execs, console=console)
     progress_tracker.start()
 
     for i in range(actual_execs):
@@ -269,9 +269,7 @@ def execute_algorithm_runs(
 
     # Finalizar progresso
     successful_execs = len([e for e in executions if not e["erro"]])
-    avg_dist = sum(
-        e["distancia"] for e in executions if e["distancia"] != float("inf")
-    ) / max(successful_execs, 1)
+    avg_dist = sum(e["distancia"] for e in executions if e["distancia"] != float("inf")) / max(successful_execs, 1)
 
     final_msg = f"{successful_execs}/{actual_execs} sucessos"
     if successful_execs > 0:

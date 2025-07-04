@@ -39,13 +39,9 @@ class CSCAlgorithm(CSPAlgorithm):
         Returns:
             tuple[str, int, dict]: (string_central, distancia_maxima, metadata)
         """
-        self._report_progress(
-            f"Iniciando CSC (d={self.params.get('d')}, n_blocks={self.params.get('n_blocks')})"
-        )
+        self._report_progress(f"Iniciando CSC (d={self.params.get('d')}, n_blocks={self.params.get('n_blocks')})")
 
-        center = heuristic_closest_string(
-            self.strings, d=self.params.get("d"), n_blocks=self.params.get("n_blocks")
-        )
+        center = heuristic_closest_string(self.strings, d=self.params.get("d"), n_blocks=self.params.get("n_blocks"))
 
         if center:
             dist = max_distance(center, self.strings)

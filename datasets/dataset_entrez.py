@@ -5,19 +5,11 @@ Funções:
     fetch_dataset(): Baixa dataset do NCBI e retorna sequências e parâmetros.
 """
 
-# dataset_entrez.py
-"""
-dataset_entrez.py
-=================
-
-Baixa sequências do NCBI via Bio.Entrez.
-Pergunta tudo via prompt: banco, termo, tamanho, quantidade.
-"""
-
 import logging
 import random
 from typing import Any
 
+from csp_blfga.core.io import validate_sequences
 from csp_blfga.ui.cli.console_manager import console
 from csp_blfga.utils.config import ENTREZ_DEFAULTS, safe_input
 
@@ -35,9 +27,7 @@ def fetch_dataset() -> tuple[list[str], dict[str, Any]]:
 
     # Carregar email do config se não estiver definido
     if not getattr(Entrez, "email", None):
-        email_input = safe_input(
-            f"Informe seu e-mail para o NCBI [{defaults['email']}]: "
-        )
+        email_input = safe_input(f"Informe seu e-mail para o NCBI [{defaults['email']}]: ")
         Entrez.email = email_input or defaults["email"]
         if not Entrez.email:
             raise ValueError("É necessário fornecer um e-mail para acessar o NCBI")
@@ -45,9 +35,7 @@ def fetch_dataset() -> tuple[list[str], dict[str, Any]]:
 
     # Carregar API key do config se não estiver definida
     if not getattr(Entrez, "api_key", None):
-        api_key_input = safe_input(
-            f"Informe sua NCBI API key (opcional) [{defaults.get('api_key','')}]: "
-        )
+        api_key_input = safe_input(f"Informe sua NCBI API key (opcional) [{defaults.get('api_key','')}]: ")
         Entrez.api_key = api_key_input or defaults.get("api_key", "")
         if Entrez.api_key:
             logger.debug("Entrez.api_key definida.")
@@ -72,17 +60,13 @@ def fetch_dataset() -> tuple[list[str], dict[str, Any]]:
     handle.close()
 
     if not isinstance(search_result, dict):
-        raise TypeError(
-            f"Resultado da busca Entrez não é um dicionário: {type(search_result)}"
-        )
+        raise TypeError(f"Resultado da busca Entrez não é um dicionário: {type(search_result)}")
 
     logger.debug(f"ESearch retornou {len(search_result.get('IdList', []))} IDs")
 
     ids = search_result.get("IdList", [])
     if not ids:
-        raise RuntimeError(
-            "A busca não retornou nenhum registro. Verifique seu termo de busca."
-        )
+        raise RuntimeError("A busca não retornou nenhum registro. Verifique seu termo de busca.")
 
     if len(ids) < n:
         logger.warning(
@@ -95,9 +79,7 @@ def fetch_dataset() -> tuple[list[str], dict[str, Any]]:
     logger.debug(f"IDs amostrados (primeiros 5): {sample_ids[:5]} ...")
 
     logger.debug("Iniciando EFetch...")
-    fetch_handle = Entrez.efetch(
-        db=db, id=",".join(sample_ids), rettype="fasta", retmode="text"
-    )
+    fetch_handle = Entrez.efetch(db=db, id=",".join(sample_ids), rettype="fasta", retmode="text")
     records = list(SeqIO.parse(fetch_handle, "fasta"))
     fetch_handle.close()
     logger.debug(f"{len(records)} sequências baixadas")
@@ -138,9 +120,7 @@ def fetch_dataset_with_params(
 
     try:
         # Buscar IDs
-        search_handle = Entrez.esearch(
-            db=db, term=term, retmax=n * 2
-        )  # Busca extra para filtrar
+        search_handle = Entrez.esearch(db=db, term=term, retmax=n * 2)  # Busca extra para filtrar
         search_results = Entrez.read(search_handle)
         search_handle.close()
 
@@ -150,9 +130,7 @@ def fetch_dataset_with_params(
 
         # Converter para dict se não for
         if not isinstance(search_results, dict):
-            raise ValueError(
-                f"Formato de resposta inesperado do NCBI: {type(search_results)}"
-            )
+            raise ValueError(f"Formato de resposta inesperado do NCBI: {type(search_results)}")
 
         # Verificar se tem IdList usando get() que é mais seguro
         ids_list = search_results.get("IdList")
@@ -172,7 +150,64 @@ def fetch_dataset_with_params(
     except Exception as e:
         raise ValueError(f"Erro ao acessar NCBI: {e}")
 
-    # Processar FASTA
+    # Processar FASTA usando método unificado
+    sequences = _parse_fasta_data(fasta_data)
+
+    if not sequences:
+        raise ValueError("Nenhuma sequência válida encontrada")
+
+    # Usar validação unificada
+    validation = validate_sequences(sequences)
+
+    if not validation["valid"]:
+        for error in validation["errors"]:
+            logger.warning(f"Validação NCBI: {error}")
+
+    # Filtrar por comprimento uniforme se necessário
+    if not validation["uniform_length"]:
+        L = len(sequences[0])
+        filtered_sequences = []
+        for seq in sequences:
+            if len(seq) == L:
+                filtered_sequences.append(seq)
+
+        if len(filtered_sequences) < min(n, len(sequences) // 2):
+            raise ValueError(f"Muito poucas sequências de comprimento uniforme: {len(filtered_sequences)}")
+        sequences = filtered_sequences
+
+    # Limitar ao número solicitado
+    final_sequences = sequences[:n]
+
+    used_params = {
+        "email": email,
+        "db": db,
+        "term": term,
+        "n_requested": n,
+        "n_obtained": len(final_sequences),
+        "L": len(final_sequences[0]) if final_sequences else 0,
+        "api_key_used": bool(api_key),
+        "total_found": validation["count"],
+        "uniform_length_count": len(sequences),
+        "alphabet": validation["alphabet"],
+    }
+
+    console.print(
+        f"✓ {len(final_sequences)} sequências obtidas (L={len(final_sequences[0]) if final_sequences else 0})"
+    )
+
+    return final_sequences, used_params
+
+
+def _parse_fasta_data(fasta_data: str) -> list[str]:
+    """
+    Processa dados FASTA baixados do NCBI.
+
+    Args:
+        fasta_data: String com dados FASTA
+
+    Returns:
+        Lista de sequências limpas
+    """
     sequences = []
     current_seq = ""
 
@@ -183,48 +218,14 @@ def fetch_dataset_with_params(
                 clean_seq = "".join(c.upper() for c in current_seq if c.isalpha())
                 if clean_seq:
                     sequences.append(clean_seq)
-                    if len(sequences) >= n:
-                        break
             current_seq = ""
         else:
             current_seq += line
 
     # Adicionar última sequência
-    if current_seq and len(sequences) < n:
+    if current_seq:
         clean_seq = "".join(c.upper() for c in current_seq if c.isalpha())
         if clean_seq:
             sequences.append(clean_seq)
 
-    if not sequences:
-        raise ValueError("Nenhuma sequência válida encontrada")
-
-    # Filtrar por comprimento uniforme
-    L = len(sequences[0])
-    filtered_sequences = []
-    for seq in sequences:
-        if len(seq) == L:
-            filtered_sequences.append(seq)
-
-    if len(filtered_sequences) < min(n, len(sequences) // 2):
-        raise ValueError(
-            f"Muito poucas sequências de comprimento uniforme: {len(filtered_sequences)}"
-        )
-
-    # Limitar ao número solicitado
-    final_sequences = filtered_sequences[:n]
-
-    used_params = {
-        "email": email,
-        "db": db,
-        "term": term,
-        "n_requested": n,
-        "n_obtained": len(final_sequences),
-        "L": L,
-        "api_key_used": bool(api_key),
-        "total_found": len(sequences),
-        "uniform_length_count": len(filtered_sequences),
-    }
-
-    console.print(f"✓ {len(final_sequences)} sequências obtidas (L={L})")
-
-    return final_sequences, used_params
+    return sequences

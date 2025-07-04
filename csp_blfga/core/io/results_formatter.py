@@ -37,9 +37,7 @@ class ResultsFormatter:
         self.extra_info = {}
         self.exporter = CSPExporter()
 
-    def add_algorithm_results(
-        self, algorithm_name: str, executions: list[dict[str, Any]]
-    ):
+    def add_algorithm_results(self, algorithm_name: str, executions: list[dict[str, Any]]):
         """
         Adiciona resultados de um algoritmo.
 
@@ -84,9 +82,7 @@ class ResultsFormatter:
         headers = ["Execução", "Tempo (s)", "Distância", "Status"]
 
         def format_row(i, exec_data):
-            distancia = exec_data.get(
-                "distancia", exec_data.get("melhor_distancia", "-")
-            )
+            distancia = exec_data.get("distancia", exec_data.get("melhor_distancia", "-"))
             if exec_data.get("erro"):
                 return [i, f"{exec_data['tempo']:.4f}", "-", f"✗ {exec_data['erro']}"]
             if exec_data.get("timeout"):
@@ -95,12 +91,8 @@ class ResultsFormatter:
                 return [i, f"{exec_data['tempo']:.4f}", "∞", "∞ Sem solução"]
             return [i, f"{exec_data['tempo']:.4f}", distancia, "✓ OK"]
 
-        table_data = [
-            format_row(i, exec_data) for i, exec_data in enumerate(executions, 1)
-        ]
-        table = tabulate(
-            table_data, headers=headers, tablefmt="grid", stralign="center"
-        )
+        table_data = [format_row(i, exec_data) for i, exec_data in enumerate(executions, 1)]
+        table = tabulate(table_data, headers=headers, tablefmt="grid", stralign="center")
         output.append(table)
         return "\n".join(output)
 
@@ -110,17 +102,14 @@ class ResultsFormatter:
         valid = [
             e
             for e in executions
-            if not e.get("erro")
-            and e.get("distancia", e.get("melhor_distancia")) not in ["-", float("inf")]
+            if not e.get("erro") and e.get("distancia", e.get("melhor_distancia")) not in ["-", float("inf")]
         ]
         output = [f"\n📈 ESTATÍSTICAS DETALHADAS - {algorithm_name.upper()}", "-" * 60]
         if not valid:
             output.append("❌ Nenhuma execução válida para calcular estatísticas.")
             return "\n".join(output)
         tempos = [e["tempo"] for e in valid]
-        distancias = [
-            e.get("distancia", e.get("melhor_distancia", float("inf"))) for e in valid
-        ]
+        distancias = [e.get("distancia", e.get("melhor_distancia", float("inf"))) for e in valid]
 
         def stat_line(label, val, sufixo=""):
             return [label, f"{val}{sufixo}"]
@@ -146,9 +135,7 @@ class ResultsFormatter:
             stat_line("Melhor (Mínima)", min(distancias)),
             stat_line("Pior (Máxima)", max(distancias)),
         ]
-        table = tabulate(
-            stats_data, headers=["Métrica", "Valor"], tablefmt="grid", stralign="left"
-        )
+        table = tabulate(stats_data, headers=["Métrica", "Valor"], tablefmt="grid", stralign="left")
         output.append(table)
         return "\n".join(output)
 
@@ -198,8 +185,7 @@ class ResultsFormatter:
                 exec_data
                 for exec_data in executions
                 if not exec_data.get("erro")
-                and exec_data.get("distancia", exec_data.get("melhor_distancia"))
-                not in ["-", float("inf")]
+                and exec_data.get("distancia", exec_data.get("melhor_distancia")) not in ["-", float("inf")]
             ]
 
             if not valid_executions:
@@ -217,16 +203,10 @@ class ResultsFormatter:
             else:
                 tempos = [exec_data["tempo"] for exec_data in valid_executions]
                 distancias = [
-                    exec_data.get(
-                        "distancia", exec_data.get("melhor_distancia", float("inf"))
-                    )
+                    exec_data.get("distancia", exec_data.get("melhor_distancia", float("inf")))
                     for exec_data in valid_executions
                 ]
-                taxa_sucesso = (
-                    len(valid_executions) / len(executions) * 100
-                    if len(executions) > 0
-                    else 0
-                )
+                taxa_sucesso = len(valid_executions) / len(executions) * 100 if len(executions) > 0 else 0
 
                 row = [
                     base_display,
@@ -235,11 +215,7 @@ class ResultsFormatter:
                     f"{statistics.stdev(tempos) if len(tempos) > 1 else 0:.4f}",
                     f"{min(distancias) if distancias else 'ERRO'}",
                     f"{statistics.mean(distancias):.2f}" if distancias else "ERRO",
-                    (
-                        f"{statistics.stdev(distancias) if len(distancias) > 1 else 0:.2f}"
-                        if distancias
-                        else "ERRO"
-                    ),
+                    (f"{statistics.stdev(distancias) if len(distancias) > 1 else 0:.2f}" if distancias else "ERRO"),
                     f"{taxa_sucesso:.1f}",
                 ]
 
@@ -254,9 +230,7 @@ class ResultsFormatter:
                         "name": algo_name,
                         "dist": min(distancias) if distancias else float("inf"),
                         "time": statistics.mean(tempos) if tempos else 0,
-                        "success_rate": (
-                            taxa_sucesso if isinstance(taxa_sucesso, int | float) else 0
-                        ),
+                        "success_rate": (taxa_sucesso if isinstance(taxa_sucesso, int | float) else 0),
                     }
                 )
             else:
@@ -292,9 +266,7 @@ class ResultsFormatter:
             return (base_name, dist, float(row[2]))
 
         comparative_data.sort(key=sort_key)
-        table = tabulate(
-            comparative_data, headers=headers, tablefmt="grid", stralign="center"
-        )
+        table = tabulate(comparative_data, headers=headers, tablefmt="grid", stralign="center")
         output.append(table)
 
         # Adicionar ranking POR BASE
@@ -312,9 +284,7 @@ class ResultsFormatter:
                     medal = "❌"
                     info = f"Falha na execução | Tempo: {alg['time']:.4f}s"
                 else:
-                    medal = (
-                        "🥇" if i == 1 else "🥈" if i == 2 else "🥉" if i == 3 else f"{i}°"
-                    )
+                    medal = "🥇" if i == 1 else "🥈" if i == 2 else "🥉" if i == 3 else f"{i}°"
                     info = f"Distância: {alg['dist']} | Tempo: {alg['time']:.4f}s | Sucesso: {alg['success_rate']:.1f}%"
                 output.append(f"{medal} {alg['name']} - {info}")
 
@@ -386,26 +356,20 @@ class ResultsFormatter:
             if "noise" in params:
                 value = params["noise"]
                 if isinstance(value, list):
-                    output.append(
-                        f"  • Taxa de ruído: variável (min: {min(value):.3f}, max: {max(value):.3f})"
-                    )
+                    output.append(f"  • Taxa de ruído: variável (min: {min(value):.3f}, max: {max(value):.3f})")
                 else:
                     output.append(f"  • Taxa de ruído: {value}")
             if "seed" in params:
                 output.append(f"  • Semente: {params['seed']}")
             if "fully_random" in params:
-                output.append(
-                    f"  • Modo: {'Totalmente aleatório' if params['fully_random'] else 'Base + ruído'}"
-                )
+                output.append(f"  • Modo: {'Totalmente aleatório' if params['fully_random'] else 'Base + ruído'}")
             if "base_string" in params or "distancia_string_base" in params:
                 output.append("")
                 output.append("🎯 STRING BASE PARA AUDITORIA:")
                 if "base_string" in params:
                     output.append(f"  • String base: '{params['base_string']}'")
                 if "distancia_string_base" in params:
-                    output.append(
-                        f"  • Distância da string base: {params['distancia_string_base']}"
-                    )
+                    output.append(f"  • Distância da string base: {params['distancia_string_base']}")
 
         if not encontrou:
             output.append("❌ Nenhum parâmetro de dataset encontrado.")

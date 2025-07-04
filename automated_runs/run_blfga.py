@@ -229,9 +229,7 @@ def get_worker_count(args) -> int | None:
         try:
             return int(args.workers)
         except ValueError:
-            print(
-                f"⚠️ Valor inválido para --workers: '{args.workers}'. Usando detecção automática."
-            )
+            print(f"⚠️ Valor inválido para --workers: '{args.workers}'. Usando detecção automática.")
             return None
 
     # 2. Verificar variável de ambiente
@@ -244,9 +242,7 @@ def get_worker_count(args) -> int | None:
             print(f"🌍 Usando {workers} workers (variável de ambiente BLFGA_WORKERS)")
             return workers
         except ValueError:
-            print(
-                f"⚠️ Valor inválido em BLFGA_WORKERS: '{env_workers}'. Usando detecção automática."
-            )
+            print(f"⚠️ Valor inválido em BLFGA_WORKERS: '{env_workers}'. Usando detecção automática.")
 
     # 3. Padrão: usar detecção automática (todos os CPUs)
     return None
@@ -274,14 +270,8 @@ def main():
 
     # Gerar combinações de datasets
     dataset_param_names = list(dataset_params_config.keys())
-    dataset_param_values = [
-        val if isinstance(val, list) else [val]
-        for val in dataset_params_config.values()
-    ]
-    dataset_configs = [
-        dict(zip(dataset_param_names, values))
-        for values in product(*dataset_param_values)
-    ]
+    dataset_param_values = [val if isinstance(val, list) else [val] for val in dataset_params_config.values()]
+    dataset_configs = [dict(zip(dataset_param_names, values)) for values in product(*dataset_param_values)]
 
     print(f"[Config] Datasets: {len(dataset_configs)}")
     print(
@@ -297,17 +287,16 @@ def main():
     for ds_idx, ds_params in enumerate(dataset_configs):
         # Gerar dataset
         strings, params_usados = generate_dataset_with_params(ds_params)
-        print(
-            f"[Dataset {ds_idx+1}] n={len(strings)}, L={len(strings[0])}, "
-            f"|Σ|={len(params_usados['alphabet'])}"
-        )
+        print(f"[Dataset {ds_idx+1}] n={len(strings)}, L={len(strings[0])}, " f"|Σ|={len(params_usados['alphabet'])}")
 
         # Preparar grid BLF-GA
         param_names = list(BLF_GA_DEFAULTS.keys())
         param_values = [
-            blfga_param_grid.get(k, [BLF_GA_DEFAULTS[k]])
-            if isinstance(blfga_param_grid.get(k, BLF_GA_DEFAULTS[k]), list)
-            else [blfga_param_grid.get(k, BLF_GA_DEFAULTS[k])]
+            (
+                blfga_param_grid.get(k, [BLF_GA_DEFAULTS[k]])
+                if isinstance(blfga_param_grid.get(k, BLF_GA_DEFAULTS[k]), list)
+                else [blfga_param_grid.get(k, BLF_GA_DEFAULTS[k])]
+            )
             for k in param_names
         ]
 
@@ -342,17 +331,13 @@ def main():
         return
 
     # Calcular workers ótimos
-    optimal_workers = calculate_optimal_workers(
-        total_experiments, available_memory_gb, user_workers
-    )
+    optimal_workers = calculate_optimal_workers(total_experiments, available_memory_gb, user_workers)
     print(f"[Paralelização] Workers utilizados: {optimal_workers}")
 
     # Informações adicionais sobre a configuração
     efficiency = total_experiments / optimal_workers if optimal_workers > 0 else 0
     print(f"[Paralelização] Experimentos por worker: {efficiency:.1f}")
-    print(
-        f"[Paralelização] Memória estimada total: {optimal_workers * args.memory_limit:.1f} GB"
-    )
+    print(f"[Paralelização] Memória estimada total: {optimal_workers * args.memory_limit:.1f} GB")
 
     # Executar experimentos em paralelo
     all_results = []
@@ -373,10 +358,7 @@ def main():
 
         with ProcessPoolExecutor(max_workers=optimal_workers) as executor:
             # Submeter todas as tarefas
-            future_to_task = {
-                executor.submit(execute_single_experiment, task): task
-                for task in all_tasks
-            }
+            future_to_task = {executor.submit(execute_single_experiment, task): task for task in all_tasks}
 
             # Coletar resultados conforme completam
             for future in as_completed(future_to_task):
@@ -386,15 +368,10 @@ def main():
                 if progress_bar:
                     progress_bar.update(1)
                 else:
-                    print(
-                        f"[Progresso] {len(all_results)}/{total_experiments} concluídos"
-                    )
+                    print(f"[Progresso] {len(all_results)}/{total_experiments} concluídos")
 
                 if not result.success:
-                    print(
-                        f"❌ Erro no experimento DS{result.dataset_idx+1}-{result.exp_idx+1}: "
-                        f"{result.error_msg}"
-                    )
+                    print(f"❌ Erro no experimento DS{result.dataset_idx+1}-{result.exp_idx+1}: " f"{result.error_msg}")
 
         if progress_bar:
             progress_bar.close()
@@ -414,10 +391,7 @@ def main():
         successful_results = [r for r in all_results if r.success]
         failed_results = [r for r in all_results if not r.success]
 
-        print(
-            f"[Resultados] Sucessos: {len(successful_results)}, "
-            f"Falhas: {len(failed_results)}"
-        )
+        print(f"[Resultados] Sucessos: {len(successful_results)}, " f"Falhas: {len(failed_results)}")
 
         if successful_results:
             # Converter para DataFrame
@@ -447,9 +421,7 @@ def main():
             print(f"   Tempo médio por experimento: {df['tempo'].mean():.2f}s")
             print(f"   Melhor distância encontrada: {df['dist'].min()}")
             print(f"   Memória média por experimento: {df['memoria_mb'].mean():.1f} MB")
-            print(
-                f"   Speedup estimado: {len(successful_results) * df['tempo'].mean() / total_time:.1f}x"
-            )
+            print(f"   Speedup estimado: {len(successful_results) * df['tempo'].mean() / total_time:.1f}x")
 
             print(f"\n💾 Resultados salvos em: {csv_path}")
 

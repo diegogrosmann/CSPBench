@@ -43,22 +43,16 @@ def save_dataset_fasta(sequences: list[str], filename: str, description: str = "
 
 def ask_save_dataset(sequences: list[str], dataset_type: str, params: dict) -> bool:
     """Pergunta se o usuário deseja salvar o dataset e salva se confirmado."""
-    save_choice = safe_input(
-        "\nDeseja salvar este dataset para uso futuro? [s/N]: "
-    ).lower()
+    save_choice = safe_input("\nDeseja salvar este dataset para uso futuro? [s/N]: ").lower()
 
     if save_choice == "s":
         # Gerar nome do arquivo baseado no tipo e parâmetros
         if dataset_type == "synthetic":
-            filename = (
-                f"synthetic_n{params['n']}_L{params['L']}_noise{params['noise']}.fasta"
-            )
+            filename = f"synthetic_n{params['n']}_L{params['L']}_noise{params['noise']}.fasta"
             description = f"Synthetic dataset: n={params['n']}, L={params['L']}, alphabet={params['alphabet']}, noise={params['noise']}"
         elif dataset_type == "entrez":
             # Limpar caracteres especiais do termo para nome do arquivo
-            clean_term = "".join(
-                c for c in params["term"] if c.isalnum() or c in "_ -"
-            )[:50]
+            clean_term = "".join(c for c in params["term"] if c.isalnum() or c in "_ -")[:50]
             filename = f"entrez_{params['db']}_{clean_term}_n{params['n']}.fasta"
             description = f"NCBI dataset: db={params['db']}, term={params['term']}, n={params['n']}"
         else:

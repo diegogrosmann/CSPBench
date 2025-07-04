@@ -1,0 +1,50 @@
+interactions:
+- request:
+    body: null
+    headers:
+      Connection:
+      - close
+      Host:
+      - eutils.ncbi.nlm.nih.gov
+      User-Agent:
+      - Python-urllib/3.12
+    method: GET
+    uri: https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=nucleotide&term=Escherichia+coli%5BOrganism%5D&retmax=2&tool=biopython&email=test%40example.com&api_key=test_api_key_123456
+  response:
+    body:
+      string: '{"error":"API key invalid","api-key":"test_api_key_123456","type":"invalid",
+
+        "status":"unknown"}'
+    headers:
+      Access-Control-Expose-Headers:
+      - X-RateLimit-Limit,X-RateLimit-Remaining
+      Connection:
+      - close
+      Content-Length:
+      - '96'
+      Content-Security-Policy:
+      - upgrade-insecure-requests
+      Content-Type:
+      - application/json
+      Date:
+      - Fri, 04 Jul 2025 18:13:25 GMT
+      Referrer-Policy:
+      - origin-when-cross-origin
+      Server:
+      - Finatra
+      Strict-Transport-Security:
+      - max-age=31536000; includeSubDomains; preload
+      Vary:
+      - Accept-Encoding
+      X-RateLimit-Limit:
+      - '3'
+      X-RateLimit-Remaining:
+      - '3'
+      X-UA-Compatible:
+      - IE=Edge
+      X-XSS-Protection:
+      - 1; mode=block
+    status:
+      code: 400
+      message: Bad Request
+version: 1

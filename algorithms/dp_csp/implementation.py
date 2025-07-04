@@ -142,9 +142,7 @@ def exact_dp_closest_string(
     n = len(strings)
 
     # LOG DETALHADO: Parâmetros de entrada
-    logger.info(
-        f"[DP_CSP] Iniciando busca exata com max_d={max_d}, baseline={baseline_val}"
-    )
+    logger.info(f"[DP_CSP] Iniciando busca exata com max_d={max_d}, baseline={baseline_val}")
     logger.info(f"[DP_CSP] Dataset: n={n}, L={len(strings[0])}, alfabeto={alphabet}")
     for i, s in enumerate(strings):
         logger.info(f"[DP_CSP] String {i}: {s}")
@@ -218,9 +216,7 @@ def exact_dp_closest_string(
             logger.info(f"[DP_CSP] Validação final: distância máxima = {max_dist}")
 
             if max_dist != d:
-                logger.warning(
-                    f"[DP_CSP] INCONSISTÊNCIA: d={d} mas distância real={max_dist}"
-                )
+                logger.warning(f"[DP_CSP] INCONSISTÊNCIA: d={d} mas distância real={max_dist}")
 
             return center, d
         else:
@@ -228,7 +224,4 @@ def exact_dp_closest_string(
             pass
 
     logger.error(f"[DP_CSP] FALHA: Não foi possível encontrar centro com d ≤ {max_d}")
-    raise RuntimeError(
-        f"Não foi possível encontrar centro com d ≤ {max_d}. "
-        "Tente aumentar o limite."
-    )
+    raise RuntimeError(f"Não foi possível encontrar centro com d ≤ {max_d}. " "Tente aumentar o limite.")

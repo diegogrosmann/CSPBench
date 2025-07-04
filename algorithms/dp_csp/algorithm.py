@@ -5,7 +5,6 @@ Classes:
     DPCSPAlgorithm: Implementação do algoritmo exato por programação dinâmica.
 """
 
-
 from algorithms.base import CSPAlgorithm, register_algorithm
 from csp_blfga.utils.distance import max_distance
 
