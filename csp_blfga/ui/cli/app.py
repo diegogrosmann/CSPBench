@@ -24,7 +24,7 @@ from datetime import datetime
 
 from algorithms.base import global_registry
 from csp_blfga.core.io.results_formatter import ResultsFormatter
-from csp_blfga.core.report.report_utils import print_quick_summary, save_detailed_report
+from csp_blfga.core.report.report_utils import print_quick_summary
 from csp_blfga.ui.cli.console_manager import console
 from csp_blfga.ui.cli.menu import menu, select_algorithms
 from csp_blfga.utils.config import ALGORITHM_TIMEOUT, safe_input
@@ -160,7 +160,7 @@ def main():
                 cprint(
                     f"Taxa de sucesso: {batch_result['resumo']['taxa_sucesso']:.1f}%"
                 )
-                from csp_blfga.core.io.export_csv_batch import export_batch_json_to_csv
+                from csp_blfga.core.io.exporter import CSPExporter
 
                 batch_dir = executor.results_dir
                 import os as os_batch
@@ -168,7 +168,8 @@ def main():
                 json_path = os_batch.path.join(batch_dir, "batch_results.json")
                 csv_path = os_batch.path.join(batch_dir, "batch_results.csv")
                 if os_batch.path.exists(json_path):
-                    export_batch_json_to_csv(json_path, csv_path)
+                    exporter = CSPExporter()
+                    exporter.export_batch_json_to_csv(json_path, csv_path)
                     cprint(
                         f"📄 Resultados detalhados do batch exportados para CSV: {csv_path}"
                     )
@@ -199,9 +200,7 @@ def main():
                     cprint(
                         f"Taxa de sucesso: {batch_result['resumo']['taxa_sucesso']:.1f}%"
                     )
-                    from csp_blfga.core.io.export_csv_batch import (
-                        export_batch_json_to_csv,
-                    )
+                    from csp_blfga.core.io.exporter import CSPExporter
 
                     batch_dir = executor.results_dir
                     import os as os_batch
@@ -209,7 +208,8 @@ def main():
                     json_path = os_batch.path.join(batch_dir, "batch_results.json")
                     csv_path = os_batch.path.join(batch_dir, "batch_results.csv")
                     if os_batch.path.exists(json_path):
-                        export_batch_json_to_csv(json_path, csv_path)
+                        exporter = CSPExporter()
+                        exporter.export_batch_json_to_csv(json_path, csv_path)
                         cprint(
                             f"📄 Resultados detalhados do batch exportados para CSV: {csv_path}"
                         )
@@ -405,12 +405,10 @@ def main():
         txt_path = os.path.join(results_dir, f"{base_name}.txt")
         csv_path = os.path.join(results_dir, f"{base_name}.csv")
 
-        save_detailed_report(formatter, txt_path)
+        formatter.save_detailed_report(txt_path)
 
         # Salvar resultados detalhados em CSV
-        from csp_blfga.core.io.export_csv import export_results_to_csv
-
-        export_results_to_csv(formatter, csv_path)
+        formatter.export_to_csv(csv_path)
         cprint(f"📄 Resultados detalhados exportados para CSV: {csv_path}")
 
     except Exception as e:

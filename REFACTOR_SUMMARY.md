@@ -71,6 +71,17 @@
 - ✅ Testes validados (16 passed)
 - ✅ Commit realizado com sucesso
 
+### T5-1 a T5-4: Refatoração do Sistema de Exportação
+- ✅ **T5-1**: Criado `core/io/exporter.py` com `CSPExporter` centralizado
+- ✅ **T5-2**: Refatorado `export_csv*` e `ResultsFormatter` para usar `CSPExporter`
+- ✅ **T5-3**: Eliminado `report_utils.save_detailed_report` (funcionalidade movida)
+- ✅ **T5-4**: Mantido `report_utils.py` com `print_quick_summary` (ainda em uso)
+- ✅ Arquivos `export_csv.py` e `export_csv_batch.py` convertidos para depreciação
+- ✅ `ResultsFormatter` integrado com `CSPExporter`
+- ✅ Todos os imports atualizados nos arquivos dependentes
+- ✅ Testes de exportação CSV e JSON validados
+- ✅ Sistema unificado e mais maintível
+
 ## 📁 Nova Estrutura do Projeto
 
 ```
@@ -89,15 +100,16 @@ csp_blfga/
 │   │   ├── batch_executor.py
 │   │   └── runner.py
 │   ├── io/                  # Entrada/saída
-│   │   ├── export_csv.py
-│   │   ├── export_csv_batch.py
+│   │   ├── exporter.py      # 🎯 CSPExporter centralizado
+│   │   ├── export_csv.py    # ⚠️ Wrapper deprecated
+│   │   ├── export_csv_batch.py     # ⚠️ Wrapper deprecated
 │   │   └── results_formatter.py
 │   └── report/              # Relatórios
-│       └── report_utils.py
+│       └── report_utils.py         # 📊 Apenas print_quick_summary
 └── utils/                   # Utilitários
     ├── config.py
     ├── distance.py
-    ├── logging.py
+    ├── logging.py           # 🔧 Sistema de logging padronizado
     ├── resource_limits_config.py
     └── resource_monitor.py
 ```

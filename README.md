@@ -35,8 +35,9 @@ csp_blfga/                    # 📦 Pacote principal
 │   │   ├── batch_executor.py     # Execução em lote
 │   │   └── runner.py            # Controle de execução e progresso
 │   ├── io/                  # Entrada/saída de dados
-│   │   ├── export_csv.py        # Exportação para CSV
-│   │   ├── export_csv_batch.py  # Exportação de lotes
+│   │   ├── export_csv.py        # [DEPRECIADO] Proxy para CSPExporter
+│   │   ├── export_csv_batch.py  # [DEPRECIADO] Proxy para CSPExporter
+│   │   ├── exporter.py          # Sistema de exportação centralizado
 │   │   └── results_formatter.py # Formatação de relatórios
 │   └── report/              # Geração de relatórios
 │       └── report_utils.py      # Utilitários de relatórios

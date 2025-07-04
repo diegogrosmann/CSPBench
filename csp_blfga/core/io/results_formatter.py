@@ -8,6 +8,7 @@ Métodos:
     add_algorithm_results(...): Adiciona resultados de um algoritmo.
     format_detailed_results(): Formata resultados detalhados.
     save_detailed_report(...): Salva relatório em arquivo.
+    export_to_csv(...): Exporta resultados para CSV usando CSPExporter.
 """
 
 import logging
@@ -16,6 +17,8 @@ from pathlib import Path
 from typing import Any
 
 from tabulate import tabulate
+
+from csp_blfga.core.io.exporter import CSPExporter
 
 
 class ResultsFormatter:
@@ -30,6 +33,7 @@ class ResultsFormatter:
     def __init__(self):
         self.results = {}
         self.extra_info = {}
+        self.exporter = CSPExporter()
 
     def add_algorithm_results(
         self, algorithm_name: str, executions: list[dict[str, Any]]
@@ -343,6 +347,25 @@ class ResultsFormatter:
             dict: Dados do relatório, incluindo informações extras e resultados.
         """
         return {"extra_info": self.extra_info, "results": self.results}
+
+    def export_to_csv(self, filename: str) -> None:
+        """
+        Exporta resultados para arquivo CSV usando CSPExporter.
+
+        Args:
+            filename: Caminho do arquivo CSV de saída.
+        """
+        self.exporter.export_to_csv(self.results, filename, self.extra_info)
+
+    def export_to_json(self, filename: str) -> None:
+        """
+        Exporta dados do relatório para arquivo JSON usando CSPExporter.
+
+        Args:
+            filename: Caminho do arquivo JSON de saída.
+        """
+        data = self.get_detailed_report_data()
+        self.exporter.export_to_json(data, filename)
 
     def _format_dataset_info(self) -> str:
         """Formata informações de todos os datasets presentes em extra_info, iterando sobre cada um."""

@@ -1,0 +1,30 @@
+{
+  "results": {
+    "algoritmo_teste": [
+      {
+        "distancia": 3,
+        "tempo": 0.5,
+        "melhor_string": "ACGT"
+      },
+      {
+        "distancia": 2,
+        "tempo": 0.3,
+        "melhor_string": "ACGG"
+      }
+    ]
+  },
+  "extra_info": {
+    "params": {
+      "n": 5,
+      "L": 4,
+      "alphabet": "ACGT"
+    },
+    "dataset_strings": [
+      "ACGT",
+      "ACGG",
+      "ACCT",
+      "ATGT",
+      "GCGT"
+    ]
+  }
+}
