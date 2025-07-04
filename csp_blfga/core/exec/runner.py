@@ -1,74 +1,108 @@
-import itertools
+"""
+Utilitários para execução de algoritmos e exibição de progresso.
+
+Classes:
+    ProgressTracker: Gerencia progresso com tqdm e mensagens através do ConsoleManager.
+
+Funções:
+    execute_algorithm_runs(...): Executa múltiplas execuções de um algoritmo, coletando resultados.
+"""
+
 import logging
-import sys
-import threading
 import time
 
-from csp_blfga.core.exec.algorithm_executor import (
-    AlgorithmExecutor,
-    ResourceLimitException,
-    TimeoutException,
-)
+from csp_blfga.core.exec.algorithm_executor import AlgorithmExecutor
 from csp_blfga.utils.config import ALGORITHM_TIMEOUT
 from csp_blfga.utils.resource_monitor import (
     check_algorithm_feasibility,
     force_garbage_collection,
 )
 
-"""
-Utilitários para execução de algoritmos e exibição de progresso (spinner).
+try:
+    from tqdm import tqdm
 
-Classes:
-    Spinner: Exibe animação de progresso durante execução de algoritmos.
-
-Funções:
-    execute_algorithm_runs(...): Executa múltiplas execuções de um algoritmo, coletando resultados.
-"""
+    TQDM_AVAILABLE = True
+except ImportError:
+    TQDM_AVAILABLE = False
+    print("⚠️ tqdm não disponível. Instale com: pip install tqdm")
 
 
-class Spinner:
-    def __init__(self, prefix: str, console=None):
-        self.prefix = prefix
-        self.stop_event = threading.Event()
-        self.thread = None
-        self.spinner = itertools.cycle(["   ", ".  ", ".. ", "..."])
+class ProgressTracker:
+    """
+    Gerenciador de progresso moderno usando tqdm para barras de progresso
+    e ConsoleManager para mensagens fora da barra.
+    """
+
+    def __init__(self, description: str, total: int | None = None, console=None):
+        self.description = description
+        self.total = total
         self.console = console
-        self.progress_override = False
+        self.pbar = None
+        self.current = 0
+        self.started = False
 
     def start(self):
-        if self.thread and self.thread.is_alive():
+        """Inicia a barra de progresso."""
+        if self.started:
             return
-        self.stop_event.clear()
-        self.progress_override = False  # Reset override flag
-        self.thread = threading.Thread(target=self._animate)
-        self.thread.daemon = True
-        self.thread.start()
 
-    def _animate(self):
-        while not self.stop_event.is_set():
-            # Só mostrar spinner se não houver progresso específico
-            if not self.progress_override:
-                # Usar console.print_inline para ser thread-safe
-                if self.console:
-                    self.console.print_inline(f"{self.prefix:<25s}{next(self.spinner)}")
-                else:
-                    print(
-                        f"\r{self.prefix:<25s}{next(self.spinner)}", end="", flush=True
-                    )
-            time.sleep(0.3)
-
-    def set_progress_override(self, value: bool):
-        self.progress_override = value
-
-    def stop(self):
-        self.stop_event.set()
-        if self.thread and self.thread.is_alive():
-            self.thread.join(timeout=0.5)  # Timeout mais curto para saída rápida
-        # Limpar a linha após parar o spinner
-        if self.console:
-            self.console.print_inline(f"{' ' * 70}\r")
+        if TQDM_AVAILABLE and self.total is not None:
+            self.pbar = tqdm(
+                total=self.total,
+                desc=self.description,
+                unit="exec",
+                leave=False,
+                ncols=80,
+                bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}]",
+            )
+        elif self.console:
+            self.console.print(f"🔄 {self.description}...")
         else:
-            print(f"\r{' ' * 70}\r", end="", flush=True)
+            print(f"🔄 {self.description}...")
+
+        self.started = True
+
+    def update(self, n: int = 1, message: str | None = None):
+        """
+        Atualiza o progresso.
+
+        Args:
+            n: Incremento no progresso
+            message: Mensagem adicional para exibir
+        """
+        self.current += n
+
+        if self.pbar:
+            self.pbar.update(n)
+            if message:
+                self.pbar.set_postfix_str(message)
+        elif message:
+            # Usar console para mensagens quando tqdm não está disponível
+            if self.console:
+                self.console.print(f"  {message}")
+            else:
+                print(f"  {message}")
+
+    def set_description(self, description: str):
+        """Atualiza a descrição da barra de progresso."""
+        self.description = description
+        if self.pbar:
+            self.pbar.set_description(description)
+
+    def finish(self, final_message: str | None = None):
+        """Finaliza a barra de progresso."""
+        if self.pbar:
+            if final_message:
+                self.pbar.set_postfix_str(final_message)
+            self.pbar.close()
+            self.pbar = None
+        elif final_message:
+            if self.console:
+                self.console.print(f"✅ {final_message}")
+            else:
+                print(f"✅ {final_message}")
+
+        self.started = False
 
 
 def execute_algorithm_runs(
@@ -82,7 +116,20 @@ def execute_algorithm_runs(
     timeout=None,
 ):
     """
-    Executa múltiplas execuções de um algoritmo em threads isoladas com timeout e monitoramento de recursos.
+    Executa múltiplas execuções de um algoritmo com monitoramento de progresso moderno.
+
+    Args:
+        alg_name: Nome do algoritmo
+        AlgClass: Classe do algoritmo
+        seqs: Sequências de entrada
+        alphabet: Alfabeto utilizado
+        num_execs: Número de execuções
+        baseline_val: Valor baseline para comparação
+        console: Instância do ConsoleManager para mensagens
+        timeout: Timeout por execução
+
+    Returns:
+        Lista de resultados das execuções
     """
     logger = logging.getLogger(__name__)
     logger.debug(f"[Runner] Iniciando {alg_name} (baseline_val={baseline_val})")
@@ -99,9 +146,9 @@ def execute_algorithm_runs(
 
     if not is_feasible:
         if console:
-            console.print(f"{alg_name:<25s}... INVIÁVEL: {feasibility_msg}")
+            console.print(f"❌ {alg_name}: INVIÁVEL - {feasibility_msg}")
         else:
-            print(f"\r{alg_name:<25s}... INVIÁVEL: {feasibility_msg}")
+            print(f"❌ {alg_name}: INVIÁVEL - {feasibility_msg}")
 
         return [
             {
@@ -117,68 +164,39 @@ def execute_algorithm_runs(
     actual_execs = 1 if is_deterministic else num_execs
     executions = []
 
+    # Criar tracker de progresso para todas as execuções
+    progress_tracker = ProgressTracker(
+        f"{alg_name}", total=actual_execs, console=console
+    )
+    progress_tracker.start()
+
     for i in range(actual_execs):
-        exec_prefix = f"{alg_name}"
+        exec_description = f"{alg_name}"
         if actual_execs > 1:
-            exec_prefix += f" ({i+1}/{actual_execs})"
+            exec_description += f" ({i+1}/{actual_execs})"
 
-        spinner = Spinner(exec_prefix, console)
         executor = AlgorithmExecutor(timeout)
-
         warning_holder = []
 
         def warning_callback(msg):
             warning_holder.append(msg)
-
-        # Criar uma função de progresso que funciona com o spinner
-        progress_shown = threading.Event()
-        last_progress_time = [
-            0.0
-        ]  # Lista para permitir modificação dentro da closure, usando float
+            # T8-2: Usar console para warnings fora da barra de progresso
+            if console:
+                console.print(f"⚠️ {msg}")
 
         def progress_callback(msg: str):
-            # Primeira chamada de progresso - parar o spinner
-            if not progress_shown.is_set():
-                spinner.set_progress_override(True)
-                progress_shown.set()
-
-            # Mostrar progresso na mesma linha usando console
-            progress_text = f"{msg:<40s}"
+            """Callback de progresso do algoritmo."""
+            # T8-2: Usar console para mensagens de progresso detalhadas
             if console:
-                console.print_inline(f"{exec_prefix:<25s}... {progress_text}")
-            else:
-                print(f"\r{exec_prefix:<25s}... {progress_text}", end="", flush=True)
-
-            # Atualizar timestamp da última mensagem de progresso
-            last_progress_time[0] = time.time()
-
-        # Thread para monitorar inatividade do progresso e reativar o spinner
-        def monitor_progress_activity():
-            while not spinner.stop_event.is_set():
-                if (
-                    progress_shown.is_set()
-                    and time.time() - last_progress_time[0] > 0.5
-                ):
-                    # Se passou mais de 0.5 segundos sem mensagem de progresso, voltar ao spinner
-                    spinner.set_progress_override(False)
-                    progress_shown.clear()
-                time.sleep(0.5)
-
-        # Iniciar thread de monitoramento
-        monitor_thread = threading.Thread(target=monitor_progress_activity)
-        monitor_thread.daemon = True
-        monitor_thread.start()
+                console.print(f"  📊 {msg}")
 
         t0 = time.time()
-
-        # Iniciar spinner antes da execução
-        spinner.start()
 
         try:
             # Criar instância do algoritmo
             instance = AlgClass(seqs, alphabet)
 
-            # Executar com timeout em thread isolada
+            # Executar com timeout
             center, val, info = executor.execute_with_timeout(
                 instance,
                 progress_callback=progress_callback,
@@ -189,12 +207,8 @@ def execute_algorithm_runs(
 
             if "erro" in info:
                 if info["erro"] == "timeout" or "timeout" in info["erro"].lower():
-                    # Parar spinner e mostrar timeout
-                    spinner.stop()
-                    if console:
-                        console.print(f"{exec_prefix:<25s}... TIMEOUT ({timeout}s)")
-                    else:
-                        print(f"\r{exec_prefix:<25s}... TIMEOUT ({timeout}s)")
+                    # Atualizar progresso com timeout
+                    progress_tracker.update(1, f"TIMEOUT ({timeout}s)")
                     executions.append(
                         {
                             "tempo": tempo_execucao,
@@ -204,136 +218,65 @@ def execute_algorithm_runs(
                             "erro": f"Timeout ({timeout}s)",
                         }
                     )
-                elif (
-                    "recurso" in info["erro"].lower()
-                    or "resource" in info["erro"].lower()
-                ):
-                    spinner.stop()
-                    if console:
-                        console.print(f"{exec_prefix:<25s}... RECURSOS LIMITADOS")
-                    else:
-                        print(f"\r{exec_prefix:<25s}... RECURSOS LIMITADOS")
+                    continue
+                else:
+                    # Erro genérico
+                    progress_tracker.update(1, f"ERRO: {info['erro']}")
                     executions.append(
                         {
                             "tempo": tempo_execucao,
-                            "iteracoes": 0,
+                            "iteracoes": info.get("iteracoes", 0),
                             "distancia": float("inf"),
                             "melhor_string": "",
-                            "erro": "Limite de recursos atingido",
+                            "erro": info["erro"],
                         }
                     )
-                else:
-                    error_msg = info["erro"][:50]
-                    spinner.stop()
-                    if console:
-                        console.print(f"{exec_prefix:<25s}... ERRO: {error_msg}")
-                    else:
-                        print(f"\r{exec_prefix:<25s}... ERRO: {error_msg}")
-                    executions.append(
-                        {
-                            "tempo": tempo_execucao,
-                            "iteracoes": 0,
-                            "distancia": float("inf"),
-                            "melhor_string": "",
-                            "erro": error_msg,
-                        }
-                    )
-            else:
-                iteracoes = info.get("iteracoes", 1)
+                    continue
 
-                logger.debug(f"[Runner] {alg_name} exec {i+1}: dist={val}")
+            # Execução bem-sucedida
+            dist_status = ""
+            if baseline_val is not None and val <= baseline_val:
+                dist_status = " ✓"
 
-                # Parar spinner e mostrar resultado final
-                spinner.stop()
-                if console:
-                    console.print(
-                        f"{exec_prefix:<25s}... dist={val}, tempo={tempo_execucao:.3f}s"
-                    )
-                else:
-                    print(
-                        f"\r{exec_prefix:<25s}... dist={val}, tempo={tempo_execucao:.3f}s"
-                    )
+            progress_tracker.update(1, f"dist={val}{dist_status}")
 
-                for warning_msg in warning_holder:
-                    if console:
-                        console.print(f"  AVISO: {warning_msg}")
+            executions.append(
+                {
+                    "tempo": tempo_execucao,
+                    "iteracoes": info.get("iteracoes", 0),
+                    "distancia": val,
+                    "melhor_string": center,
+                    "erro": "",
+                }
+            )
 
-                executions.append(
-                    {
-                        "tempo": tempo_execucao,
-                        "iteracoes": iteracoes,
-                        "distancia": val,
-                        "melhor_string": center,
-                    }
-                )
-
-        except (TimeoutException, ResourceLimitException) as e:
-            tempo_execucao = time.time() - t0
-            spinner.stop()
-
-            if isinstance(e, ResourceLimitException):
-                if console:
-                    console.print(f"{exec_prefix:<25s}... RECURSOS LIMITADOS")
-                else:
-                    print(f"\r{exec_prefix:<25s}... RECURSOS LIMITADOS")
-                executions.append(
-                    {
-                        "tempo": tempo_execucao,
-                        "iteracoes": 0,
-                        "distancia": float("inf"),
-                        "melhor_string": "",
-                        "erro": "Limite de recursos atingido",
-                    }
-                )
-            else:
-                if console:
-                    console.print(f"{exec_prefix:<25s}... TIMEOUT ({timeout}s)")
-                else:
-                    print(f"\r{exec_prefix:<25s}... TIMEOUT ({timeout}s)")
-                executions.append(
-                    {
-                        "tempo": tempo_execucao,
-                        "iteracoes": 0,
-                        "distancia": float("inf"),
-                        "melhor_string": "",
-                        "erro": f"Timeout ({timeout}s)",
-                    }
-                )
-
-        except KeyboardInterrupt:
-            # Cancelar executor e parar spinner
-            executor.cancel()
-            spinner.stop()
-            if console:
-                console.print("\nExecução interrompida pelo usuário. Encerrando.")
-            else:
-                print("\nExecução interrompida pelo usuário. Encerrando.")
-            sys.exit(0)
+            # Limpeza de memória a cada execução
+            force_garbage_collection()
 
         except Exception as e:
             tempo_execucao = time.time() - t0
-            spinner.stop()
-            error_msg = str(e)[:50]
-            if console:
-                console.print(f"{exec_prefix:<25s}... ERRO: {error_msg}")
-            else:
-                print(f"\r{exec_prefix:<25s}... ERRO: {error_msg}")
+            progress_tracker.update(1, f"ERRO: {str(e)}")
+
             executions.append(
                 {
                     "tempo": tempo_execucao,
                     "iteracoes": 0,
                     "distancia": float("inf"),
                     "melhor_string": "",
-                    "erro": error_msg,
+                    "erro": str(e),
                 }
             )
 
-        finally:
-            # Garantir que spinner pare em qualquer caso
-            if spinner.thread and spinner.thread.is_alive():
-                spinner.stop()
-            # Força garbage collection após cada execução
-            force_garbage_collection()
+    # Finalizar progresso
+    successful_execs = len([e for e in executions if not e["erro"]])
+    avg_dist = sum(
+        e["distancia"] for e in executions if e["distancia"] != float("inf")
+    ) / max(successful_execs, 1)
 
-    logger.debug(f"[Runner] {alg_name} finalizado: {len(executions)} execuções")
+    final_msg = f"{successful_execs}/{actual_execs} sucessos"
+    if successful_execs > 0:
+        final_msg += f", avg_dist={avg_dist:.1f}"
+
+    progress_tracker.finish(final_msg)
+
     return executions
