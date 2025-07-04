@@ -5,13 +5,13 @@ Classes:
     BaselineAlg: Implementação do algoritmo baseline.
 """
 
-from algorithms.base import Algorithm, register_algorithm
+from algorithms.base import CSPAlgorithm, register_algorithm
 
 from .implementation import greedy_consensus, max_distance
 
 
 @register_algorithm
-class BaselineAlg(Algorithm):
+class BaselineAlg(CSPAlgorithm):
     """
     Algoritmo de consenso ganancioso (Baseline) para o Closest String Problem.
 
@@ -20,7 +20,7 @@ class BaselineAlg(Algorithm):
         alphabet (str): Alfabeto utilizado.
 
     Métodos:
-        run(): Executa o algoritmo e retorna (centro, distância máxima).
+        run(): Executa o algoritmo e retorna (centro, distância máxima, metadata).
     """
 
     name = "Baseline"
@@ -28,16 +28,25 @@ class BaselineAlg(Algorithm):
     is_deterministic = True
 
     def __init__(self, strings: list[str], alphabet: str, **params):
-        self.strings = strings
-        self.alphabet = alphabet
+        super().__init__(strings, alphabet, **params)
 
-    def run(self) -> tuple[str, int]:
+    def run(self) -> tuple[str, int, dict]:
         """
         Executa o consenso guloso e calcula a maior distância de Hamming.
 
         Returns:
-            tuple[str, int]: (string centro, distância máxima)
+            tuple[str, int, dict]: (string centro, distância máxima, metadata)
         """
+        self._report_progress("Iniciando consenso ganancioso...")
         center = greedy_consensus(self.strings, self.alphabet)
+
+        self._report_progress("Calculando distância máxima...")
         dist = max_distance(center, self.strings)
-        return center, dist
+
+        metadata = {
+            "iteracoes": 1,  # Algoritmo determinístico executado uma vez
+            "centro_encontrado": center,
+            "total_strings": len(self.strings),
+        }
+
+        return center, dist, metadata

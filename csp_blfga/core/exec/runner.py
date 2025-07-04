@@ -196,12 +196,30 @@ def execute_algorithm_runs(
             # Criar instância do algoritmo
             instance = AlgClass(seqs, alphabet)
 
+            # Configurar callbacks se algoritmo suportar
+            if hasattr(instance, "set_progress_callback"):
+                instance.set_progress_callback(progress_callback)
+            if hasattr(instance, "set_warning_callback"):
+                instance.set_warning_callback(warning_callback)
+
             # Executar com timeout
-            center, val, info = executor.execute_with_timeout(
+            result = executor.execute_with_timeout(
                 instance,
                 progress_callback=progress_callback,
                 warning_callback=warning_callback,
             )
+
+            # Processar resultado baseado no formato retornado
+            if len(result) == 3:
+                # Resultado do executor: (center, val, info)
+                center, val, info = result
+            else:
+                # Formato inesperado
+                center, val, info = (
+                    result[0],
+                    result[1],
+                    result[2] if len(result) > 2 else {},
+                )
 
             tempo_execucao = time.time() - t0
 

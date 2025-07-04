@@ -5,9 +5,8 @@ Classes:
     DPCSPAlgorithm: Implementação do algoritmo exato por programação dinâmica.
 """
 
-from collections.abc import Callable
 
-from algorithms.base import Algorithm, register_algorithm
+from algorithms.base import CSPAlgorithm, register_algorithm
 from csp_blfga.utils.distance import max_distance
 
 from .config import DP_CSP_DEFAULTS
@@ -15,7 +14,7 @@ from .implementation import exact_dp_closest_string
 
 
 @register_algorithm
-class DPCSPAlgorithm(Algorithm):
+class DPCSPAlgorithm(CSPAlgorithm):
     """
     DP-CSP: Solução exata por programação dinâmica para o Closest String Problem.
 
@@ -25,8 +24,7 @@ class DPCSPAlgorithm(Algorithm):
         **params: Parâmetros do algoritmo.
 
     Métodos:
-        set_progress_callback(callback): Define callback de progresso.
-        run(): Executa o DP-CSP e retorna (centro, distância máxima).
+        run(): Executa o DP-CSP e retorna (centro, distância máxima, metadata).
     """
 
     name = "DP-CSP"
@@ -34,40 +32,50 @@ class DPCSPAlgorithm(Algorithm):
     is_deterministic = True
 
     def __init__(self, strings: list[str], alphabet: str, **params):
-        self.strings = strings
-        self.alphabet = alphabet
-        self.params = {**self.default_params, **params}
-        self.progress_callback = None
+        super().__init__(strings, alphabet, **params)
 
-    def set_progress_callback(self, callback: Callable[[str], None]) -> None:
+    def run(self) -> tuple[str, int, dict]:
         """
-        Armazena o callback para ser usado no run().
-
-        Args:
-            callback (Callable[[str], None]): Função de callback de progresso.
-        """
-        self.progress_callback = callback
-
-    def run(self) -> tuple[str, int]:
-        """
-        Executa o algoritmo DP-CSP e retorna a string central e a distância máxima.
+        Executa o algoritmo DP-CSP e retorna a string central, distância máxima e metadata.
 
         Returns:
-            tuple[str, int]: (string_central, distancia_maxima)
+            tuple[str, int, dict]: (string_central, distancia_maxima, metadata)
         """
         max_d = self.params.get("max_d")
         if max_d is None:
             # Usa baseline como upper bound
             max_d = max_distance(self.strings[0], self.strings)
 
+        self._report_progress(f"Iniciando DP-CSP com max_d={max_d}")
+
         try:
             center, dist = exact_dp_closest_string(
                 self.strings,
                 self.alphabet,
                 max_d,
-                progress_callback=self.progress_callback,
+                progress_callback=self._report_progress,
             )
-            return center, dist
+
+            metadata = {
+                "iteracoes": 1,
+                "max_d_usado": max_d,
+                "solucao_exata": True,
+                "centro_encontrado": center,
+            }
+
+            return center, dist, metadata
         except RuntimeError:
             # Fallback para primeira string se falhar
-            return self.strings[0], max_distance(self.strings[0], self.strings)
+            self._report_warning("DP-CSP falhou, usando fallback para primeira string")
+            fallback_center = self.strings[0]
+            fallback_dist = max_distance(fallback_center, self.strings)
+
+            metadata = {
+                "iteracoes": 1,
+                "max_d_usado": max_d,
+                "solucao_exata": False,
+                "fallback_usado": True,
+                "centro_encontrado": fallback_center,
+            }
+
+            return fallback_center, fallback_dist, metadata
