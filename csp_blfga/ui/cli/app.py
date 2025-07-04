@@ -28,7 +28,7 @@ from csp_blfga.core.report.report_utils import print_quick_summary, save_detaile
 from csp_blfga.ui.cli.console_manager import console
 from csp_blfga.ui.cli.menu import menu, select_algorithms
 from csp_blfga.utils.config import ALGORITHM_TIMEOUT, safe_input
-from csp_blfga.utils.logging_utils import setup_logging
+from csp_blfga.utils.logging import setup_logging
 from csp_blfga.utils.resource_monitor import (
     check_algorithm_feasibility,
     get_safe_memory_limit,

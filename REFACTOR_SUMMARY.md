@@ -57,9 +57,16 @@
 
 ### T3-3: Atualizar README com nova árvore
 - ✅ Estrutura de diretórios completamente atualizada
-- ✅ Emojis e descrições claras adicionados
+- ✅ Emojis e descrições claras adicionadas
 - ✅ Seções reorganizadas para refletir nova arquitetura
 - ✅ Documentação das responsabilidades de cada módulo
+
+### T4-1 a T4-4: Padronização do Sistema de Logging
+- ✅ Arquivo `utils/logging_utils.py` verificado (já removido)
+- ✅ Arquivo `utils/logging.py` mantido como padrão
+- ✅ Assinatura padronizada: `setup_logging(base_name: str, silent: bool = False, debug: bool = False)`
+- ✅ Todos os imports já ajustados para usar `csp_blfga.utils.logging`
+- ✅ Documentação atualizada no README e REFACTOR_SUMMARY
 
 ## 📁 Nova Estrutura do Projeto
 
@@ -87,7 +94,7 @@ csp_blfga/
 └── utils/                   # Utilitários
     ├── config.py
     ├── distance.py
-    ├── logging_utils.py
+    ├── logging.py
     ├── resource_limits_config.py
     └── resource_monitor.py
 ```

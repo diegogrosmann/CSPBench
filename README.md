@@ -43,7 +43,7 @@ csp_blfga/                    # 📦 Pacote principal
 └── utils/                    # 🔧 Utilitários gerais
     ├── config.py            # Configurações globais
     ├── distance.py          # Funções de distância
-    ├── logging_utils.py     # Sistema de logging
+    ├── logging.py           # Sistema de logging padronizado
     ├── resource_monitor.py  # Monitoramento de recursos
     └── resource_limits_config.py # Configuração de limites
 
