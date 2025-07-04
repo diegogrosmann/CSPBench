@@ -88,7 +88,7 @@ def create_example_config():
                     "parametros": {"n": 10, "L": 50, "alphabet": "ACGT", "noise": 0.1},
                 },
                 "algoritmos": ["Baseline", "BLF-GA", "H³-CSP"],
-                "execucoes_por_algoritmo": 3,
+                "execucoes_por_algoritmo_por_base": 3,
                 "timeout": 300,
             },
             {
@@ -103,7 +103,7 @@ def create_example_config():
                     },
                 },
                 "algoritmos": ["Baseline", "BLF-GA", "CSC"],
-                "execucoes_por_algoritmo": 3,
+                "execucoes_por_algoritmo_por_base": 3,
                 "timeout": 600,
             },
             {
@@ -113,7 +113,7 @@ def create_example_config():
                     "parametros": {"filepath": "saved_datasets/sequences.fasta"},
                 },
                 "algoritmos": ["Baseline", "BLF-GA"],
-                "execucoes_por_algoritmo": 3,
+                "execucoes_por_algoritmo_por_base": 3,
                 "timeout": 900,
             },
         ],

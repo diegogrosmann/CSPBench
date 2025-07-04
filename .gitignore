@@ -6,3 +6,4 @@ results
 saved_datasets
 batch_configs
 .pytest_cache
+.ruff_cache

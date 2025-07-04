@@ -1,3 +1,0 @@
-algoritmo,execucao,melhor_string,distancia,tempo,status,erro,distancia_string_base,seed,n,L,alphabet
-algoritmo_teste,1,ACGT,3,0.5,sucesso,,,,5,4,ACGT
-algoritmo_teste,2,ACGG,2,0.3,sucesso,,,,5,4,ACGT
