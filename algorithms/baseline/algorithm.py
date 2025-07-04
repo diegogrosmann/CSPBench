@@ -4,8 +4,11 @@ Algoritmo de consenso ganancioso (Baseline) para o Closest String Problem.
 Classes:
     BaselineAlg: Implementação do algoritmo baseline.
 """
+
 from algorithms.base import Algorithm, register_algorithm
+
 from .implementation import greedy_consensus, max_distance
+
 
 @register_algorithm
 class BaselineAlg(Algorithm):
@@ -19,6 +22,7 @@ class BaselineAlg(Algorithm):
     Métodos:
         run(): Executa o algoritmo e retorna (centro, distância máxima).
     """
+
     name = "Baseline"
     default_params: dict = {}
     is_deterministic = True

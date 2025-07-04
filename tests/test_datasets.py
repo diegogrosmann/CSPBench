@@ -1,5 +1,5 @@
 import pytest
-import io
+
 from datasets.dataset_file import _load_fasta, _load_text, load_dataset_with_params
 from datasets.dataset_utils import ask_save_dataset
 
@@ -19,6 +19,7 @@ def test_load_fasta_and_text(tmp_path):
     txt2.write_text("1234\nACGT\n!!@@\n")
     seqs3 = _load_text(txt2)
     assert seqs3 == ["ACGT"]
+
 
 def test_load_dataset_with_params(tmp_path):
     fasta = tmp_path / "valid.fasta"
@@ -41,10 +42,18 @@ def test_load_dataset_with_params(tmp_path):
     with pytest.raises(ValueError):
         load_dataset_with_params(params3)
 
+
 def test_ask_save_dataset(monkeypatch, tmp_path):
     monkeypatch.setattr("builtins.input", lambda _: "s")
     seqs = ["ACGT", "TGCA"]
-    params = {"n": 2, "L": 4, "alphabet": "ACGT", "noise": 0.1, "term": "test", "db": "nucleotide"}
+    params = {
+        "n": 2,
+        "L": 4,
+        "alphabet": "ACGT",
+        "noise": 0.1,
+        "term": "test",
+        "db": "nucleotide",
+    }
     assert ask_save_dataset(seqs, "synthetic", params)
     assert ask_save_dataset(seqs, "entrez", params)
     assert ask_save_dataset(seqs, "custom", params)
@@ -53,6 +62,9 @@ def test_ask_save_dataset(monkeypatch, tmp_path):
     assert not ask_save_dataset(seqs, "synthetic", params)
 
     monkeypatch.setattr("builtins.input", lambda _: "s")
-    def fail_save(*a, **kw): raise Exception("fail")
+
+    def fail_save(*a, **kw):
+        raise Exception("fail")
+
     monkeypatch.setattr("datasets.dataset_utils.save_dataset_fasta", fail_save)
     assert not ask_save_dataset(seqs, "synthetic", params)

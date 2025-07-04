@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 """
 Implementação exata do DP-CSP (Programação Dinâmica) para o Closest String Problem.
 
@@ -18,46 +19,46 @@ o menor raio possível até um limite superior fornecido.
 """
 
 import logging
-from typing import Dict, List, Optional, Sequence, Tuple, cast, Callable
+from collections.abc import Callable, Sequence
+from typing import cast
 
-from utils.distance import max_hamming
-from utils.resource_monitor import get_safe_memory_limit, force_garbage_collection
+from csp_blfga.utils.distance import max_hamming
+from csp_blfga.utils.resource_monitor import get_safe_memory_limit
+
 from .config import DP_CSP_DEFAULTS
 
 logger = logging.getLogger(__name__)
 
 String = str
-RemVec = Tuple[int, ...]          # vetor de erros restantes p/ cada string
+RemVec = tuple[int, ...]  # vetor de erros restantes p/ cada string
 
 
 # ----------------------------------------------------------------------
 # DP decisório: existe centro com raio ≤ d?
 # ----------------------------------------------------------------------
 
-def _dp_decision(strings: Sequence[String],
-                 alphabet: str,
-                 d: int) -> Optional[String]:
+
+def _dp_decision(strings: Sequence[String], alphabet: str, d: int) -> String | None:
     """
     Se existir string-centro c com raio ≤ d, devolve uma delas; caso
     contrário retorna None.
     """
     n, L = len(strings), len(strings[0])
-    
+
     # Logs removidos para reduzir verbosidade
-    
+
     # Pré-cálculo δσ[pos] = vetor 0/1 indicando discrepâncias
-    delta: List[Dict[String, RemVec]] = []
+    delta: list[dict[String, RemVec]] = []
     for pos in range(L):
         col = [s[pos] for s in strings]
         delta.append({σ: tuple(int(σ != c) for c in col) for σ in alphabet})
 
     start: RemVec = (d,) * n
     frontier: set[RemVec] = {start}
-    parent: Dict[Tuple[int, RemVec],
-                 Tuple[Optional[RemVec], String]] = {
-        (0, start): (None, '')       # (prev_rem, char usado para chegar aqui)
+    parent: dict[tuple[int, RemVec], tuple[RemVec | None, String]] = {
+        (0, start): (None, "")  # (prev_rem, char usado para chegar aqui)
     }
-    
+
     # Estado inicial silencioso
 
     for pos in range(L):
@@ -80,37 +81,38 @@ def _dp_decision(strings: Sequence[String],
                 # Estado adicionado silenciosamente
         frontier = nxt
         # Nova fronteira processada silenciosamente
-        if not frontier:              # nenhum estado viável
+        if not frontier:  # nenhum estado viável
             # Solução inviável - retorno silencioso
             return None
 
     # Reconstrução -------------------------------------------------------
     final_rem = next(iter(frontier))
     # Reconstrução silenciosa da solução
-    
-    center_chars: List[String] = []
+
+    center_chars: list[String] = []
     pos: int = L
-    rem: RemVec = final_rem         # rem nunca é None dentro do loop
+    rem: RemVec = final_rem  # rem nunca é None dentro do loop
 
     while pos > 0:
         prev_rem, σ = parent[(pos, rem)]
         center_chars.append(σ)
         # Caractere escolhido silenciosamente
         pos -= 1
-        if prev_rem is None:         # chegamos ao estado inicial
+        if prev_rem is None:  # chegamos ao estado inicial
             break
         rem = cast(RemVec, prev_rem)  # garante tipo para o próximo acesso
 
     center_chars.reverse()
-    result = ''.join(center_chars)
+    result = "".join(center_chars)
     # Solução reconstruída silenciosamente
-    
+
     # Validação silenciosa
-    from utils.distance import hamming_distance
+    from csp_blfga.utils.distance import hamming_distance
+
     max_dist = max(hamming_distance(result, s) for s in strings)
     if max_dist > d:
         logger.error(f"[DP_DECISION] ERRO: Solução inválida! dist={max_dist} > d={d}")
-    
+
     return result
 
 
@@ -118,47 +120,54 @@ def _dp_decision(strings: Sequence[String],
 # Interface principal
 # ----------------------------------------------------------------------
 
-def exact_dp_closest_string(strings: List[String],
-                            alphabet: str,
-                            max_d: Optional[int] = None,
-                            progress_callback: Optional[Callable[[str], None]] = None,
-                            warning_callback: Optional[Callable[[str], None]] = None
-                            ) -> Tuple[String, int]:
+
+def exact_dp_closest_string(
+    strings: list[String],
+    alphabet: str,
+    max_d: int | None = None,
+    progress_callback: Callable[[str], None] | None = None,
+    warning_callback: Callable[[str], None] | None = None,
+) -> tuple[String, int]:
     """
     Busca o menor raio d* ≤ max_d tal que exista string-centro.
     Retorna (centro, d*).  Levanta RuntimeError se não encontrar.
     Monitora memória e tempo para evitar travamento.
     """
     import time
+
     baseline_val = max_hamming(strings[0], strings)  # cota superior simples
     if max_d is None:
         max_d = baseline_val
 
     n = len(strings)
-    
+
     # LOG DETALHADO: Parâmetros de entrada
-    logger.info(f"[DP_CSP] Iniciando busca exata com max_d={max_d}, baseline={baseline_val}")
+    logger.info(
+        f"[DP_CSP] Iniciando busca exata com max_d={max_d}, baseline={baseline_val}"
+    )
     logger.info(f"[DP_CSP] Dataset: n={n}, L={len(strings[0])}, alfabeto={alphabet}")
     for i, s in enumerate(strings):
         logger.info(f"[DP_CSP] String {i}: {s}")
 
     # --- Monitoramento de recursos ---
     safe_mem_mb = get_safe_memory_limit()
-    max_time = DP_CSP_DEFAULTS.get('max_time', 300)
+    max_time = DP_CSP_DEFAULTS.get("max_time", 300)
     t0 = time.time()
-    
+
     logger.info(f"[DP_CSP] Limites: mem={safe_mem_mb:.1f}MB, tempo={max_time}s")
 
     def check_limits(d):
         # Checa memória, tempo e viabilidade incrementalmente
-        import os, gc
+        import gc
+        import os
+
         gc.collect()
         mem_mb = 0.0
         try:
-            if os.path.exists('/proc/self/status'):
-                with open('/proc/self/status', 'r') as f:
+            if os.path.exists("/proc/self/status"):
+                with open("/proc/self/status") as f:
                     for line in f:
-                        if line.startswith('VmRSS:'):
+                        if line.startswith("VmRSS:"):
                             kb = int(line.split()[1])
                             mem_mb = kb / 1024.0
                             break
@@ -168,10 +177,12 @@ def exact_dp_closest_string(strings: List[String],
         # Limite prático para (d+1)^n: ~2e9 (16GB RAM, 8 bytes/estado)
         state_count_est = (d + 1) ** n
         # Verificação silenciosa de recursos
-        
+
         if state_count_est > 2_000_000_000:
-            msg = (f"DP-CSP interrompido: (d+1)^n = {state_count_est:,} excede limite prático "
-                   "(~2e9 estados, ~16GB RAM). Tente reduzir n ou d.")
+            msg = (
+                f"DP-CSP interrompido: (d+1)^n = {state_count_est:,} excede limite prático "
+                "(~2e9 estados, ~16GB RAM). Tente reduzir n ou d."
+            )
             logger.error(f"[DP_CSP] {msg}")
             if warning_callback:
                 warning_callback(msg)
@@ -195,24 +206,27 @@ def exact_dp_closest_string(strings: List[String],
         if progress_callback:
             progress_callback(f"Testando d={d}")
         logger.info(f"[DP_CSP] Testando d={d} (tentativa {d+1}/{max_d+1})")
-        
+
         center = _dp_decision(strings, alphabet, d)
         if center is not None:
             # VALIDAÇÃO FINAL: Verificar se a solução está correta
-            from utils.distance import hamming_distance
+            from csp_blfga.utils.distance import hamming_distance
+
             max_dist = max(hamming_distance(center, s) for s in strings)
             logger.info(f"[DP_CSP] SUCESSO! Encontrou solução com d={d}")
             logger.info(f"[DP_CSP] Centro encontrado: {center}")
             logger.info(f"[DP_CSP] Validação final: distância máxima = {max_dist}")
-            
+
             if max_dist != d:
-                logger.warning(f"[DP_CSP] INCONSISTÊNCIA: d={d} mas distância real={max_dist}")
-            
+                logger.warning(
+                    f"[DP_CSP] INCONSISTÊNCIA: d={d} mas distância real={max_dist}"
+                )
+
             return center, d
         else:
             # Nenhuma solução encontrada - processamento silencioso
             pass
-    
+
     logger.error(f"[DP_CSP] FALHA: Não foi possível encontrar centro com d ≤ {max_d}")
     raise RuntimeError(
         f"Não foi possível encontrar centro com d ≤ {max_d}. "

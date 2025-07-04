@@ -4,11 +4,15 @@ DP-CSP: Dynamic Programming exata para o Closest String Problem.
 Classes:
     DPCSPAlgorithm: Implementação do algoritmo exato por programação dinâmica.
 """
-from typing import Callable
+
+from collections.abc import Callable
+
 from algorithms.base import Algorithm, register_algorithm
+from csp_blfga.utils.distance import max_hamming
+
 from .config import DP_CSP_DEFAULTS
 from .implementation import exact_dp_closest_string
-from utils.distance import max_hamming
+
 
 @register_algorithm
 class DPCSPAlgorithm(Algorithm):
@@ -24,6 +28,7 @@ class DPCSPAlgorithm(Algorithm):
         set_progress_callback(callback): Define callback de progresso.
         run(): Executa o DP-CSP e retorna (centro, distância máxima).
     """
+
     name = "DP-CSP"
     default_params = DP_CSP_DEFAULTS
     is_deterministic = True
@@ -50,17 +55,17 @@ class DPCSPAlgorithm(Algorithm):
         Returns:
             tuple[str, int]: (string_central, distancia_maxima)
         """
-        max_d = self.params.get('max_d')
+        max_d = self.params.get("max_d")
         if max_d is None:
             # Usa baseline como upper bound
             max_d = max_hamming(self.strings[0], self.strings)
-        
+
         try:
             center, dist = exact_dp_closest_string(
-                self.strings, 
-                self.alphabet, 
+                self.strings,
+                self.alphabet,
                 max_d,
-                progress_callback=self.progress_callback
+                progress_callback=self.progress_callback,
             )
             return center, dist
         except RuntimeError:

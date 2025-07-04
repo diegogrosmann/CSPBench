@@ -12,10 +12,11 @@ Atributos:
 """
 
 from abc import ABC, abstractmethod
-from typing import Callable
+from collections.abc import Callable
 
 # Registry for all algorithms
 global_registry: dict[str, type] = {}
+
 
 def register_algorithm(cls: type) -> type:
     """
@@ -26,9 +27,10 @@ def register_algorithm(cls: type) -> type:
     Returns:
         type: A própria classe, para uso como decorador.
     """
-    name = getattr(cls, 'name', cls.__name__)
+    name = getattr(cls, "name", cls.__name__)
     global_registry[name] = cls
     return cls
+
 
 class Algorithm(ABC):
     """
@@ -43,6 +45,7 @@ class Algorithm(ABC):
         - __init__(self, strings, alphabet, **params)
         - run(self) -> tuple[str, int]
     """
+
     name: str
     default_params: dict
     is_deterministic: bool = False
@@ -59,13 +62,16 @@ class Algorithm(ABC):
         """
         pass
 
-    def set_progress_callback(self, callback: Callable[[str], None]) -> None:
+    def set_progress_callback(
+        self, callback: Callable[[str], None]
+    ) -> None:  # noqa: B027
         """
         (Opcional) Define um callback para relatar o progresso do algoritmo.
 
         Args:
             callback (Callable[[str], None]): Função de callback.
         """
+        # Implementação opcional - subclasses podem sobrescrever
         pass
 
     @abstractmethod

@@ -4,10 +4,13 @@ CSC: Consensus String Clustering para CSP.
 Classes:
     CSCAlgorithm: Implementação do algoritmo CSC.
 """
+
 from algorithms.base import Algorithm, register_algorithm
+from csp_blfga.utils.distance import max_hamming
+
 from .config import CSC_DEFAULTS
 from .implementation import heuristic_closest_string
-from utils.distance import max_hamming
+
 
 @register_algorithm
 class CSCAlgorithm(Algorithm):
@@ -22,6 +25,7 @@ class CSCAlgorithm(Algorithm):
     Métodos:
         run(): Executa o CSC e retorna (centro, distância máxima).
     """
+
     name = "CSC"
     default_params = CSC_DEFAULTS
 
@@ -38,9 +42,7 @@ class CSCAlgorithm(Algorithm):
             tuple[str, int]: (string_central, distancia_maxima)
         """
         center = heuristic_closest_string(
-            self.strings, 
-            d=self.params.get('d'),
-            n_blocks=self.params.get('n_blocks')
+            self.strings, d=self.params.get("d"), n_blocks=self.params.get("n_blocks")
         )
         if center:
             dist = max_hamming(center, self.strings)

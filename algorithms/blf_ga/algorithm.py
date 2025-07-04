@@ -5,10 +5,13 @@ Classes:
     BLFGAAlgorithm: Wrapper para integração do BLF-GA ao framework CSP.
 """
 
-from typing import Callable
+from collections.abc import Callable
+
 from algorithms.base import Algorithm, register_algorithm
+
 from .config import BLF_GA_DEFAULTS
 from .implementation import BLFGA
+
 
 @register_algorithm
 class BLFGAAlgorithm(Algorithm):
@@ -24,6 +27,7 @@ class BLFGAAlgorithm(Algorithm):
         set_progress_callback(callback): Define callback de progresso.
         run(): Executa o BLF-GA e retorna (centro, distância máxima).
     """
+
     name = "BLF-GA"
     default_params = BLF_GA_DEFAULTS
 

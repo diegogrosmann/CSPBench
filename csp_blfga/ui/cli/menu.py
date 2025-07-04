@@ -6,10 +6,12 @@ Funções:
     select_algorithms(): Exibe menu de algoritmos e retorna lista selecionada.
 """
 
+import os
+
 from algorithms.base import global_registry
 from src.console_manager import console
 from utils.config import safe_input
-import os
+
 
 def menu() -> str:
     """
@@ -19,7 +21,7 @@ def menu() -> str:
         str: Opção escolhida pelo usuário ('1', '2', '3' ou '4').
     """
     if os.environ.get("CSP_AUTOMATED_TEST") == "1":
-        return '1'  # Gerar dataset sintético
+        return "1"  # Gerar dataset sintético
     console.print("\n=== Closest String Problem ===")
     console.print("1) Gerar dataset sintético")
     console.print("2) Carregar dataset de arquivo")
@@ -27,9 +29,10 @@ def menu() -> str:
     console.print("4) Execução em lote (batch)")
     while True:
         c = safe_input("Escolha [1/2/3/4]: ")
-        if c in {'1', '2', '3', '4'}:
+        if c in {"1", "2", "3", "4"}:
             return c
         console.print("Inválido.")
+
 
 def select_algorithms() -> list[str]:
     """
@@ -47,15 +50,15 @@ def select_algorithms() -> list[str]:
     for idx, name in enumerate(all_algs, 1):
         console.print(f" {idx}) {name}")
     selected = []
-    
+
     raw = safe_input("Escolha (ex.: 1,3 ou 0 para todos) [padrão 1]: ")
     if not raw:
         return [all_algs[0]] if all_algs else []
-    if raw == '0':
+    if raw == "0":
         return all_algs
-    for part in raw.split(','):
+    for part in raw.split(","):
         if part.strip().isdigit():
             i = int(part)
             if 1 <= i <= len(all_algs):
-                selected.append(all_algs[i-1])
+                selected.append(all_algs[i - 1])
     return selected

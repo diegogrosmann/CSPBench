@@ -1,0 +1,116 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "csp-blfga"
+version = "1.0.0"
+description = "Closest String Problem - Bottom-Left-Fill Genetic Algorithm"
+readme = "README.md"
+requires-python = ">=3.12"
+license = {text = "MIT"}
+authors = [
+    {name = "Diego Grosmann", email = "diego.grosmann@example.com"},
+]
+keywords = ["genetic-algorithm", "bioinformatics", "optimization", "closest-string-problem"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    "numpy>=1.21.0",
+    "rich>=10.0.0",
+    "pyyaml>=6.0",
+    "psutil>=5.8.0",
+    "biopython>=1.79",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "black>=23.0.0",
+    "isort>=5.0.0",
+    "ruff>=0.1.0",
+    "pre-commit>=3.0.0",
+]
+
+[project.scripts]
+csp-blfga = "csp_blfga.cli:main"
+
+[project.urls]
+"Homepage" = "https://github.com/diego-grosmann/csp-blfga"
+"Bug Reports" = "https://github.com/diego-grosmann/csp-blfga/issues"
+"Source" = "https://github.com/diego-grosmann/csp-blfga"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["csp_blfga*"]
+exclude = ["tests*"]
+
+[tool.black]
+line-length = 88
+target-version = ['py312']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | _build
+  | buck-out
+  | build
+  | dist
+)/
+'''
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+include_trailing_comma = true
+force_grid_wrap = 0
+use_parentheses = true
+ensure_newline_before_comments = true
+line_length = 88
+
+[tool.ruff]
+target-version = "py312"
+line-length = 88
+
+[tool.ruff.lint]
+select = [
+    "E",  # pycodestyle errors
+    "W",  # pycodestyle warnings
+    "F",  # pyflakes
+    "I",  # isort
+    "B",  # flake8-bugbear
+    "C4", # flake8-comprehensions
+    "UP", # pyupgrade
+]
+ignore = [
+    "E501",  # line too long, handled by black
+    "B008",  # do not perform function calls in argument defaults
+    "C901",  # too complex
+    "E402",  # module level import not at top of file
+    "B023",  # function definition does not bind loop variable
+    "E741",  # ambiguous variable name
+    "B905",  # zip without strict parameter
+    "F841",  # local variable assigned but never used
+    "B007",  # loop control variable not used
+    "B904",  # raise exceptions with from
+]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]
+"algorithms/base.py" = ["B027"]
+"algorithms/**" = ["E402", "E741", "B905", "F841", "B007"]
+"datasets/**" = ["E402", "B904"]
+"tests/**" = ["B011", "UP022"]

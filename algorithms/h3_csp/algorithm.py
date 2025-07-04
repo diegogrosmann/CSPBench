@@ -4,10 +4,14 @@ H³-CSP: Hybrid Hierarchical Hamming Search para CSP.
 Classes:
     H3CSPAlgorithm: Wrapper para integração do H³-CSP ao framework CSP.
 """
-from typing import Callable
+
+from collections.abc import Callable
+
 from algorithms.base import Algorithm, register_algorithm
+
 from .config import H3_CSP_DEFAULTS
 from .implementation import H3CSP
+
 
 @register_algorithm
 class H3CSPAlgorithm(Algorithm):
@@ -23,6 +27,7 @@ class H3CSPAlgorithm(Algorithm):
         set_progress_callback(callback): Define callback de progresso.
         run(): Executa o H³-CSP e retorna (centro, distância máxima).
     """
+
     name = "H³-CSP"
     default_params = H3_CSP_DEFAULTS
 
