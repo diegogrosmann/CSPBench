@@ -672,6 +672,15 @@ class BatchExecutor:
         )
 
         # Salvamento de arquivo README com metadados do lote
+        self._create_batch_readme(batch_result)
+
+    def _create_batch_readme(self, batch_result: dict) -> None:
+        """
+        Cria arquivo README com metadados do lote.
+
+        Args:
+            batch_result: Resultado do lote para incluir no README.
+        """
         readme_path = self.results_dir / "README.md"
         with open(readme_path, "w", encoding="utf-8") as f:
             f.write(
@@ -686,46 +695,10 @@ class BatchExecutor:
             f.write(f"**ID do lote**: {self.batch_id}\n")
             f.write(f"**Tempo total**: {batch_result['tempo_total']:.1f} segundos\n")
             f.write(
-                f"**Taxa de sucesso**: {batch_result['resumo']['taxa_sucesso']:.1f}%\n\n"
-            )
-            f.write("## Arquivos\n\n")
-            f.write(f"- `{json_filename}`: Resultados detalhados em formato JSON\n")
-            f.write(
-                f"- `{consolidated_filename}`: Relatório consolidado de todos algoritmos\n"
-            )
-            f.write("- Arquivos individuais: Relatórios por base de dados\n")
-
-        console.print(f"📝 README criado: {self.results_dir / 'README.md'}")
-        # Relatório consolidado de algoritmos
-        consolidated_filename = "consolidated_algorithms.txt"
-        consolidated_path = self.results_dir / consolidated_filename
-        self.consolidated_formatter.save_detailed_report(str(consolidated_path))
-        console.print(
-            f"📄 Relatório consolidado salvo: {self.results_dir / consolidated_filename}"
-        )
-
-        # Salvamento de arquivo README com metadados do lote
-        readme_path = self.results_dir / "README.md"
-        with open(readme_path, "w", encoding="utf-8") as f:
-            f.write(
-                f"# Resultados do Lote: {self.batch_info.get('nome', 'Sem nome')}\n\n"
+                f"**Configurações**: {len(batch_result['execucoes'])} configurações\n"
             )
             f.write(
-                f"**Descrição**: {self.batch_info.get('descricao', 'Sem descrição')}\n\n"
+                f"**Algoritmos**: {len(self.consolidated_formatter.results)} algoritmos\n"
             )
-            f.write(
-                f"**Data de execução**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
-            )
-            f.write(f"**ID do lote**: {self.batch_id}\n")
-            f.write(f"**Tempo total**: {batch_result['tempo_total']:.1f} segundos\n")
-            f.write(
-                f"**Taxa de sucesso**: {batch_result['resumo']['taxa_sucesso']:.1f}%\n\n"
-            )
-            f.write("## Arquivos\n\n")
-            f.write(f"- `{json_filename}`: Resultados detalhados em formato JSON\n")
-            f.write(
-                f"- `{consolidated_filename}`: Relatório consolidado de todos algoritmos\n"
-            )
-            f.write("- Arquivos individuais: Relatórios por base de dados\n")
 
         console.print(f"📝 README criado: {self.results_dir / 'README.md'}")

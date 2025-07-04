@@ -20,7 +20,7 @@ import time
 from collections import Counter
 from collections.abc import Callable, Sequence
 
-from csp_blfga.utils.distance import max_hamming
+from csp_blfga.utils.distance import max_distance
 
 from .config import H3_CSP_DEFAULTS
 
@@ -76,7 +76,7 @@ def _exhaustive_block(
         # Bloco processado silenciosamente
         for cand_tuple in itertools.product(alphabet, repeat=m):
             cand = "".join(cand_tuple)
-            dist = max_hamming(cand, [s[l:r] for s in strings])
+            dist = max_distance(cand, [s[l:r] for s in strings])
             if len(bests) < k or dist < bests[-1][0]:
                 bests.append((dist, cand))
                 bests.sort(key=lambda x: x[0])
@@ -89,14 +89,14 @@ def _exhaustive_block(
             blk = s[l:r]
             if blk not in seen:
                 seen.add(blk)
-                dist = max_hamming(blk, [t[l:r] for t in strings])
+                dist = max_distance(blk, [t[l:r] for t in strings])
                 bests.append((dist, blk))
         bests.sort(key=lambda x: x[0])
         bests = bests[:k]
 
     # Garante inclusão do consenso
     cons = consensus_block(strings, l, r)
-    bests.append((max_hamming(cons, [s[l:r] for s in strings]), cons))
+    bests.append((max_distance(cons, [s[l:r] for s in strings]), cons))
     bests.sort(key=lambda x: x[0])
     return [c for _, c in bests[:k]]
 
@@ -126,7 +126,7 @@ def _beam_search_block(
         beam = [s for _, s in scored[:beam_width]]
 
     # Score final em todo bloco
-    final_scored = [(max_hamming(c, [s[l:r] for s in strings]), c) for c in beam]
+    final_scored = [(max_distance(c, [s[l:r] for s in strings]), c) for c in beam]
     final_scored.sort(key=lambda x: x[0])
     return [c for _, c in final_scored[:k]]
 
@@ -148,14 +148,14 @@ def _local_search(candidate: String, strings: Sequence[String]) -> String:
     improved = True
     while improved:
         improved = False
-        base_val = max_hamming("".join(cand_list), list(strings))
+        base_val = max_distance("".join(cand_list), list(strings))
         for i in range(L):
             cur_char = cand_list[i]
             for alt in alphabet_by_pos[i]:
                 if alt == cur_char:
                     continue
                 cand_list[i] = alt
-                new_val = max_hamming("".join(cand_list), list(strings))
+                new_val = max_distance("".join(cand_list), list(strings))
                 if new_val < base_val:
                     base_val = new_val
                     improved = True
@@ -207,7 +207,7 @@ class H3CSP:
         for l, r in self.blocks:
             # calcula d_b
             cons = consensus_block(self.strings, l, r)
-            d_b = max_hamming(cons, [s[l:r] for s in self.strings])
+            d_b = max_distance(cons, [s[l:r] for s in self.strings])
 
             if d_b <= small_limit:
                 cands = _exhaustive_block(self.strings, self.alphabet, l, r, k)
@@ -245,7 +245,7 @@ class H3CSP:
                 self.progress_callback("Fusão de blocos...")
             best_by_block = [cands[0] for cands in block_cands]
             center = self._fuse_blocks(best_by_block)
-            best_val = max_hamming(center, list(self.strings))
+            best_val = max_distance(center, list(self.strings))
 
             logger.info(f"[Fusão inicial] dist={best_val}")
 
@@ -257,7 +257,7 @@ class H3CSP:
                     self.progress_callback(f"Refinamento: iteração {it+1}")
 
                 center = _local_search(center, self.strings)
-                new_val = max_hamming(center, list(self.strings))
+                new_val = max_distance(center, list(self.strings))
                 if new_val < best_val:
                     logger.info(f"[Local] it={it+1}  {best_val}->{new_val}")
                     best_val = new_val

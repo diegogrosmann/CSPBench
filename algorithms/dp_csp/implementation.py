@@ -22,7 +22,7 @@ import logging
 from collections.abc import Callable, Sequence
 from typing import cast
 
-from csp_blfga.utils.distance import max_hamming
+from csp_blfga.utils.distance import max_distance
 from csp_blfga.utils.resource_monitor import get_safe_memory_limit
 
 from .config import DP_CSP_DEFAULTS
@@ -135,7 +135,7 @@ def exact_dp_closest_string(
     """
     import time
 
-    baseline_val = max_hamming(strings[0], strings)  # cota superior simples
+    baseline_val = max_distance(strings[0], strings)  # cota superior simples
     if max_d is None:
         max_d = baseline_val
 

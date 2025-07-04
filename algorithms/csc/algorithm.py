@@ -6,7 +6,7 @@ Classes:
 """
 
 from algorithms.base import Algorithm, register_algorithm
-from csp_blfga.utils.distance import max_hamming
+from csp_blfga.utils.distance import max_distance
 
 from .config import CSC_DEFAULTS
 from .implementation import heuristic_closest_string
@@ -45,8 +45,8 @@ class CSCAlgorithm(Algorithm):
             self.strings, d=self.params.get("d"), n_blocks=self.params.get("n_blocks")
         )
         if center:
-            dist = max_hamming(center, self.strings)
+            dist = max_distance(center, self.strings)
             return center, dist
         else:
             # Fallback para primeira string se falhar
-            return self.strings[0], max_hamming(self.strings[0], self.strings)
+            return self.strings[0], max_distance(self.strings[0], self.strings)

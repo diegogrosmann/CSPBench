@@ -8,7 +8,7 @@ Classes:
 from collections.abc import Callable
 
 from algorithms.base import Algorithm, register_algorithm
-from csp_blfga.utils.distance import max_hamming
+from csp_blfga.utils.distance import max_distance
 
 from .config import DP_CSP_DEFAULTS
 from .implementation import exact_dp_closest_string
@@ -58,7 +58,7 @@ class DPCSPAlgorithm(Algorithm):
         max_d = self.params.get("max_d")
         if max_d is None:
             # Usa baseline como upper bound
-            max_d = max_hamming(self.strings[0], self.strings)
+            max_d = max_distance(self.strings[0], self.strings)
 
         try:
             center, dist = exact_dp_closest_string(
@@ -70,4 +70,4 @@ class DPCSPAlgorithm(Algorithm):
             return center, dist
         except RuntimeError:
             # Fallback para primeira string se falhar
-            return self.strings[0], max_hamming(self.strings[0], self.strings)
+            return self.strings[0], max_distance(self.strings[0], self.strings)

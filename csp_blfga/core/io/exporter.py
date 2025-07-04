@@ -139,7 +139,7 @@ class CSPExporter:
                             base_params = b.get("params", {})
                             break
 
-                    # Se houver execuções detalhadas, exportar todas
+                    # Exportar execuções detalhadas
                     execucoes_detalhadas = result.get("execucoes_detalhadas")
                     if execucoes_detalhadas and isinstance(execucoes_detalhadas, list):
                         for exec_idx, exec_data in enumerate(execucoes_detalhadas, 1):
@@ -153,12 +153,6 @@ class CSPExporter:
                                 base_params,
                             )
                             rows.append(row)
-                    else:
-                        # Caso antigo: só resultado agregado
-                        row = self._create_batch_row(
-                            config_nome, alg, base_idx, 1, result, result, base_params
-                        )
-                        rows.append(row)
 
         self._write_batch_csv(csv_path, rows)
         self.logger.info(f"Batch exportado para CSV: {csv_path}")
@@ -216,10 +210,10 @@ class CSPExporter:
             "distancia_string_base",
         ]
 
-        csv_path = Path(csv_path)
-        csv_path.parent.mkdir(parents=True, exist_ok=True)
+        csv_file = Path(csv_path)
+        csv_file.parent.mkdir(parents=True, exist_ok=True)
 
-        with open(csv_path, "w", encoding="utf-8", newline="") as f:
+        with open(csv_file, "w", encoding="utf-8", newline="") as f:
             writer = csv.DictWriter(f, fieldnames=headers)
             writer.writeheader()
             for row in rows:

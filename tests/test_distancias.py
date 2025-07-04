@@ -1,4 +1,4 @@
-from csp_blfga.utils.distance import hamming_distance, max_hamming
+from csp_blfga.utils.distance import hamming_distance, max_distance
 
 
 def test_hamming_distance():
@@ -7,7 +7,7 @@ def test_hamming_distance():
     assert hamming_distance("ATAT", "TATA") == 4
 
 
-def test_max_hamming():
+def test_max_distance():
     strings = ["AAAA", "AAAT", "AATT", "TTTT"]
-    assert max_hamming("AAAA", strings) == 4
-    assert max_hamming("TTTT", strings) == 4
+    assert max_distance("AAAA", strings) == 4
+    assert max_distance("TTTT", strings) == 4

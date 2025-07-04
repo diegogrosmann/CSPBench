@@ -18,7 +18,7 @@ from itertools import combinations, product
 import numpy as np
 from sklearn.cluster import DBSCAN
 
-from csp_blfga.utils.distance import hamming_distance, max_hamming
+from csp_blfga.utils.distance import hamming_distance, max_distance
 
 from .config import CSC_DEFAULTS
 
@@ -196,7 +196,7 @@ def heuristic_closest_string(
         progress_callback(f"Avaliando {len(candidates)} candidatos...")
 
     # Avalia os candidatos e escolhe o melhor (menor raio máximo)
-    best_candidate = min(candidates, key=lambda cand: max_hamming(cand, strings))
+    best_candidate = min(candidates, key=lambda cand: max_distance(cand, strings))
     logger.info(f"Melhor candidato antes da busca local: {best_candidate}")
 
     if progress_callback:
@@ -232,7 +232,7 @@ def local_search(
                 new_candidate = candidate.copy()
                 new_candidate[i] = alt
                 new_candidate_str = "".join(new_candidate)
-                if max_hamming(new_candidate_str, strings) < max_hamming(
+                if max_distance(new_candidate_str, strings) < max_distance(
                     "".join(candidate), strings
                 ):
                     candidate[i] = alt

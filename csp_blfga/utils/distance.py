@@ -8,8 +8,6 @@ Funções:
     max_hamming_parallel(candidate, strings): Versão paralela para conjuntos grandes.
 """
 
-import concurrent.futures
-
 
 def hamming_distance(s1: str, s2: str) -> int:
     """Calcula a distância de Hamming entre duas strings."""
@@ -34,21 +32,4 @@ def max_distance(center: str, strings: list[str]) -> int:
         dist = hamming_distance(center, s)
         distances.append(dist)
 
-    return max(distances)
-
-
-def max_hamming(center: str, strings: list[str]) -> int:
-    """Alias para max_distance para compatibilidade."""
-    return max_distance(center, strings)
-
-
-def max_hamming_parallel(candidate, strings):
-    """
-    Calcula a maior distância de Hamming do candidato para o conjunto em paralelo.
-    """
-    # Executa hamming_distance em paralelo para cada string
-    with concurrent.futures.ProcessPoolExecutor() as executor:
-        distances = list(
-            executor.map(hamming_distance, [candidate] * len(strings), strings)
-        )
     return max(distances)

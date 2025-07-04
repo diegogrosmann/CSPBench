@@ -3,7 +3,7 @@ from algorithms.blf_ga.algorithm import BLFGAAlgorithm
 from algorithms.csc.algorithm import CSCAlgorithm
 from algorithms.dp_csp.algorithm import DPCSPAlgorithm
 from algorithms.h3_csp.algorithm import H3CSPAlgorithm
-from csp_blfga.utils.distance import max_hamming
+from csp_blfga.utils.distance import max_distance
 
 
 def get_simple_instance():
@@ -17,7 +17,7 @@ def test_baseline_algorithm():
     alg = BaselineAlg(strings, alphabet)
     center, dist = alg.run()
     assert len(center) == 4
-    assert dist == min(max_hamming(center, strings) for center in strings)
+    assert dist == min(max_distance(center, strings) for center in strings)
 
 
 def test_blfga_algorithm():
@@ -25,7 +25,7 @@ def test_blfga_algorithm():
     alg = BLFGAAlgorithm(strings, alphabet)
     center, dist = alg.run()
     assert len(center) == 4
-    assert dist <= max(max_hamming(center, strings) for center in strings)
+    assert dist <= max(max_distance(center, strings) for center in strings)
 
 
 def test_csc_algorithm():
@@ -33,7 +33,7 @@ def test_csc_algorithm():
     alg = CSCAlgorithm(strings, alphabet)
     center, dist = alg.run()
     assert len(center) == 4
-    assert dist <= max(max_hamming(center, strings) for center in strings)
+    assert dist <= max(max_distance(center, strings) for center in strings)
 
 
 def test_dp_csp_algorithm():
@@ -42,7 +42,7 @@ def test_dp_csp_algorithm():
     center, dist = alg.run()
     assert len(center) == 4
     # Verificar se a distância retornada é correta
-    actual_dist = max_hamming(center, strings)
+    actual_dist = max_distance(center, strings)
     assert dist == actual_dist
 
 
@@ -51,4 +51,4 @@ def test_h3_csp_algorithm():
     alg = H3CSPAlgorithm(strings, alphabet)
     center, dist = alg.run()
     assert len(center) == 4
-    assert dist <= max(max_hamming(center, strings) for center in strings)
+    assert dist <= max(max_distance(center, strings) for center in strings)

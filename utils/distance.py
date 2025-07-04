@@ -4,8 +4,8 @@ Funções de distância compartilhadas entre algoritmos CSP.
 Funções:
     hamming_distance(s1, s2): Calcula a distância de Hamming entre duas strings.
     max_distance(center, strings): Maior distância de Hamming do centro para o conjunto.
-    max_hamming(center, strings): Alias para max_distance.
-    max_hamming_parallel(candidate, strings): Versão paralela para conjuntos grandes.
+    max_distance(center, strings): Alias para max_distance.
+    max_distance_parallel(candidate, strings): Versão paralela para conjuntos grandes.
 """
 
 import concurrent.futures
@@ -37,12 +37,7 @@ def max_distance(center: str, strings: list[str]) -> int:
     return max(distances)
 
 
-def max_hamming(center: str, strings: list[str]) -> int:
-    """Alias para max_distance para compatibilidade."""
-    return max_distance(center, strings)
-
-
-def max_hamming_parallel(candidate, strings):
+def max_distance_parallel(candidate, strings):
     """
     Calcula a maior distância de Hamming do candidato para o conjunto em paralelo.
     """
