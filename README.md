@@ -155,3 +155,4 @@ pip install -r requirements.txt
 ### Observações sobre o main.py
 
 O arquivo `main.py` está totalmente documentado com docstrings no estilo Google, detalhando o fluxo, parâmetros e retornos de cada função. Consulte o código para detalhes de uso programático e integração.
+# Test
