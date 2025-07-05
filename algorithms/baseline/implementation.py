@@ -50,7 +50,7 @@ def greedy_consensus(strings: list[str], alphabet: str) -> str:
     result = "".join(consensus)
 
     # VALIDAÇÃO: Verificar a distância do consenso
-    from csp_blfga.utils.distance import max_distance
+    from src.utils.distance import max_distance
 
     final_distance = max_distance(result, strings)
     logger.info(f"[CONSENSUS] Consenso: {result}, distância: {final_distance}")
@@ -68,7 +68,7 @@ def max_distance(center: str, strings: list[str]) -> int:
     Returns:
         int: Maior distância de Hamming encontrada.
     """
-    from csp_blfga.utils.distance import hamming_distance
+    from src.utils.distance import hamming_distance
 
     distances = [hamming_distance(center, s) for s in strings]
     return max(distances)

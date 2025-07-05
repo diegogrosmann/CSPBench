@@ -3,7 +3,7 @@ from algorithms.blf_ga.algorithm import BLFGAAlgorithm
 from algorithms.csc.algorithm import CSCAlgorithm
 from algorithms.dp_csp.algorithm import DPCSPAlgorithm
 from algorithms.h3_csp.algorithm import H3CSPAlgorithm
-from csp_blfga.utils.distance import max_distance
+from src.utils.distance import max_distance
 
 
 def get_simple_instance():

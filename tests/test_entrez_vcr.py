@@ -8,7 +8,7 @@ evitando chamadas reais à API durante os testes.
 import pytest
 import vcr
 
-from datasets.dataset_entrez import fetch_dataset_with_params
+from src.datasets.dataset_entrez import fetch_dataset_with_params
 
 
 class TestDatasetEntrez:

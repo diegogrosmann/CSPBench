@@ -37,7 +37,7 @@ BLF_GA_DEFAULTS = {
     "refine_elites": "best",  # all, best
     "refine_iter_limit": 100,  # Limite de iterações por refinamento
     # --- Critérios de Parada e Reinício ---
-    "max_gens": 400,  # Número máximo de gerações (30 a 100+)
+    "max_gens": 100,  # Número máximo de gerações (30 a 100+)
     "max_time": 1200.0,  # Tempo máximo em segundos
     "no_improve_patience": 0.2,  # Gerações sem melhoria para encerrar (int fixo ou float 0-1 para proporção de max_gens)
     "restart_patience": 20,  # Gerações sem melhoria para restart

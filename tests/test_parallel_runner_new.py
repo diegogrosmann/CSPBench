@@ -10,11 +10,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from csp_blfga.core.exec.parallel_runner import (
-    ParallelRunner,
-    execute_algorithms_parallel,
-)
-from csp_blfga.utils.signal_manager import get_signal_manager
+from src.core.exec.parallel_runner import ParallelRunner, execute_algorithms_parallel
+from src.utils.signal_manager import get_signal_manager
 
 
 class TestParallelRunner:
@@ -127,7 +124,7 @@ class TestParallelRunner:
         # BLF-GA pode ou não dar timeout dependendo da máquina
         assert "BLF-GA" in results
 
-    @patch("csp_blfga.utils.signal_manager.is_interrupted")
+    @patch("src.utils.signal_manager.is_interrupted")
     def test_execute_algorithms_interrupted(self, mock_is_interrupted):
         """Testa execução interrompida por sinal."""
         # Simular interrupção depois do primeiro algoritmo

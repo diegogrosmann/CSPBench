@@ -22,8 +22,8 @@ import logging
 from collections.abc import Callable, Sequence
 from typing import cast
 
-from csp_blfga.utils.distance import max_distance
-from csp_blfga.utils.resource_monitor import get_safe_memory_limit
+from src.utils.distance import max_distance
+from src.utils.resource_monitor import get_safe_memory_limit
 
 from .config import DP_CSP_DEFAULTS
 
@@ -107,7 +107,7 @@ def _dp_decision(strings: Sequence[String], alphabet: str, d: int) -> String | N
     # Solução reconstruída silenciosamente
 
     # Validação silenciosa
-    from csp_blfga.utils.distance import hamming_distance
+    from src.utils.distance import hamming_distance
 
     max_dist = max(hamming_distance(result, s) for s in strings)
     if max_dist > d:
@@ -208,7 +208,7 @@ def exact_dp_closest_string(
         center = _dp_decision(strings, alphabet, d)
         if center is not None:
             # VALIDAÇÃO FINAL: Verificar se a solução está correta
-            from csp_blfga.utils.distance import hamming_distance
+            from src.utils.distance import hamming_distance
 
             max_dist = max(hamming_distance(center, s) for s in strings)
             logger.info(f"[DP_CSP] SUCESSO! Encontrou solução com d={d}")

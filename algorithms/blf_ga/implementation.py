@@ -27,7 +27,7 @@ from collections.abc import Callable
 
 import numpy as np
 
-from csp_blfga.utils.distance import hamming_distance, max_distance
+from src.utils.distance import hamming_distance, max_distance
 
 from .config import BLF_GA_DEFAULTS
 from .ops import genetic_ops

@@ -1,4 +1,4 @@
-from csp_blfga.utils.distance import hamming_distance, max_distance
+from src.utils.distance import hamming_distance, max_distance
 
 
 def test_hamming_distance():

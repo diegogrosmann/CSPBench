@@ -20,7 +20,7 @@ import time
 from collections import Counter
 from collections.abc import Callable, Sequence
 
-from csp_blfga.utils.distance import max_distance
+from src.utils.distance import max_distance
 
 from .config import H3_CSP_DEFAULTS
 

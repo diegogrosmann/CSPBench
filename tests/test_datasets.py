@@ -1,8 +1,8 @@
 import pytest
 
-from csp_blfga.core.io import load_fasta, load_txt
-from datasets.dataset_file import load_dataset_with_params
-from datasets.dataset_utils import ask_save_dataset
+from src.core.io import load_fasta, load_txt
+from src.datasets.dataset_file import load_dataset_with_params
+from src.datasets.dataset_utils import ask_save_dataset
 
 
 def test_load_fasta_and_text(tmp_path):
@@ -75,5 +75,5 @@ def test_ask_save_dataset(monkeypatch, tmp_path):
     def fail_save(*a, **kw):
         raise Exception("fail")
 
-    monkeypatch.setattr("datasets.dataset_utils.save_dataset_fasta", fail_save)
+    monkeypatch.setattr("src.datasets.dataset_utils.save_dataset_fasta", fail_save)
     assert not ask_save_dataset(seqs, "synthetic", params)

@@ -1,8 +1,8 @@
 import builtins
 
-from csp_blfga.utils.config import SYNTHETIC_DEFAULTS, safe_input
-from datasets.dataset_synthetic import generate_dataset
-from datasets.dataset_utils import ensure_datasets_folder
+from src.datasets.dataset_synthetic import generate_dataset
+from src.datasets.dataset_utils import ensure_datasets_folder
+from src.utils.config import SYNTHETIC_DEFAULTS, safe_input
 
 
 def test_generate_synthetic_dataset(monkeypatch):

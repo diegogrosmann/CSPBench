@@ -6,7 +6,7 @@ Classes:
 """
 
 from algorithms.base import CSPAlgorithm, register_algorithm
-from csp_blfga.utils.distance import max_distance
+from src.utils.distance import max_distance
 
 from .config import DP_CSP_DEFAULTS
 from .implementation import exact_dp_closest_string

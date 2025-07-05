@@ -18,7 +18,7 @@ from itertools import combinations, product
 import numpy as np
 from sklearn.cluster import DBSCAN
 
-from csp_blfga.utils.distance import hamming_distance, max_distance
+from src.utils.distance import hamming_distance, max_distance
 
 from .config import CSC_DEFAULTS
 
