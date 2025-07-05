@@ -1,4 +1,5 @@
 """Testes para o módulo results_formatter.py."""
+
 import os
 import tempfile
 import unittest

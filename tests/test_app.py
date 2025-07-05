@@ -1,4 +1,5 @@
 """Testes para o módulo app.py."""
+
 import unittest
 from unittest.mock import MagicMock, patch
 
