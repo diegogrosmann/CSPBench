@@ -18,7 +18,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
-from src.datasets.dataset_entrez import fetch_dataset_with_params
+from src.datasets.dataset_entrez import fetch_dataset_silent
 from src.datasets.dataset_file import load_dataset_with_params
 from src.datasets.dataset_synthetic import generate_dataset_with_params
 
@@ -84,10 +84,10 @@ class DatasetFactory:
         # Verificar cache
         cache_key = self._get_cache_key(dataset_config, base_index)
         if self.cache_enabled and cache_key in self._cache:
-            logger.debug(f"Usando dataset do cache: {cache_key}")
+            logger.debug("Usando dataset do cache: %s", cache_key)
             return self._cache[cache_key]
 
-        logger.info(f"Criando dataset tipo '{dataset_type}' (base {base_index})")
+        logger.info("Criando dataset tipo '%s' (base %s)", dataset_type, base_index)
 
         try:
             if dataset_type == DatasetType.FILE.value:
@@ -108,11 +108,11 @@ class DatasetFactory:
             if self.cache_enabled:
                 self._cache[cache_key] = (sequences, metadata)
 
-            logger.info(f"Dataset criado: {len(sequences)} sequências, L={metadata.get('L', 'N/A')}")
+            logger.info("Dataset criado: %d sequências, L=%s", len(sequences), metadata.get("L", "N/A"))
             return sequences, metadata
 
         except Exception as e:
-            logger.error(f"Erro ao criar dataset: {e}")
+            logger.error("Erro ao criar dataset: %s", e)
             raise DatasetError(f"Erro ao criar dataset: {e}")
 
     def _create_file_dataset(self, config: dict[str, Any]) -> tuple[list[str], dict[str, Any]]:
@@ -161,7 +161,7 @@ class DatasetFactory:
         if base_index is not None and "seed" not in params:
             params["seed"] = 42 + base_index
 
-        sequences, metadata = fetch_dataset_with_params(params)
+        sequences, metadata = fetch_dataset_silent(params)
 
         return sequences, metadata
 

@@ -8,16 +8,6 @@ Funções auxiliares:
     exact_dp_closest_string(...): Busca incremental do menor raio possível.
 """
 
-# dp_csp.py
-"""
-DP-CSP – Programação Dinâmica exata para o Closest String Problem
-=================================================================
-
-Implementa busca exata em O(L · |Σ| · (d+1)^n).  Útil para instâncias
-pequenas (n ≤ 10, d ≤ 8).  Inclui busca incremental sobre d para achar
-o menor raio possível até um limite superior fornecido.
-"""
-
 import logging
 from collections.abc import Callable, Sequence
 from typing import cast
@@ -111,7 +101,7 @@ def _dp_decision(strings: Sequence[String], alphabet: str, d: int) -> String | N
 
     max_dist = max(hamming_distance(result, s) for s in strings)
     if max_dist > d:
-        logger.error(f"[DP_DECISION] ERRO: Solução inválida! dist={max_dist} > d={d}")
+        logger.error("[DP_DECISION] ERRO: Solução inválida! dist=%d > d=%d", max_dist, d)
 
     return result
 
@@ -142,17 +132,17 @@ def exact_dp_closest_string(
     n = len(strings)
 
     # LOG DETALHADO: Parâmetros de entrada
-    logger.info(f"[DP_CSP] Iniciando busca exata com max_d={max_d}, baseline={baseline_val}")
-    logger.info(f"[DP_CSP] Dataset: n={n}, L={len(strings[0])}, alfabeto={alphabet}")
+    logger.info("[DP_CSP] Iniciando busca exata com max_d=%d, baseline=%d", max_d, baseline_val)
+    logger.info("[DP_CSP] Dataset: n=%d, L=%d, alfabeto=%s", n, len(strings[0]), alphabet)
     for i, s in enumerate(strings):
-        logger.info(f"[DP_CSP] String {i}: {s}")
+        logger.info("[DP_CSP] String %d: %s", i, s)
 
     # --- Monitoramento de recursos ---
     safe_mem_mb = get_safe_memory_limit()
     max_time = DP_CSP_DEFAULTS.get("max_time", 300)
     t0 = time.time()
 
-    logger.info(f"[DP_CSP] Limites: mem={safe_mem_mb:.1f}MB, tempo={max_time}s")
+    logger.info("[DP_CSP] Limites: mem=%.1fMB, tempo=%ds", safe_mem_mb, max_time)
 
     def check_limits(d):
         # Checa memória, tempo e viabilidade incrementalmente
@@ -163,7 +153,7 @@ def exact_dp_closest_string(
         mem_mb = 0.0
         try:
             if os.path.exists("/proc/self/status"):
-                with open("/proc/self/status") as f:
+                with open("/proc/self/status", encoding="utf-8") as f:
                     for line in f:
                         if line.startswith("VmRSS:"):
                             kb = int(line.split()[1])
@@ -181,19 +171,19 @@ def exact_dp_closest_string(
                 f"DP-CSP interrompido: (d+1)^n = {state_count_est:,} excede limite prático "
                 "(~2e9 estados, ~16GB RAM). Tente reduzir n ou d."
             )
-            logger.error(f"[DP_CSP] {msg}")
+            logger.error("[DP_CSP] %s", msg)
             if warning_callback:
                 warning_callback(msg)
             raise RuntimeError(msg)
         if mem_mb > safe_mem_mb * 0.95:
             msg = f"DP-CSP interrompido: uso de memória {mem_mb:.1f}MB excedeu limite seguro ({safe_mem_mb:.1f}MB)"
-            logger.error(f"[DP_CSP] {msg}")
+            logger.error("[DP_CSP] %s", msg)
             if warning_callback:
                 warning_callback(msg)
             raise RuntimeError(msg)
         if elapsed > max_time:
             msg = f"DP-CSP interrompido: tempo de execução excedeu {max_time}s"
-            logger.error(f"[DP_CSP] {msg}")
+            logger.error("[DP_CSP] %s", msg)
             if warning_callback:
                 warning_callback(msg)
             raise RuntimeError(msg)
@@ -203,7 +193,8 @@ def exact_dp_closest_string(
         check_limits(d)
         if progress_callback:
             progress_callback(f"Testando d={d}")
-        logger.info(f"[DP_CSP] Testando d={d} (tentativa {d+1}/{max_d+1})")
+        # Lazy formatting para logging
+        logger.info("[DP_CSP] Testando d=%d (tentativa %d/%d)", d, d + 1, max_d + 1)
 
         center = _dp_decision(strings, alphabet, d)
         if center is not None:
@@ -211,17 +202,18 @@ def exact_dp_closest_string(
             from src.utils.distance import hamming_distance
 
             max_dist = max(hamming_distance(center, s) for s in strings)
-            logger.info(f"[DP_CSP] SUCESSO! Encontrou solução com d={d}")
-            logger.info(f"[DP_CSP] Centro encontrado: {center}")
-            logger.info(f"[DP_CSP] Validação final: distância máxima = {max_dist}")
+            # Lazy formatting para logging
+            logger.info("[DP_CSP] SUCESSO! Encontrou solução com d=%d", d)
+            logger.info("[DP_CSP] Centro encontrado: %s", center)
+            logger.info("[DP_CSP] Validação final: distância máxima = %d", max_dist)
 
             if max_dist != d:
-                logger.warning(f"[DP_CSP] INCONSISTÊNCIA: d={d} mas distância real={max_dist}")
+                logger.warning("[DP_CSP] INCONSISTÊNCIA: d=%d mas distância real=%d", d, max_dist)
 
             return center, d
         else:
             # Nenhuma solução encontrada - processamento silencioso
             pass
 
-    logger.error(f"[DP_CSP] FALHA: Não foi possível encontrar centro com d ≤ {max_d}")
+    logger.error("[DP_CSP] FALHA: Não foi possível encontrar centro com d ≤ %d", max_d)
     raise RuntimeError(f"Não foi possível encontrar centro com d ≤ {max_d}. " "Tente aumentar o limite.")

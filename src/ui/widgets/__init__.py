@@ -1,5 +1,10 @@
 """
-Widgets e componentes para futuras interfaces gráficas.
+Widgets de interface para CSP-BLFGA.
 
-Placeholder para componentes de GUI que serão implementados futuramente.
+Módulos:
+    gui: Interface gráfica (futuro)
 """
+
+from .gui import run_gui
+
+__all__ = ["run_gui"]

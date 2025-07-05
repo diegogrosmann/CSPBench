@@ -33,7 +33,7 @@ interactions:
         </IdList><TranslationSet><Translation>     <From>human[Organism]</From>     <To>"Homo
         sapiens"[Organism]</To>    </Translation></TranslationSet><TranslationStack>   <TermSet>    <Term>insulin[Protein
         Name]</Term>    <Field>Protein Name</Field>    <Count>1008</Count>    <Explode>N</Explode>   </TermSet>   <TermSet>    <Term>"Homo
-        sapiens"[Organism]</Term>    <Field>Organism</Field>    <Count>2011788</Count>    <Explode>Y</Explode>   </TermSet>   <OP>AND</OP>  </TranslationStack><QueryTranslation>insulin[Protein
+        sapiens"[Organism]</Term>    <Field>Organism</Field>    <Count>2011815</Count>    <Explode>Y</Explode>   </TermSet>   <OP>AND</OP>  </TranslationStack><QueryTranslation>insulin[Protein
         Name] AND "Homo sapiens"[Organism]</QueryTranslation></eSearchResult>
 
         '
@@ -51,18 +51,18 @@ interactions:
       Content-Type:
       - text/xml; charset=UTF-8
       Date:
-      - Fri, 04 Jul 2025 18:13:17 GMT
+      - Sat, 05 Jul 2025 18:54:24 GMT
       NCBI-PHID:
-      - 322C0197278FA60500002D1F5AE2AC18.1.1.m_1
+      - 322C727405DFBC9500003FFEFF782A48.1.1.m_1
       NCBI-SID:
-      - F5BB357BF0555B6C_83B7SID
+      - 528FE3CECF55919E_694DSID
       Referrer-Policy:
       - origin-when-cross-origin
       Server:
       - Finatra
       Set-Cookie:
-      - ncbi_sid=F5BB357BF0555B6C_83B7SID; domain=.nih.gov; path=/; expires=Sat, 04
-        Jul 2026 18:13:18 GMT
+      - ncbi_sid=528FE3CECF55919E_694DSID; domain=.nih.gov; path=/; expires=Sun, 05
+        Jul 2026 18:54:25 GMT
       Strict-Transport-Security:
       - max-age=31536000; includeSubDomains; preload
       Transfer-Encoding:
@@ -72,7 +72,7 @@ interactions:
       X-RateLimit-Limit:
       - '10'
       X-RateLimit-Remaining:
-      - '9'
+      - '8'
       X-UA-Compatible:
       - IE=Edge
       X-XSS-Protection:
@@ -90,7 +90,7 @@ interactions:
       User-Agent:
       - Python-urllib/3.12
     method: GET
-    uri: https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=protein&id=124617%2C109148522%2C2247857574%2C2247857573%2C2247857572%2C2247857571&rettype=fasta&retmode=text&tool=biopython&email=test%40example.com&api_key=40aff1a7f51fc7e0711203ea3b2f5ae37c09
+    uri: https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=protein&id=124617%2C109148522%2C2247857574&rettype=fasta&retmode=text&tool=biopython&email=test%40example.com&api_key=40aff1a7f51fc7e0711203ea3b2f5ae37c09
   response:
     body:
       string: '>sp|P01308.1|INS_HUMAN RecName: Full=Insulin; Contains: RecName: Full=Insulin
@@ -117,27 +117,6 @@ interactions:
         EGSLQKRGIVEQCCTSICSLYQLENYCN
 
 
-        >KAI4069450.1 insulin, partial [Homo sapiens]
-
-        MALWMRLLPLLALLALWGPDPAAAFVNQHLCGSHLVEALYLVCGERGFFYTPKTRREAEDLQAGELLQLD
-
-        AARRQPPTRRLLHRERWNKALE
-
-
-        >KAI4069449.1 insulin [Homo sapiens]
-
-        MALWMRLLPLLALLALWGPDPAAAFVNQHLCGSHLVEALYLVCGERGFFYTPKTRREAEDLQVGQVELGG
-
-        GPGAGSLQPLALEGSLQKRGIVEQCCTSICSLYQLENYCN
-
-
-        >KAI4069448.1 insulin [Homo sapiens]
-
-        MALWMRLLPLLALLALWGPDPAAAFVNQHLCGSHLVEALYLVCGERGFFYTPKTRREAEDLQVGQVELGG
-
-        GPGAGSLQPLALEGSLQKRGIVEQCCTSICSLYQLENYCN
-
-
         '
     headers:
       Access-Control-Allow-Origin:
@@ -155,18 +134,18 @@ interactions:
       Content-Type:
       - text/plain
       Date:
-      - Fri, 04 Jul 2025 18:13:19 GMT
+      - Sat, 05 Jul 2025 18:54:25 GMT
       NCBI-PHID:
-      - 322C0197278FA60500005E1F5C34BBF7.1.1.m_7
+      - 939BB7C1981D062500007BECA210AC10.1.1.m_7
       NCBI-SID:
-      - 58869C42583D3D83_3944SID
+      - BDF1942D49E65850_399CSID
       Referrer-Policy:
       - origin-when-cross-origin
       Server:
       - Finatra
       Set-Cookie:
-      - ncbi_sid=58869C42583D3D83_3944SID; domain=.nih.gov; path=/; expires=Sat, 04
-        Jul 2026 18:13:19 GMT
+      - ncbi_sid=BDF1942D49E65850_399CSID; domain=.nih.gov; path=/; expires=Sun, 05
+        Jul 2026 18:54:26 GMT
       Strict-Transport-Security:
       - max-age=31536000; includeSubDomains; preload
       Transfer-Encoding:

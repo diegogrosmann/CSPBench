@@ -13,6 +13,7 @@ import time
 
 from src.core.exec.algorithm_executor import AlgorithmExecutor
 from src.utils.config import ALGORITHM_TIMEOUT
+from src.utils.curses_console import CursesConsole
 from src.utils.resource_monitor import (
     check_algorithm_feasibility,
     force_garbage_collection,
@@ -46,7 +47,11 @@ class ProgressTracker:
         if self.started:
             return
 
-        if TQDM_AVAILABLE and self.total is not None:
+        # Verificar se é curses console primeiro
+        if isinstance(self.console, CursesConsole) and self.total is not None:
+            # Usar funcionalidade nativa do curses
+            self.console.show_progress(self.description, 0, self.total)
+        elif TQDM_AVAILABLE and self.total is not None:
             from tqdm import tqdm  # Import local para evitar erro do Pylance
 
             self.pbar = tqdm(
@@ -74,7 +79,13 @@ class ProgressTracker:
         """
         self.current += n
 
-        if self.pbar:
+        # Verificar se é curses console primeiro
+        if isinstance(self.console, CursesConsole) and self.total is not None:
+            # Atualizar barra do curses
+            self.console.show_progress(self.description, self.current, self.total)
+            if message:
+                self.console.show_status(message)
+        elif self.pbar:
             self.pbar.update(n)
             if message:
                 self.pbar.set_postfix_str(message)
@@ -88,12 +99,24 @@ class ProgressTracker:
     def set_description(self, description: str):
         """Atualiza a descrição da barra de progresso."""
         self.description = description
-        if self.pbar:
+        if isinstance(self.console, CursesConsole) and self.total is not None:
+            # Atualizar descrição no curses
+            self.console.show_progress(self.description, self.current, self.total)
+        self.description = description
+        if isinstance(self.console, CursesConsole) and self.total is not None:
+            # Atualizar descrição no curses
+            self.console.show_progress(self.description, self.current, self.total)
+        elif self.pbar:
             self.pbar.set_description(description)
 
     def finish(self, final_message: str | None = None):
         """Finaliza a barra de progresso."""
-        if self.pbar:
+        if isinstance(self.console, CursesConsole):
+            # Esconder progresso e mostrar mensagem final
+            self.console.hide_progress()
+            if final_message:
+                self.console.show_status(final_message)
+        elif self.pbar:
             if final_message:
                 self.pbar.set_postfix_str(final_message)
             self.pbar.close()

@@ -29,6 +29,7 @@ class BLFGAAlgorithm(CSPAlgorithm):
 
     name = "BLF-GA"
     default_params = BLF_GA_DEFAULTS
+    supports_internal_parallel = True  # BLF-GA pode usar paralelismo interno
 
     def __init__(self, strings: list[str], alphabet: str, **params):
         super().__init__(strings, alphabet, **params)
@@ -62,5 +63,4 @@ class BLFGAAlgorithm(CSPAlgorithm):
         """
         Executa o BLF-GA e retorna a string central, a distância máxima e o histórico de distâncias.
         """
-        return self.blf_ga_instance.run()
         return self.blf_ga_instance.run()

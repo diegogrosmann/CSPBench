@@ -1,9 +1,9 @@
 __pycache__
 .venv
 .vscode
-logs
-results
-saved_datasets
-batch_configs
 .pytest_cache
 .ruff_cache
+saved_datasets/*
+batch_configs/*
+outputs/logs/*
+outputs/reports/*

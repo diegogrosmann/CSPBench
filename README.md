@@ -64,7 +64,9 @@ datasets/                     # 📊 Gerenciamento de datasets
 
 tests/                        # 🧪 Testes automatizados
 main.py                      # 🚀 Ponto de entrada principal
-results/                     # 📈 Relatórios gerados
+outputs/                     # 📈 Saídas organizadas
+  ├── reports/               # Relatórios gerados
+  └── logs/                  # Logs do sistema
 logs/                        # 📝 Logs de execução
 saved_datasets/              # 💾 Datasets salvos
 batch_configs/               # ⚙️ Configurações de lote
@@ -141,9 +143,18 @@ pip install -r requirements.txt
 
 ## Relatórios e Resultados
 
-- Relatórios detalhados são salvos em `results/` após cada execução.
+- Relatórios detalhados são salvos em `outputs/reports/` após cada execução.
 - Resumos rápidos são exibidos no console.
 - Execuções em lote geram relatórios consolidados.
+
+## Interface Gráfica (Futuro)
+
+O projeto está preparado para interface gráfica que será implementada futuramente:
+
+```python
+from src.ui.widgets import run_gui
+# run_gui()  # Será implementado em versões futuras
+```
 
 ## Suporte e Documentação
 
@@ -155,4 +166,38 @@ pip install -r requirements.txt
 ### Observações sobre o main.py
 
 O arquivo `main.py` está totalmente documentado com docstrings no estilo Google, detalhando o fluxo, parâmetros e retornos de cada função. Consulte o código para detalhes de uso programático e integração.
-# Test
+
+## Uso
+
+### Execução Básica
+
+```bash
+python main.py
+```
+
+### Parâmetros da CLI
+
+```bash
+python main.py --help
+```
+
+Principais opções:
+- `--silent`: Modo silencioso (sem interação)
+- `--dataset {synthetic,file,entrez,batch}`: Tipo de dataset
+- `--algorithms ALGS [ALGS ...]`: Algoritmos a executar
+- `--num-execs N`: Número de execuções por algoritmo
+- `--timeout N`: Timeout por execução (segundos)
+- `--workers N` ou `-w N`: Número de workers paralelos (padrão: 4)
+
+### Configuração de Paralelismo
+
+O sistema detecta automaticamente algoritmos que suportam paralelismo interno:
+- **Algoritmos sem paralelismo interno**: Usa múltiplos workers externos
+- **Algoritmos com paralelismo interno**: Usa 1 worker externo e configura workers internos
+
+Exemplo com múltiplos algoritmos:
+```bash
+python main.py --dataset synthetic --algorithms Baseline CSC BLF-GA --workers 4
+```
+
+A variável de ambiente `INTERNAL_WORKERS` é configurada automaticamente baseada no número de CPUs disponíveis.

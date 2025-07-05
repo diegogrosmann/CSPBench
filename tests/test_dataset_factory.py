@@ -102,7 +102,7 @@ class TestDatasetFactory:
         with pytest.raises(DatasetError, match="Arquivo não encontrado"):
             self.factory.create_dataset(config)
 
-    @patch("src.core.data.dataset_factory.fetch_dataset_with_params")
+    @patch("src.core.data.dataset_factory.fetch_dataset_silent")
     def test_create_dataset_entrez(self, mock_fetch):
         """Test creating dataset from Entrez."""
         mock_fetch.return_value = (

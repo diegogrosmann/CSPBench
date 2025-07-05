@@ -25,8 +25,6 @@ logger = logging.getLogger(__name__)
 class ConfigError(Exception):
     """Exceção personalizada para erros de configuração."""
 
-    pass
-
 
 class ConfigLoader:
     """
@@ -48,7 +46,7 @@ class ConfigLoader:
             "nome",
             "algoritmos",
             "dataset",
-            "execucoes_por_algoritmo_por_base",
+            "runs_per_algorithm_per_base",
             "num_bases",
         }
         self.optional_fields = {
@@ -81,15 +79,15 @@ class ConfigLoader:
         if not config_path.exists():
             raise ConfigError(f"Arquivo de configuração não encontrado: {config_path}")
 
-        logger.info(f"Carregando configuração: {config_path}")
+        logger.info("Carregando configuração: %s", config_path)
 
         try:
             with open(config_path, encoding="utf-8") as f:
                 config = yaml.safe_load(f)
         except yaml.YAMLError as e:
-            raise ConfigError(f"Erro ao parsear YAML: {e}")
+            raise ConfigError(f"Erro ao parsear YAML: {e}") from e
         except Exception as e:
-            raise ConfigError(f"Erro ao ler arquivo: {e}")
+            raise ConfigError(f"Erro ao ler arquivo: {e}") from e
 
         # Resolver paths relativos
         config = self._resolve_paths(config, config_path.parent)
@@ -97,7 +95,7 @@ class ConfigLoader:
         # Validar configuração
         self._validate_config(config)
 
-        logger.info(f"Configuração carregada com sucesso: {config.get('nome', 'sem nome')}")
+        logger.info("Configuração carregada com sucesso: %s", config.get("nome", "sem nome"))
         return config
 
     def load_multiple_configs(self, config_paths: list[str | Path]) -> list[dict[str, Any]]:
@@ -119,7 +117,7 @@ class ConfigLoader:
                 config = self.load_config(path)
                 configs.append(config)
             except ConfigError as e:
-                logger.error(f"Erro ao carregar {path}: {e}")
+                logger.error("Erro ao carregar %s: %s", path, e)
                 raise
 
         return configs
@@ -189,16 +187,27 @@ class ConfigLoader:
         if not isinstance(config, dict):
             raise ConfigError("Configuração deve ser um dicionário")
 
-        # Verificar campos obrigatórios
+        # Verificar campos obrigatórios com suporte a retro-compatibilidade
         missing_fields = self.required_fields - config.keys()
+
+        # Verificar se existe runs_per_algorithm_per_base ou execucoes_por_algoritmo_por_base
+        if "runs_per_algorithm_per_base" in missing_fields:
+            if "execucoes_por_algoritmo_por_base" in config:
+                missing_fields.remove("runs_per_algorithm_per_base")
+            elif "execucoes_por_algoritmo" in config:
+                missing_fields.remove("runs_per_algorithm_per_base")
+
         if missing_fields:
             raise ConfigError(f"Campos obrigatórios ausentes: {missing_fields}")
 
         # Verificar campos desconhecidos
         all_fields = self.required_fields | self.optional_fields
+        # Adicionar campos antigos permitidos para compatibilidade
+        all_fields.add("execucoes_por_algoritmo_por_base")
+        all_fields.add("execucoes_por_algoritmo")
         unknown_fields = config.keys() - all_fields
         if unknown_fields:
-            logger.warning(f"Campos desconhecidos ignorados: {unknown_fields}")
+            logger.warning("Campos desconhecidos ignorados: %s", unknown_fields)
 
         # Validações específicas
         self._validate_algorithms(config["algoritmos"])
@@ -249,7 +258,8 @@ class ConfigLoader:
     def _validate_numeric_fields(self, config: dict[str, Any]) -> None:
         """Valida campos numéricos."""
         numeric_fields = {
-            "execucoes_por_algoritmo_por_base": (int, lambda x: x > 0),
+            "runs_per_algorithm_per_base": (int, lambda x: x > 0),
+            "execucoes_por_algoritmo_por_base": (int, lambda x: x > 0),  # Retro-compatibilidade
             "num_bases": (int, lambda x: x > 0),
             "timeout": (int, lambda x: x > 0),
             "max_workers": (int, lambda x: x > 0),
@@ -278,7 +288,7 @@ class ConfigLoader:
                 "tipo": "file",
                 "filepath": "saved_datasets/dataset_custom.fasta",
             },
-            "execucoes_por_algoritmo_por_base": 3,
+            "runs_per_algorithm_per_base": 3,
             "num_bases": 1,
             "timeout": 300,
             "max_workers": 4,
@@ -305,6 +315,6 @@ class ConfigLoader:
         try:
             with open(output_path, "w", encoding="utf-8") as f:
                 yaml.safe_dump(config, f, default_flow_style=False, sort_keys=False, allow_unicode=True)
-            logger.info(f"Configuração salva em: {output_path}")
+            logger.info("Configuração salva em: %s", output_path)
         except Exception as e:
-            raise ConfigError(f"Erro ao salvar configuração: {e}")
+            raise ConfigError(f"Erro ao salvar configuração: {e}") from e

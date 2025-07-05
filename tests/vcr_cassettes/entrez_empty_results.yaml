@@ -35,18 +35,18 @@ interactions:
       Content-Type:
       - text/xml; charset=UTF-8
       Date:
-      - Fri, 04 Jul 2025 18:13:24 GMT
+      - Sat, 05 Jul 2025 18:54:29 GMT
       NCBI-PHID:
-      - 939B4E7FD146E3450000630D1A463E05.1.1.m_1
+      - 939BB7C1981D062500007FECA8F4778E.1.1.m_1
       NCBI-SID:
-      - 857BF03FA21E381B_1182SID
+      - 022913139DD9FCC5_7B82SID
       Referrer-Policy:
       - origin-when-cross-origin
       Server:
       - Finatra
       Set-Cookie:
-      - ncbi_sid=857BF03FA21E381B_1182SID; domain=.nih.gov; path=/; expires=Sat, 04
-        Jul 2026 18:13:24 GMT
+      - ncbi_sid=022913139DD9FCC5_7B82SID; domain=.nih.gov; path=/; expires=Sun, 05
+        Jul 2026 18:54:30 GMT
       Strict-Transport-Security:
       - max-age=31536000; includeSubDomains; preload
       Transfer-Encoding:

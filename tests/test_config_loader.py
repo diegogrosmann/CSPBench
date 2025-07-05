@@ -254,7 +254,7 @@ class TestConfigLoader:
         assert default_config["algoritmos"] == ["Baseline", "BLF-GA"]
         assert default_config["dataset"]["tipo"] == "file"
         assert default_config["dataset"]["filepath"] == "saved_datasets/dataset_custom.fasta"
-        assert default_config["execucoes_por_algoritmo_por_base"] == 3
+        assert default_config["runs_per_algorithm_per_base"] == 3
         assert default_config["num_bases"] == 1
         assert default_config["timeout"] == 300
         assert default_config["max_workers"] == 4

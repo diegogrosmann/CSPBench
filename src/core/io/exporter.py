@@ -2,7 +2,7 @@
 Sistema de exportação centralizado para resultados CSP.
 
 Este módulo unifica todas as funcionalidades de exportação de resultados
-para diferentes formatos (CSV, JSON, TXT).
+para diferentes formatos (CSV, JSON, TXT) na estrutura outputs/.
 
 Classes:
     CSPExporter: Exportador centralizado para resultados CSP.
@@ -11,6 +11,7 @@ Classes:
 import csv
 import json
 import logging
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -20,10 +21,21 @@ class CSPExporter:
     Exportador centralizado para resultados de algoritmos CSP.
 
     Suporta exportação para múltiplos formatos (CSV, JSON, TXT).
+    Usa estrutura padronizada outputs/reports/<timestamp>/
     """
 
-    def __init__(self):
+    def __init__(self, base_subfolder: str | None = None):
         self.logger = logging.getLogger(__name__)
+
+        # Criar timestamp para subfolder se não fornecido
+        if base_subfolder is None:
+            base_subfolder = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+
+        # Definir diretório base
+        self.base_dir = Path("outputs") / "reports" / base_subfolder
+        self.base_dir.mkdir(parents=True, exist_ok=True)
+
+        self.logger.info(f"CSPExporter inicializado: {self.base_dir}")
 
     def export_to_csv(
         self,
@@ -36,10 +48,10 @@ class CSPExporter:
 
         Args:
             results: Resultados por algoritmo.
-            filename: Caminho do arquivo CSV.
+            filename: Nome do arquivo CSV (relativo ao base_dir).
             extra_info: Informações extras do experimento.
         """
-        file_path = Path(filename)
+        file_path = self.base_dir / filename
         file_path.parent.mkdir(parents=True, exist_ok=True)
 
         headers = [
@@ -219,10 +231,10 @@ class CSPExporter:
 
         Args:
             data: Dados a serem exportados.
-            filename: Caminho do arquivo JSON.
+            filename: Nome do arquivo JSON (relativo ao base_dir).
             convert_keys: Se True, converte chaves de dict para string.
         """
-        file_path = Path(filename)
+        file_path = self.base_dir / filename
         file_path.parent.mkdir(parents=True, exist_ok=True)
 
         if convert_keys:

@@ -26,9 +26,7 @@ class BaselineAlg(CSPAlgorithm):
     name = "Baseline"
     default_params: dict = {}
     is_deterministic = True
-
-    def __init__(self, strings: list[str], alphabet: str, **params):
-        super().__init__(strings, alphabet, **params)
+    supports_internal_parallel = False  # Baseline não suporta paralelismo interno
 
     def run(self) -> tuple[str, int, dict]:
         """

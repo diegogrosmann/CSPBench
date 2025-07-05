@@ -8,13 +8,13 @@ evitando chamadas reais à API durante os testes.
 import pytest
 import vcr
 
-from src.datasets.dataset_entrez import fetch_dataset_with_params
+from src.datasets.dataset_entrez import fetch_dataset_silent
 
 
 class TestDatasetEntrez:
     """Testes para dataset_entrez usando VCR."""
 
-    def test_fetch_dataset_with_params(self):
+    def test_fetch_dataset_silent(self):
         """Testa busca de dataset do NCBI com parâmetros."""
         params = {
             "email": "test@example.com",
@@ -27,7 +27,7 @@ class TestDatasetEntrez:
         # Então esperamos erro de comprimento uniforme
         with vcr.use_cassette("tests/vcr_cassettes/entrez_nucleotide_test.yaml"):
             with pytest.raises(ValueError, match="Muito poucas sequências de comprimento uniforme"):
-                sequences, metadata = fetch_dataset_with_params(params)
+                sequences, metadata = fetch_dataset_silent(params)
 
     def test_fetch_protein_dataset(self):
         """Testa busca de dataset de proteínas."""
@@ -39,7 +39,7 @@ class TestDatasetEntrez:
         }
 
         with vcr.use_cassette("tests/vcr_cassettes/entrez_protein_test.yaml"):
-            sequences, metadata = fetch_dataset_with_params(params)
+            sequences, metadata = fetch_dataset_silent(params)
 
             # Verificar sequências
             assert len(sequences) <= 3  # Pode retornar menos se não houver suficientes
@@ -62,7 +62,7 @@ class TestDatasetEntrez:
         with vcr.use_cassette("tests/vcr_cassettes/entrez_invalid_params.yaml"):
             # Pode funcionar ou dar erro dependendo do que encontrar
             try:
-                sequences, metadata = fetch_dataset_with_params(params)
+                sequences, metadata = fetch_dataset_silent(params)
                 # Se funcionou, verificar se tem dados
                 assert len(sequences) >= 1
                 assert "n_obtained" in metadata
@@ -81,7 +81,7 @@ class TestDatasetEntrez:
 
         with vcr.use_cassette("tests/vcr_cassettes/entrez_empty_results.yaml"):
             with pytest.raises(ValueError, match="Nenhum resultado encontrado"):
-                fetch_dataset_with_params(params)
+                fetch_dataset_silent(params)
 
     def test_fetch_dataset_with_api_key(self):
         """Testa busca com API key."""
@@ -96,7 +96,7 @@ class TestDatasetEntrez:
         # API key inválida causa erro HTTP 400
         with vcr.use_cassette("tests/vcr_cassettes/entrez_with_api_key.yaml"):
             with pytest.raises(ValueError, match="Erro ao acessar NCBI"):
-                fetch_dataset_with_params(params)
+                fetch_dataset_silent(params)
 
     def test_fetch_dataset_large_request(self):
         """Testa requisição com muitas sequências."""
@@ -110,7 +110,7 @@ class TestDatasetEntrez:
         # Grandes requisições de E. coli têm comprimentos muito diferentes
         with vcr.use_cassette("tests/vcr_cassettes/entrez_large_request.yaml"):
             with pytest.raises(ValueError, match="Muito poucas sequências de comprimento uniforme"):
-                fetch_dataset_with_params(params)
+                fetch_dataset_silent(params)
 
     def test_fetch_dataset_uniform_length_filtering(self):
         """Testa filtragem por comprimento uniforme."""
@@ -124,7 +124,7 @@ class TestDatasetEntrez:
         # RNAs ribossomais têm comprimentos diferentes, então esperamos erro
         with vcr.use_cassette("tests/vcr_cassettes/entrez_uniform_length.yaml"):
             with pytest.raises(ValueError, match="Muito poucas sequências de comprimento uniforme"):
-                fetch_dataset_with_params(params)
+                fetch_dataset_silent(params)
 
 
 # Configuração do VCR

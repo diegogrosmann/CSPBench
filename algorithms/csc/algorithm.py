@@ -28,9 +28,7 @@ class CSCAlgorithm(CSPAlgorithm):
 
     name = "CSC"
     default_params = CSC_DEFAULTS
-
-    def __init__(self, strings: list[str], alphabet: str, **params):
-        super().__init__(strings, alphabet, **params)
+    supports_internal_parallel = False  # CSC não suporta paralelismo interno
 
     def run(self) -> tuple[str, int, dict]:
         """

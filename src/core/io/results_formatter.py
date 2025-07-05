@@ -15,6 +15,7 @@ Métodos:
 
 import logging
 import statistics
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -290,19 +291,31 @@ class ResultsFormatter:
 
         return "\n".join(output)
 
-    def save_detailed_report(self, filename: str):
+    def save_detailed_report(self, filename: str | None = None):
         """
-        Salva o relatório detalhado em um arquivo.
+        Salva o relatório detalhado em um arquivo na estrutura outputs/reports/.
 
         Args:
-            filename: Nome do arquivo ou caminho completo
+            filename: Nome do arquivo ou None para gerar automaticamente
         """
-        file_path = Path(filename)
+        if filename is None:
+            timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+            filename = f"detailed_report_{timestamp}.txt"
+
+        # Usar estrutura padronizada outputs/reports/<timestamp>/
+        if "/" not in filename:
+            timestamp_dir = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+            file_path = Path("outputs") / "reports" / timestamp_dir / filename
+        else:
+            file_path = Path(filename)
+
         # Garantir que o diretório existe
         file_path.parent.mkdir(parents=True, exist_ok=True)
 
         with open(file_path, "w", encoding="utf-8") as f:
             f.write(self.format_detailed_results())
+
+        logging.getLogger(__name__).info(f"Relatório salvo em: {file_path}")
 
     def get_detailed_report_data(self):
         """

@@ -29,8 +29,12 @@ class H3CSPAlgorithm(CSPAlgorithm):
 
     name = "H³-CSP"
     default_params = H3_CSP_DEFAULTS
+    supports_internal_parallel = False  # H³-CSP não suporta paralelismo interno
 
     def __init__(self, strings: list[str], alphabet: str, **params):
+        """
+        Inicializa o H3CSPAlgorithm e instancia o wrapper H3CSP.
+        """
         super().__init__(strings, alphabet, **params)
         self.h3_csp_instance = H3CSP(self.strings, self.alphabet, **self.params)
 

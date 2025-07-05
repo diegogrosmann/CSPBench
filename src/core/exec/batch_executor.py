@@ -4,13 +4,15 @@ Sistema de execução em lote para múltiplas configurações de CSP.
 Classes:
     BatchConfig: Representa uma configuração de execução
     BatchExecutor: Executa sequência de configurações
+
+Formatos suportados: YAML (.yaml, .yml) e JSON (.json)
 """
 
 import json
 import logging
+import os
 import time
 import uuid
-import xml.etree.ElementTree as ET
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -47,12 +49,12 @@ def select_batch_config() -> str:
 
     # Buscar arquivos de configuração
     config_files = []
-    for pattern in ["*.yaml", "*.yml", "*.json", "*.xml"]:
+    for pattern in ["*.yaml", "*.yml", "*.json"]:
         config_files.extend(batch_dir.glob(pattern))
 
     if not config_files:
         console.print("❌ Nenhum arquivo de configuração encontrado em batch_configs/")
-        console.print("Crie um arquivo .yaml, .json ou .xml neste diretório.")
+        console.print("Crie um arquivo .yaml ou .json neste diretório.")
         return ""
 
     console.print("\n📋 Arquivos de configuração disponíveis:")
@@ -88,7 +90,7 @@ def create_example_config():
                     "parametros": {"n": 10, "L": 50, "alphabet": "ACGT", "noise": 0.1},
                 },
                 "algoritmos": ["Baseline", "BLF-GA", "H³-CSP"],
-                "execucoes_por_algoritmo_por_base": 3,
+                "runs_per_algorithm_per_base": 3,
                 "timeout": 300,
             },
             {
@@ -103,7 +105,7 @@ def create_example_config():
                     },
                 },
                 "algoritmos": ["Baseline", "BLF-GA", "CSC"],
-                "execucoes_por_algoritmo_por_base": 3,
+                "runs_per_algorithm_per_base": 3,
                 "timeout": 600,
             },
             {
@@ -113,7 +115,7 @@ def create_example_config():
                     "parametros": {"filepath": "saved_datasets/sequences.fasta"},
                 },
                 "algoritmos": ["Baseline", "BLF-GA"],
-                "execucoes_por_algoritmo_por_base": 3,
+                "runs_per_algorithm_per_base": 3,
                 "timeout": 900,
             },
         ],
@@ -134,53 +136,55 @@ class BatchConfig:
         self.nome = config_dict.get("nome", "Execução Sem Nome")
         self.dataset_config = config_dict.get("dataset", {})
         self.algoritmos = config_dict.get("algoritmos", [])
-        # Mudança de execucoes_por_algoritmo para execucoes_por_algoritmo_por_base
-        self.execucoes_por_algoritmo_por_base = config_dict.get(
-            "execucoes_por_algoritmo_por_base",
-            config_dict.get("execucoes_por_algoritmo", 3),
-        )  # Retro-compatibilidade
+        # Mudança de execucoes_por_algoritmo_por_base para runs_per_algorithm_per_base
+        self.runs_per_algorithm_per_base = config_dict.get(
+            "runs_per_algorithm_per_base",
+            config_dict.get("execucoes_por_algoritmo_por_base", config_dict.get("execucoes_por_algoritmo", 3)),
+        )  # Retro-compatibilidade com nomes antigos
+
+        # Manter aliases para compatibilidade
+        self.execucoes_por_algoritmo_por_base = self.runs_per_algorithm_per_base
         self.num_bases = config_dict.get("num_bases", 1)
         self.timeout = config_dict.get("timeout", ALGORITHM_TIMEOUT)
 
     def __str__(self):
         return (
             f"BatchConfig({self.nome}, {len(self.algoritmos)} algoritmos, "
-            f"{self.execucoes_por_algoritmo_por_base} exec por base, {self.num_bases} bases)"
+            f"{self.runs_per_algorithm_per_base} exec por base, {self.num_bases} bases)"
         )
 
 
 class BatchExecutor:
     """Executa uma sequência de configurações em lote."""
 
-    def __init__(self, config_file: str):
+    def __init__(self, config_file: str, workers: int = 4):
         self.config_file = Path(config_file)
         self.batch_info = {}
         self.execucoes = []
         self.results = {}
         self.consolidated_formatter = ResultsFormatter()
+        self.workers = workers  # Número de workers para paralelismo
 
         # Identificador único para esta execução em lote
         self.batch_id = f"batch_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}"
 
-        # Criar diretório dedicado para os resultados deste lote
-        self.results_dir = Path("results") / self.batch_id
+        # Criar diretório dedicado para os resultados deste lote na nova estrutura
+        self.results_dir = Path("outputs") / "reports" / self.batch_id
         self.results_dir.mkdir(parents=True, exist_ok=True)
         console.print(f"📁 Diretório de resultados criado: {self.results_dir}")
 
         self._load_config()
 
     def _load_config(self):
-        """Carrega configuração do arquivo YAML, JSON ou XML."""
+        """Carrega configuração do arquivo YAML ou JSON."""
         try:
             with open(self.config_file, encoding="utf-8") as f:
                 if self.config_file.suffix.lower() in [".yaml", ".yml"]:
                     config = yaml.safe_load(f)
                 elif self.config_file.suffix.lower() == ".json":
                     config = json.load(f)
-                elif self.config_file.suffix.lower() == ".xml":
-                    config = self._parse_xml(f)
                 else:
-                    raise ValueError(f"Formato de arquivo não suportado: {self.config_file.suffix}")
+                    raise ValueError(f"Formato de arquivo não suportado: {self.config_file.suffix}. Use .yaml ou .json")
 
             self.batch_info = config.get("batch_info", {})
             execucoes_raw = config.get("execucoes", [])
@@ -193,89 +197,6 @@ class BatchExecutor:
         except Exception as e:
             console.print(f"❌ Erro ao carregar configuração: {e}")
             raise
-
-    def _parse_xml(self, file_handle):
-        """Converte XML para estrutura de dicionário compatível."""
-        tree = ET.parse(file_handle)
-        root = tree.getroot()
-
-        config = {}
-
-        # Parse batch_info
-        batch_info_elem = root.find("batch_info")
-        if batch_info_elem is not None:
-            batch_info = {}
-            for child in batch_info_elem:
-                if child.tag in ["timeout_global"] and child.text is not None:
-                    batch_info[child.tag] = int(child.text)
-                else:
-                    batch_info[child.tag] = child.text if child.text is not None else ""
-            config["batch_info"] = batch_info
-
-        # Parse execucoes
-        execucoes_elem = root.find("execucoes")
-        execucoes = []
-
-        if execucoes_elem is not None:
-            for exec_elem in execucoes_elem.findall("execucao"):
-                exec_config = {}
-
-                # Nome
-                nome_elem = exec_elem.find("nome")
-                if nome_elem is not None and nome_elem.text is not None:
-                    exec_config["nome"] = nome_elem.text
-
-                # Dataset
-                dataset_elem = exec_elem.find("dataset")
-                if dataset_elem is not None:
-                    dataset_config = {}
-
-                    tipo_elem = dataset_elem.find("tipo")
-                    if tipo_elem is not None and tipo_elem.text is not None:
-                        dataset_config["tipo"] = tipo_elem.text
-
-                    params_elem = dataset_elem.find("parametros")
-                    if params_elem is not None:
-                        parametros = {}
-                        for param in params_elem:
-                            if param.text is None:
-                                continue
-                            if param.tag in ["n", "L"]:
-                                parametros[param.tag] = int(param.text)
-                            elif param.tag == "noise":
-                                parametros[param.tag] = float(param.text)
-                            else:
-                                parametros[param.tag] = param.text
-                        dataset_config["parametros"] = parametros
-
-                    exec_config["dataset"] = dataset_config
-
-                # Algoritmos
-                algs_elem = exec_elem.find("algoritmos")
-                if algs_elem is not None:
-                    algoritmos = []
-                    for alg_elem in algs_elem.findall("algoritmo"):
-                        if alg_elem.text is not None:
-                            algoritmos.append(alg_elem.text)
-                    exec_config["algoritmos"] = algoritmos
-
-                # Execuções por algoritmo por base
-                exec_per_alg_elem = exec_elem.find("execucoes_por_algoritmo_por_base")
-                if exec_per_alg_elem is None:
-                    exec_per_alg_elem = exec_elem.find("execucoes_por_algoritmo")
-
-                if exec_per_alg_elem is not None and exec_per_alg_elem.text is not None:
-                    exec_config["execucoes_por_algoritmo_por_base"] = int(exec_per_alg_elem.text)
-
-                # Timeout
-                timeout_elem = exec_elem.find("timeout")
-                if timeout_elem is not None and timeout_elem.text is not None:
-                    exec_config["timeout"] = int(timeout_elem.text)
-
-                execucoes.append(exec_config)
-
-        config["execucoes"] = execucoes
-        return config
 
     def _generate_dataset(self, dataset_config: dict[str, Any]) -> tuple[list[str], dict[str, Any]]:
         """Gera ou carrega dataset baseado na configuração."""
@@ -299,9 +220,9 @@ class BatchExecutor:
             return load_dataset_with_params(params)
 
         elif dataset_type == "entrez":
-            from src.datasets.dataset_entrez import fetch_dataset_with_params
+            from src.datasets.dataset_entrez import fetch_dataset_silent
 
-            return fetch_dataset_with_params(params)
+            return fetch_dataset_silent(params)
 
         else:
             raise ValueError(f"Tipo de dataset não suportado: {dataset_type}")
@@ -320,7 +241,7 @@ class BatchExecutor:
             "erro": None,
             "tempo_total": 0.0,
             "num_bases": config.num_bases,
-            "execucoes_por_algoritmo_por_base": config.execucoes_por_algoritmo_por_base,
+            "runs_per_algorithm_per_base": config.runs_per_algorithm_per_base,
         }
 
         try:
@@ -334,15 +255,15 @@ class BatchExecutor:
                 # Gerar/carregar dataset para esta base
                 seqs, dataset_params = self._generate_dataset(config.dataset_config)
 
-                logger.debug(f"[BatchExecutor] Base {base_idx+1}: {len(seqs)} seqs")
+                logger.debug("[BatchExecutor] Base %d: %d seqs", base_idx + 1, len(seqs))
 
                 if not seqs:
                     raise ValueError(f"Dataset vazio gerado para base {base_idx + 1}")
 
                 alphabet = "".join(sorted(set("".join(seqs))))
                 n, L = len(seqs), len(seqs[0])
-                seed = dataset_params.get("seed")
-                distancia_string_base = dataset_params.get("distancia_string_base", None)
+                # seed = dataset_params.get("seed")  # Não utilizado
+                # distancia_string_base = dataset_params.get("distancia_string_base", None)  # Não utilizado
 
                 # Armazenar informações da base de dados
                 if "bases_info" not in result:
@@ -384,7 +305,7 @@ class BatchExecutor:
                 base_key_info = f"{config.nome}_Base{base_idx+1}"
                 exec_formatter.extra_info = {base_key_info: dataset_params}
 
-                logger.debug(f"[BatchExecutor] extra_info definido para {base_key_info}")
+                logger.debug("[BatchExecutor] extra_info definido para %s", base_key_info)
 
                 # Atualizar informações extras no formatter consolidado
                 if not hasattr(self.consolidated_formatter, "extra_info"):
@@ -393,77 +314,157 @@ class BatchExecutor:
                 base_key = f"{config.nome}_Base{base_idx+1}"
                 self.consolidated_formatter.extra_info[base_key] = dataset_params
 
-                # Executar algoritmos
-                for alg_name in viable_algs:
-                    console.print(f"\n🔄 Executando {alg_name} para base {base_idx + 1}...")
-                    if alg_name not in global_registry:
-                        console.print(f"❌ Algoritmo '{alg_name}' não encontrado!")
-                        continue
-                    AlgClass = global_registry[alg_name]
-                    execucoes_por_algoritmo = config.execucoes_por_algoritmo_por_base
-                    try:
-                        executions = execute_algorithm_runs(
-                            alg_name,
-                            AlgClass,
-                            seqs,
-                            alphabet,
-                            execucoes_por_algoritmo,
-                            None,
-                            console,
-                            config.timeout,
-                        )
+                # Configurar workers internos para paralelismo
+                import multiprocessing
+
+                cpu_count = multiprocessing.cpu_count()
+                external_workers = self.workers
+
+                # Verificar se algum algoritmo suporta paralelismo interno
+                has_internal_parallel = any(
+                    getattr(global_registry.get(alg_name), "supports_internal_parallel", False)
+                    for alg_name in viable_algs
+                )
+
+                if has_internal_parallel:
+                    external_workers = 1
+                    internal_workers = max(1, cpu_count // 1)
+                else:
+                    internal_workers = max(1, cpu_count // external_workers)
+
+                # Configurar variável de ambiente para workers internos
+                os.environ["INTERNAL_WORKERS"] = str(internal_workers)
+
+                # Decidir se usar execução paralela ou sequencial
+                use_parallel = len(viable_algs) > 1 and config.runs_per_algorithm_per_base == 1
+
+                if use_parallel:
+                    console.print(f"🚀 Usando execução paralela para {len(viable_algs)} algoritmos")
+                    console.print(f"   - Workers externos: {external_workers}")
+                    console.print(f"   - Workers internos: {internal_workers}")
+                    console.print(f"   - Paralelismo interno: {has_internal_parallel}")
+
+                    from src.core.exec.parallel_runner import (
+                        execute_algorithms_parallel,
+                    )
+
+                    parallel_results = execute_algorithms_parallel(
+                        algorithm_names=viable_algs,
+                        seqs=seqs,
+                        alphabet=alphabet,
+                        console=console,
+                        max_workers=external_workers,
+                        timeout=config.timeout,
+                    )
+
+                    # Processar resultados do paralelismo
+                    for alg_name, alg_data in parallel_results.items():
+                        executions = [alg_data]  # Resultado paralelo já é uma execução
 
                         exec_formatter.add_algorithm_results(alg_name, executions)
                         exec_key = f"{config.nome}_Base{base_idx+1}_{alg_name}"
                         self.consolidated_formatter.add_algorithm_results(exec_key, executions)
-                        valid_results = [e for e in executions if "distancia" in e and e["distancia"] != float("inf")]
-                        if valid_results:
-                            best_exec = min(valid_results, key=lambda e: e["distancia"])
-                            # Usar distancia da string base dos params
+
+                        if "distancia" in alg_data and alg_data["distancia"] != float("inf"):
                             dist_base = dataset_params.get("distancia_string_base", "-")
                             base_key_result = f"base_{base_idx+1}"
                             if alg_name not in result["algoritmos_executados"]:
                                 result["algoritmos_executados"][alg_name] = {}
                             result["algoritmos_executados"][alg_name][base_key_result] = {
-                                "dist": best_exec["distancia"],
+                                "dist": alg_data["distancia"],
                                 "dist_base": dist_base,
-                                "time": best_exec["tempo"],
+                                "time": alg_data["tempo"],
                                 "status": "sucesso",
-                                "execucoes_detalhadas": executions,  # Adicionar todas as execuções
+                                "execucoes_detalhadas": executions,
                             }
                         else:
-                            error_exec = next((e for e in executions if "erro" in e), executions[0])
                             base_key_result = f"base_{base_idx+1}"
                             if alg_name not in result["algoritmos_executados"]:
                                 result["algoritmos_executados"][alg_name] = {}
                             result["algoritmos_executados"][alg_name][base_key_result] = {
                                 "dist": float("inf"),
-                                "time": error_exec["tempo"],
+                                "time": alg_data.get("tempo", 0.0),
                                 "status": "erro",
-                                "erro": error_exec.get("erro", "Erro desconhecido"),
-                                "execucoes_detalhadas": executions,  # Adicionar todas as execuções mesmo em caso de erro
+                                "erro": alg_data.get("erro", "Erro desconhecido"),
+                                "execucoes_detalhadas": executions,
                             }
-                    except Exception as e:
-                        console.print(f"❌ Erro executando {alg_name} na base {base_idx+1}: {e}")
-                        base_key_result = f"base_{base_idx+1}"
-                        if alg_name not in result["algoritmos_executados"]:
-                            result["algoritmos_executados"][alg_name] = {}
-                        # Criar execução de erro para manter consistência
-                        error_execution = [
-                            {
-                                "distancia": float("inf"),
-                                "tempo": 0.0,
+                else:
+                    console.print(f"🔄 Usando execução sequencial para {len(viable_algs)} algoritmos")
+                    console.print(f"   - Workers internos: {internal_workers}")
+
+                    # Executar algoritmos sequencialmente
+                    for alg_name in viable_algs:
+                        console.print(f"\n🔄 Executando {alg_name} para base {base_idx + 1}...")
+                        if alg_name not in global_registry:
+                            console.print(f"❌ Algoritmo '{alg_name}' não encontrado!")
+                            continue
+                        AlgClass = global_registry[alg_name]
+                        execucoes_por_algoritmo = config.runs_per_algorithm_per_base
+                        try:
+                            executions = execute_algorithm_runs(
+                                alg_name,
+                                AlgClass,
+                                seqs,
+                                alphabet,
+                                execucoes_por_algoritmo,
+                                None,
+                                console,
+                                config.timeout,
+                            )
+
+                            exec_formatter.add_algorithm_results(alg_name, executions)
+                            exec_key = f"{config.nome}_Base{base_idx+1}_{alg_name}"
+                            self.consolidated_formatter.add_algorithm_results(exec_key, executions)
+                            valid_results = [
+                                e for e in executions if "distancia" in e and e["distancia"] != float("inf")
+                            ]
+                            if valid_results:
+                                best_exec = min(valid_results, key=lambda e: e["distancia"])
+                                # Usar distancia da string base dos params
+                                dist_base = dataset_params.get("distancia_string_base", "-")
+                                base_key_result = f"base_{base_idx+1}"
+                                if alg_name not in result["algoritmos_executados"]:
+                                    result["algoritmos_executados"][alg_name] = {}
+                                result["algoritmos_executados"][alg_name][base_key_result] = {
+                                    "dist": best_exec["distancia"],
+                                    "dist_base": dist_base,
+                                    "time": best_exec["tempo"],
+                                    "status": "sucesso",
+                                    "execucoes_detalhadas": executions,  # Adicionar todas as execuções
+                                }
+                            else:
+                                error_exec = next((e for e in executions if "erro" in e), executions[0])
+                                base_key_result = f"base_{base_idx+1}"
+                                if alg_name not in result["algoritmos_executados"]:
+                                    result["algoritmos_executados"][alg_name] = {}
+                                result["algoritmos_executados"][alg_name][base_key_result] = {
+                                    "dist": float("inf"),
+                                    "time": error_exec["tempo"],
+                                    "status": "erro",
+                                    "erro": error_exec.get("erro", "Erro desconhecido"),
+                                    "execucoes_detalhadas": executions,  # Adicionar todas as execuções mesmo em caso de erro
+                                }
+                        except Exception as e:  # pylint: disable=broad-except
+                            console.print(f"❌ Erro executando {alg_name} na base {base_idx+1}: {e}")
+                            base_key_result = f"base_{base_idx+1}"
+                            if alg_name not in result["algoritmos_executados"]:
+                                result["algoritmos_executados"][alg_name] = {}
+                            # Criar execução de erro para manter consistência
+                            error_execution = [
+                                {
+                                    "distancia": float("inf"),
+                                    "tempo": 0.0,
+                                    "status": "erro",
+                                    "erro": str(e),
+                                }
+                            ]
+                            result["algoritmos_executados"][alg_name][base_key_result] = {
+                                "dist": float("inf"),
+                                "time": 0.0,
                                 "status": "erro",
                                 "erro": str(e),
+                                "execucoes_detalhadas": error_execution,
                             }
-                        ]
-                        result["algoritmos_executados"][alg_name][base_key_result] = {
-                            "dist": float("inf"),
-                            "time": 0.0,
-                            "status": "erro",
-                            "erro": str(e),
-                            "execucoes_detalhadas": error_execution,
-                        }
 
                 # Salvar relatório individual para esta base
                 report_filename = f"{exec_index+1}_base{base_idx+1}_{config.nome.replace(' ', '_')}.txt"
@@ -471,9 +472,9 @@ class BatchExecutor:
                 exec_formatter.save_detailed_report(str(report_path))
                 console.print(f"📄 Relatório para base {base_idx+1} salvo: {report_filename}")
 
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-except
             console.print(f"❌ Erro na execução: {e}")
-            logger.exception(f"Erro na execução {config.nome}")
+            logger.exception("Erro na execução %s", config.nome)
             result["erro"] = str(e)
 
         finally:
@@ -513,9 +514,9 @@ class BatchExecutor:
             except KeyboardInterrupt:
                 console.print("\n⚠️ Execução em lote interrompida pelo usuário")
                 break
-            except Exception as e:
+            except Exception as e:  # pylint: disable=broad-except
                 console.print(f"\n❌ Erro fatal na execução {i+1}: {e}")
-                logger.exception(f"Erro fatal na execução {config.nome}")
+                logger.exception("Erro fatal na execução %s", config.nome)
                 continue
 
         # Finalizar lote
@@ -530,12 +531,7 @@ class BatchExecutor:
 
         return batch_result
 
-    def _generate_batch_summary(
-        self,
-        batch_result: dict[str, Any],
-        num_bases_sinteticas=None,
-        execs_por_base_str=None,
-    ):
+    def _generate_batch_summary(self, batch_result: dict[str, Any]):
         """Gera resumo consolidado do lote."""
         total_execucoes = len(batch_result["execucoes"])
         execucoes_com_sucesso = len([e for e in batch_result["execucoes"] if not e.get("erro")])
@@ -565,7 +561,7 @@ class BatchExecutor:
                     }
 
                 # Para cada base processada neste algoritmo
-                for base_key, result in base_results.items():
+                for _, result in base_results.items():
                     alg_stats[alg_name]["total"] += 1
                     if result.get("status") == "sucesso":
                         alg_stats[alg_name]["sucessos"] += 1

@@ -48,11 +48,13 @@ class CSPAlgorithm(ABC):
         name (str): Nome do algoritmo
         default_params (dict): Parâmetros padrão
         is_deterministic (bool): Se é determinístico (padrão: False)
+        supports_internal_parallel (bool): Se suporta paralelismo interno (padrão: False)
     """
 
     name: str
     default_params: dict
     is_deterministic: bool = False
+    supports_internal_parallel: bool = False
 
     @abstractmethod
     def __init__(self, strings: list[str], alphabet: str, **params):
@@ -99,7 +101,6 @@ class CSPAlgorithm(ABC):
             - int: Distância máxima (valor objetivo)
             - dict: Metadata da execução (iterações, etc.)
         """
-        pass
 
     def get_metadata(self) -> dict[str, Any]:
         """
@@ -112,6 +113,7 @@ class CSPAlgorithm(ABC):
             "name": self.name,
             "params": self.params,
             "is_deterministic": self.is_deterministic,
+            "supports_internal_parallel": self.supports_internal_parallel,
             "input_size": len(self.strings),
             "string_length": len(self.strings[0]) if self.strings else 0,
             "alphabet_size": len(self.alphabet),

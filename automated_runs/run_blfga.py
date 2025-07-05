@@ -1,19 +1,15 @@
+#!/usr/bin/env python3
 """
-Versão paralelizada do run_blfga.py para execução eficiente de múltiplos experimentos.
-
-Características:
-- Paralelização usando multiprocessing
-- Monitoramento de recursos
-- Controle de memória por worker
-- Progress tracking com tqdm
+Ponto de entrada para execução BLFGA automatizada.
 """
 
-import argparse
 import os
 import sys
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+# ensure project root is in path for module imports
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir)))
 
+import argparse
 import resource
 import time
 from concurrent.futures import ProcessPoolExecutor, as_completed
@@ -27,12 +23,10 @@ from typing import Any
 import pandas as pd
 import psutil
 import yaml
+from datasets.dataset_synthetic import generate_dataset_with_params
 
 from algorithms.blf_ga.algorithm import BLFGAAlgorithm
 from algorithms.blf_ga.config import BLF_GA_DEFAULTS
-
-# Imports do projeto
-from datasets.dataset_synthetic import generate_dataset_with_params
 
 # Configurações
 CONFIG_DIR = os.path.join(os.path.dirname(__file__), "configs")
@@ -70,14 +64,14 @@ class ExperimentResult:
 
 def load_yaml(path: str) -> dict:
     """Carrega arquivo YAML."""
-    with open(path) as f:
+    with open(path, encoding="utf-8") as f:
         return yaml.safe_load(f)
 
 
 def limit_worker_memory(max_mem_gb: float = 1.0):
     """Limita memória de um worker específico."""
     try:
-        soft, hard = resource.getrlimit(resource.RLIMIT_AS)
+        _soft, hard = resource.getrlimit(resource.RLIMIT_AS)
         max_bytes = int(max_mem_gb * 1024**3)
         resource.setrlimit(resource.RLIMIT_AS, (max_bytes, hard))
     except Exception as e:
@@ -108,7 +102,7 @@ def execute_single_experiment(task: ExperimentTask) -> ExperimentResult:
         # Executar algoritmo
         alg = BLFGAAlgorithm(task.strings, task.alphabet, **task.params)
         t0 = time.time()
-        center, dist, history = alg.run_with_history()
+        _, dist, _ = alg.run_with_history()
         t1 = time.time()
 
         # Monitorar memória final
@@ -127,7 +121,7 @@ def execute_single_experiment(task: ExperimentTask) -> ExperimentResult:
             success=True,
         )
 
-    except Exception as e:
+    except Exception as e:  # pylint: disable=broad-except
         return ExperimentResult(
             dataset_idx=task.dataset_idx,
             exp_idx=task.exp_idx,
@@ -322,11 +316,11 @@ def main():
     print(f"[Total] Experimentos: {total_experiments}")
 
     # Verificar limites de segurança
-    MAX_EXPERIMENTS = args.max_experiments
-    if total_experiments > MAX_EXPERIMENTS:
+    max_experiments_limit = args.max_experiments
+    if total_experiments > max_experiments_limit:
         print(
-            f"❌ Número de experimentos ({total_experiments}) excede o limite "
-            f"seguro ({MAX_EXPERIMENTS}). Reduza o grid de parâmetros ou use --max-experiments."
+            f"❌ Número de experimentos ({total_experiments}) excede o limite seguro ({max_experiments_limit}). "
+            "Reduza o grid de parâmetros ou use --max-experiments."
         )
         return
 
@@ -379,7 +373,7 @@ def main():
     except KeyboardInterrupt:
         print("\n❌ Execução interrompida pelo usuário!")
         return
-    except Exception as e:
+    except Exception as e:  # pylint: disable=broad-except
         print(f"❌ Erro na execução paralela: {e}")
         return
 

@@ -13,7 +13,8 @@ import multiprocessing
 import threading
 import time
 from collections.abc import Callable
-from concurrent.futures import ProcessPoolExecutor, TimeoutError, as_completed
+from concurrent.futures import ProcessPoolExecutor, as_completed
+from concurrent.futures import TimeoutError as ConcurrentTimeoutError
 from typing import Any
 
 from src.utils.resource_monitor import (
@@ -30,15 +31,11 @@ class TimeoutException(Exception):
     Exceção lançada quando um algoritmo excede o tempo limite de execução.
     """
 
-    pass
-
 
 class ResourceLimitException(Exception):
     """
     Exceção lançada quando há violação dos limites de recursos do sistema.
     """
-
-    pass
 
 
 class AlgorithmExecutor:
@@ -64,11 +61,11 @@ class AlgorithmExecutor:
 
         # Configurar limites usando o método from_config
         limits = ResourceLimits.from_config()
-        # Ajustar limites baseados no timeout
-        limits.max_iterations = min(100000, timeout_seconds * 1000)
-        limits.check_interval = min(2.0, timeout_seconds / 10)
+        # Ajustar limites baseados no timeout usando os defaults como base
+        limits.max_iterations = min(limits.max_iterations, timeout_seconds * 1000)
+        limits.check_interval = min(limits.check_interval, timeout_seconds / 10)
 
-        logger.info(f"AlgorithmExecutor criado: timeout={timeout_seconds}s")
+        logger.info("AlgorithmExecutor criado: timeout=%ss", timeout_seconds)
         self.resource_monitor = ResourceMonitor(limits)
         self.resource_violation = False
 
@@ -89,7 +86,7 @@ class AlgorithmExecutor:
         Returns:
             Tuple[Optional[Any], Union[int, float], dict]: Resultado da execução, incluindo centro, distância e informações adicionais.
         """
-        logger.info(f"Executando algoritmo {algorithm_instance.__class__.__name__} com timeout={self.timeout}s")
+        logger.info("Executando algoritmo %s com timeout=%ss", algorithm_instance.__class__.__name__, self.timeout)
         result_queue = multiprocessing.Queue()
         progress_queue = multiprocessing.Queue()
         self.stop_event.clear()
@@ -100,7 +97,7 @@ class AlgorithmExecutor:
 
         # Configurar monitor de recursos
         def resource_violation_handler(violation_msg: str):
-            logger.warning(f"Violação de recursos detectada: {violation_msg}")
+            logger.warning("Violação de recursos detectada: %s", violation_msg)
             self.resource_violation = True
             self.stop_event.set()
             if warning_callback:
@@ -117,7 +114,7 @@ class AlgorithmExecutor:
 
                 if hasattr(algorithm_instance, "set_progress_callback"):
                     algorithm_instance.set_progress_callback(progress)
-                logger.info(f"Iniciando processo do algoritmo {algorithm_instance.__class__.__name__}")
+                logger.info("Iniciando processo do algoritmo %s", algorithm_instance.__class__.__name__)
 
                 # Executar algoritmo e processar resultado
                 result = algorithm_instance.run()
@@ -145,12 +142,12 @@ class AlgorithmExecutor:
                     center, distance = result[0], result[1]
                     info = {"erro": "Formato de resultado inesperado"}
 
-                logger.info(f"Algoritmo finalizado: dist={distance}, info={info}")
+                logger.info("Algoritmo finalizado: dist=%s, info=%s", distance, info)
                 result_queue.put(("success", center, distance, info))
 
-            except Exception as e:
+            except Exception as e:  # pylint: disable=broad-except
                 error_msg = str(e)
-                logger.error(f"Erro na execução do algoritmo: {error_msg}", exc_info=True)
+                logger.error("Erro na execução do algoritmo: %s", error_msg, exc_info=True)
                 result_queue.put(("error", None, float("inf"), {"erro": error_msg}))
 
         # Iniciar monitoramento de recursos
@@ -174,7 +171,7 @@ class AlgorithmExecutor:
                     msg = progress_queue.get_nowait()
                     if progress_callback:
                         progress_callback(msg)
-            except Exception:
+            except Exception:  # pylint: disable=broad-except
                 pass
 
             if elapsed >= self.timeout:
@@ -196,7 +193,7 @@ class AlgorithmExecutor:
                 status, center, distance, info = result
 
                 self.resource_monitor.stop_monitoring()
-                logger.info(f"Resultado recebido do processo: status={status}")
+                logger.info("Resultado recebido do processo: status=%s", status)
 
                 if status == "timeout":
                     raise TimeoutException("Algoritmo cancelado por timeout durante execução")
@@ -207,7 +204,7 @@ class AlgorithmExecutor:
                 else:
                     return center, distance, info
 
-            except Exception:
+            except Exception:  # pylint: disable=broad-except
                 time.sleep(check_interval)
 
         # Processo terminou - obter resultado final
@@ -216,9 +213,9 @@ class AlgorithmExecutor:
         try:
             result = result_queue.get_nowait()
             status, center, distance, info = result
-            logger.info(f"Processo terminou: status={status}")
+            logger.info("Processo terminou: status=%s", status)
             return center, distance, info
-        except Exception:
+        except Exception:  # pylint: disable=broad-except
             logger.error("Processo terminou sem resultado")
             return None, float("inf"), {"erro": "Processo terminou sem resultado"}
 
@@ -232,10 +229,17 @@ class AlgorithmExecutor:
         self.resource_monitor.stop_monitoring()
 
 
-def _execute_algorithm_in_process(alg_class, strings, alphabet, params, timeout):
+def _execute_algorithm_in_process(alg_class, strings, alphabet, params, timeout):  # pylint: disable=unused-argument
     """
     Função auxiliar para executar algoritmo em processo separado.
     Esta função é importada e executada no processo worker.
+
+    Args:
+        alg_class: Classe do algoritmo
+        strings: Lista de strings
+        alphabet: Alfabeto
+        params: Parâmetros do algoritmo
+        timeout: Timeout (não usado diretamente, mas mantido para compatibilidade)
     """
     try:
         # Criar instância do algoritmo
@@ -254,7 +258,7 @@ def _execute_algorithm_in_process(alg_class, strings, alphabet, params, timeout)
             # Algoritmo moderno
             return result
 
-    except Exception as e:
+    except Exception as e:  # pylint: disable=broad-except
         # Retornar erro estruturado
         return None, float("inf"), {"erro": str(e)}
 
@@ -341,7 +345,7 @@ class ParallelAlgorithmExecutor:
                     "metadata": metadata,
                     "error": None,
                 }
-            except TimeoutError:
+            except ConcurrentTimeoutError:
                 results[index] = {
                     "name": task_info["name"],
                     "success": False,
@@ -350,7 +354,7 @@ class ParallelAlgorithmExecutor:
                     "metadata": {},
                     "error": f"Timeout ({self.timeout_seconds}s)",
                 }
-            except Exception as e:
+            except Exception as e:  # pylint: disable=broad-except
                 results[index] = {
                     "name": task_info["name"],
                     "success": False,
@@ -421,7 +425,7 @@ class ModernParallelExecutor:
         Returns:
             Lista de resultados
         """
-        logger.info(f"Executando {len(tasks)} tarefas em paralelo com {self.max_workers} workers")
+        logger.info("Executando %s tarefas em paralelo com %s workers", len(tasks), self.max_workers)
 
         with ProcessPoolExecutor(max_workers=self.max_workers) as executor:
             # Submeter todas as tarefas
@@ -435,8 +439,8 @@ class ModernParallelExecutor:
                 try:
                     result = future.result(timeout=self.timeout)
                     results.append(result)
-                except TimeoutError:
-                    logger.warning(f"Timeout na tarefa {task.get('name', 'unknown')}")
+                except ConcurrentTimeoutError:
+                    logger.warning("Timeout na tarefa %s", task.get("name", "unknown"))
                     results.append(
                         {
                             "name": task.get("name", "unknown"),
@@ -448,8 +452,8 @@ class ModernParallelExecutor:
                             "error": "timeout",
                         }
                     )
-                except Exception as e:
-                    logger.error(f"Erro na tarefa {task.get('name', 'unknown')}: {e}")
+                except Exception as e:  # pylint: disable=broad-except
+                    logger.error("Erro na tarefa %s: %s", task.get("name", "unknown"), e)
                     results.append(
                         {
                             "name": task.get("name", "unknown"),
@@ -514,7 +518,7 @@ class ModernParallelExecutor:
                 "error": None,
             }
 
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-except
             execution_time = time.time() - start_time
             return {
                 "name": task.get("name", "unknown"),

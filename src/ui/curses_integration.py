@@ -34,12 +34,12 @@ def add_curses_batch_option_to_menu():
 
         # Listar arquivos de configuração
         config_files = []
-        for pattern in ["*.yaml", "*.yml", "*.json", "*.xml"]:
+        for pattern in ["*.yaml", "*.yml", "*.json"]:
             config_files.extend(batch_dir.glob(pattern))
 
         if not config_files:
             console.print("❌ Nenhum arquivo de configuração encontrado!")
-            console.print("💡 Crie arquivos .yaml, .json ou .xml em batch_configs/")
+            console.print("💡 Crie arquivos .yaml ou .json em batch_configs/")
             return
 
         # Mostrar opções
@@ -73,7 +73,7 @@ def run_curses_batch_execution(config_path: Path):
 
     try:
         # Criar executor com arquivo de configuração
-        executor = BatchExecutor(str(config_path))
+        executor = BatchExecutor(str(config_path), workers=4)
 
         # As configurações já foram carregadas no construtor
         execucoes = executor.execucoes

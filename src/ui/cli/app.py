@@ -25,7 +25,6 @@ from datetime import datetime
 from algorithms.base import global_registry
 from src.core.io.results_formatter import ResultsFormatter
 from src.core.report.report_utils import print_quick_summary
-from src.datasets.dataset_utils import ask_save_dataset
 from src.ui.cli.console_manager import console
 from src.ui.cli.menu import (
     configure_optimization_params,
@@ -35,7 +34,9 @@ from src.ui.cli.menu import (
     select_optimization_algorithm,
     select_sensitivity_algorithm,
 )
+from src.ui.cli.save_wizard import ask_save_dataset
 from src.utils.config import ALGORITHM_TIMEOUT, safe_input
+from src.utils.curses_console import create_console_manager
 from src.utils.logging import setup_logging
 from src.utils.resource_monitor import (
     check_algorithm_feasibility,
@@ -80,15 +81,36 @@ def main():
     )
     parser.add_argument("--num-execs", type=int, help="Número de execuções por algoritmo")
     parser.add_argument("--timeout", type=int, help="Timeout por execução (segundos)")
+    parser.add_argument("--workers", "-w", type=int, default=4, help="Número de workers paralelos (padrão: 4)")
+    parser.add_argument(
+        "--console",
+        type=str,
+        choices=["auto", "curses", "simple"],
+        default="auto",
+        help="Tipo de console: auto (detecta automaticamente), curses (forçar curses), simple (console simples)",
+    )
     args = parser.parse_args()
 
     silent = args.silent
+
+    # Criar console manager apropriado
+    if silent:
+        # Em modo silencioso, sempre usar console simples
+        console_manager = create_console_manager(force_simple=True)
+    else:
+        # Detectar ou forçar tipo de console
+        if args.console == "simple":
+            console_manager = create_console_manager(force_simple=True)
+        elif args.console == "curses":
+            console_manager = create_console_manager(force_simple=False)
+        else:  # auto
+            console_manager = create_console_manager(force_simple=False)
 
     def silent_print(*a, **k):
         pass
 
     p = print if not silent else silent_print
-    cprint = console.print if not silent else silent_print
+    cprint = console_manager.print if not silent else silent_print
 
     # Mostrar o número do processo (PID) logo no início
     p(f"[PID] Processo em execução: {os.getpid()}")
@@ -156,7 +178,7 @@ def main():
                     if not config_file:
                         cprint("❌ Nenhum arquivo de configuração selecionado.")
                         return
-                executor = BatchExecutor(config_file)
+                executor = BatchExecutor(config_file, workers=args.workers)
                 batch_result = executor.execute_batch()
                 cprint("\n✅ Execução em lote concluída!")
                 cprint(f"Tempo total: {batch_result['tempo_total']:.1f}s")
@@ -192,7 +214,7 @@ def main():
                     cprint("❌ Nenhum arquivo de configuração selecionado.")
                     return
                 try:
-                    executor = BatchExecutor(config_file)
+                    executor = BatchExecutor(config_file, workers=args.workers)
                     batch_result = executor.execute_batch()
                     cprint("\n✅ Execução em lote concluída!")
                     cprint(f"Tempo total: {batch_result['tempo_total']:.1f}s")
@@ -330,54 +352,127 @@ def main():
         cprint("EXECUTANDO ALGORITMOS")
         cprint("=" * 50)
 
-        from src.core.exec.runner import execute_algorithm_runs
+        # Configurar workers internos baseado no número de CPUs e workers externos
+        import multiprocessing
 
-        formatter = ResultsFormatter()
-        results = {}
+        cpu_count = multiprocessing.cpu_count()
+        external_workers = args.workers
 
-        for alg_name in viable_algs:
-            if alg_name not in global_registry:
-                cprint(f"ERRO: Algoritmo '{alg_name}' não encontrado!")
-                continue
+        # Verificar se algum algoritmo suporta paralelismo interno
+        has_internal_parallel = any(
+            getattr(global_registry.get(alg_name), "supports_internal_parallel", False)
+            for alg_name in viable_algs
+            if alg_name in global_registry
+        )
 
-            # Log apenas início simplificado
-            logging.debug(f"[ALG_EXEC] Iniciando {alg_name}")
-            AlgClass = global_registry[alg_name]
+        if has_internal_parallel:
+            # Se há paralelismo interno, use apenas 1 worker externo
+            external_workers = 1
+            internal_workers = max(1, cpu_count // 1)
+        else:
+            # Se não há paralelismo interno, use todos os workers externos
+            internal_workers = max(1, cpu_count // external_workers)
 
-            executions = execute_algorithm_runs(alg_name, AlgClass, seqs, alphabet, num_execs, None, console, timeout)
+        # Configurar variável de ambiente para workers internos
+        os.environ["INTERNAL_WORKERS"] = str(internal_workers)
 
-            # Log resumido das execuções
-            logging.debug(f"[ALG_EXEC] {alg_name} concluído: {len(executions)} execuções")
-            for _, exec_data in enumerate(executions):
-                # Não calcular mais distancia_string_base aqui, apenas usar seed
-                exec_data["seed"] = seed
+        cprint("🔧 Configuração de paralelismo:")
+        cprint(f"   - CPUs disponíveis: {cpu_count}")
+        cprint(f"   - Workers externos: {external_workers}")
+        cprint(f"   - Workers internos: {internal_workers}")
+        cprint(f"   - Paralelismo interno detectado: {has_internal_parallel}")
 
-            formatter.add_algorithm_results(alg_name, executions)
-            valid_results = [e for e in executions if "distancia" in e and e["distancia"] != float("inf")]
-            if valid_results:
-                best_exec = min(valid_results, key=lambda e: e["distancia"])
-                logging.debug(f"[ALG_EXEC] {alg_name} melhor: dist={best_exec['distancia']}")
+        # Decidir se usar execução paralela ou sequencial
+        use_parallel = len(viable_algs) > 1 and num_execs == 1
 
-                # Adicionar distância da string base ao resultado
-                dist_base = params.get("distancia_string_base", "-")
+        if use_parallel:
+            cprint(f"🚀 Usando execução paralela para {len(viable_algs)} algoritmos")
+            from src.core.exec.parallel_runner import execute_algorithms_parallel
 
-                results[alg_name] = {
-                    "dist": best_exec["distancia"],
-                    "dist_base": dist_base,
-                    "time": best_exec["tempo"],
-                }
-            else:
-                error_exec = next((e for e in executions if "erro" in e), executions[0])
-                logging.debug(f"[ALG_EXEC] {alg_name} sem resultados válidos")
-                results[alg_name] = {
-                    "dist": "-",
-                    "dist_base": "-",
-                    "time": error_exec["tempo"],
-                    "warn": error_exec.get("erro", "Erro desconhecido"),
-                }
+            parallel_results = execute_algorithms_parallel(
+                algorithm_names=viable_algs,
+                seqs=seqs,
+                alphabet=alphabet,
+                console=console_manager,
+                max_workers=external_workers,
+                timeout=timeout,
+            )
+
+            formatter = ResultsFormatter()
+            results = {}
+
+            for alg_name, alg_data in parallel_results.items():
+                # Converter resultado do formato paralelo para o formato esperado
+                executions = [alg_data]  # Resultado paralelo já é uma execução
+                executions[0]["seed"] = seed
+
+                formatter.add_algorithm_results(alg_name, executions)
+
+                if "distancia" in alg_data and alg_data["distancia"] != float("inf"):
+                    dist_base = params.get("distancia_string_base", "-")
+                    results[alg_name] = {
+                        "dist": alg_data["distancia"],
+                        "dist_base": dist_base,
+                        "time": alg_data["tempo"],
+                    }
+                else:
+                    results[alg_name] = {
+                        "dist": "-",
+                        "dist_base": "-",
+                        "time": "-",
+                    }
+        else:
+            cprint(f"🔄 Usando execução sequencial para {len(viable_algs)} algoritmos")
+            from src.core.exec.runner import execute_algorithm_runs
+
+            formatter = ResultsFormatter()
+            results = {}
+
+            for alg_name in viable_algs:
+                if alg_name not in global_registry:
+                    cprint(f"ERRO: Algoritmo '{alg_name}' não encontrado!")
+                    continue
+
+                # Log apenas início simplificado
+                logging.debug(f"[ALG_EXEC] Iniciando {alg_name}")
+                AlgClass = global_registry[alg_name]
+
+                executions = execute_algorithm_runs(
+                    alg_name, AlgClass, seqs, alphabet, num_execs, None, console_manager, timeout
+                )
+
+                # Log resumido das execuções
+                logging.debug(f"[ALG_EXEC] {alg_name} concluído: {len(executions)} execuções")
+                for _, exec_data in enumerate(executions):
+                    # Não calcular mais distancia_string_base aqui, apenas usar seed
+                    exec_data["seed"] = seed
+
+                formatter.add_algorithm_results(alg_name, executions)
+                valid_results = [e for e in executions if "distancia" in e and e["distancia"] != float("inf")]
+                if valid_results:
+                    best_exec = min(valid_results, key=lambda e: e["distancia"])
+                    logging.debug(f"[ALG_EXEC] {alg_name} melhor: dist={best_exec['distancia']}")
+
+                    # Adicionar distância da string base ao resultado
+                    dist_base = params.get("distancia_string_base", "-")
+
+                    results[alg_name] = {
+                        "dist": best_exec["distancia"],
+                        "dist_base": dist_base,
+                        "time": best_exec["tempo"],
+                    }
+                else:
+                    error_exec = next((e for e in executions if "erro" in e), executions[0])
+                    logging.debug(f"[ALG_EXEC] {alg_name} sem resultados válidos")
+                    results[alg_name] = {
+                        "dist": "-",
+                        "dist_base": "-",
+                        "time": error_exec["tempo"],
+                        "warn": error_exec.get("erro", "Erro desconhecido"),
+                    }
 
         # Exibir resumo dos resultados
-        print_quick_summary(results, console)
+        print_quick_summary(results, console_manager)
 
         cprint("\n📄 Gerando relatório detalhado...")
         # Adicionar informações básicas ao formatter para o relatório
@@ -417,11 +512,15 @@ def main():
 
     except Exception as e:
         if not silent:
-            console.print(f"\nERRO FATAL: {e}")
+            console_manager.print(f"\nERRO FATAL: {e}")
             traceback.print_exc()
         else:
             logging.exception("Erro fatal durante execução", exc_info=e)
         sys.exit(1)
+    finally:
+        # Limpar console curses se necessário
+        if hasattr(console_manager, "cleanup") and callable(getattr(console_manager, "cleanup", None)):
+            console_manager.cleanup()
 
 
 def generate_dataset_automated():
@@ -470,7 +569,6 @@ def run_optimization_workflow():
     """Executa o workflow de otimização de hiperparâmetros."""
     from src.datasets.dataset_synthetic import generate_dataset
     from src.optimization.optuna_optimizer import optimize_algorithm
-    from src.ui.cli.console_manager import console
 
     console.print("\n=== Otimização de Hiperparâmetros ===")
 
@@ -555,7 +653,6 @@ def run_sensitivity_workflow():
     """Executa o workflow de análise de sensibilidade."""
     from src.datasets.dataset_synthetic import generate_dataset
     from src.optimization.sensitivity_analyzer import analyze_algorithm_sensitivity
-    from src.ui.cli.console_manager import console
 
     console.print("\n=== Análise de Sensibilidade ===")
 

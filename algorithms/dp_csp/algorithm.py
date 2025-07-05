@@ -28,10 +28,8 @@ class DPCSPAlgorithm(CSPAlgorithm):
 
     name = "DP-CSP"
     default_params = DP_CSP_DEFAULTS
+    supports_internal_parallel = False  # DP-CSP não suporta paralelismo interno
     is_deterministic = True
-
-    def __init__(self, strings: list[str], alphabet: str, **params):
-        super().__init__(strings, alphabet, **params)
 
     def run(self) -> tuple[str, int, dict]:
         """

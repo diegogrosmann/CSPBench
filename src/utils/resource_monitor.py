@@ -129,7 +129,7 @@ class ResourceMonitor:
 
             # No Linux/Unix, tenta ler de /proc/self/status
             if os.path.exists("/proc/self/status"):
-                with open("/proc/self/status") as f:
+                with open("/proc/self/status", encoding="utf-8") as f:
                     for line in f:
                         if line.startswith("VmRSS:"):
                             # VmRSS está em kB
@@ -163,8 +163,8 @@ class ResourceMonitor:
 
             return memory_mb
 
-        except Exception as e:
-            logger.error(f"Erro ao obter uso de memória: {e}")
+        except Exception as e:  # pylint: disable=broad-except
+            logger.error("Erro ao obter uso de memória: %s", e)
             return 0.0
 
     def check_limits(self) -> tuple[bool, list[str]]:
@@ -198,7 +198,7 @@ class ResourceMonitor:
         if self.limits.gc_force_on_limit:
             threshold_memory = self.limits.max_memory_mb * self.limits.gc_threshold_ratio
             if memory_mb > threshold_memory:
-                logger.info(f"Executando GC preventivo: {memory_mb:.1f}MB > {threshold_memory:.1f}MB")
+                logger.info("Executando GC preventivo: %.1fMB > %.1fMB", memory_mb, threshold_memory)
                 force_garbage_collection()
 
         return len(violations) == 0, violations
@@ -218,7 +218,7 @@ class ResourceMonitor:
                 # Verificar se deve fazer GC por frequência
                 if self.limits.gc_auto_collect and self.gc_counter >= self.limits.gc_frequency:
                     should_gc = True
-                    logger.debug(f"GC por frequência: {self.gc_counter} >= {self.limits.gc_frequency}")
+                    logger.debug("GC por frequência: %s >= %s", self.gc_counter, self.limits.gc_frequency)
 
                 # Verificar se deve fazer GC por tempo (a cada 30 segundos)
                 current_time = time.time()
@@ -237,11 +237,11 @@ class ResourceMonitor:
 
                 if not is_safe and self.violation_callback:
                     violation_msg = "; ".join(violations)
-                    logger.warning(f"Limites de recursos violados: {violation_msg}")
+                    logger.warning("Limites de recursos violados: %s", violation_msg)
                     self.violation_callback(violation_msg)
 
-            except Exception as e:
-                logger.error(f"Erro no loop de monitoramento: {e}")
+            except Exception as e:  # pylint: disable=broad-except
+                logger.error("Erro no loop de monitoramento: %s", e)
                 time.sleep(1.0)
 
     def get_memory_stats(self) -> dict:
@@ -279,7 +279,7 @@ def get_available_memory_mb() -> float:
         # No Linux, tenta ler /proc/meminfo
         if os.path.exists("/proc/meminfo"):
             meminfo = {}
-            with open("/proc/meminfo") as f:
+            with open("/proc/meminfo", encoding="utf-8") as f:
                 for line in f:
                     parts = line.split()
                     if len(parts) >= 2:
@@ -297,8 +297,8 @@ def get_available_memory_mb() -> float:
         # Fallback conservador: assume 2GB disponível
         return 2048.0
 
-    except Exception as e:
-        logger.error(f"Erro ao obter memória disponível: {e}")
+    except Exception as e:  # pylint: disable=broad-except
+        logger.error("Erro ao obter memória disponível: %s", e)
         return 1024.0  # Fallback muito conservador
 
 
@@ -330,7 +330,7 @@ def estimate_algorithm_memory(n: int, L: int, algorithm_name: str) -> float:
     multiplier = multipliers.get(algorithm_name, 10)
     estimated = base_data_mb * multiplier
 
-    logger.debug(f"Estimativa de memória para {algorithm_name}: {estimated:.2f}MB")
+    logger.debug("Estimativa de memória para %s: %.2fMB", algorithm_name, estimated)
     return estimated
 
 
@@ -422,8 +422,11 @@ def force_garbage_collection():
         objects_freed = objects_before - objects_after
 
         logger.debug(
-            f"GC executado: {collected_total} objetos coletados, "
-            f"{objects_freed} objetos liberados ({objects_before} → {objects_after})"
+            "GC executado: %s objetos coletados, " "%s objetos liberados (%s → %s)",
+            collected_total,
+            objects_freed,
+            objects_before,
+            objects_after,
         )
 
         # Forçar limpeza adicional se muitos objetos foram coletados
@@ -431,5 +434,5 @@ def force_garbage_collection():
             logger.debug("Executando GC adicional devido ao alto número de objetos coletados")
             gc.collect()
 
-    except Exception as e:
-        logger.error(f"Erro no garbage collection: {e}")
+    except Exception as e:  # pylint: disable=broad-except
+        logger.error("Erro no garbage collection: %s", e)

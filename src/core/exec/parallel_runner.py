@@ -25,6 +25,7 @@ from typing import Any
 from algorithms.base import global_registry
 from src.core.exec.algorithm_executor import ParallelAlgorithmExecutor
 from src.core.exec.runner import ProgressTracker
+from src.utils.curses_console import CursesConsole
 from src.utils.resource_monitor import force_garbage_collection
 from src.utils.signal_manager import is_interrupted, register_shutdown_callback
 
@@ -61,10 +62,11 @@ class ParallelRunner:
         Inicializa o runner paralelo.
 
         Args:
-            max_workers: Número máximo de workers paralelos
+            max_workers: Número máximo de workers paralelos (padrão: 4)
             timeout: Timeout por algoritmo em segundos
         """
-        self.max_workers = max_workers
+        # Definir workers padrão como 4
+        self.max_workers = max_workers if max_workers is not None else 4
         self.timeout = timeout
         self._shutdown_requested = False
         self._current_executor = None
@@ -115,6 +117,7 @@ class ParallelRunner:
         # Preparar tarefas
         tasks = []
         valid_algorithms = []
+        has_internal_parallel = False
 
         for alg_name in algorithm_names:
             if alg_name not in global_registry:
@@ -123,6 +126,11 @@ class ParallelRunner:
                 continue
 
             alg_class = global_registry[alg_name]
+
+            # Verificar se algum algoritmo suporta paralelismo interno
+            if getattr(alg_class, "supports_internal_parallel", False):
+                has_internal_parallel = True
+
             tasks.append(
                 {
                     "alg_class": alg_class,
@@ -138,6 +146,20 @@ class ParallelRunner:
             if console:
                 console.print("❌ Nenhum algoritmo válido encontrado")
             return {}
+
+        # Calcular workers externos baseado no suporte a paralelismo interno
+        external_workers = 1 if has_internal_parallel else self.max_workers
+
+        if console:
+            console.print("🔧 Configuração de paralelismo:")
+            console.print(f"   - Workers externos: {external_workers}")
+            console.print(f"   - Paralelismo interno detectado: {has_internal_parallel}")
+
+            # Se é curses console, mostrar status
+            if isinstance(console, CursesConsole):
+                console.show_status(f"Preparando execução de {len(tasks)} algoritmos...")
+
+        logger.info(f"Usando {external_workers} workers externos (paralelismo interno: {has_internal_parallel})")
 
         # Criar tracker de progresso
         progress_tracker = ProgressTracker(f"Executando {len(tasks)} algoritmos", total=len(tasks), console=console)

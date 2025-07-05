@@ -9,21 +9,12 @@ Funções auxiliares:
     max_distance(center, strings): Wrapper para distância máxima.
 """
 
-# blf_ga.py
-"""
-blf_ga.py
-=========
-
-Implementação em Python 3 da heurística BLF-GA (Blockwise Learning Fusion
-+ Genetic Algorithm) para o Closest String Problem (CSP) com refinamento
-corrigido para evitar loops infinitos.
-"""
-
 import logging
 import random
 import time
 from collections import Counter
 from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
 
 import numpy as np
 
@@ -59,30 +50,34 @@ class BLFGA:
         max_time: float | None = None,
         seed: int | None = None,
         # Novos parâmetros
-        immigrant_freq: int | None = None,
-        immigrant_ratio: float | None = None,
-        diversity_threshold: float | None = None,
-        mutation_adapt_N: int | None = None,
-        mutation_adapt_factor: float | None = None,
-        mutation_adapt_duration: int | None = None,
-        mutation_type: str | None = None,
-        mutation_multi_n: int | None = None,
-        tournament_k: int | None = None,
-        crossover_type: str | None = None,
-        niching: bool | None = None,
-        niching_radius: int | None = None,
-        refinement_type: str | None = None,
-        refine_elites: str | None = None,
-        refine_iter_limit: int | None = None,
-        restart_patience: int | None = None,
-        restart_ratio: float | None = None,
-        disable_elitism_gens: int | None = None,
-        no_improve_patience: int | None = None,
+        immigrant_freq: int | None = None,  # pylint: disable=unused-argument
+        immigrant_ratio: float | None = None,  # pylint: disable=unused-argument
+        diversity_threshold: float | None = None,  # pylint: disable=unused-argument
+        mutation_adapt_N: int | None = None,  # pylint: disable=unused-argument
+        mutation_adapt_factor: float | None = None,  # pylint: disable=unused-argument
+        mutation_adapt_duration: int | None = None,  # pylint: disable=unused-argument
+        mutation_type: str | None = None,  # pylint: disable=unused-argument
+        mutation_multi_n: int | None = None,  # pylint: disable=unused-argument
+        tournament_k: int | None = None,  # pylint: disable=unused-argument
+        crossover_type: str | None = None,  # pylint: disable=unused-argument
+        niching: bool | None = None,  # pylint: disable=unused-argument
+        niching_radius: int | None = None,  # pylint: disable=unused-argument
+        refinement_type: str | None = None,  # pylint: disable=unused-argument
+        refine_elites: str | None = None,  # pylint: disable=unused-argument
+        refine_iter_limit: int | None = None,  # pylint: disable=unused-argument
+        restart_patience: int | None = None,  # pylint: disable=unused-argument
+        restart_ratio: float | None = None,  # pylint: disable=unused-argument
+        disable_elitism_gens: int | None = None,  # pylint: disable=unused-argument
+        no_improve_patience: int | None = None,  # pylint: disable=unused-argument
     ):
         self.strings = strings
         self.n = len(strings)
         self.L = len(strings[0])
         self.alphabet = alphabet
+
+        # Configurar workers internos a partir da variável de ambiente
+        # Temporariamente desabilitado para debug
+        self.internal_workers = 1  # int(os.environ.get('INTERNAL_WORKERS', '1'))
 
         # Carrega parâmetros do dicionário de defaults, permite sobrescrever via argumentos
         params = {**BLF_GA_DEFAULTS}
@@ -224,7 +219,8 @@ class BLFGA:
 
             repo = self._learn_blocks(pop)
             pop = self._next_generation(pop, repo)
-            pop.sort(key=lambda s: max_distance(s, self.strings))
+            # Ordenar população por fitness usando paralelismo
+            pop = self._sort_population_parallel(pop)
 
             # --- Elitismo adaptativo ---
             k = max(1, int(self.elite_rate * self.pop_size))
@@ -262,7 +258,7 @@ class BLFGA:
 
             # Log apenas a cada 50 gerações ou na última
             if gen % 50 == 0 or gen == self.max_gens or best_val == 0:
-                logger.debug(f"Geração {gen}: melhor_dist={best_val}, diversidade={diversity:.2f}")
+                logger.debug("Geração %s: melhor_dist=%s, diversidade=%.2f", gen, best_val, diversity)
 
             if best_val == 0:
                 if self.progress_callback:
@@ -280,7 +276,7 @@ class BLFGA:
         pop = [consensus]
         for _ in range(self.pop_size // 3):
             s = list(consensus)
-            for idx, (l, r) in enumerate(self.blocks):
+            for l, r in self.blocks:
                 if self.rng.random() < 0.5:
                     src = self.rng.choice(self.strings)
                     s[l:r] = src[l:r]
@@ -342,8 +338,11 @@ class BLFGA:
         else:
             return ind
 
-    def _next_generation(self, pop: Population, repo: list[String]) -> Population:
-        pop_sorted = sorted(pop, key=lambda s: max_distance(s, self.strings))
+    def _next_generation(self, pop: Population, repo: list[String]) -> Population:  # pylint: disable=unused-argument
+        # Avaliar e ordenar população usando paralelismo
+        evaluated_pop = self._evaluate_population_parallel(pop)
+        pop_sorted = [s for s, _ in evaluated_pop]
+
         elite_n = max(1, int(self.elite_rate * self.pop_size))
         new_pop = pop_sorted[:elite_n]
         while len(new_pop) < self.pop_size:
@@ -362,8 +361,6 @@ class BLFGA:
 
     def _refine_elites(self, pop: Population) -> Population:
         # Paralelização opcional pode ser feita aqui
-        from concurrent.futures import ThreadPoolExecutor
-
         def refine(ind):
             return self._apply_refinement(ind)
 
@@ -389,3 +386,41 @@ class BLFGA:
             blocks.append((cur, min(self.L, cur + length)))
             cur += length
         return blocks
+
+    def _evaluate_population_parallel(self, pop: Population) -> list[tuple[str, int]]:
+        """
+        Avalia a população em paralelo usando threads.
+
+        Args:
+            pop: População a ser avaliada
+
+        Returns:
+            Lista de tuplas (string, fitness) ordenadas por fitness
+        """
+        if self.internal_workers <= 1:
+            # Se apenas 1 worker, usar avaliação sequencial
+            return [(s, max_distance(s, self.strings)) for s in pop]
+
+        # Função para avaliar uma string
+        def evaluate_string(s: str) -> tuple[str, int]:
+            return (s, max_distance(s, self.strings))
+
+        # Usar ThreadPoolExecutor para paralelizar avaliações
+        with ThreadPoolExecutor(max_workers=self.internal_workers) as executor:
+            results = list(executor.map(evaluate_string, pop))
+
+        # Ordenar por fitness (distância máxima)
+        return sorted(results, key=lambda x: x[1])
+
+    def _sort_population_parallel(self, pop: Population) -> Population:
+        """
+        Ordena a população por fitness usando paralelismo.
+
+        Args:
+            pop: População a ser ordenada
+
+        Returns:
+            População ordenada por fitness
+        """
+        evaluated = self._evaluate_population_parallel(pop)
+        return [s for s, _ in evaluated]
