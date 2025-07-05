@@ -27,7 +27,14 @@ from src.core.io.results_formatter import ResultsFormatter
 from src.core.report.report_utils import print_quick_summary
 from src.datasets.dataset_utils import ask_save_dataset
 from src.ui.cli.console_manager import console
-from src.ui.cli.menu import menu, select_algorithms
+from src.ui.cli.menu import (
+    configure_optimization_params,
+    configure_sensitivity_params,
+    menu,
+    select_algorithms,
+    select_optimization_algorithm,
+    select_sensitivity_algorithm,
+)
 from src.utils.config import ALGORITHM_TIMEOUT, safe_input
 from src.utils.logging import setup_logging
 from src.utils.resource_monitor import (
@@ -204,6 +211,29 @@ def main():
                 except Exception as e:
                     cprint(f"❌ Erro na execução em lote: {e}")
                     return
+            elif choice == "5":
+                # Execução em lote com interface curses
+                from src.ui.curses_integration import add_curses_batch_option_to_menu
+
+                curses_executor = add_curses_batch_option_to_menu()
+                curses_executor()
+                return
+            elif choice == "6":
+                # Otimização de hiperparâmetros
+                try:
+                    run_optimization_workflow()
+                except Exception as e:
+                    cprint(f"❌ Erro na otimização: {e}")
+                    logging.exception("Erro na otimização", exc_info=e)
+                return
+            elif choice == "7":
+                # Análise de sensibilidade
+                try:
+                    run_sensitivity_workflow()
+                except Exception as e:
+                    cprint(f"❌ Erro na análise de sensibilidade: {e}")
+                    logging.exception("Erro na análise de sensibilidade", exc_info=e)
+                return
             elif choice in ["1", "2", "3"]:
                 try:
                     if choice == "1":
@@ -436,5 +466,175 @@ def generate_dataset_automated():
     return data, params
 
 
-if __name__ == "__main__":
-    main()
+def run_optimization_workflow():
+    """Executa o workflow de otimização de hiperparâmetros."""
+    from src.datasets.dataset_synthetic import generate_dataset
+    from src.optimization.optuna_optimizer import optimize_algorithm
+    from src.ui.cli.console_manager import console
+
+    console.print("\n=== Otimização de Hiperparâmetros ===")
+
+    # Selecionar algoritmo
+    algorithm_name = select_optimization_algorithm()
+    if not algorithm_name:
+        console.print("❌ Nenhum algoritmo selecionado.")
+        return
+
+    # Configurar parâmetros
+    config = configure_optimization_params()
+
+    # Gerar dataset para otimização
+    console.print("\n📊 Gerando dataset para otimização...")
+    seqs, _ = generate_dataset(silent=True)
+
+    console.print(f"✅ Dataset gerado: {len(seqs)} sequências de tamanho {len(seqs[0])}")
+
+    # Executar otimização
+    alphabet = "".join(sorted(set("".join(seqs))))
+
+    try:
+        result = optimize_algorithm(
+            algorithm_name=algorithm_name,
+            sequences=seqs,
+            alphabet=alphabet,
+            n_trials=config["n_trials"],
+            timeout_per_trial=config["timeout"],
+            show_progress=True,
+        )
+
+        console.print("\n✅ Otimização concluída!")
+        console.print(f"Melhor valor: {result.best_value}")
+        console.print(f"Melhores parâmetros: {result.best_params}")
+
+        # Salvar visualizações se solicitado
+        if config["save_plots"]:
+            from src.optimization.visualization import OptimizationVisualizer
+
+            visualizer = OptimizationVisualizer(result)
+            plots_dir = os.path.join(RESULTS_DIR, "optimization_plots")
+            os.makedirs(plots_dir, exist_ok=True)
+
+            # Salvar gráficos
+            history_path = os.path.join(plots_dir, f"{algorithm_name}_history.png")
+            importance_path = os.path.join(plots_dir, f"{algorithm_name}_importance.png")
+
+            visualizer.plot_optimization_history(save_path=history_path)
+            visualizer.plot_parameter_importance(save_path=importance_path)
+
+            console.print(f"📊 Gráficos salvos em: {plots_dir}")
+
+        # Salvar resultados
+        import json
+
+        results_path = os.path.join(
+            RESULTS_DIR, f"optimization_{algorithm_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+        )
+        with open(results_path, "w") as f:
+            json.dump(
+                {
+                    "best_params": result.best_params,
+                    "best_value": result.best_value,
+                    "n_trials": result.n_trials,
+                    "study_name": result.study_name,
+                    "optimization_time": result.optimization_time,
+                    "all_trials": result.all_trials,
+                },
+                f,
+                indent=2,
+                default=str,
+            )
+
+        console.print(f"💾 Resultados salvos em: {results_path}")
+
+    except Exception as e:
+        console.print(f"❌ Erro durante otimização: {e}")
+        logging.exception("Erro na otimização", exc_info=e)
+
+
+def run_sensitivity_workflow():
+    """Executa o workflow de análise de sensibilidade."""
+    from src.datasets.dataset_synthetic import generate_dataset
+    from src.optimization.sensitivity_analyzer import analyze_algorithm_sensitivity
+    from src.ui.cli.console_manager import console
+
+    console.print("\n=== Análise de Sensibilidade ===")
+
+    # Selecionar algoritmo
+    algorithm_name = select_sensitivity_algorithm()
+    if not algorithm_name:
+        console.print("❌ Nenhum algoritmo selecionado.")
+        return
+
+    # Configurar parâmetros
+    config = configure_sensitivity_params()
+
+    # Gerar dataset para análise
+    console.print("\n📊 Gerando dataset para análise...")
+    seqs, _ = generate_dataset(silent=True)
+
+    console.print(f"✅ Dataset gerado: {len(seqs)} sequências de tamanho {len(seqs[0])}")
+
+    # Executar análise de sensibilidade
+    alphabet = "".join(sorted(set("".join(seqs))))
+
+    try:
+        result = analyze_algorithm_sensitivity(
+            algorithm_name=algorithm_name,
+            sequences=seqs,
+            alphabet=alphabet,
+            n_samples=config["n_samples"],
+            timeout_per_sample=config.get("timeout", 60),
+            show_progress=True,
+        )
+
+        console.print("\n✅ Análise de sensibilidade concluída!")
+        console.print(f"Parâmetros analisados: {len(result.parameter_names)}")
+
+        # Mostrar principais parâmetros sensíveis
+        important_params = result.get_most_important_parameters(n=5)
+        console.print("\n📈 Parâmetros mais sensíveis:")
+        for param, value in important_params:
+            console.print(f"  • {param}: {value:.4f}")
+
+        # Salvar visualizações se solicitado
+        if config["save_plots"]:
+            from src.optimization.visualization import SensitivityVisualizer
+
+            visualizer = SensitivityVisualizer(result)
+            plots_dir = os.path.join(RESULTS_DIR, "sensitivity_plots")
+            os.makedirs(plots_dir, exist_ok=True)
+
+            # Salvar gráficos
+            sensitivity_path = os.path.join(plots_dir, f"{algorithm_name}_sensitivity.png")
+            visualizer.plot_sensitivity_indices(save_path=sensitivity_path)
+
+            console.print(f"📊 Gráficos salvos em: {plots_dir}")
+
+        # Salvar resultados
+        import json
+
+        results_path = os.path.join(
+            RESULTS_DIR, f"sensitivity_{algorithm_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+        )
+        with open(results_path, "w") as f:
+            json.dump(
+                {
+                    "method": result.method,
+                    "parameter_names": result.parameter_names,
+                    "first_order": result.first_order,
+                    "total_order": result.total_order,
+                    "second_order": result.second_order,
+                    "confidence_intervals": result.confidence_intervals,
+                    "n_samples": result.n_samples,
+                    "analysis_time": result.analysis_time,
+                },
+                f,
+                indent=2,
+                default=str,
+            )
+
+        console.print(f"💾 Resultados salvos em: {results_path}")
+
+    except Exception as e:
+        console.print(f"❌ Erro durante análise de sensibilidade: {e}")
+        logging.exception("Erro na análise de sensibilidade", exc_info=e)
