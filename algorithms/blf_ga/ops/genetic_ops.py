@@ -54,7 +54,9 @@ def mutate_transposition(ind: str, rng: random.Random) -> str:
 
 
 # --- Crossover ---
-def crossover_one_point(p1: String, p2: String, rng: random.Random) -> tuple[String, String]:
+def crossover_one_point(
+    p1: String, p2: String, rng: random.Random
+) -> tuple[String, String]:
     L = len(p1)
     point = rng.randint(1, L - 1)
     c1 = p1[:point] + p2[point:]
@@ -62,7 +64,9 @@ def crossover_one_point(p1: String, p2: String, rng: random.Random) -> tuple[Str
     return c1, c2
 
 
-def crossover_uniform(p1: String, p2: String, rng: random.Random) -> tuple[String, String]:
+def crossover_uniform(
+    p1: String, p2: String, rng: random.Random
+) -> tuple[String, String]:
     L = len(p1)
     c1 = []
     c2 = []

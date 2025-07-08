@@ -14,13 +14,29 @@ import curses
 import logging
 import threading
 import time
+from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-from typing import Any
+from typing import TYPE_CHECKING, Any, Dict, Optional
 
-from src.core.exec.batch_executor import BatchExecutor
+from src.core.interfaces.executor import TaskStatus
+
+if TYPE_CHECKING:
+    from .curses_integration import AlgorithmExecutionTracker
 
 logger = logging.getLogger(__name__)
+
+
+class WorkerStatus(Enum):
+    """Status dos workers de execução."""
+
+    IDLE = "idle"
+    RUNNING = "running"
+    FINISHED = "finished"
+    ERROR = "error"
+    FAILED = "failed"
+    COMPLETED = "completed"
+    TIMEOUT = "timeout"
 
 
 class ExecutionStatus(Enum):
@@ -54,7 +70,13 @@ class AlgorithmProgress:
         self.status = ExecutionStatus.RUNNING
         self.start_time = time.time()
 
-    def update(self, run_index: int, distance: float | None = None, iterations: int | None = None, message: str = ""):
+    def update(
+        self,
+        run_index: int,
+        distance: float | None = None,
+        iterations: int | None = None,
+        message: str = "",
+    ):
         """Atualiza progresso."""
         self.current_run = run_index + 1
         if distance is not None:
@@ -88,12 +110,14 @@ class AlgorithmProgress:
 class BatchProgress:
     """Progresso de execução de um batch."""
 
-    def __init__(self, name: str, total_configs: int):
+    def __init__(self, name: str):
         self.name = name
-        self.total_configs = total_configs
+        self.total_configs = 0
         self.current_config = 0
+        self.config_name = ""
         self.current_base = 0
         self.total_bases = 0
+        self.distancia_string_base: int | None = None
         self.dataset_info = {}
         self.algorithms: dict[str, AlgorithmProgress] = {}
         self.start_time: float | None = None
@@ -105,16 +129,40 @@ class BatchProgress:
         self.status = ExecutionStatus.RUNNING
         self.start_time = time.time()
 
-    def set_current_config(self, config_index: int, config_name: str, total_bases: int):
+    def set_current_config(
+        self,
+        config_index: int,
+        config_name: str | None = None,
+        total_configs: int | None = None,
+    ):
         """Define configuração atual."""
-        self.current_config = config_index + 1
-        self.total_bases = total_bases
-        self.current_base = 0
+        self.current_config = config_index
+        if config_name:
+            self.config_name = config_name
+        if total_configs:
+            self.total_configs = total_configs
+        elif self.total_configs is None:
+            self.total_configs = 1
 
-    def set_current_base(self, base_index: int, dataset_info: dict):
+    def set_current_base(
+        self,
+        base_index: int,
+        total_bases: int | None = None,
+        distancia_string_base: Optional[int] = None,
+        dataset_info: Optional[Dict[str, Any]] = None,
+    ):
         """Define base atual."""
-        self.current_base = base_index + 1
-        self.dataset_info = dataset_info
+        self.current_base = base_index
+        if total_bases:
+            self.total_bases = total_bases
+        elif self.total_bases is None:
+            self.total_bases = 1
+
+        if distancia_string_base is not None:
+            self.distancia_string_base = distancia_string_base
+
+        if dataset_info is not None:
+            self.dataset_info = dataset_info
 
     def add_algorithm(self, name: str, total_runs: int):
         """Adiciona algoritmo ao rastreamento."""
@@ -140,44 +188,52 @@ class BatchProgress:
         """Retorna progresso geral."""
         if self.total_configs == 0:
             return 0.0
-        base_progress = 0.0
-        if self.total_bases > 0:
-            base_progress = (self.current_base / self.total_bases) * (1.0 / self.total_configs)
-        config_progress = (self.current_config - 1) / self.total_configs
-        return (config_progress + base_progress) * 100
+        progress = 0.0
+        current = 0.0
+        if self.total_configs > 0:
+            current = (self.current_config - 1) / self.total_configs
+        elif self.total_bases > 0:
+            current = (self.current_base - 1) / self.total_bases
+
+        progress = current * 100 if current > 0 else 0
+
+        return progress
 
 
 class CursesInterface:
     """Interface curses para acompanhar execução."""
 
-    def __init__(self, stdscr):
+    def __init__(self, stdscr=None):
         self.stdscr = stdscr
-        self.height, self.width = stdscr.getmaxyx()
+        self.height = 24  # Valor padrão
+        self.width = 80  # Valor padrão
+        if stdscr:
+            self.height, self.width = stdscr.getmaxyx()
+
         self.batch_progress: BatchProgress | None = None
         self.lock = threading.Lock()
         self.running = True
 
-        # Configurar curses
-        curses.curs_set(0)  # Esconder cursor
-        curses.start_color()
-        curses.use_default_colors()
+        # Cores serão configuradas em start()
+        self.colors = {}
 
-        # Definir pares de cores
-        curses.init_pair(1, curses.COLOR_GREEN, -1)  # Verde
-        curses.init_pair(2, curses.COLOR_YELLOW, -1)  # Amarelo
-        curses.init_pair(3, curses.COLOR_RED, -1)  # Vermelho
-        curses.init_pair(4, curses.COLOR_BLUE, -1)  # Azul
-        curses.init_pair(5, curses.COLOR_CYAN, -1)  # Ciano
-        curses.init_pair(6, curses.COLOR_MAGENTA, -1)  # Magenta
+        # Sistema de slots para compatibilidade com CursesExecutionMonitor
+        self.max_workers = 8
+        self.algorithm_slots: dict[int, AlgorithmSlot] = {}
+        self.algorithm_trackers: Optional[Dict[str, "AlgorithmExecutionTracker"]] = (
+            None  # Para armazenar referência aos trackers do CursesExecutionMonitor
+        )
 
-        self.colors = {
-            "green": curses.color_pair(1),
-            "yellow": curses.color_pair(2),
-            "red": curses.color_pair(3),
-            "blue": curses.color_pair(4),
-            "cyan": curses.color_pair(5),
-            "magenta": curses.color_pair(6),
-        }
+        # Estado do countdown automático
+        self.countdown_active = False
+        self.countdown_message = ""
+
+        # Inicializar slots
+        for i in range(self.max_workers):
+            self.algorithm_slots[i] = AlgorithmSlot(slot_id=i)
+
+        # Thread para loop principal (compatibilidade)
+        self.main_thread: Optional[threading.Thread] = None
 
     def set_batch_progress(self, batch_progress: BatchProgress):
         """Define progresso do batch."""
@@ -186,28 +242,38 @@ class CursesInterface:
 
     def draw_header(self, y: int) -> int:
         """Desenha cabeçalho."""
+        if not self.stdscr or not self.colors:
+            return y + 2
+
         title = "CSP-BLFGA - Execução de Algoritmos"
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         # Centralizar título
         title_x = max(0, (self.width - len(title)) // 2)
-        self.stdscr.addstr(y, title_x, title, self.colors["cyan"] | curses.A_BOLD)
+        cyan_attr = self.colors.get("cyan", curses.A_BOLD)
+        self.stdscr.addstr(y, title_x, title, cyan_attr | curses.A_BOLD)
 
         # Timestamp no canto direito
         timestamp_x = max(0, self.width - len(timestamp) - 1)
-        self.stdscr.addstr(y, timestamp_x, timestamp, self.colors["blue"])
+        blue_attr = self.colors.get("blue", curses.A_NORMAL)
+        self.stdscr.addstr(y, timestamp_x, timestamp, blue_attr)
 
         return y + 2
 
     def draw_batch_info(self, y: int) -> int:
         """Desenha informações do batch."""
-        if not self.batch_progress:
+        if not self.batch_progress or not self.stdscr:
             return y
 
         batch = self.batch_progress
 
         # Título do batch
-        self.stdscr.addstr(y, 0, f"Batch: {batch.name}", self.colors["yellow"] | curses.A_BOLD)
+        self.stdscr.addstr(
+            y,
+            0,
+            f"Batch: {batch.name}",
+            self.colors.get("yellow", curses.A_BOLD) | curses.A_BOLD,
+        )
         y += 1
 
         # Progresso geral
@@ -219,13 +285,15 @@ class CursesInterface:
         y += 1
 
         # Configuração atual
-        self.stdscr.addstr(y, 0, f"Config: {batch.current_config}/{batch.total_configs}")
+        self.stdscr.addstr(
+            y, 0, f"Config: {batch.current_config}/{batch.total_configs}"
+        )
         if batch.total_bases > 0:
             self.stdscr.addstr(y, 20, f"Base: {batch.current_base}/{batch.total_bases}")
         y += 2
 
         # Informações do dataset
-        if batch.dataset_info:
+        if batch.dataset_info and self.stdscr:
             info = batch.dataset_info
             dataset_str = f"Dataset: {info.get('type', 'N/A')}"
             if "n" in info and "L" in info:
@@ -233,83 +301,166 @@ class CursesInterface:
             if "alphabet" in info:
                 dataset_str += f" | Alfabeto: {info['alphabet']}"
 
-            self.stdscr.addstr(y, 0, dataset_str[: self.width - 1], self.colors["green"])
-            y += 2
+            green_attr = self.colors.get("green", curses.A_NORMAL)
+            self.stdscr.addstr(y, 0, dataset_str[: self.width - 1], green_attr)
+            y += 1
 
-        return y
+        # Distância da string base (se disponível)
+        if self.batch_progress.distancia_string_base is not None:
+            dist_base = self.batch_progress.distancia_string_base
+            if dist_base is not None and dist_base != "-":
+                base_str = f"Distância String Base: {dist_base}"
+                cyan_attr = self.colors.get("cyan", curses.A_NORMAL)
+                self.stdscr.addstr(y, 0, base_str[: self.width - 1], cyan_attr)
+                y += 1
+
+        return y + 1
 
     def draw_algorithms(self, y: int) -> int:
         """Desenha progresso dos algoritmos."""
-        if not self.batch_progress:
+        if not self.batch_progress or not self.stdscr:
             return y
 
         batch = self.batch_progress
 
-        if not batch.algorithms:
-            return y
-
         # Cabeçalho
-        self.stdscr.addstr(y, 0, "Algoritmos:", self.colors["yellow"] | curses.A_BOLD)
+        yellow_attr = self.colors.get("yellow", curses.A_BOLD)
+        self.stdscr.addstr(y, 0, "Algoritmos:", yellow_attr | curses.A_BOLD)
         y += 1
 
         # Linha de separação
         self.stdscr.addstr(y, 0, "-" * min(80, self.width - 1))
         y += 1
 
-        # Algoritmos
-        for alg_name, alg_progress in batch.algorithms.items():
-            if y >= self.height - 2:
-                break
+        # Mostrar algoritmos do batch se existirem
+        if batch.algorithms:
+            for alg_name, alg_progress in batch.algorithms.items():
+                if y >= self.height - 2:
+                    break
 
-            # Nome do algoritmo
-            color = self.colors["green"]
-            if alg_progress.status == ExecutionStatus.RUNNING:
-                color = self.colors["yellow"]
-            elif alg_progress.status == ExecutionStatus.ERROR:
-                color = self.colors["red"]
-            elif alg_progress.status == ExecutionStatus.COMPLETED:
-                color = self.colors["green"]
+                # Nome do algoritmo
+                color = self.colors.get("green", curses.A_NORMAL)
+                if alg_progress.status == ExecutionStatus.RUNNING:
+                    color = self.colors.get("yellow", curses.A_BOLD)
+                elif alg_progress.status == ExecutionStatus.ERROR:
+                    color = self.colors.get("red", curses.A_REVERSE)
+                elif alg_progress.status == ExecutionStatus.COMPLETED:
+                    color = self.colors.get("green", curses.A_NORMAL)
 
-            self.stdscr.addstr(y, 0, f"{alg_name:<15}", color | curses.A_BOLD)
+                self.stdscr.addstr(y, 0, f"{alg_name:<15}", color | curses.A_BOLD)
 
-            # Status
-            status_str = alg_progress.status.value.upper()
-            self.stdscr.addstr(y, 16, f"{status_str:<12}")
+                # Status
+                status_str = alg_progress.status.value.upper()
+                self.stdscr.addstr(y, 16, f"{status_str:<12}")
 
-            # Progresso
-            progress = alg_progress.get_progress_percent()
-            self.stdscr.addstr(y, 29, f"{progress:5.1f}%")
+                # Progresso
+                progress = alg_progress.get_progress_percent()
+                self.stdscr.addstr(y, 29, f"{progress:5.1f}%")
 
-            # Execução atual
-            if alg_progress.total_runs > 0:
-                self.stdscr.addstr(y, 36, f"({alg_progress.current_run}/{alg_progress.total_runs})")
+                # Execução atual
+                if alg_progress.total_runs > 0:
+                    self.stdscr.addstr(
+                        y, 36, f"({alg_progress.current_run}/{alg_progress.total_runs})"
+                    )
 
-            # Melhor distância
-            if alg_progress.best_distance != float("inf"):
-                dist_str = f"{alg_progress.best_distance:.4f}"
-                self.stdscr.addstr(y, 45, f"Dist: {dist_str}")
+                # Melhor distância
+                if alg_progress.best_distance != float("inf"):
+                    dist_str = f"{alg_progress.best_distance:.4f}"
+                    self.stdscr.addstr(y, 45, f"Dist: {dist_str}")
 
-            # Tempo decorrido
-            elapsed = alg_progress.get_elapsed_time()
-            if elapsed > 0:
-                time_x = min(60, self.width - 10)
-                self.stdscr.addstr(y, time_x, f"{elapsed:.1f}s")
+                # Tempo decorrido
+                elapsed = alg_progress.get_elapsed_time()
+                if elapsed > 0:
+                    time_x = min(60, self.width - 10)
+                    self.stdscr.addstr(y, time_x, f"{elapsed:.1f}s")
 
+                y += 1
+
+                # Exibir execuções ativas agrupadas (múltiplas por linha)
+                if (
+                    alg_progress.status == ExecutionStatus.RUNNING
+                    and self.algorithm_trackers
+                    and alg_name in self.algorithm_trackers
+                    and y < self.height - 2
+                ):
+
+                    tracker = self.algorithm_trackers[alg_name]
+                    active_executions = tracker.get_active_executions()
+
+                    if active_executions:
+                        cyan_attr = self.colors.get("cyan", curses.A_BOLD)
+                        for exec_info in active_executions:
+                            if y >= self.height - 2:
+                                break
+                            exec_msg = f"→ Executando ({exec_info.run_index + 1}/{tracker.total_runs})"
+
+                            # Adicionar mensagem de progresso se disponível
+                            if exec_info.progress_message:
+                                exec_msg += f" - {exec_info.progress_message}"
+
+                            # Truncar mensagem se muito longa
+                            max_msg_len = self.width - 5
+                            if len(exec_msg) > max_msg_len:
+                                exec_msg = exec_msg[: max_msg_len - 3] + "..."
+
+                            self.stdscr.addstr(y, 2, exec_msg, cyan_attr)
+                            y += 1
+
+                # Exibir mensagem de progresso apenas se não houver algorithm_trackers (fallback)
+                elif (
+                    alg_progress.progress_message
+                    and alg_progress.status == ExecutionStatus.RUNNING
+                    and not self.algorithm_trackers
+                    and y < self.height - 2
+                ):
+                    msg = alg_progress.progress_message[: self.width - 5]
+                    cyan_attr = self.colors.get("cyan", curses.A_BOLD)
+                    self.stdscr.addstr(y, 2, f"→ {msg}", cyan_attr)
+                    y += 1
+
+        # Mostrar informações dos slots ativos se não houver algoritmos no batch
+        elif any(
+            slot.status != WorkerStatus.IDLE for slot in self.algorithm_slots.values()
+        ):
+            y += 1
+            cyan_attr = self.colors.get("cyan", curses.A_BOLD)
+            self.stdscr.addstr(y, 0, "Workers Ativos:", cyan_attr | curses.A_BOLD)
             y += 1
 
-            # Mensagem de progresso se houver
-            if alg_progress.progress_message and y < self.height - 2:
-                msg = alg_progress.progress_message[: self.width - 5]
-                self.stdscr.addstr(y, 2, f"→ {msg}", self.colors["cyan"])
+            for slot in self.algorithm_slots.values():
+                if slot.status == WorkerStatus.IDLE or y >= self.height - 2:
+                    continue
+
+                # Mapear status para cor
+                color = self.colors.get("green", curses.A_NORMAL)
+                if slot.status == WorkerStatus.RUNNING:
+                    color = self.colors.get("yellow", curses.A_BOLD)
+                elif slot.status == WorkerStatus.FAILED:
+                    color = self.colors.get("red", curses.A_REVERSE)
+                elif slot.status == WorkerStatus.COMPLETED:
+                    color = self.colors.get("green", curses.A_NORMAL)
+
+                # Formato: [slot] algoritmo status tempo
+                slot_info = f"[{slot.slot_id:2d}] {slot.algorithm_name:<15} {slot.status.value:<10}"
+                if slot.elapsed_time > 0:
+                    slot_info += f" {slot.elapsed_time:6.1f}s"
+
+                self.stdscr.addstr(y, 2, slot_info, color)
                 y += 1
 
         return y
 
     def draw_progress_bar(
-        self, y: int, x: int, width: int, progress: float, filled_char: str = "█", empty_char: str = "░"
+        self,
+        y: int,
+        x: int,
+        width: int,
+        progress: float,
+        filled_char: str = "█",
+        empty_char: str = "░",
     ) -> None:
         """Desenha barra de progresso."""
-        if width <= 0:
+        if width <= 0 or not self.stdscr:
             return
 
         filled_width = int((progress / 100.0) * width)
@@ -317,7 +468,8 @@ class CursesInterface:
 
         # Barra preenchida
         if filled_width > 0:
-            self.stdscr.addstr(y, x, filled_char * filled_width, self.colors["green"])
+            green_attr = self.colors.get("green", curses.A_NORMAL)
+            self.stdscr.addstr(y, x, filled_char * filled_width, green_attr)
 
         # Barra vazia
         if filled_width < width:
@@ -325,20 +477,33 @@ class CursesInterface:
 
     def draw_footer(self, y: int) -> int:
         """Desenha rodapé."""
-        footer = "Pressione 'q' para sair | 'r' para atualizar"
+        if not self.stdscr:
+            return y + 1
+
+        # Usar mensagem de countdown se estiver ativa, caso contrário usar rodapé normal
+        if self.countdown_active and self.countdown_message:
+            footer = self.countdown_message
+            footer_attr = self.colors.get("yellow", curses.A_BOLD) | curses.A_BOLD
+        else:
+            footer = "Pressione 'q' para sair | 'r' para atualizar"
+            footer_attr = self.colors.get("blue", curses.A_NORMAL)
+
         footer_x = max(0, (self.width - len(footer)) // 2)
 
         if y < self.height - 1:
-            self.stdscr.addstr(y, footer_x, footer, self.colors["blue"])
+            self.stdscr.addstr(y, footer_x, footer, footer_attr)
 
         return y + 1
 
     def refresh_display(self):
         """Atualiza a tela."""
-        with self.lock:
-            self.stdscr.clear()
+        if not self.stdscr:
+            return
 
+        with self.lock:
             try:
+                self.stdscr.clear()
+
                 y = 0
                 y = self.draw_header(y)
                 y = self.draw_batch_info(y)
@@ -357,6 +522,9 @@ class CursesInterface:
 
     def run(self):
         """Loop principal da interface."""
+        if not self.stdscr:
+            return
+
         # Configurar input não-bloqueante
         self.stdscr.nodelay(True)
         self.stdscr.timeout(100)  # 100ms timeout
@@ -378,14 +546,219 @@ class CursesInterface:
                 self.running = False
                 break
             except Exception as e:
-                logger.error(f"Erro na interface curses: {e}")
+                logger.error("Erro na interface curses: %s", e)
                 break
 
         # Limpar curses
         curses.curs_set(1)
 
+    def start(self, stdscr):
+        """
+        Inicia a interface curses (compatibilidade com CursesExecutionMonitor).
 
-def create_curses_console_adapter(interface: CursesInterface, batch_progress: BatchProgress):
+        Args:
+            stdscr: Tela curses padrão
+        """
+        self.stdscr = stdscr
+        self.height, self.width = stdscr.getmaxyx()
+        self.running = True
+
+        # Configurar curses
+        curses.curs_set(0)  # Esconder cursor
+        stdscr.nodelay(True)  # Não bloquear em getch()
+        stdscr.timeout(100)  # Timeout de 100ms
+
+        # Inicializar cores
+        self.colors = {}
+        if curses.has_colors():
+            curses.start_color()
+            curses.use_default_colors()
+
+            # Definir pares de cores
+            curses.init_pair(1, curses.COLOR_GREEN, -1)  # Verde
+            curses.init_pair(2, curses.COLOR_YELLOW, -1)  # Amarelo
+            curses.init_pair(3, curses.COLOR_RED, -1)  # Vermelho
+            curses.init_pair(4, curses.COLOR_BLUE, -1)  # Azul
+            curses.init_pair(5, curses.COLOR_CYAN, -1)  # Ciano
+            curses.init_pair(6, curses.COLOR_MAGENTA, -1)  # Magenta
+
+            self.colors = {
+                "green": curses.color_pair(1),
+                "yellow": curses.color_pair(2),
+                "red": curses.color_pair(3),
+                "blue": curses.color_pair(4),
+                "cyan": curses.color_pair(5),
+                "magenta": curses.color_pair(6),
+            }
+        else:
+            # Terminal não suporta cores, usar atributos padrão
+            self.colors = {
+                "green": curses.A_NORMAL,
+                "yellow": curses.A_BOLD,
+                "red": curses.A_REVERSE,
+                "blue": curses.A_UNDERLINE,
+                "cyan": curses.A_BOLD,
+                "magenta": curses.A_STANDOUT,
+            }
+
+        # Criar um batch progress básico apenas se não houver um já configurado
+        # Não sobrescrever informações reais do dataset
+        if not self.batch_progress:
+            self.batch_progress = BatchProgress("Execução de Algoritmos")
+            self.batch_progress.start()
+            self.batch_progress.set_current_config(0, "Execução Principal", 1)
+
+        # Iniciar thread principal
+        self.main_thread = threading.Thread(target=self._main_loop, daemon=True)
+        self.main_thread.start()
+
+    def stop(self):
+        """Para a interface curses (compatibilidade com CursesExecutionMonitor)."""
+        self.running = False
+        if self.main_thread:
+            self.main_thread.join(timeout=1.0)
+
+    def update_worker(
+        self,
+        slot_id: int,
+        algorithm_name: str,
+        status: WorkerStatus,
+        task_id: Optional[str] = None,
+        result: Optional[Any] = None,
+    ):
+        """
+        Atualiza um worker específico (compatibilidade com CursesExecutionMonitor).
+
+        Args:
+            slot_id: ID do slot do worker
+            algorithm_name: Nome do algoritmo
+            status: Status atual
+            task_id: ID da tarefa (opcional)
+            result: Resultado da tarefa (opcional)
+        """
+        with self.lock:
+            if slot_id not in self.algorithm_slots:
+                return
+
+            slot = self.algorithm_slots[slot_id]
+
+            # Atualizar dados do slot
+            slot.algorithm_name = algorithm_name
+            slot.status = status
+            slot.task_id = task_id
+            slot.result = result
+
+            # Gerenciar tempo de início
+            if status == WorkerStatus.RUNNING and slot.start_time is None:
+                slot.start_time = time.time()
+            elif status in [
+                WorkerStatus.COMPLETED,
+                WorkerStatus.FAILED,
+                WorkerStatus.TIMEOUT,
+            ]:
+                if slot.start_time:
+                    slot.elapsed_time = time.time() - slot.start_time
+                slot.start_time = None
+            elif status == WorkerStatus.IDLE:
+                slot.start_time = None
+                slot.elapsed_time = 0.0
+
+            # Sincronizar com sistema de algoritmos do batch
+            if self.batch_progress:
+                alg_progress = self.batch_progress.get_algorithm(algorithm_name)
+                if not alg_progress:
+                    # Criar novo progresso de algoritmo
+                    self.batch_progress.add_algorithm(algorithm_name, 1)
+                    alg_progress = self.batch_progress.get_algorithm(algorithm_name)
+
+                if alg_progress:
+                    # Mapear status
+                    if status == WorkerStatus.RUNNING:
+                        alg_progress.start()
+                        alg_progress.progress_message = f"Executando no slot {slot_id}"
+                    elif status == WorkerStatus.COMPLETED:
+                        if result and hasattr(result, "result_data"):
+                            # Extrair distância do resultado se disponível
+                            result_data = result.result_data
+                            if isinstance(result_data, dict):
+                                distance = result_data.get(
+                                    "distance",
+                                    result_data.get("distancia", float("inf")),
+                                )
+                                alg_progress.best_distance = distance
+                        alg_progress.complete(success=True)
+                    elif status in [WorkerStatus.FAILED, WorkerStatus.TIMEOUT]:
+                        error_msg = (
+                            "Timeout"
+                            if status == WorkerStatus.TIMEOUT
+                            else "Falha na execução"
+                        )
+                        if result and hasattr(result, "error_message"):
+                            error_msg = result.error_message
+                        alg_progress.complete(success=False, error_message=error_msg)
+
+    def _main_loop(self):
+        """Loop principal da interface (compatibilidade)."""
+        while self.running:
+            try:
+                # Atualizar tempo decorrido dos slots em execução
+                with self.lock:
+                    current_time = time.time()
+                    for slot in self.algorithm_slots.values():
+                        if slot.status == WorkerStatus.RUNNING and slot.start_time:
+                            slot.elapsed_time = current_time - slot.start_time
+
+                # Atualizar tela
+                self.refresh_display()
+
+                # Verificar input do usuário
+                if self.stdscr:
+                    key = self.stdscr.getch()
+                    if key == ord("q") or key == ord("Q"):
+                        self.running = False
+                        break
+                    elif key == ord("r") or key == ord("R"):
+                        # Forçar atualização
+                        pass
+
+                time.sleep(0.1)
+
+            except KeyboardInterrupt:
+                self.running = False
+                break
+            except Exception as e:
+                logger.error("Erro no loop principal da interface curses: %s", e)
+                time.sleep(0.1)
+
+    def _safe_addstr(self, y: int, x: int, text: str, attr=0):
+        """Adiciona string de forma segura."""
+        if not self.stdscr or y >= self.height or x >= self.width:
+            return
+        try:
+            # Truncar texto se necessário
+            max_len = self.width - x - 1
+            if len(text) > max_len:
+                text = text[:max_len]
+            self.stdscr.addstr(y, x, text, attr)
+        except curses.error:
+            pass
+
+    def set_countdown_message(self, message: str):
+        """Define mensagem de countdown para exibir no rodapé."""
+        with self.lock:
+            self.countdown_active = bool(message)
+            self.countdown_message = message
+
+    def clear_countdown_message(self):
+        """Limpa mensagem de countdown."""
+        with self.lock:
+            self.countdown_active = False
+            self.countdown_message = ""
+
+
+def create_curses_console_adapter(
+    interface: CursesInterface, batch_progress: BatchProgress
+):
     """Cria adaptador para console que atualiza interface curses."""
 
     class CursesConsoleAdapter:
@@ -416,7 +789,7 @@ def create_curses_console_adapter(interface: CursesInterface, batch_progress: Ba
     return CursesConsoleAdapter(interface, batch_progress)
 
 
-def run_batch_with_curses(batch_executor: BatchExecutor, execucoes: list[Any]):
+def run_batch_with_curses(batch_executor: Any, execucoes: list[Any]):
     """Executa batch com interface curses."""
 
     def run_curses_interface(stdscr):
@@ -424,13 +797,14 @@ def run_batch_with_curses(batch_executor: BatchExecutor, execucoes: list[Any]):
         interface = CursesInterface(stdscr)
 
         # Criar progresso do batch
-        batch_progress = BatchProgress("Execução Batch", len(execucoes))
+        batch_progress = BatchProgress("Execução Batch")
         batch_progress.start()
         interface.set_batch_progress(batch_progress)
 
         # Thread para execução do batch
         batch_thread = threading.Thread(
-            target=execute_batch_with_progress, args=(batch_executor, execucoes, batch_progress, interface)
+            target=execute_batch_with_progress,
+            args=(batch_executor, execucoes, batch_progress, interface),
         )
         batch_thread.daemon = True
         batch_thread.start()
@@ -445,23 +819,32 @@ def run_batch_with_curses(batch_executor: BatchExecutor, execucoes: list[Any]):
 
 
 def execute_batch_with_progress(
-    batch_executor: BatchExecutor, execucoes: list[Any], batch_progress: BatchProgress, interface: CursesInterface
+    batch_executor: Any,
+    execucoes: list[Any],
+    batch_progress: BatchProgress,
+    interface: CursesInterface,
 ):
     """Executa batch atualizando progresso."""
 
     try:
         # Executar configurações
         for config_index, config in enumerate(execucoes):
-            batch_progress.set_current_config(config_index, config.nome, config.num_bases)
+            batch_progress.set_current_config(
+                config_index, config.nome, config.num_bases
+            )
 
             # Adicionar algoritmos ao rastreamento
             for alg_name in config.algoritmos:
-                batch_progress.add_algorithm(alg_name, config.execucoes_por_algoritmo_por_base)
+                batch_progress.add_algorithm(
+                    alg_name, config.execucoes_por_algoritmo_por_base
+                )
 
             # Executar bases
             for base_index in range(config.num_bases):
                 # Gerar dataset
-                seqs, dataset_params = batch_executor._generate_dataset(config.dataset_config)
+                seqs, dataset_params = batch_executor._generate_dataset(
+                    config.dataset_config
+                )
 
                 # Atualizar informações do dataset
                 dataset_info = {
@@ -470,7 +853,7 @@ def execute_batch_with_progress(
                     "L": len(seqs[0]) if seqs else 0,
                     "alphabet": "".join(sorted(set("".join(seqs)))) if seqs else "",
                 }
-                batch_progress.set_current_base(base_index, dataset_info)
+                batch_progress.set_current_base(base_index, dataset_info=dataset_info)
 
                 # Executar algoritmos
                 for alg_name in config.algoritmos:
@@ -480,21 +863,32 @@ def execute_batch_with_progress(
 
                         try:
                             # Executar algoritmo com callback de progresso
-                            executions = execute_algorithm_with_progress(alg_name, seqs, config, alg_progress)
+                            executions = execute_algorithm_with_progress(
+                                alg_name, seqs, config, alg_progress
+                            )
 
                             # Atualizar com melhor resultado
                             if executions:
                                 valid_results = [
-                                    e for e in executions if e.get("distancia", float("inf")) != float("inf")
+                                    e
+                                    for e in executions
+                                    if e.get("distancia", float("inf")) != float("inf")
                                 ]
                                 if valid_results:
-                                    best_exec = min(valid_results, key=lambda e: e["distancia"])
+                                    best_exec = min(
+                                        valid_results, key=lambda e: e["distancia"]
+                                    )
                                     alg_progress.best_distance = best_exec["distancia"]
                                     alg_progress.complete(success=True)
                                 else:
-                                    alg_progress.complete(success=False, error_message="Nenhum resultado válido")
+                                    alg_progress.complete(
+                                        success=False,
+                                        error_message="Nenhum resultado válido",
+                                    )
                             else:
-                                alg_progress.complete(success=False, error_message="Execução falhou")
+                                alg_progress.complete(
+                                    success=False, error_message="Execução falhou"
+                                )
 
                         except Exception as e:
                             alg_progress.complete(success=False, error_message=str(e))
@@ -503,10 +897,12 @@ def execute_batch_with_progress(
 
     except Exception as e:
         batch_progress.complete(success=False)
-        logger.error(f"Erro na execução do batch: {e}")
+        logger.error("Erro na execução do batch: %s", e)
 
 
-def execute_algorithm_with_progress(alg_name: str, seqs: list[str], config: Any, alg_progress: AlgorithmProgress):
+def execute_algorithm_with_progress(
+    alg_name: str, seqs: list[str], config: Any, alg_progress: AlgorithmProgress
+):
     """Executa algoritmo com atualização de progresso."""
 
     from algorithms.base import global_registry
@@ -526,33 +922,86 @@ def execute_algorithm_with_progress(alg_name: str, seqs: list[str], config: Any,
 
     # Executar runs
     executions = []
-    for run_index in range(config.execucoes_por_algoritmo_por_base):
+    total_runs = getattr(config, "execucoes_por_algoritmo_por_base", 1)
+    timeout = getattr(config, "timeout", 300)
+
+    for run_index in range(total_runs):
         alg_progress.update(run_index)
 
         # Executar run individual
         try:
-            from src.core.exec.algorithm_executor import AlgorithmExecutor
+            from src.core.interfaces import create_executor
 
-            executor = AlgorithmExecutor(config.timeout)
-            instance = AlgClass(seqs, alphabet)
-
-            # Configurar callbacks se suportados
-            if hasattr(instance, "set_progress_callback"):
-                instance.set_progress_callback(progress_callback)
-            if hasattr(instance, "set_iteration_callback"):
-                instance.set_iteration_callback(iteration_callback)
-
-            result = executor.execute_with_timeout(instance)[0]
-            executions.append(
-                {
-                    "tempo": 0.0,  # Será preenchido pela execução
-                    "distancia": result.get("distancia", float("inf")) if result else float("inf"),
-                    "melhor_string": result.get("melhor_string", "") if result else "",
-                    "iteracoes": result.get("iteracoes", 0) if result else 0,
-                }
+            # Criar executor com timeout
+            executor = create_executor(
+                executor_type="scheduler", timeout_seconds=timeout
             )
 
+            try:
+                instance = AlgClass(seqs, alphabet)
+
+                # Configurar callbacks se suportados
+                if hasattr(instance, "set_progress_callback"):
+                    instance.set_progress_callback(progress_callback)
+                if hasattr(instance, "set_iteration_callback"):
+                    instance.set_iteration_callback(iteration_callback)
+
+                # Submeter tarefa e aguardar resultado
+                handle = executor.submit(instance)
+
+                # Aguardar conclusão
+                while executor.poll(handle) == TaskStatus.RUNNING:
+                    import time
+
+                    time.sleep(0.1)
+
+                # Obter resultado
+                result = executor.result(handle)
+
+                if isinstance(result, Exception):
+                    raise result
+
+                if result and hasattr(result, "center") and hasattr(result, "distance"):
+                    # Resultado do novo sistema
+                    executions.append(
+                        {
+                            "tempo": result["metadata"].get("execution_time", 0.0),
+                            "distancia": result["distance"],
+                            "melhor_string": (
+                                result["center"] if result["center"] else ""
+                            ),
+                            "iteracoes": result["metadata"].get("iteracoes", 0),
+                        }
+                    )
+                else:
+                    executions.append(
+                        {
+                            "tempo": 0.0,
+                            "distancia": float("inf"),
+                            "erro": "Resultado vazio",
+                        }
+                    )
+            finally:
+                # Garantir que o executor seja encerrado
+                if hasattr(executor, "shutdown"):
+                    executor.shutdown(wait=True)
+
         except Exception as e:
+            logger.error("Erro executando %s run %s: %s", alg_name, run_index, e)
             executions.append({"tempo": 0.0, "distancia": float("inf"), "erro": str(e)})
 
     return executions
+
+
+# Mapeamento de slots para algoritmos
+@dataclass
+class AlgorithmSlot:
+    """Representa um slot de algoritmo para execução."""
+
+    slot_id: int
+    algorithm_name: str = "---"
+    status: WorkerStatus = WorkerStatus.IDLE
+    task_id: Optional[str] = None
+    start_time: Optional[float] = None
+    elapsed_time: float = 0.0
+    result: Optional[Any] = None

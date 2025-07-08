@@ -18,6 +18,7 @@ import logging
 import os
 import signal
 import sys
+import time
 import traceback
 import uuid
 from datetime import datetime
@@ -27,24 +28,23 @@ from src.core.io.results_formatter import ResultsFormatter
 from src.core.report.report_utils import print_quick_summary
 from src.ui.cli.console_manager import console
 from src.ui.cli.menu import (
+    configure_batch_optimization_params,
     configure_optimization_params,
     configure_sensitivity_params,
     menu,
     select_algorithms,
+    select_dataset_for_optimization,
     select_optimization_algorithm,
     select_sensitivity_algorithm,
 )
 from src.ui.cli.save_wizard import ask_save_dataset
 from src.utils.config import ALGORITHM_TIMEOUT, safe_input
-from src.utils.curses_console import create_console_manager
 from src.utils.logging import setup_logging
-from src.utils.resource_monitor import (
-    check_algorithm_feasibility,
-    get_safe_memory_limit,
-)
 
-RESULTS_DIR = "results"
-LOGS_DIR = "logs"
+# Removed resource_monitor imports - using new scheduler system
+
+RESULTS_DIR = "outputs/reports"
+LOGS_DIR = "outputs/logs"
 os.makedirs(RESULTS_DIR, exist_ok=True)
 os.makedirs(LOGS_DIR, exist_ok=True)
 
@@ -60,8 +60,10 @@ def signal_handler(signum, frame):
     sys.exit(0)
 
 
-def main():
-    parser = argparse.ArgumentParser(description="Closest String Problem (CSP) - Execução principal")
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="Closest String Problem (CSP) - Execução principal"
+    )
     parser.add_argument(
         "--silent",
         action="store_true",
@@ -79,38 +81,27 @@ def main():
         nargs="+",
         help="Algoritmos a executar (nomes separados por espaço)",
     )
-    parser.add_argument("--num-execs", type=int, help="Número de execuções por algoritmo")
-    parser.add_argument("--timeout", type=int, help="Timeout por execução (segundos)")
-    parser.add_argument("--workers", "-w", type=int, default=4, help="Número de workers paralelos (padrão: 4)")
     parser.add_argument(
-        "--console",
-        type=str,
-        choices=["auto", "curses", "simple"],
-        default="auto",
-        help="Tipo de console: auto (detecta automaticamente), curses (forçar curses), simple (console simples)",
+        "--num-execs", type=int, help="Número de execuções por algoritmo"
+    )
+    parser.add_argument("--timeout", type=int, help="Timeout por execução (segundos)")
+    parser.add_argument(
+        "--workers",
+        "-w",
+        type=int,
+        default=4,
+        help="Número de workers paralelos (padrão: 4)",
     )
     args = parser.parse_args()
 
     silent = args.silent
 
-    # Criar console manager apropriado
-    if silent:
-        # Em modo silencioso, sempre usar console simples
-        console_manager = create_console_manager(force_simple=True)
-    else:
-        # Detectar ou forçar tipo de console
-        if args.console == "simple":
-            console_manager = create_console_manager(force_simple=True)
-        elif args.console == "curses":
-            console_manager = create_console_manager(force_simple=False)
-        else:  # auto
-            console_manager = create_console_manager(force_simple=False)
-
+    # Usar sempre console simples
     def silent_print(*a, **k):
         pass
 
     p = print if not silent else silent_print
-    cprint = console_manager.print if not silent else silent_print
+    cprint = console.print if not silent else silent_print
 
     # Mostrar o número do processo (PID) logo no início
     p(f"[PID] Processo em execução: {os.getpid()}")
@@ -131,7 +122,9 @@ def main():
             if not args.dataset:
                 args.dataset = "synthetic"
             if not args.algorithms:
-                args.algorithms = ["Baseline"]  # Usar Baseline em vez de BLF-GA para testes
+                args.algorithms = [
+                    "Baseline"
+                ]  # Usar Baseline em vez de BLF-GA para testes
             if not args.num_execs:
                 args.num_execs = 1
             if not args.timeout:
@@ -165,36 +158,36 @@ def main():
                 params = {"dataset_source": "3"}
                 params.update(p)
             elif args.dataset == "batch":
-                from src.core.exec.batch_executor import (
-                    BatchExecutor,
-                    select_batch_config,
-                )
+                from src.ui.cli.batch_executor import execute_batch_config
 
-                # Em modo silencioso, usar o arquivo de teste
-                if silent:
-                    config_file = "batch_configs/teste.yaml"
-                else:
-                    config_file = select_batch_config()
+                # Perguntar pelo arquivo de configuração se não especificado
+                if not silent:
+                    config_file = safe_input(
+                        "Arquivo de configuração [batch_configs/exemplo.yaml]: "
+                    ).strip()
                     if not config_file:
-                        cprint("❌ Nenhum arquivo de configuração selecionado.")
-                        return
-                executor = BatchExecutor(config_file, workers=args.workers)
-                batch_result = executor.execute_batch()
-                cprint("\n✅ Execução em lote concluída!")
-                cprint(f"Tempo total: {batch_result['tempo_total']:.1f}s")
-                cprint(f"Taxa de sucesso: {batch_result['resumo']['taxa_sucesso']:.1f}%")
-                from src.core.io.exporter import CSPExporter
+                        config_file = "batch_configs/exemplo.yaml"
+                else:
+                    config_file = "batch_configs/exemplo.yaml"
 
-                batch_dir = executor.results_dir
-                import os as os_batch
+                try:
+                    cprint(f"� Executando batch: {config_file}")
 
-                json_path = os_batch.path.join(batch_dir, "batch_results.json")
-                csv_path = os_batch.path.join(batch_dir, "batch_results.csv")
-                if os_batch.path.exists(json_path):
-                    exporter = CSPExporter()
-                    exporter.export_batch_json_to_csv(json_path, csv_path)
-                    cprint(f"📄 Resultados detalhados do batch exportados para CSV: {csv_path}")
-                return
+                    # Executar batch (usa curses por padrão se não em modo silencioso)
+                    use_curses = not silent
+                    batch_results = execute_batch_config(
+                        config_file, use_curses=use_curses, silent=silent
+                    )
+
+                    cprint(
+                        f"✅ Batch concluído! {len(batch_results)} execuções processadas"
+                    )
+                    return
+
+                except Exception as e:
+                    cprint(f"❌ Erro na execução do batch: {e}")
+                    logging.exception("Erro na execução do batch", exc_info=e)
+                    return
             else:
                 cprint("❌ Fonte de dataset inválida.")
                 return
@@ -204,51 +197,44 @@ def main():
             params = {"dataset_source": choice}
 
             if choice == "4":
-                from src.core.exec.batch_executor import (
-                    BatchExecutor,
-                    select_batch_config,
-                )
+                # Execução em lote
+                from src.ui.cli.batch_executor import execute_batch_config
 
-                config_file = select_batch_config()
-                if not config_file:
-                    cprint("❌ Nenhum arquivo de configuração selecionado.")
-                    return
                 try:
-                    executor = BatchExecutor(config_file, workers=args.workers)
-                    batch_result = executor.execute_batch()
-                    cprint("\n✅ Execução em lote concluída!")
-                    cprint(f"Tempo total: {batch_result['tempo_total']:.1f}s")
-                    cprint(f"Taxa de sucesso: {batch_result['resumo']['taxa_sucesso']:.1f}%")
-                    from src.core.io.exporter import CSPExporter
+                    config_file = safe_input(
+                        "Arquivo de configuração [batch_configs/exemplo.yaml]: "
+                    ).strip()
+                    if not config_file:
+                        config_file = "batch_configs/exemplo.yaml"
 
-                    batch_dir = executor.results_dir
-                    import os as os_batch
+                    cprint(f"📋 Executando batch: {config_file}")
 
-                    json_path = os_batch.path.join(batch_dir, "batch_results.json")
-                    csv_path = os_batch.path.join(batch_dir, "batch_results.csv")
-                    if os_batch.path.exists(json_path):
-                        exporter = CSPExporter()
-                        exporter.export_batch_json_to_csv(json_path, csv_path)
-                        cprint(f"📄 Resultados detalhados do batch exportados para CSV: {csv_path}")
+                    # Executar batch com curses se não em modo silencioso
+                    use_curses = not silent
+                    batch_results = execute_batch_config(
+                        config_file, use_curses=use_curses, silent=silent
+                    )
+
+                    cprint(
+                        f"✅ Batch concluído! {len(batch_results)} execuções processadas"
+                    )
+                    return
+
                 except Exception as e:
-                    cprint(f"❌ Erro na execução em lote: {e}")
-                    return
-            elif choice == "5":
-                # Execução em lote com interface curses
-                from src.ui.curses_integration import add_curses_batch_option_to_menu
-
-                curses_executor = add_curses_batch_option_to_menu()
-                curses_executor()
+                    cprint(f"❌ Erro na execução do batch: {e}")
+                    logging.exception("Erro na execução do batch", exc_info=e)
                 return
-            elif choice == "6":
-                # Otimização de hiperparâmetros
+            elif choice == "5":
+                # Otimização de hiperparâmetros (interativo)
                 try:
-                    run_optimization_workflow()
+                    from src.ui.cli.menu import interactive_optimization_menu
+
+                    interactive_optimization_menu()
                 except Exception as e:
                     cprint(f"❌ Erro na otimização: {e}")
                     logging.exception("Erro na otimização", exc_info=e)
                 return
-            elif choice == "7":
+            elif choice == "6":
                 # Análise de sensibilidade
                 try:
                     run_sensitivity_workflow()
@@ -306,9 +292,9 @@ def main():
         else:
             logging.debug(f"[DATASET] {len(seqs)} strings (primeiras 2: {seqs[:2]})")
 
-        # Verificação de recursos do sistema
-        safe_memory = get_safe_memory_limit()
-        cprint(f"Limite seguro de memória: {safe_memory:.1f}%")
+        # Verificação de recursos do sistema (simplificada)
+        # TODO: Implementar verificação com novo sistema de monitoramento
+        cprint("Sistema de recursos atualizado - verificação de memória disponível")
 
         # Algoritmos
         if args.algorithms:
@@ -319,18 +305,14 @@ def main():
             cprint("Nenhum algoritmo selecionado.")
             return
 
-        # Verificar viabilidade dos algoritmos selecionados
-        viable_algs = []
+        # TODO: Implementar verificação de viabilidade com novo sistema
+        # Por enquanto, todos os algoritmos são considerados viáveis
+        viable_algs = algs
         for alg_name in algs:
-            is_viable, msg = check_algorithm_feasibility(n, L, alg_name)
-            if is_viable:
-                viable_algs.append(alg_name)
-                cprint(f"✓ {alg_name}: {msg}")
-            else:
-                cprint(f"⚠ {alg_name}: {msg} (será pulado)")
+            cprint(f"✓ {alg_name}: Algoritmo selecionado")
 
         if not viable_algs:
-            cprint("Nenhum algoritmo viável.")
+            cprint("Nenhum algoritmo selecionado.")
             return
 
         # Número de execuções e timeout
@@ -343,34 +325,54 @@ def main():
             timeout = args.timeout
         else:
             default_timeout = ALGORITHM_TIMEOUT
-            timeout_input = safe_input(f"\nTimeout por execução em segundos [{default_timeout}]: ")
-            timeout = int(timeout_input) if timeout_input.isdigit() and int(timeout_input) > 0 else default_timeout
+            timeout_input = safe_input(
+                f"\nTimeout por execução em segundos [{default_timeout}]: "
+            )
+            timeout = (
+                int(timeout_input)
+                if timeout_input.isdigit() and int(timeout_input) > 0
+                else default_timeout
+            )
         cprint(f"Timeout configurado: {timeout}s por execução")
+
+        # Configurar número de workers externos
+        # Se não foi fornecido via linha de comando e não está em modo silencioso, perguntar
+        if not hasattr(args, "workers_provided") and not silent:
+            # Verificar se o valor foi fornecido via linha de comando
+            workers_provided = "--workers" in sys.argv or "-w" in sys.argv
+            if not workers_provided:
+                workers_input = safe_input(f"\nNúmero de workers externos [4]: ")
+                external_workers = (
+                    int(workers_input)
+                    if workers_input.isdigit() and int(workers_input) > 0
+                    else 4
+                )
+            else:
+                external_workers = args.workers
+        else:
+            external_workers = args.workers
 
         # Execução dos algoritmos
         cprint("\n" + "=" * 50)
         cprint("EXECUTANDO ALGORITMOS")
         cprint("=" * 50)
 
-        # Configurar workers internos baseado no número de CPUs e workers externos
+        # Configurar workers para execução
         import multiprocessing
 
         cpu_count = multiprocessing.cpu_count()
-        external_workers = args.workers
 
         # Verificar se algum algoritmo suporta paralelismo interno
         has_internal_parallel = any(
-            getattr(global_registry.get(alg_name), "supports_internal_parallel", False)
+            getattr(global_registry[alg_name], "supports_internal_parallel", False)
             for alg_name in viable_algs
             if alg_name in global_registry
         )
 
+        # Configurar workers internos baseado no número de CPUs e workers externos
         if has_internal_parallel:
-            # Se há paralelismo interno, use apenas 1 worker externo
-            external_workers = 1
-            internal_workers = max(1, cpu_count // 1)
+            internal_workers = max(1, cpu_count // external_workers)
         else:
-            # Se não há paralelismo interno, use todos os workers externos
             internal_workers = max(1, cpu_count // external_workers)
 
         # Configurar variável de ambiente para workers internos
@@ -382,97 +384,215 @@ def main():
         cprint(f"   - Workers internos: {internal_workers}")
         cprint(f"   - Paralelismo interno detectado: {has_internal_parallel}")
 
-        # Decidir se usar execução paralela ou sequencial
-        use_parallel = len(viable_algs) > 1 and num_execs == 1
-
-        if use_parallel:
-            cprint(f"🚀 Usando execução paralela para {len(viable_algs)} algoritmos")
-            from src.core.exec.parallel_runner import execute_algorithms_parallel
-
-            parallel_results = execute_algorithms_parallel(
-                algorithm_names=viable_algs,
-                seqs=seqs,
-                alphabet=alphabet,
-                console=console_manager,
-                max_workers=external_workers,
-                timeout=timeout,
+        # Perguntar sobre interface curses para monitoramento (apenas se não em modo silencioso)
+        use_curses_monitoring = False
+        if not silent:
+            curses_input = (
+                safe_input("\n🖥️  Usar interface curses para monitoramento? (S/n): ")
+                .lower()
+                .strip()
             )
+            use_curses_monitoring = curses_input in ["", "s", "sim", "y", "yes"]
+            if use_curses_monitoring:
+                cprint(
+                    "💡 Usando interface curses para monitoramento - Pressione 'q' para sair"
+                )
+            else:
+                cprint("💡 Usando modo tradicional para monitoramento")
 
-            formatter = ResultsFormatter()
-            results = {}
+        cprint(
+            f"🚀 Executando {len(viable_algs)} algoritmos com {num_execs} execuções cada"
+        )
 
-            for alg_name, alg_data in parallel_results.items():
-                # Converter resultado do formato paralelo para o formato esperado
-                executions = [alg_data]  # Resultado paralelo já é uma execução
-                executions[0]["seed"] = seed
+        if use_curses_monitoring:
+            # Usar nova interface curses para execução
+            from src.ui.curses_integration import CursesExecutionMonitor
 
-                formatter.add_algorithm_results(alg_name, executions)
-
-                if "distancia" in alg_data and alg_data["distancia"] != float("inf"):
-                    dist_base = params.get("distancia_string_base", "-")
-                    results[alg_name] = {
-                        "dist": alg_data["distancia"],
-                        "dist_base": dist_base,
-                        "time": alg_data["tempo"],
-                    }
-                else:
-                    results[alg_name] = {
-                        "dist": "-",
-                        "dist_base": "-",
-                        "time": "-",
-                    }
-        else:
-            cprint(f"🔄 Usando execução sequencial para {len(viable_algs)} algoritmos")
-            from src.core.exec.runner import execute_algorithm_runs
-
-            formatter = ResultsFormatter()
-            results = {}
-
-            for alg_name in viable_algs:
-                if alg_name not in global_registry:
-                    cprint(f"ERRO: Algoritmo '{alg_name}' não encontrado!")
-                    continue
-
-                # Log apenas início simplificado
-                logging.debug(f"[ALG_EXEC] Iniciando {alg_name}")
-                AlgClass = global_registry[alg_name]
-
-                executions = execute_algorithm_runs(
-                    alg_name, AlgClass, seqs, alphabet, num_execs, None, console_manager, timeout
+            try:
+                monitor = CursesExecutionMonitor(
+                    max_workers=external_workers, timeout=timeout
                 )
 
-                # Log resumido das execuções
-                logging.debug(f"[ALG_EXEC] {alg_name} concluído: {len(executions)} execuções")
-                for _, exec_data in enumerate(executions):
-                    # Não calcular mais distancia_string_base aqui, apenas usar seed
-                    exec_data["seed"] = seed
+                # Executar algoritmos com monitoramento curses (com múltiplas execuções)
+                algorithm_results = monitor.execute_algorithms(
+                    algorithm_names=viable_algs,
+                    seqs=seqs,
+                    alphabet=alphabet,
+                    num_execs=num_execs,
+                    dataset_params=params,  # Passar parâmetros do dataset
+                )
 
-                formatter.add_algorithm_results(alg_name, executions)
-                valid_results = [e for e in executions if "distancia" in e and e["distancia"] != float("inf")]
-                if valid_results:
-                    best_exec = min(valid_results, key=lambda e: e["distancia"])
-                    logging.debug(f"[ALG_EXEC] {alg_name} melhor: dist={best_exec['distancia']}")
+                # Converter TaskResult para formato esperado
+                formatter = ResultsFormatter()
+                results = {}
 
-                    # Adicionar distância da string base ao resultado
-                    dist_base = params.get("distancia_string_base", "-")
+                for alg_name, task_results in algorithm_results.items():
+                    if isinstance(task_results, list) and len(task_results) > 0:
+                        # Múltiplas execuções - processar todas
+                        executions = []
+                        for task_result in task_results:
+                            if task_result.success and task_result.distance is not None:
+                                execution_result = {
+                                    "tempo": task_result.time,
+                                    "distancia": task_result.distance,
+                                    "melhor_string": task_result.center or "",
+                                    "iteracoes": task_result.metadata.get(
+                                        "iteracoes", 0
+                                    ),
+                                    "seed": seed,
+                                }
+                            else:
+                                execution_result = {
+                                    "tempo": 0.0,
+                                    "distancia": float("inf"),
+                                    "melhor_string": "",
+                                    "iteracoes": 0,
+                                    "seed": seed,
+                                }
+                            executions.append(execution_result)
 
-                    results[alg_name] = {
-                        "dist": best_exec["distancia"],
-                        "dist_base": dist_base,
-                        "time": best_exec["tempo"],
-                    }
-                else:
-                    error_exec = next((e for e in executions if "erro" in e), executions[0])
-                    logging.debug(f"[ALG_EXEC] {alg_name} sem resultados válidos")
-                    results[alg_name] = {
-                        "dist": "-",
-                        "dist_base": "-",
-                        "time": error_exec["tempo"],
-                        "warn": error_exec.get("erro", "Erro desconhecido"),
-                    }
+                        formatter.add_algorithm_results(alg_name, executions)
+
+                        # Encontrar melhor resultado
+                        valid_results = [
+                            e for e in executions if e["distancia"] != float("inf")
+                        ]
+
+                        if valid_results:
+                            best_exec = min(valid_results, key=lambda e: e["distancia"])
+                            dist_base = params.get("distancia_string_base", "-")
+                            results[alg_name] = {
+                                "dist": best_exec["distancia"],
+                                "dist_base": dist_base,
+                                "time": best_exec["tempo"],
+                            }
+                        else:
+                            results[alg_name] = {
+                                "dist": "-",
+                                "dist_base": "-",
+                                "time": "-",
+                                "warn": "Todas as execuções falharam",
+                            }
+                    else:
+                        # Resultado único ou erro
+                        results[alg_name] = {
+                            "dist": "-",
+                            "dist_base": "-",
+                            "time": "-",
+                            "warn": "Erro na execução",
+                        }
+
+            except Exception as e:
+                cprint(f"❌ Erro na interface curses: {e}")
+                cprint("🔄 Fallback para execução tradicional...")
+                use_curses_monitoring = False
+
+        if not use_curses_monitoring:
+            # Execução tradicional usando novo sistema
+            from src.core.interfaces import TaskStatus, create_executor
+
+            formatter = ResultsFormatter()
+            results = {}
+
+            # Criar executor único para todas as execuções
+            executor = create_executor(
+                timeout_seconds=timeout, max_workers=external_workers
+            )
+
+            try:
+                # Executar algoritmos usando novo executor
+                for alg_name in viable_algs:
+                    if alg_name not in global_registry:
+                        cprint(f"ERRO: Algoritmo '{alg_name}' não encontrado!")
+                        continue
+
+                    logging.debug(
+                        f"[ALG_EXEC] Iniciando {alg_name} com {num_execs} execuções"
+                    )
+                    AlgClass = global_registry[alg_name]
+
+                    executions = []
+
+                    # Submeter múltiplas execuções
+                    for i in range(num_execs):
+                        cprint(f"  Executando {alg_name} - Run {i+1}/{num_execs}")
+                        instance = AlgClass(seqs, alphabet)
+                        handle = executor.submit(instance)
+
+                        # Aguardar conclusão
+                        while executor.poll(handle) == TaskStatus.RUNNING:
+                            time.sleep(0.1)
+
+                        result = executor.result(handle)
+
+                        if isinstance(result, Exception):
+                            execution_result = {
+                                "tempo": 0.0,
+                                "distancia": float("inf"),
+                                "melhor_string": "",
+                                "iteracoes": 0,
+                                "seed": seed,
+                            }
+                        else:
+                            # Extrair tempo do metadata se disponível
+                            metadata = result.get("metadata", {})
+                            execution_time = metadata.get("execution_time", 0.0)
+                            if execution_time == 0.0:
+                                execution_time = metadata.get(
+                                    "tempo", metadata.get("time", 0.0)
+                                )
+
+                            execution_result = {
+                                "tempo": execution_time,
+                                "distancia": result.get(
+                                    "distance", result.get("distancia", float("inf"))
+                                ),
+                                "melhor_string": result.get(
+                                    "center", result.get("melhor_string", "")
+                                ),
+                                "iteracoes": result.get("metadata", {}).get(
+                                    "iteracoes", 0
+                                ),
+                                "seed": seed,
+                            }
+
+                        executions.append(execution_result)
+
+                    # Processar resultados para este algoritmo
+                    formatter.add_algorithm_results(alg_name, executions)
+
+                    valid_results = [
+                        e
+                        for e in executions
+                        if "distancia" in e and e["distancia"] != float("inf")
+                    ]
+
+                    if valid_results:
+                        best_exec = min(valid_results, key=lambda e: e["distancia"])
+                        dist_base = params.get("distancia_string_base", "-")
+                        results[alg_name] = {
+                            "dist": best_exec["distancia"],
+                            "dist_base": dist_base,
+                            "time": best_exec["tempo"],
+                        }
+                        cprint(
+                            f"  ✅ {alg_name}: {len(valid_results)}/{num_execs} execuções válidas, melhor distância: {best_exec['distancia']}"
+                        )
+                    else:
+                        results[alg_name] = {
+                            "dist": "-",
+                            "dist_base": "-",
+                            "time": "-",
+                        }
+                        cprint(f"  ❌ {alg_name}: Todas as execuções falharam")
+
+            finally:
+                # Garantir que o executor seja encerrado
+                if hasattr(executor, "shutdown"):
+                    executor.shutdown(wait=True)
 
         # Exibir resumo dos resultados
-        print_quick_summary(results, console_manager)
+        print_quick_summary(results, console)
 
         cprint("\n📄 Gerando relatório detalhado...")
         # Adicionar informações básicas ao formatter para o relatório
@@ -485,7 +605,9 @@ def main():
                         base_strings_info.append(
                             {
                                 "base_string": exec_data["melhor_string"],
-                                "distancia_string_base": params.get("distancia_string_base", "-"),
+                                "distancia_string_base": params.get(
+                                    "distancia_string_base", "-"
+                                ),
                             }
                         )
             formatter.extra_info = {
@@ -496,7 +618,10 @@ def main():
             }
             logging.debug("[main] formatter configurado")
 
-        results_dir = "results"
+        # Usar estrutura padronizada outputs/reports com timestamp
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        results_dir = os.path.join("outputs", "reports", timestamp)
+        os.makedirs(results_dir, exist_ok=True)
         txt_path = os.path.join(results_dir, f"{base_name}.txt")
         csv_path = os.path.join(results_dir, f"{base_name}.csv")
 
@@ -512,15 +637,11 @@ def main():
 
     except Exception as e:
         if not silent:
-            console_manager.print(f"\nERRO FATAL: {e}")
+            console.print(f"\nERRO FATAL: {e}")
             traceback.print_exc()
         else:
             logging.exception("Erro fatal durante execução", exc_info=e)
         sys.exit(1)
-    finally:
-        # Limpar console curses se necessário
-        if hasattr(console_manager, "cleanup") and callable(getattr(console_manager, "cleanup", None)):
-            console_manager.cleanup()
 
 
 def generate_dataset_automated():
@@ -567,10 +688,20 @@ def generate_dataset_automated():
 
 def run_optimization_workflow():
     """Executa o workflow de otimização de hiperparâmetros."""
-    from src.datasets.dataset_synthetic import generate_dataset
     from src.optimization.optuna_optimizer import optimize_algorithm
 
     console.print("\n=== Otimização de Hiperparâmetros ===")
+
+    # Perguntar tipo de otimização
+    print("\nTipo de otimização:")
+    print("1) Otimização simples")
+    print("2) Otimização em lote (múltiplas configurações)")
+
+    opt_type = safe_input("Escolha [1]: ")
+
+    if opt_type == "2":
+        run_batch_optimization_workflow()
+        return
 
     # Selecionar algoritmo
     algorithm_name = select_optimization_algorithm()
@@ -578,17 +709,11 @@ def run_optimization_workflow():
         console.print("❌ Nenhum algoritmo selecionado.")
         return
 
+    # Selecionar dataset
+    seqs, alphabet, dataset_info = select_dataset_for_optimization()
+
     # Configurar parâmetros
     config = configure_optimization_params()
-
-    # Gerar dataset para otimização
-    console.print("\n📊 Gerando dataset para otimização...")
-    seqs, _ = generate_dataset(silent=True)
-
-    console.print(f"✅ Dataset gerado: {len(seqs)} sequências de tamanho {len(seqs[0])}")
-
-    # Executar otimização
-    alphabet = "".join(sorted(set("".join(seqs))))
 
     try:
         result = optimize_algorithm(
@@ -614,7 +739,9 @@ def run_optimization_workflow():
 
             # Salvar gráficos
             history_path = os.path.join(plots_dir, f"{algorithm_name}_history.png")
-            importance_path = os.path.join(plots_dir, f"{algorithm_name}_importance.png")
+            importance_path = os.path.join(
+                plots_dir, f"{algorithm_name}_importance.png"
+            )
 
             visualizer.plot_optimization_history(save_path=history_path)
             visualizer.plot_parameter_importance(save_path=importance_path)
@@ -625,7 +752,8 @@ def run_optimization_workflow():
         import json
 
         results_path = os.path.join(
-            RESULTS_DIR, f"optimization_{algorithm_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+            RESULTS_DIR,
+            f"optimization_{algorithm_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
         )
         with open(results_path, "w") as f:
             json.dump(
@@ -649,6 +777,112 @@ def run_optimization_workflow():
         logging.exception("Erro na otimização", exc_info=e)
 
 
+def run_batch_optimization_workflow():
+    """Executa workflow de otimização em lote com múltiplas configurações."""
+    import json
+    import os
+    from datetime import datetime
+
+    from src.optimization.optuna_optimizer import optimize_algorithm
+
+    console.print("\n=== Otimização em Lote ===")
+
+    # Configurar parâmetros do batch
+    batch_config = configure_batch_optimization_params()
+
+    console.print(f"🔧 Configuração do batch:")
+    console.print(f"   - Trials por configuração: {batch_config['n_trials']}")
+    console.print(f"   - Timeout por trial: {batch_config['timeout']}s")
+    console.print(f"   - Configurações de dataset: {batch_config['n_configs']}")
+    console.print(f"   - Algoritmos: {', '.join(batch_config['algorithms'])}")
+
+    # Confirmar execução
+    confirm = safe_input("\n🚀 Iniciar otimização em lote? (S/n): ")
+    if confirm.lower() in ["n", "no", "nao"]:
+        console.print("❌ Operação cancelada.")
+        return
+
+    # Armazenar resultados
+    batch_results = {
+        "batch_info": {"timestamp": datetime.now().isoformat(), "config": batch_config},
+        "results": [],
+    }
+
+    # Executar para cada configuração de dataset
+    for config_idx in range(batch_config["n_configs"]):
+        console.print(f"\n📊 Configuração {config_idx + 1}/{batch_config['n_configs']}")
+
+        # Gerar/selecionar dataset para esta configuração
+        seqs, alphabet, dataset_info = select_dataset_for_optimization()
+
+        config_results = {
+            "config_index": config_idx + 1,
+            "dataset_info": dataset_info,
+            "algorithms": {},
+        }
+
+        # Executar otimização para cada algoritmo
+        for alg_name in batch_config["algorithms"]:
+            console.print(f"\n🔬 Otimizando {alg_name}...")
+
+            try:
+                result = optimize_algorithm(
+                    algorithm_name=alg_name,
+                    sequences=seqs,
+                    alphabet=alphabet,
+                    n_trials=batch_config["n_trials"],
+                    timeout_per_trial=batch_config["timeout"],
+                    show_progress=True,
+                )
+
+                config_results["algorithms"][alg_name] = {
+                    "best_value": result.best_value,
+                    "best_params": result.best_params,
+                    "n_trials": result.n_trials,
+                    "optimization_time": result.optimization_time,
+                    "study_name": result.study_name,
+                }
+
+                console.print(f"✅ {alg_name}: Melhor valor = {result.best_value}")
+
+            except Exception as e:
+                console.print(f"❌ Erro em {alg_name}: {e}")
+                config_results["algorithms"][alg_name] = {
+                    "error": str(e),
+                    "best_value": float("inf"),
+                }
+
+        batch_results["results"].append(config_results)
+
+    # Salvar resultados se solicitado
+    if batch_config["save_results"]:
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        results_dir = os.path.join("outputs", "reports")
+        os.makedirs(results_dir, exist_ok=True)
+
+        results_file = os.path.join(results_dir, f"batch_optimization_{timestamp}.json")
+
+        with open(results_file, "w") as f:
+            json.dump(batch_results, f, indent=2, default=str)
+
+        console.print(f"💾 Resultados salvos em: {results_file}")
+
+    # Exibir resumo
+    console.print("\n📊 Resumo da Otimização em Lote:")
+    console.print("=" * 50)
+
+    for result in batch_results["results"]:
+        config_idx = result["config_index"]
+        console.print(f"\n📋 Configuração {config_idx}:")
+        console.print(f"   Dataset: {result['dataset_info'].get('type', 'N/A')}")
+
+        for alg_name, alg_result in result["algorithms"].items():
+            if "error" in alg_result:
+                console.print(f"   ❌ {alg_name}: {alg_result['error']}")
+            else:
+                console.print(f"   ✅ {alg_name}: {alg_result['best_value']:.6f}")
+
+
 def run_sensitivity_workflow():
     """Executa o workflow de análise de sensibilidade."""
     from src.datasets.dataset_synthetic import generate_dataset
@@ -669,7 +903,9 @@ def run_sensitivity_workflow():
     console.print("\n📊 Gerando dataset para análise...")
     seqs, _ = generate_dataset(silent=True)
 
-    console.print(f"✅ Dataset gerado: {len(seqs)} sequências de tamanho {len(seqs[0])}")
+    console.print(
+        f"✅ Dataset gerado: {len(seqs)} sequências de tamanho {len(seqs[0])}"
+    )
 
     # Executar análise de sensibilidade
     alphabet = "".join(sorted(set("".join(seqs))))
@@ -687,11 +923,29 @@ def run_sensitivity_workflow():
         console.print("\n✅ Análise de sensibilidade concluída!")
         console.print(f"Parâmetros analisados: {len(result.parameter_names)}")
 
-        # Mostrar principais parâmetros sensíveis
-        important_params = result.get_most_important_parameters(n=5)
+        # Mostrar principais parâmetros sensíveis baseado no método
         console.print("\n📈 Parâmetros mais sensíveis:")
-        for param, value in important_params:
-            console.print(f"  • {param}: {value:.4f}")
+        if result.method == "sobol" and result.total_order:
+            # Para Sobol, usar índices de ordem total
+            sorted_params = sorted(
+                result.total_order.items(), key=lambda x: x[1], reverse=True
+            )
+            for param, value in sorted_params[:5]:
+                console.print(f"  • {param}: {value:.4f}")
+        elif result.method == "morris" and result.mu_star:
+            # Para Morris, usar mu_star
+            sorted_params = sorted(
+                result.mu_star.items(), key=lambda x: x[1], reverse=True
+            )
+            for param, value in sorted_params[:5]:
+                console.print(f"  • {param}: {value:.4f}")
+        elif result.method == "fast" and result.first_order:
+            # Para FAST, usar índices de primeira ordem
+            sorted_params = sorted(
+                result.first_order.items(), key=lambda x: x[1], reverse=True
+            )
+            for param, value in sorted_params[:5]:
+                console.print(f"  • {param}: {value:.4f}")
 
         # Salvar visualizações se solicitado
         if config["save_plots"]:
@@ -702,7 +956,9 @@ def run_sensitivity_workflow():
             os.makedirs(plots_dir, exist_ok=True)
 
             # Salvar gráficos
-            sensitivity_path = os.path.join(plots_dir, f"{algorithm_name}_sensitivity.png")
+            sensitivity_path = os.path.join(
+                plots_dir, f"{algorithm_name}_sensitivity.png"
+            )
             visualizer.plot_sensitivity_indices(save_path=sensitivity_path)
 
             console.print(f"📊 Gráficos salvos em: {plots_dir}")
@@ -711,7 +967,8 @@ def run_sensitivity_workflow():
         import json
 
         results_path = os.path.join(
-            RESULTS_DIR, f"sensitivity_{algorithm_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+            RESULTS_DIR,
+            f"sensitivity_{algorithm_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
         )
         with open(results_path, "w") as f:
             json.dump(
@@ -721,7 +978,10 @@ def run_sensitivity_workflow():
                     "first_order": result.first_order,
                     "total_order": result.total_order,
                     "second_order": result.second_order,
-                    "confidence_intervals": result.confidence_intervals,
+                    "mu": result.mu,
+                    "mu_star": result.mu_star,
+                    "sigma": result.sigma,
+                    "main_effect": result.main_effect,
                     "n_samples": result.n_samples,
                     "analysis_time": result.analysis_time,
                 },

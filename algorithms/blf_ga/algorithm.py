@@ -35,6 +35,17 @@ class BLFGAAlgorithm(CSPAlgorithm):
         super().__init__(strings, alphabet, **params)
         self.blf_ga_instance = BLFGA(self.strings, self.alphabet, **self.params)
 
+    def set_params(self, **params) -> None:
+        """
+        Define novos parâmetros para o algoritmo.
+
+        Args:
+            **params: Parâmetros a serem atualizados
+        """
+        super().set_params(**params)
+        # Atualizar instância do BLF-GA diretamente
+        self.blf_ga_instance.update_params(**params)
+
     def set_progress_callback(self, callback: Callable[[str], None]) -> None:
         """
         Passa o callback para a instância do BLFGA.

@@ -1,0 +1,50 @@
+[MASTER]
+# Lista de plugins (separados por vírgula)
+load-plugins=
+
+# Lista de mensagens que não devem ser reportadas
+disable=
+    missing-module-docstring,
+    missing-class-docstring,
+    missing-function-docstring,
+    too-many-arguments,
+    too-many-positional-arguments,
+    too-many-locals,
+    too-many-instance-attributes,
+    too-many-statements,
+    too-many-branches,
+    too-many-return-statements,
+    useless-parent-delegation,
+    invalid-name,
+    unused-variable,
+    unused-argument,
+    line-too-long,
+    fixme
+
+[FORMAT]
+# Máximo comprimento de linha
+max-line-length=88
+
+# Número de espaços por nível de indentação
+indent-string='    '
+
+[MESSAGES CONTROL]
+# Habilitar apenas as verificações mais importantes
+enable=
+    broad-exception-caught,
+    logging-fstring-interpolation,
+    raise-missing-from,
+    no-else-return,
+    unnecessary-pass,
+    unused-import,
+    import-error,
+    cyclic-import,
+    consider-using-enumerate,
+    chained-comparison
+
+[REPORTS]
+# Desabilitar relatórios detalhados
+reports=no
+
+# Incluir apenas uma pontuação
+score=yes

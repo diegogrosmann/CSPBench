@@ -29,13 +29,13 @@ class CSPExporter:
 
         # Criar timestamp para subfolder se não fornecido
         if base_subfolder is None:
-            base_subfolder = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+            base_subfolder = datetime.now().strftime("%Y%m%d_%H%M%S")
 
         # Definir diretório base
         self.base_dir = Path("outputs") / "reports" / base_subfolder
         self.base_dir.mkdir(parents=True, exist_ok=True)
 
-        self.logger.info(f"CSPExporter inicializado: {self.base_dir}")
+        self.logger.info("CSPExporter inicializado: %s", self.base_dir)
 
     def export_to_csv(
         self,
@@ -51,7 +51,7 @@ class CSPExporter:
             filename: Nome do arquivo CSV (relativo ao base_dir).
             extra_info: Informações extras do experimento.
         """
-        file_path = self.base_dir / filename
+        file_path = Path(filename)
         file_path.parent.mkdir(parents=True, exist_ok=True)
 
         headers = [
@@ -84,13 +84,16 @@ class CSPExporter:
                         "algoritmo": alg_name,
                         "execucao": idx,
                         "melhor_string": exec_data.get("melhor_string", ""),
-                        "distancia": exec_data.get("distancia", exec_data.get("melhor_distancia", "")),
+                        "distancia": exec_data.get(
+                            "distancia", exec_data.get("melhor_distancia", "")
+                        ),
                         "tempo": exec_data.get("tempo", ""),
                         "status": exec_data.get(
                             "status",
                             (
                                 "sucesso"
-                                if "distancia" in exec_data and exec_data["distancia"] != float("inf")
+                                if "distancia" in exec_data
+                                and exec_data["distancia"] != float("inf")
                                 else "erro"
                             ),
                         ),
@@ -100,16 +103,22 @@ class CSPExporter:
                             params.get("distancia_string_base", ""),
                         ),
                         "seed": exec_data.get("seed", params.get("seed", "")),
-                        "n": params.get("n", len(dataset_strings) if dataset_strings else ""),
+                        "n": params.get(
+                            "n", len(dataset_strings) if dataset_strings else ""
+                        ),
                         "L": params.get(
                             "L",
-                            (len(dataset_strings[0]) if dataset_strings and len(dataset_strings) > 0 else ""),
+                            (
+                                len(dataset_strings[0])
+                                if dataset_strings and len(dataset_strings) > 0
+                                else ""
+                            ),
                         ),
                         "alphabet": params.get("alphabet", ""),
                     }
                     writer.writerow(row)
 
-        self.logger.info(f"Resultados exportados para CSV: {file_path}")
+        self.logger.info("Resultados exportados para CSV: %s", file_path)
 
     def export_batch_json_to_csv(self, json_path: str, csv_path: str) -> None:
         """
@@ -158,7 +167,7 @@ class CSPExporter:
                             rows.append(row)
 
         self._write_batch_csv(csv_path, rows)
-        self.logger.info(f"Batch exportado para CSV: {csv_path}")
+        self.logger.info("Batch exportado para CSV: %s", csv_path)
 
     def _create_batch_row(
         self,
@@ -176,7 +185,9 @@ class CSPExporter:
             "algoritmo": alg,
             "base_idx": base_idx,
             "execucao_idx": exec_idx,
-            "dist": exec_data.get("distancia", exec_data.get("melhor_distancia", result.get("dist", ""))),
+            "dist": exec_data.get(
+                "distancia", exec_data.get("melhor_distancia", result.get("dist", ""))
+            ),
             "dist_base": result.get("dist_base", ""),
             "tempo": exec_data.get("tempo", result.get("time", "")),
             "status": exec_data.get("status", result.get("status", "")),
@@ -243,7 +254,7 @@ class CSPExporter:
         with open(file_path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
 
-        self.logger.info(f"Dados exportados para JSON: {file_path}")
+        self.logger.info("Dados exportados para JSON: %s", file_path)
 
     def _convert_dict_keys_to_str(self, obj: Any) -> Any:
         """

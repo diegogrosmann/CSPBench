@@ -13,9 +13,11 @@ from collections.abc import Callable, Sequence
 from typing import cast
 
 from src.utils.distance import max_distance
-from src.utils.resource_monitor import get_safe_memory_limit
 
 from .config import DP_CSP_DEFAULTS
+
+# Removed resource_monitor dependency - using simplified resource management
+
 
 logger = logging.getLogger(__name__)
 
@@ -101,7 +103,9 @@ def _dp_decision(strings: Sequence[String], alphabet: str, d: int) -> String | N
 
     max_dist = max(hamming_distance(result, s) for s in strings)
     if max_dist > d:
-        logger.error("[DP_DECISION] ERRO: Solução inválida! dist=%d > d=%d", max_dist, d)
+        logger.error(
+            "[DP_DECISION] ERRO: Solução inválida! dist=%d > d=%d", max_dist, d
+        )
 
     return result
 
@@ -132,17 +136,24 @@ def exact_dp_closest_string(
     n = len(strings)
 
     # LOG DETALHADO: Parâmetros de entrada
-    logger.info("[DP_CSP] Iniciando busca exata com max_d=%d, baseline=%d", max_d, baseline_val)
-    logger.info("[DP_CSP] Dataset: n=%d, L=%d, alfabeto=%s", n, len(strings[0]), alphabet)
+    logger.info(
+        "[DP_CSP] Iniciando busca exata com max_d=%d, baseline=%d", max_d, baseline_val
+    )
+    logger.info(
+        "[DP_CSP] Dataset: n=%d, L=%d, alfabeto=%s", n, len(strings[0]), alphabet
+    )
     for i, s in enumerate(strings):
         logger.info("[DP_CSP] String %d: %s", i, s)
 
-    # --- Monitoramento de recursos ---
-    safe_mem_mb = get_safe_memory_limit()
+    # --- Monitoramento de recursos simplificado ---
+    # TODO: Implementar monitoramento com novo sistema
+    safe_mem_mb = 1000.0  # Limite padrão simplificado
     max_time = DP_CSP_DEFAULTS.get("max_time", 300)
     t0 = time.time()
 
-    logger.info("[DP_CSP] Limites: mem=%.1fMB, tempo=%ds", safe_mem_mb, max_time)
+    logger.info(
+        "[DP_CSP] Limites simplificados: mem=%.1fMB, tempo=%ds", safe_mem_mb, max_time
+    )
 
     def check_limits(d):
         # Checa memória, tempo e viabilidade incrementalmente
@@ -208,7 +219,9 @@ def exact_dp_closest_string(
             logger.info("[DP_CSP] Validação final: distância máxima = %d", max_dist)
 
             if max_dist != d:
-                logger.warning("[DP_CSP] INCONSISTÊNCIA: d=%d mas distância real=%d", d, max_dist)
+                logger.warning(
+                    "[DP_CSP] INCONSISTÊNCIA: d=%d mas distância real=%d", d, max_dist
+                )
 
             return center, d
         else:
@@ -216,4 +229,7 @@ def exact_dp_closest_string(
             pass
 
     logger.error("[DP_CSP] FALHA: Não foi possível encontrar centro com d ≤ %d", max_d)
-    raise RuntimeError(f"Não foi possível encontrar centro com d ≤ {max_d}. " "Tente aumentar o limite.")
+    raise RuntimeError(
+        f"Não foi possível encontrar centro com d ≤ {max_d}. "
+        "Tente aumentar o limite."
+    )

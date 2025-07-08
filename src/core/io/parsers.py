@@ -47,7 +47,7 @@ def load_fasta(file_path: str | Path) -> list[str]:
     current_seq = ""
     line_num = 0
 
-    logger.info(f"Carregando FASTA: {file_path}")
+    logger.info("Carregando FASTA: %s", file_path)
 
     try:
         with open(file_path, encoding="utf-8") as f:
@@ -71,12 +71,12 @@ def load_fasta(file_path: str | Path) -> list[str]:
                 sequences.append(current_seq)
 
     except Exception as e:
-        raise ValueError(f"Erro ao processar FASTA na linha {line_num}: {e}")
+        raise ValueError(f"Erro ao processar FASTA na linha {line_num}: {e}") from e
 
     if not sequences:
         raise ValueError(f"Nenhuma sequência encontrada no arquivo: {file_path}")
 
-    logger.info(f"Carregadas {len(sequences)} sequências do FASTA")
+    logger.info("Carregadas %s sequências do FASTA", len(sequences))
     return sequences
 
 
@@ -107,7 +107,7 @@ def load_txt(file_path: str | Path) -> list[str]:
     sequences = []
     line_num = 0
 
-    logger.info(f"Carregando TXT: {file_path}")
+    logger.info("Carregando TXT: %s", file_path)
 
     try:
         with open(file_path, encoding="utf-8") as f:
@@ -121,12 +121,12 @@ def load_txt(file_path: str | Path) -> list[str]:
                 sequences.append(line)
 
     except Exception as e:
-        raise ValueError(f"Erro ao processar TXT na linha {line_num}: {e}")
+        raise ValueError(f"Erro ao processar TXT na linha {line_num}: {e}") from e
 
     if not sequences:
         raise ValueError(f"Nenhuma sequência encontrada no arquivo: {file_path}")
 
-    logger.info(f"Carregadas {len(sequences)} sequências do TXT")
+    logger.info("Carregadas %s sequências do TXT", len(sequences))
     return sequences
 
 
@@ -154,23 +154,23 @@ def load_sequences(file_path: str | Path) -> list[str]:
 
     if suffix in [".fasta", ".fa", ".fas"]:
         return load_fasta(file_path)
-    elif suffix in [".txt"]:
+    if suffix in [".txt"]:
         return load_txt(file_path)
-    else:
-        # Tentar detectar pelo conteúdo
-        try:
-            with open(file_path, encoding="utf-8") as f:
-                first_line = f.readline().strip()
 
-                if first_line.startswith(">"):
-                    logger.info(f"Detectado formato FASTA em: {file_path}")
-                    return load_fasta(file_path)
-                else:
-                    logger.info(f"Assumindo formato TXT em: {file_path}")
-                    return load_txt(file_path)
+    # Tentar detectar pelo conteúdo
+    try:
+        with open(file_path, encoding="utf-8") as f:
+            first_line = f.readline().strip()
 
-        except Exception as e:
-            raise ValueError(f"Não foi possível detectar formato do arquivo: {e}")
+            if first_line.startswith(">"):
+                logger.info("Detectado formato FASTA em: %s", file_path)
+                return load_fasta(file_path)
+
+            logger.info("Assumindo formato TXT em: %s", file_path)
+            return load_txt(file_path)
+
+    except Exception as e:
+        raise ValueError(f"Não foi possível detectar formato do arquivo: {e}") from e
 
 
 def validate_sequences(sequences: list[str]) -> dict[str, Any]:

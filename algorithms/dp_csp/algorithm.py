@@ -31,6 +31,21 @@ class DPCSPAlgorithm(CSPAlgorithm):
     supports_internal_parallel = False  # DP-CSP não suporta paralelismo interno
     is_deterministic = True
 
+    def __init__(self, strings: list[str], alphabet: str, **params):
+        """
+        Inicializa o algoritmo DP-CSP.
+
+        Args:
+            strings: Lista de strings do dataset
+            alphabet: Alfabeto utilizado
+            **params: Parâmetros específicos do algoritmo
+        """
+        self.strings = strings
+        self.alphabet = alphabet
+        self.params = {**self.default_params, **params}
+        self.progress_callback = None
+        self.warning_callback = None
+
     def run(self) -> tuple[str, int, dict]:
         """
         Executa o algoritmo DP-CSP e retorna a string central, distância máxima e metadata.
@@ -61,18 +76,9 @@ class DPCSPAlgorithm(CSPAlgorithm):
             }
 
             return center, dist, metadata
-        except RuntimeError:
-            # Fallback para primeira string se falhar
-            self._report_warning("DP-CSP falhou, usando fallback para primeira string")
-            fallback_center = self.strings[0]
-            fallback_dist = max_distance(fallback_center, self.strings)
+        except RuntimeError as e:
+            # DP-CSP falhou devido a limitações de memória/tempo
+            self._report_warning(f"DP-CSP falhou: {e}")
 
-            metadata = {
-                "iteracoes": 1,
-                "max_d_usado": max_d,
-                "solucao_exata": False,
-                "fallback_usado": True,
-                "centro_encontrado": fallback_center,
-            }
-
-            return fallback_center, fallback_dist, metadata
+            # Re-raise a exceção para indicar falha real
+            raise RuntimeError(f"DP-CSP falhou: {e}") from e

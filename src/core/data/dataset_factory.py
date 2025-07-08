@@ -36,8 +36,6 @@ class DatasetType(Enum):
 class DatasetError(Exception):
     """Exceção personalizada para erros de dataset."""
 
-    pass
-
 
 class DatasetFactory:
     """
@@ -93,9 +91,13 @@ class DatasetFactory:
             if dataset_type == DatasetType.FILE.value:
                 sequences, metadata = self._create_file_dataset(dataset_config)
             elif dataset_type == DatasetType.ENTREZ.value:
-                sequences, metadata = self._create_entrez_dataset(dataset_config, base_index)
+                sequences, metadata = self._create_entrez_dataset(
+                    dataset_config, base_index
+                )
             elif dataset_type == DatasetType.SYNTHETIC.value:
-                sequences, metadata = self._create_synthetic_dataset(dataset_config, base_index)
+                sequences, metadata = self._create_synthetic_dataset(
+                    dataset_config, base_index
+                )
             else:
                 raise DatasetError(f"Tipo de dataset não suportado: {dataset_type}")
 
@@ -108,14 +110,20 @@ class DatasetFactory:
             if self.cache_enabled:
                 self._cache[cache_key] = (sequences, metadata)
 
-            logger.info("Dataset criado: %d sequências, L=%s", len(sequences), metadata.get("L", "N/A"))
+            logger.info(
+                "Dataset criado: %d sequências, L=%s",
+                len(sequences),
+                metadata.get("L", "N/A"),
+            )
             return sequences, metadata
 
         except Exception as e:
             logger.error("Erro ao criar dataset: %s", e)
-            raise DatasetError(f"Erro ao criar dataset: {e}")
+            raise DatasetError(f"Erro ao criar dataset: {e}") from e
 
-    def _create_file_dataset(self, config: dict[str, Any]) -> tuple[list[str], dict[str, Any]]:
+    def _create_file_dataset(
+        self, config: dict[str, Any]
+    ) -> tuple[list[str], dict[str, Any]]:
         """
         Cria dataset a partir de arquivo.
 
@@ -153,7 +161,9 @@ class DatasetFactory:
         required_fields = ["email", "db", "term"]
         missing_fields = [f for f in required_fields if f not in config]
         if missing_fields:
-            raise DatasetError(f"Dataset tipo 'entrez' deve ter campos: {missing_fields}")
+            raise DatasetError(
+                f"Dataset tipo 'entrez' deve ter campos: {missing_fields}"
+            )
 
         params = config.copy()
 
@@ -181,7 +191,9 @@ class DatasetFactory:
         required_fields = ["n", "L", "alphabet"]
         missing_fields = [f for f in required_fields if f not in config]
         if missing_fields:
-            raise DatasetError(f"Dataset tipo 'synthetic' deve ter campos: {missing_fields}")
+            raise DatasetError(
+                f"Dataset tipo 'synthetic' deve ter campos: {missing_fields}"
+            )
 
         params = config.copy()
 
@@ -194,7 +206,9 @@ class DatasetFactory:
 
         return sequences, metadata
 
-    def _get_cache_key(self, config: dict[str, Any], base_index: int | None = None) -> str:
+    def _get_cache_key(
+        self, config: dict[str, Any], base_index: int | None = None
+    ) -> str:
         """
         Gera chave de cache para o dataset.
 
@@ -283,13 +297,17 @@ class DatasetFactory:
             required_fields = ["email", "db", "term"]
             missing_fields = [f for f in required_fields if f not in config]
             if missing_fields:
-                raise DatasetError(f"Dataset tipo 'entrez' deve ter campos: {missing_fields}")
+                raise DatasetError(
+                    f"Dataset tipo 'entrez' deve ter campos: {missing_fields}"
+                )
 
         elif dataset_type == DatasetType.SYNTHETIC.value:
             required_fields = ["n", "L", "alphabet"]
             missing_fields = [f for f in required_fields if f not in config]
             if missing_fields:
-                raise DatasetError(f"Dataset tipo 'synthetic' deve ter campos: {missing_fields}")
+                raise DatasetError(
+                    f"Dataset tipo 'synthetic' deve ter campos: {missing_fields}"
+                )
 
     def create_multiple_datasets(
         self, dataset_config: dict[str, Any], num_bases: int
@@ -310,8 +328,8 @@ class DatasetFactory:
                 dataset = self.create_dataset(dataset_config, base_index=i)
                 datasets.append(dataset)
             except Exception as e:
-                logger.error(f"Erro ao criar base {i}: {e}")
-                raise DatasetError(f"Erro ao criar base {i}: {e}")
+                logger.error("Erro ao criar base %s: %s", i, e)
+                raise DatasetError(f"Erro ao criar base {i}: {e}") from e
 
         return datasets
 

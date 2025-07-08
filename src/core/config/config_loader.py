@@ -95,10 +95,14 @@ class ConfigLoader:
         # Validar configuração
         self._validate_config(config)
 
-        logger.info("Configuração carregada com sucesso: %s", config.get("nome", "sem nome"))
+        logger.info(
+            "Configuração carregada com sucesso: %s", config.get("nome", "sem nome")
+        )
         return config
 
-    def load_multiple_configs(self, config_paths: list[str | Path]) -> list[dict[str, Any]]:
+    def load_multiple_configs(
+        self, config_paths: list[str | Path]
+    ) -> list[dict[str, Any]]:
         """
         Carrega múltiplas configurações.
 
@@ -122,7 +126,9 @@ class ConfigLoader:
 
         return configs
 
-    def merge_configs(self, base_config: dict[str, Any], override_config: dict[str, Any]) -> dict[str, Any]:
+    def merge_configs(
+        self, base_config: dict[str, Any], override_config: dict[str, Any]
+    ) -> dict[str, Any]:
         """
         Faz merge de duas configurações.
 
@@ -141,7 +147,9 @@ class ConfigLoader:
 
         return merged
 
-    def _resolve_paths(self, config: dict[str, Any], config_dir: Path) -> dict[str, Any]:
+    def _resolve_paths(
+        self, config: dict[str, Any], config_dir: Path
+    ) -> dict[str, Any]:
         """
         Resolve paths relativos na configuração.
 
@@ -253,13 +261,18 @@ class ConfigLoader:
             required_synthetic = ["n", "L", "alphabet"]
             missing = [f for f in required_synthetic if f not in dataset]
             if missing:
-                raise ConfigError(f"Dataset tipo 'synthetic' deve ter campos: {missing}")
+                raise ConfigError(
+                    f"Dataset tipo 'synthetic' deve ter campos: {missing}"
+                )
 
     def _validate_numeric_fields(self, config: dict[str, Any]) -> None:
         """Valida campos numéricos."""
         numeric_fields = {
             "runs_per_algorithm_per_base": (int, lambda x: x > 0),
-            "execucoes_por_algoritmo_por_base": (int, lambda x: x > 0),  # Retro-compatibilidade
+            "execucoes_por_algoritmo_por_base": (
+                int,
+                lambda x: x > 0,
+            ),  # Retro-compatibilidade
             "num_bases": (int, lambda x: x > 0),
             "timeout": (int, lambda x: x > 0),
             "max_workers": (int, lambda x: x > 0),
@@ -270,7 +283,9 @@ class ConfigLoader:
             if field in config:
                 value = config[field]
                 if not isinstance(value, expected_type):
-                    raise ConfigError(f"Campo '{field}' deve ser do tipo {expected_type.__name__}")
+                    raise ConfigError(
+                        f"Campo '{field}' deve ser do tipo {expected_type.__name__}"
+                    )
                 if not validator(value):
                     raise ConfigError(f"Campo '{field}' tem valor inválido: {value}")
 
@@ -314,7 +329,13 @@ class ConfigLoader:
 
         try:
             with open(output_path, "w", encoding="utf-8") as f:
-                yaml.safe_dump(config, f, default_flow_style=False, sort_keys=False, allow_unicode=True)
+                yaml.safe_dump(
+                    config,
+                    f,
+                    default_flow_style=False,
+                    sort_keys=False,
+                    allow_unicode=True,
+                )
             logger.info("Configuração salva em: %s", output_path)
         except Exception as e:
             raise ConfigError(f"Erro ao salvar configuração: {e}") from e

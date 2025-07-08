@@ -1,28 +1,34 @@
 """
 Módulo de otimização de hiperparâmetros usando Optuna.
 
+Este módulo fornece funcionalidades para otimizar hiperparâmetros de algoritmos
+CSP usando o framework Optuna, incluindo diferentes estratégias de amostragem,
+poda de trials e salvamento de resultados.
+
 Classes:
-    OptunaOptimizer: Otimizador principal usando Optuna
-    OptimizationConfig: Configuração da otimização
+    OptimizationConfig: Configuração para otimização
     OptimizationResult: Resultado da otimização
+    OptunaOptimizer: Classe principal para otimização
 
 Funções:
-    optimize_algorithm: Otimiza hiperparâmetros de um algoritmo
-    create_optimization_study: Cria estudo de otimização
+    optimize_algorithm: Função principal para otimizar algoritmos
+    create_optimization_study: Cria um estudo Optuna
 """
 
+import json
 import logging
+import os
 import time
 from dataclasses import dataclass
-from typing import Any
+from datetime import datetime
+from typing import Any, Dict, List, Optional, Union
 
 import optuna
-from optuna.pruners import MedianPruner
-from optuna.samplers import TPESampler
+from optuna.pruners import MedianPruner, SuccessiveHalvingPruner
+from optuna.samplers import CmaEsSampler, RandomSampler, TPESampler
+from tqdm import tqdm
 
 from algorithms.base import global_registry
-from src.core.exec.algorithm_executor import AlgorithmExecutor
-from src.ui.cli.console_manager import console
 
 logger = logging.getLogger(__name__)
 
@@ -31,46 +37,51 @@ logger = logging.getLogger(__name__)
 class OptimizationConfig:
     """Configuração para otimização de hiperparâmetros."""
 
-    algorithm_name: str
-    dataset_sequences: list[str]
-    alphabet: str
     n_trials: int = 100
-    timeout_per_trial: int = 300
-    n_jobs: int = 1
-    study_name: str | None = None
-    direction: str = "minimize"  # minimize ou maximize
-    sampler: str = "TPE"  # TPE, Random, CmaEs
-    pruner: str = "median"  # median, hyperband, none
-
-    def __post_init__(self):
-        """Validação da configuração."""
-        if self.algorithm_name not in global_registry:
-            raise ValueError(f"Algoritmo não encontrado: {self.algorithm_name}")
-
-        if self.direction not in ["minimize", "maximize"]:
-            raise ValueError("direction deve ser 'minimize' ou 'maximize'")
+    timeout: Optional[float] = None
+    timeout_per_trial: Optional[float] = 60.0
+    direction: str = "minimize"  # "minimize" ou "maximize"
+    sampler: str = "TPE"  # "TPE", "CmaEs", "Random"
+    pruner: str = "Median"  # "Median", "SuccessiveHalving", None
+    study_name: Optional[str] = None
+    storage: Optional[str] = None
+    load_if_exists: bool = True
+    show_progress: bool = True
+    n_startup_trials: int = 10
+    n_ei_candidates: int = 24
+    seed: Optional[int] = None
 
 
 @dataclass
 class OptimizationResult:
-    """Resultado da otimização."""
+    """Resultado da otimização de hiperparâmetros."""
 
-    best_params: dict[str, Any]
+    best_params: Dict[str, Any]
     best_value: float
     n_trials: int
     study_name: str
     optimization_time: float
-    all_trials: list[dict]
+    all_trials: List[Dict[str, Any]]
+    study: optuna.Study
 
-    def summary(self) -> str:
-        """Retorna resumo da otimização."""
-        return (
-            f"Otimização Concluída:\n"
-            f"  Melhor valor: {self.best_value:.6f}\n"
-            f"  Melhores parâmetros: {self.best_params}\n"
-            f"  Trials executados: {self.n_trials}\n"
-            f"  Tempo total: {self.optimization_time:.1f}s"
-        )
+    def __post_init__(self):
+        """Processa trials após inicialização."""
+        if not self.all_trials:
+            self.all_trials = []
+            for trial in self.study.trials:
+                trial_data = {
+                    "number": trial.number,
+                    "value": trial.value,
+                    "params": trial.params,
+                    "state": trial.state.name,
+                    "datetime_start": trial.datetime_start,
+                    "datetime_complete": trial.datetime_complete,
+                }
+                if trial.datetime_start and trial.datetime_complete:
+                    trial_data["duration"] = (
+                        trial.datetime_complete - trial.datetime_start
+                    ).total_seconds()
+                self.all_trials.append(trial_data)
 
 
 class OptunaOptimizer:
@@ -78,255 +89,486 @@ class OptunaOptimizer:
 
     def __init__(self, config: OptimizationConfig):
         self.config = config
-        self.study: optuna.Study | None = None
-        self.algorithm_class = global_registry[config.algorithm_name]
+        self.study: Optional[optuna.Study] = None
+        self.algorithm_class: Optional[type] = None
+        self.sequences: List[str] = []
+        self.alphabet: str = ""
 
-        # Configurar sampler
-        if config.sampler == "TPE":
-            sampler = TPESampler(seed=42)
-        elif config.sampler == "Random":
-            sampler = optuna.samplers.RandomSampler(seed=42)
-        elif config.sampler == "CmaEs":
-            sampler = optuna.samplers.CmaEsSampler(seed=42)
+    def _create_sampler(self) -> optuna.samplers.BaseSampler:
+        """Cria sampler baseado na configuração."""
+        if self.config.sampler == "TPE":
+            return TPESampler(
+                n_startup_trials=self.config.n_startup_trials,
+                n_ei_candidates=self.config.n_ei_candidates,
+                seed=self.config.seed,
+            )
+        elif self.config.sampler == "CmaEs":
+            return CmaEsSampler(seed=self.config.seed)
+        elif self.config.sampler == "Random":
+            return RandomSampler(seed=self.config.seed)
         else:
-            sampler = TPESampler(seed=42)
+            logger.warning(f"Sampler desconhecido: {self.config.sampler}. Usando TPE.")
+            return TPESampler(seed=self.config.seed)
 
-        # Configurar pruner
-        if config.pruner == "median":
-            pruner = MedianPruner(n_startup_trials=5, n_warmup_steps=10)
-        elif config.pruner == "hyperband":
-            pruner = optuna.pruners.HyperbandPruner()
+    def _create_pruner(self) -> Optional[optuna.pruners.BasePruner]:
+        """Cria pruner baseado na configuração."""
+        if self.config.pruner == "Median":
+            return MedianPruner(n_startup_trials=self.config.n_startup_trials)
+        elif self.config.pruner == "SuccessiveHalving":
+            return SuccessiveHalvingPruner()
         else:
-            pruner = optuna.pruners.NopPruner()
+            return None
 
-        # Criar estudo
-        study_name = config.study_name or f"{config.algorithm_name}_optimization"
-        self.study = optuna.create_study(
-            direction=config.direction, sampler=sampler, pruner=pruner, study_name=study_name
-        )
+    def _get_parameter_space(self, algorithm_name: str) -> Dict[str, Any]:
+        """Obtém espaço de parâmetros para o algoritmo."""
+        # Mapear algoritmos para seus espaços de parâmetros
+        parameter_spaces = {
+            "BLF-GA": {
+                "pop_size": ("int", 30, 200),
+                "max_gens": ("int", 50, 500),
+                "cross_prob": ("float", 0.6, 0.95),
+                "mut_prob": ("float", 0.01, 0.3),
+                "elite_rate": ("float", 0.01, 0.15),
+                "tournament_k": ("int", 2, 8),
+                "immigrant_freq": ("int", 5, 20),
+                "immigrant_ratio": ("float", 0.1, 0.4),
+                "diversity_threshold": ("float", 0.2, 0.8),
+                "no_improve_patience": ("float", 0.1, 0.5),
+                "restart_patience": ("int", 10, 50),
+                "restart_ratio": ("float", 0.2, 0.6),
+                "crossover_type": (
+                    "categorical",
+                    ["one_point", "uniform", "blend_blocks"],
+                ),
+                "mutation_type": (
+                    "categorical",
+                    ["multi", "inversion", "transposition"],
+                ),
+                "mutation_multi_n": ("int", 1, 5),
+                "refinement_type": (
+                    "categorical",
+                    ["greedy", "swap", "insertion", "2opt"],
+                ),
+                "refine_elites": ("categorical", ["best", "all"]),
+                "refine_iter_limit": ("int", 50, 200),
+                "niching": ("categorical", [True, False]),
+                "niching_radius": ("int", 2, 8),
+                "mutation_adapt_factor": ("float", 1.5, 3.0),
+                "mutation_adapt_duration": ("int", 3, 10),
+                "disable_elitism_gens": ("int", 3, 10),
+            },
+            "CSC": {
+                "max_iter": ("int", 100, 1000),
+                "patience": ("int", 10, 100),
+                "min_improvement": ("float", 1e-6, 1e-3),
+                "random_restart": ("categorical", [True, False]),
+                "restart_patience": ("int", 20, 100),
+                "max_restarts": ("int", 1, 10),
+            },
+            "H3-CSP": {
+                "beam_width": ("int", 5, 50),
+                "max_iterations": ("int", 50, 500),
+                "diversity_factor": ("float", 0.1, 0.9),
+                "local_search": ("categorical", [True, False]),
+                "local_search_iters": ("int", 10, 100),
+                "restart_threshold": ("int", 10, 100),
+                "max_restarts": ("int", 1, 10),
+            },
+            "DP-CSP": {
+                "max_depth": ("int", 5, 20),
+                "pruning_threshold": ("float", 0.1, 0.9),
+                "use_heuristic": ("categorical", [True, False]),
+                "memory_limit": ("int", 100, 1000),
+            },
+        }
 
-        logger.info(f"Criado estudo de otimização: {study_name}")
+        return parameter_spaces.get(algorithm_name, {})
 
-    def _suggest_parameters(self, trial: optuna.Trial) -> dict[str, Any]:
-        """Define espaço de busca de hiperparâmetros baseado no algoritmo."""
-
+    def _suggest_parameters(
+        self, trial: optuna.Trial, algorithm_name: str
+    ) -> Dict[str, Any]:
+        """Sugere parâmetros para o trial."""
+        param_space = self._get_parameter_space(algorithm_name)
         params = {}
 
-        if self.config.algorithm_name == "BLF-GA":
-            # Parâmetros específicos do BLF-GA
-            params.update(
-                {
-                    "population_size": trial.suggest_int("population_size", 20, 200, step=10),
-                    "max_generations": trial.suggest_int("max_generations", 100, 1000, step=50),
-                    "crossover_rate": trial.suggest_float("crossover_rate", 0.6, 0.95, step=0.05),
-                    "mutation_rate": trial.suggest_float("mutation_rate", 0.01, 0.3, step=0.01),
-                    "elite_size": trial.suggest_int("elite_size", 1, 10),
-                    "tournament_size": trial.suggest_int("tournament_size", 2, 8),
-                }
-            )
+        for param_name, param_config in param_space.items():
+            param_type = param_config[0]
 
-        elif self.config.algorithm_name == "CSC":
-            # Parâmetros específicos do CSC
-            params.update(
-                {
-                    "max_iterations": trial.suggest_int("max_iterations", 100, 2000, step=100),
-                    "improvement_threshold": trial.suggest_float("improvement_threshold", 1e-6, 1e-3, log=True),
-                    "restart_threshold": trial.suggest_int("restart_threshold", 10, 100, step=10),
-                }
-            )
+            if param_type == "int":
+                low, high = param_config[1], param_config[2]
+                params[param_name] = trial.suggest_int(param_name, low, high)
+            elif param_type == "float":
+                low, high = param_config[1], param_config[2]
+                params[param_name] = trial.suggest_float(param_name, low, high)
+            elif param_type == "categorical":
+                choices = param_config[1]
+                params[param_name] = trial.suggest_categorical(param_name, choices)
+            elif param_type == "loguniform":
+                low, high = param_config[1], param_config[2]
+                params[param_name] = trial.suggest_float(
+                    param_name, low, high, log=True
+                )
 
-        elif self.config.algorithm_name == "DP-CSP":
-            # Parâmetros específicos do DP-CSP
-            params.update(
-                {
-                    "beam_width": trial.suggest_int("beam_width", 10, 100, step=10),
-                    "pruning_factor": trial.suggest_float("pruning_factor", 0.1, 0.9, step=0.1),
-                }
-            )
-
-        elif self.config.algorithm_name == "H3-CSP":
-            # Parâmetros específicos do H3-CSP
-            params.update(
-                {
-                    "max_depth": trial.suggest_int("max_depth", 5, 20),
-                    "branching_factor": trial.suggest_int("branching_factor", 2, 10),
-                    "heuristic_weight": trial.suggest_float("heuristic_weight", 0.1, 2.0, step=0.1),
-                }
-            )
-
-        # Parâmetros comuns se o algoritmo suportar
-        common_params = {}
-        if hasattr(self.algorithm_class, "supports_seed") and self.algorithm_class.supports_seed:
-            common_params["seed"] = trial.suggest_int("seed", 1, 1000000)
-
-        params.update(common_params)
         return params
 
-    def _objective(self, trial: optuna.Trial) -> float:
+    def _objective(self, trial: optuna.Trial, algorithm_name: str) -> float:
         """Função objetivo para otimização."""
-
         try:
             # Sugerir parâmetros
-            params = self._suggest_parameters(trial)
+            params = self._suggest_parameters(trial, algorithm_name)
 
-            # Criar instância do algoritmo com parâmetros
-            algorithm_instance = self.algorithm_class(self.config.dataset_sequences, self.config.alphabet, **params)
+            # Criar instância do algoritmo
+            if self.algorithm_class is None:
+                raise ValueError(
+                    f"Classe do algoritmo não encontrada: {algorithm_name}"
+                )
 
-            # Configurar timeout se suportado
-            if hasattr(algorithm_instance, "set_timeout"):
-                algorithm_instance.set_timeout(self.config.timeout_per_trial)
+            # Criar algoritmo com parâmetros sugeridos
+            algorithm = self.algorithm_class(self.sequences, self.alphabet)
+
+            # Aplicar parâmetros sugeridos
+            if hasattr(algorithm, "set_params"):
+                algorithm.set_params(**params)
+            elif hasattr(algorithm, "config"):
+                # Atualizar configuração do algoritmo
+                if hasattr(algorithm.config, "update"):
+                    algorithm.config.update(params)
+                else:
+                    for key, value in params.items():
+                        if hasattr(algorithm.config, key):
+                            setattr(algorithm.config, key, value)
+            else:
+                # Tentar definir parâmetros diretamente
+                for key, value in params.items():
+                    if hasattr(algorithm, key):
+                        setattr(algorithm, key, value)
 
             # Executar algoritmo
-            executor = AlgorithmExecutor(self.config.timeout_per_trial)
-            result, _, _ = executor.execute_with_timeout(algorithm_instance)
+            start_time = time.time()
+            result = algorithm.run()
+            execution_time = time.time() - start_time
 
-            if result is None or "distancia" not in result:
-                return float("inf")
+            # Extrair center e distance do resultado
+            if isinstance(result, tuple):
+                if len(result) == 2:
+                    center, distance = result
+                elif len(result) == 3:
+                    center, distance, metadata = result
+                else:
+                    raise ValueError(
+                        f"Resultado inesperado do algoritmo: {len(result)} valores"
+                    )
+            else:
+                raise ValueError(f"Tipo de resultado inesperado: {type(result)}")
 
-            distance = result["distancia"]
+            # Verificar timeout por trial
+            if (
+                self.config.timeout_per_trial
+                and execution_time > self.config.timeout_per_trial
+            ):
+                raise optuna.TrialPruned(
+                    f"Trial excedeu timeout: {execution_time:.2f}s"
+                )
 
-            # Reportar valor intermediário para pruning
-            trial.report(distance, step=0)
+            # Armazenar informações adicionais
+            trial.set_user_attr("execution_time", execution_time)
+            trial.set_user_attr("center", center)
+            trial.set_user_attr("distance", distance)
 
-            # Verificar se deve ser podado
-            if trial.should_prune():
-                raise optuna.TrialPruned()
+            # Retornar valor baseado na direção
+            if self.config.direction == "minimize":
+                return distance
+            else:
+                return -distance
 
-            return distance
-
-        except optuna.TrialPruned:
-            raise
         except Exception as e:
-            logger.warning(f"Erro no trial {trial.number}: {e}")
-            return float("inf")
+            logger.error(f"Erro no trial {trial.number}: {e}")
+            # Retornar valor que indica falha
+            if self.config.direction == "minimize":
+                return float("inf")
+            else:
+                return float("-inf")
 
-    def optimize(self, show_progress: bool = True) -> OptimizationResult:
+    def optimize(
+        self, algorithm_name: str, sequences: List[str], alphabet: str
+    ) -> OptimizationResult:
         """Executa otimização de hiperparâmetros."""
+        logger.info(f"Iniciando otimização para {algorithm_name}")
 
-        if not self.study:
-            raise ValueError("Study não foi inicializado corretamente")
+        # Verificar se algoritmo existe
+        if algorithm_name not in global_registry:
+            raise ValueError(f"Algoritmo não encontrado: {algorithm_name}")
 
-        if show_progress:
-            console.print(f"\n🔍 Iniciando otimização de {self.config.algorithm_name}")
-            console.print(
-                f"📊 Dataset: n={len(self.config.dataset_sequences)}, L={len(self.config.dataset_sequences[0])}"
-            )
-            console.print(f"🎯 Trials: {self.config.n_trials}")
-            console.print(f"⏱️  Timeout por trial: {self.config.timeout_per_trial}s")
+        self.algorithm_class = global_registry[algorithm_name]
+        self.sequences = sequences
+        self.alphabet = alphabet
 
-        start_time = time.time()
+        # Criar sampler e pruner
+        sampler = self._create_sampler()
+        pruner = self._create_pruner()
 
-        # Callback para mostrar progresso
-        def progress_callback(study: optuna.Study, trial):
-            if show_progress and trial.number % 10 == 0:
-                best_value = study.best_value if study.best_trial else "N/A"
-                console.print(f"  Trial {trial.number}/{self.config.n_trials}: melhor={best_value}")
+        # Criar estudo
+        study_name = (
+            self.config.study_name or f"optimize_{algorithm_name}_{int(time.time())}"
+        )
+
+        self.study = optuna.create_study(
+            direction=self.config.direction,
+            sampler=sampler,
+            pruner=pruner,
+            study_name=study_name,
+            storage=self.config.storage,
+            load_if_exists=self.config.load_if_exists,
+        )
 
         # Executar otimização
-        try:
+        start_time = time.time()
+
+        if self.config.show_progress:
+            # Usar tqdm para mostrar progresso
+            with tqdm(total=self.config.n_trials, desc="Otimizando") as pbar:
+
+                def callback(study, trial):
+                    pbar.set_description(f"Trial {trial.number}: {trial.value:.6f}")
+                    pbar.update(1)
+
+                self.study.optimize(
+                    lambda trial: self._objective(trial, algorithm_name),
+                    n_trials=self.config.n_trials,
+                    timeout=self.config.timeout,
+                    callbacks=[callback],
+                )
+        else:
             self.study.optimize(
-                self._objective,
+                lambda trial: self._objective(trial, algorithm_name),
                 n_trials=self.config.n_trials,
-                n_jobs=self.config.n_jobs,
-                callbacks=[progress_callback] if show_progress else None,
-                show_progress_bar=False,  # Usamos nosso próprio progresso
+                timeout=self.config.timeout,
             )
-        except KeyboardInterrupt:
-            console.print("\n⚠️  Otimização interrompida pelo usuário")
 
         optimization_time = time.time() - start_time
 
-        # Coletar resultados
-        all_trials = []
-        for trial in self.study.trials:
-            trial_data = {
-                "number": trial.number,
-                "value": trial.value,
-                "params": trial.params,
-                "state": trial.state.name,
-                "datetime_start": trial.datetime_start,
-                "datetime_complete": trial.datetime_complete,
-                "duration": trial.duration.total_seconds() if trial.duration else None,
-            }
-            all_trials.append(trial_data)
+        logger.info(f"Otimização concluída em {optimization_time:.2f}s")
+        logger.info(f"Melhor valor: {self.study.best_value}")
+        logger.info(f"Melhores parâmetros: {self.study.best_params}")
 
+        # Criar resultado
         result = OptimizationResult(
-            best_params=self.study.best_params if self.study.best_trial else {},
-            best_value=self.study.best_value if self.study.best_trial else float("inf"),
+            best_params=self.study.best_params,
+            best_value=self.study.best_value,
             n_trials=len(self.study.trials),
-            study_name=self.study.study_name,
+            study_name=study_name,
             optimization_time=optimization_time,
-            all_trials=all_trials,
+            all_trials=[],
+            study=self.study,
         )
-
-        if show_progress:
-            console.print(f"\n✅ {result.summary()}")
 
         return result
 
-    def get_optimization_history(self) -> list[dict]:
-        """Retorna histórico de otimização."""
-        if not self.study:
-            return []
 
-        history = []
-        for trial in self.study.trials:
-            if trial.value is not None:
-                history.append({"trial": trial.number, "value": trial.value, "params": trial.params.copy()})
+def create_optimization_study(
+    algorithm_name: str,
+    direction: str = "minimize",
+    sampler: str = "TPE",
+    pruner: str = "Median",
+    study_name: Optional[str] = None,
+    storage: Optional[str] = None,
+    load_if_exists: bool = True,
+    seed: Optional[int] = None,
+) -> optuna.Study:
+    """Cria um estudo Optuna para otimização."""
 
-        return history
+    # Criar sampler
+    if sampler == "TPE":
+        sampler_obj = TPESampler(seed=seed)
+    elif sampler == "CmaEs":
+        sampler_obj = CmaEsSampler(seed=seed)
+    elif sampler == "Random":
+        sampler_obj = RandomSampler(seed=seed)
+    else:
+        logger.warning(f"Sampler desconhecido: {sampler}. Usando TPE.")
+        sampler_obj = TPESampler(seed=seed)
+
+    # Criar pruner
+    if pruner == "Median":
+        pruner_obj = MedianPruner()
+    elif pruner == "SuccessiveHalving":
+        pruner_obj = SuccessiveHalvingPruner()
+    else:
+        pruner_obj = None
+
+    # Nome do estudo
+    if not study_name:
+        study_name = f"optimize_{algorithm_name}_{int(time.time())}"
+
+    # Criar estudo
+    study = optuna.create_study(
+        direction=direction,
+        sampler=sampler_obj,
+        pruner=pruner_obj,
+        study_name=study_name,
+        storage=storage,
+        load_if_exists=load_if_exists,
+    )
+
+    return study
 
 
 def optimize_algorithm(
     algorithm_name: str,
-    sequences: list[str],
+    sequences: List[str],
     alphabet: str,
     n_trials: int = 100,
-    timeout_per_trial: int = 300,
+    timeout: Optional[float] = None,
+    timeout_per_trial: Optional[float] = 60.0,
+    direction: str = "minimize",
+    sampler: str = "TPE",
+    pruner: str = "Median",
+    study_name: Optional[str] = None,
+    storage: Optional[str] = None,
+    load_if_exists: bool = True,
     show_progress: bool = True,
+    seed: Optional[int] = None,
 ) -> OptimizationResult:
     """
-    Função conveniente para otimizar um algoritmo.
+    Otimiza hiperparâmetros de um algoritmo CSP.
 
     Args:
-        algorithm_name: Nome do algoritmo a otimizar
-        sequences: Sequências do dataset
-        alphabet: Alfabeto usado
-        n_trials: Número de trials
-        timeout_per_trial: Timeout por trial em segundos
-        show_progress: Mostrar progresso
+        algorithm_name: Nome do algoritmo a ser otimizado
+        sequences: Lista de sequências do dataset
+        alphabet: Alfabeto usado nas sequências
+        n_trials: Número de trials para otimização
+        timeout: Timeout total para otimização (segundos)
+        timeout_per_trial: Timeout por trial (segundos)
+        direction: Direção da otimização ("minimize" ou "maximize")
+        sampler: Tipo de sampler ("TPE", "CmaEs", "Random")
+        pruner: Tipo de pruner ("Median", "SuccessiveHalving", None)
+        study_name: Nome do estudo
+        storage: URL de armazenamento (opcional)
+        load_if_exists: Carregar estudo existente se existir
+        show_progress: Mostrar barra de progresso
+        seed: Seed para reprodutibilidade
 
     Returns:
-        Resultado da otimização
+        OptimizationResult: Resultado da otimização
     """
 
+    # Criar configuração
     config = OptimizationConfig(
-        algorithm_name=algorithm_name,
-        dataset_sequences=sequences,
-        alphabet=alphabet,
         n_trials=n_trials,
+        timeout=timeout,
         timeout_per_trial=timeout_per_trial,
+        direction=direction,
+        sampler=sampler,
+        pruner=pruner,
+        study_name=study_name,
+        storage=storage,
+        load_if_exists=load_if_exists,
+        show_progress=show_progress,
+        seed=seed,
     )
 
+    # Criar otimizador
     optimizer = OptunaOptimizer(config)
-    return optimizer.optimize(show_progress=show_progress)
+
+    # Executar otimização
+    result = optimizer.optimize(algorithm_name, sequences, alphabet)
+
+    return result
 
 
-def create_optimization_study(
-    algorithm_name: str, study_name: str | None = None, direction: str = "minimize"
-) -> optuna.Study:
+def run_optimization_with_dataset_selection():
     """
-    Cria um estudo de otimização Optuna.
-
-    Args:
-        algorithm_name: Nome do algoritmo
-        study_name: Nome do estudo (opcional)
-        direction: Direção da otimização
-
-    Returns:
-        Estudo Optuna criado
+    Executa otimização com seleção interativa de dataset.
     """
+    try:
+        from src.ui.cli.menu import (
+            configure_optimization_params,
+            select_dataset_for_optimization,
+            select_optimization_algorithm,
+        )
 
-    name = study_name or f"{algorithm_name}_study"
+        # Selecionar dataset
+        sequences, alphabet, dataset_info = select_dataset_for_optimization()
 
-    return optuna.create_study(direction=direction, sampler=TPESampler(seed=42), pruner=MedianPruner(), study_name=name)
+        # Selecionar algoritmo
+        algorithm_name = select_optimization_algorithm()
+
+        # Configurar parâmetros
+        config_dict = configure_optimization_params()
+
+        # Executar otimização
+        print(f"\n🚀 Iniciando otimização do {algorithm_name}...")
+        print(
+            f"📊 Dataset: {dataset_info.get('type', 'N/A')} - {len(sequences)} sequências"
+        )
+        print(f"🔬 Trials: {config_dict.get('n_trials', 100)}")
+
+        result = optimize_algorithm(
+            algorithm_name=algorithm_name,
+            sequences=sequences,
+            alphabet=alphabet,
+            n_trials=config_dict.get("n_trials", 100),
+            timeout_per_trial=config_dict.get("timeout_per_trial", 60),
+            direction=config_dict.get("direction", "minimize"),
+            sampler=config_dict.get("sampler", "TPE"),
+            pruner=config_dict.get("pruner", "Median"),
+            show_progress=True,
+        )
+
+        # Exibir resultados
+        print(f"\n✅ Otimização concluída!")
+        print(f"🎯 Melhor valor: {result.best_value:.6f}")
+        print(f"⏱️ Tempo total: {result.optimization_time:.2f} segundos")
+        print(f"📈 Trials realizados: {result.n_trials}")
+
+        # Salvar resultados
+        os.makedirs("outputs/reports", exist_ok=True)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"outputs/reports/optimization_{algorithm_name}_{timestamp}.json"
+
+        report = {
+            "algorithm": algorithm_name,
+            "dataset_info": dataset_info,
+            "best_params": result.best_params,
+            "best_value": result.best_value,
+            "n_trials": result.n_trials,
+            "optimization_time": result.optimization_time,
+            "study_name": result.study_name,
+            "timestamp": timestamp,
+        }
+
+        with open(filename, "w", encoding="utf-8") as f:
+            json.dump(report, f, indent=2, default=str, ensure_ascii=False)
+
+        print(f"💾 Relatório salvo em: {filename}")
+
+        # Opção de gerar gráficos
+        plots_input = input("Gerar gráficos de visualização? (s/N): ").strip()
+        if plots_input.lower() in ["s", "sim", "y", "yes"]:
+            try:
+                from src.optimization.visualization import OptimizationVisualizer
+
+                visualizer = OptimizationVisualizer(result)
+
+                # Gráfico de histórico
+                history_path = f"outputs/reports/optimization_{algorithm_name}_{timestamp}_history.png"
+                visualizer.plot_optimization_history(
+                    save_path=history_path, interactive=False
+                )
+
+                # Gráfico de importância
+                importance_path = f"outputs/reports/optimization_{algorithm_name}_{timestamp}_importance.png"
+                visualizer.plot_parameter_importance(
+                    save_path=importance_path, interactive=False
+                )
+
+                print(f"📊 Gráficos salvos em outputs/reports/")
+
+            except Exception as e:
+                print(f"⚠️ Erro ao gerar gráficos: {e}")
+
+    except Exception as e:
+        print(f"❌ Erro na otimização: {e}")
+        import traceback
+
+        traceback.print_exc()

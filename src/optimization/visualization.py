@@ -31,7 +31,9 @@ class OptimizationVisualizer:
     def __init__(self, result: OptimizationResult):
         self.result = result
 
-    def plot_optimization_history(self, save_path: str | None = None, interactive: bool = True):
+    def plot_optimization_history(
+        self, save_path: str | None = None, interactive: bool = True
+    ):
         """Plota histórico de otimização."""
 
         if interactive:
@@ -61,7 +63,10 @@ class OptimizationVisualizer:
 
         # Criar subplot
         fig = make_subplots(
-            rows=2, cols=1, subplot_titles=("Valores dos Trials", "Melhor Valor até o Momento"), vertical_spacing=0.1
+            rows=2,
+            cols=1,
+            subplot_titles=("Valores dos Trials", "Melhor Valor até o Momento"),
+            vertical_spacing=0.1,
         )
 
         # Plot 1: Valores dos trials
@@ -93,7 +98,11 @@ class OptimizationVisualizer:
         )
 
         # Layout
-        fig.update_layout(title=f"Histórico de Otimização - {self.result.study_name}", height=600, showlegend=False)
+        fig.update_layout(
+            title=f"Histórico de Otimização - {self.result.study_name}",
+            height=600,
+            showlegend=False,
+        )
 
         fig.update_xaxes(title_text="Trial", row=2, col=1)
         fig.update_yaxes(title_text="Valor Objetivo", row=1, col=1)
@@ -101,7 +110,7 @@ class OptimizationVisualizer:
 
         if save_path:
             fig.write_html(save_path)
-            logger.info(f"Gráfico salvo em {save_path}")
+            logger.info("Gráfico salvo em %s", save_path)
 
         return fig
 
@@ -145,11 +154,13 @@ class OptimizationVisualizer:
 
         if save_path:
             plt.savefig(save_path, dpi=300, bbox_inches="tight")
-            logger.info(f"Gráfico salvo em {save_path}")
+            logger.info("Gráfico salvo em %s", save_path)
 
         return fig
 
-    def plot_parameter_importance(self, save_path: str | None = None, interactive: bool = True):
+    def plot_parameter_importance(
+        self, save_path: str | None = None, interactive: bool = True
+    ):
         """Plota importância dos parâmetros baseado na variância."""
 
         # Calcular variância de cada parâmetro
@@ -185,7 +196,16 @@ class OptimizationVisualizer:
 
         if interactive:
             # Plot interativo
-            fig = go.Figure(data=[go.Bar(x=variances, y=param_names, orientation="h", marker_color="steelblue")])
+            fig = go.Figure(
+                data=[
+                    go.Bar(
+                        x=variances,
+                        y=param_names,
+                        orientation="h",
+                        marker_color="steelblue",
+                    )
+                ]
+            )
 
             fig.update_layout(
                 title="Importância dos Parâmetros (Variância)",
@@ -196,7 +216,7 @@ class OptimizationVisualizer:
 
             if save_path:
                 fig.write_html(save_path)
-                logger.info(f"Gráfico salvo em {save_path}")
+                logger.info("Gráfico salvo em %s", save_path)
 
             return fig
 
@@ -213,7 +233,7 @@ class OptimizationVisualizer:
 
             if save_path:
                 plt.savefig(save_path, dpi=300, bbox_inches="tight")
-                logger.info(f"Gráfico salvo em {save_path}")
+                logger.info("Gráfico salvo em %s", save_path)
 
             return fig
 
@@ -224,7 +244,9 @@ class SensitivityVisualizer:
     def __init__(self, result: SensitivityResult):
         self.result = result
 
-    def plot_sensitivity_indices(self, save_path: str | None = None, interactive: bool = True):
+    def plot_sensitivity_indices(
+        self, save_path: str | None = None, interactive: bool = True
+    ):
         """Plota índices de sensibilidade."""
 
         if interactive:
@@ -286,7 +308,7 @@ class SensitivityVisualizer:
 
         if save_path:
             fig.write_html(save_path)
-            logger.info(f"Gráfico salvo em {save_path}")
+            logger.info("Gráfico salvo em %s", save_path)
 
         return fig
 
@@ -298,7 +320,9 @@ class SensitivityVisualizer:
         st_values = [self.result.total_order[p] for p in param_names]
 
         # Criar figura
-        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, max(6, len(param_names) * 0.4)))
+        fig, (ax1, ax2) = plt.subplots(
+            1, 2, figsize=(15, max(6, len(param_names) * 0.4))
+        )
 
         # S1
         ax1.barh(param_names, s1_values, color="lightblue")
@@ -317,15 +341,19 @@ class SensitivityVisualizer:
 
         if save_path:
             plt.savefig(save_path, dpi=300, bbox_inches="tight")
-            logger.info(f"Gráfico salvo em {save_path}")
+            logger.info("Gráfico salvo em %s", save_path)
 
         return fig
 
-    def plot_parameter_ranking(self, save_path: str | None = None, interactive: bool = True):
+    def plot_parameter_ranking(
+        self, save_path: str | None = None, interactive: bool = True
+    ):
         """Plota ranking dos parâmetros por importância."""
 
         # Ordenar por índices totais
-        sorted_params = sorted(self.result.total_order.items(), key=lambda x: x[1], reverse=True)
+        sorted_params = sorted(
+            self.result.total_order.items(), key=lambda x: x[1], reverse=True
+        )
 
         param_names = [p[0] for p in sorted_params]
         st_values = [p[1] for p in sorted_params]
@@ -335,9 +363,24 @@ class SensitivityVisualizer:
             # Plot interativo
             fig = go.Figure()
 
-            fig.add_trace(go.Bar(x=param_names, y=s1_values, name="S1 (Primeira Ordem)", marker_color="lightblue"))
+            fig.add_trace(
+                go.Bar(
+                    x=param_names,
+                    y=s1_values,
+                    name="S1 (Primeira Ordem)",
+                    marker_color="lightblue",
+                )
+            )
 
-            fig.add_trace(go.Bar(x=param_names, y=st_values, name="ST (Total)", marker_color="orange", opacity=0.7))
+            fig.add_trace(
+                go.Bar(
+                    x=param_names,
+                    y=st_values,
+                    name="ST (Total)",
+                    marker_color="orange",
+                    opacity=0.7,
+                )
+            )
 
             fig.update_layout(
                 title="Ranking de Importância dos Parâmetros",
@@ -348,7 +391,7 @@ class SensitivityVisualizer:
 
             if save_path:
                 fig.write_html(save_path)
-                logger.info(f"Gráfico salvo em {save_path}")
+                logger.info("Gráfico salvo em %s", save_path)
 
             return fig
 
@@ -359,8 +402,21 @@ class SensitivityVisualizer:
             x = np.arange(len(param_names), dtype=float)
             width = 0.35
 
-            ax.bar(x - width / 2, s1_values, width, label="S1 (Primeira Ordem)", color="lightblue")
-            ax.bar(x + width / 2, st_values, width, label="ST (Total)", color="orange", alpha=0.7)
+            ax.bar(
+                x - width / 2,
+                s1_values,
+                width,
+                label="S1 (Primeira Ordem)",
+                color="lightblue",
+            )
+            ax.bar(
+                x + width / 2,
+                st_values,
+                width,
+                label="ST (Total)",
+                color="orange",
+                alpha=0.7,
+            )
 
             ax.set_xlabel("Parâmetros")
             ax.set_ylabel("Índice de Sensibilidade")
@@ -374,18 +430,22 @@ class SensitivityVisualizer:
 
             if save_path:
                 plt.savefig(save_path, dpi=300, bbox_inches="tight")
-                logger.info(f"Gráfico salvo em {save_path}")
+                logger.info("Gráfico salvo em %s", save_path)
 
             return fig
 
 
-def plot_optimization_history(result: OptimizationResult, save_path: str | None = None, interactive: bool = True):
+def plot_optimization_history(
+    result: OptimizationResult, save_path: str | None = None, interactive: bool = True
+):
     """Função conveniente para plotar histórico de otimização."""
     visualizer = OptimizationVisualizer(result)
     return visualizer.plot_optimization_history(save_path, interactive)
 
 
-def plot_parameter_importance(result: SensitivityResult, save_path: str | None = None, interactive: bool = True):
+def plot_parameter_importance(
+    result: SensitivityResult, save_path: str | None = None, interactive: bool = True
+):
     """Função conveniente para plotar importância dos parâmetros."""
     visualizer = SensitivityVisualizer(result)
     return visualizer.plot_sensitivity_indices(save_path, interactive)
@@ -414,4 +474,4 @@ def save_visualization(fig, save_path: str, format: str = "html"):
     else:  # Matplotlib
         fig.savefig(str(path), dpi=300, bbox_inches="tight")
 
-    logger.info(f"Visualização salva em {path}")
+    logger.info("Visualização salva em %s", path)

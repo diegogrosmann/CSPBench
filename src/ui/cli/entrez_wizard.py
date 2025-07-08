@@ -30,7 +30,9 @@ def collect_entrez_parameters() -> dict[str, Any]:
         raise ValueError("É necessário fornecer um e-mail para acessar o NCBI")
 
     # Coletar API key (opcional)
-    api_key_input = safe_input(f"Informe sua NCBI API key (opcional) [{defaults.get('api_key', '')}]: ")
+    api_key_input = safe_input(
+        f"Informe sua NCBI API key (opcional) [{defaults.get('api_key', '')}]: "
+    )
     api_key = api_key_input or defaults.get("api_key", "")
 
     # Coletar base de dados
@@ -55,5 +57,5 @@ def collect_entrez_parameters() -> dict[str, Any]:
     if api_key:
         params["api_key"] = api_key
 
-    logger.debug(f"Parâmetros coletados: {params}")
+    logger.debug("Parâmetros coletados: %s", params)
     return params

@@ -209,17 +209,33 @@ def heuristic_closest_string(
     return best_candidate
 
 
-def local_search(candidate, strings, progress_callback: Callable[[str], None] | None = None):
+def local_search(
+    candidate, strings, progress_callback: Callable[[str], None] | None = None
+):
     candidate = list(candidate)
     improved = True
     iterations = 0
-    while improved and iterations < 50:  # Limite para evitar loops longos
+    max_iterations = 50  # Limite para evitar loops longos
+
+    while improved and iterations < max_iterations:
         improved = False
         iterations += 1
 
         # Verificar cancelamento periodicamente
-        if progress_callback and iterations % 10 == 0:
-            progress_callback(f"Busca local: iteração {iterations}")
+        if progress_callback:
+            if iterations % 10 == 0:
+                progress_callback(
+                    f"Busca local: iteração {iterations}/{max_iterations}"
+                )
+
+            # Verificação adicional para cancelamento - checar se o processo ainda deve rodar
+            try:
+                import signal
+
+                # Isso permitirá que o processo seja interrompido mais facilmente
+                signal.signal(signal.SIGTERM, signal.default_int_handler)
+            except (ImportError, AttributeError):
+                pass  # Em caso de erro, continuar normalmente
 
         for i in range(len(candidate)):
             current_char = candidate[i]
@@ -230,9 +246,19 @@ def local_search(candidate, strings, progress_callback: Callable[[str], None] | 
                 new_candidate = candidate.copy()
                 new_candidate[i] = alt
                 new_candidate_str = "".join(new_candidate)
-                if max_distance(new_candidate_str, strings) < max_distance("".join(candidate), strings):
+                if max_distance(new_candidate_str, strings) < max_distance(
+                    "".join(candidate), strings
+                ):
                     candidate[i] = alt
                     improved = True
+                    # Parar no primeiro melhoramento para evitar travamento
+                    break
 
-    logger.debug(f"Resultado da busca local: {''.join(candidate)}")
+            # Se melhorou, parar de testar outras posições nesta iteração
+            if improved:
+                break
+
+    logger.debug(
+        f"Resultado da busca local após {iterations} iterações: {''.join(candidate)}"
+    )
     return "".join(candidate)

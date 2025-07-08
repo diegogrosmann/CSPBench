@@ -1,0 +1,245 @@
+name: CSP-BLFGA CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  lint-and-typecheck:
+    name: Lint & Type Check
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python 3.12
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.12'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install ruff mypy
+        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+        pip install -e .
+        
+    - name: Lint with ruff
+      run: |
+        # Falhar se ruff encontrar erros
+        ruff check . --output-format=github
+        
+    - name: Type check with mypy
+      run: |
+        mypy src/ --ignore-missing-imports --no-strict-optional
+        
+  tests:
+    name: Tests & Coverage
+    runs-on: ubuntu-latest
+    needs: lint-and-typecheck
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python 3.12
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.12'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pytest pytest-cov pytest-xdist
+        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+        pip install -e .
+        
+    - name: Run tests with coverage
+      run: |
+        pytest tests/ \
+          --cov=src/core/scheduler/scheduler \
+          --cov=src/core/scheduler/resource_monitor \
+          --cov=src/utils/curses_console \
+          --cov-report=term-missing \
+          --cov-report=xml \
+          --cov-report=html \
+          --cov-fail-under=90 \
+          -v \
+          --tb=short
+          
+    - name: Upload coverage reports
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.xml
+        flags: unittests
+        name: codecov-umbrella
+        
+    - name: Archive coverage HTML report
+      uses: actions/upload-artifact@v3
+      with:
+        name: coverage-html-report
+        path: htmlcov/
+        
+  build-docs:
+    name: Build Documentation
+    runs-on: ubuntu-latest
+    needs: tests
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python 3.12
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.12'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install mkdocs mkdocs-material mkdocs-mermaid2-plugin
+        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+        
+    - name: Build docs with mkdocs
+      run: |
+        # Usar --strict para falhar em warnings
+        mkdocs build --strict
+        
+    - name: Archive documentation
+      uses: actions/upload-artifact@v3
+      with:
+        name: documentation
+        path: site/
+        
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: tests
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python 3.12
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.12'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+        pip install -e .
+        
+    - name: Run integration tests
+      run: |
+        # Testes de integração com timeout maior
+        python -m pytest tests/test_integracao.py -v --tb=short --timeout=300
+        
+    - name: Test main execution
+      run: |
+        # Testar execução do main.py
+        python main.py --silent --dataset synthetic --algorithms Baseline --num-execs 1 --timeout 30
+        
+    - name: Test batch execution scripts
+      run: |
+        # Testar scripts de execução em lote
+        cd automated_runs
+        python -c "
+import sys, os
+sys.path.insert(0, os.path.abspath('..'))
+from run_blfga import main as run_blfga_main
+print('✅ Batch scripts importable')
+"
+        
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python 3.12
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.12'
+        
+    - name: Install bandit
+      run: |
+        pip install bandit[toml]
+        
+    - name: Run bandit security scan
+      run: |
+        bandit -r src/ -f json -o bandit-report.json
+        bandit -r src/ -f txt
+        
+    - name: Upload security scan results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: security-scan-results
+        path: bandit-report.json
+        
+  performance-tests:
+    name: Performance Tests
+    runs-on: ubuntu-latest
+    needs: tests
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python 3.12
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.12'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pytest-benchmark
+        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+        pip install -e .
+        
+    - name: Run performance benchmarks
+      run: |
+        # Executar testes de performance se existirem
+        if [ -f "tests/test_performance.py" ]; then
+          pytest tests/test_performance.py --benchmark-only --benchmark-json=benchmark.json
+        fi
+        
+    - name: Upload benchmark results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: performance-benchmark-results
+        path: benchmark.json
+        
+  deploy-docs:
+    name: Deploy Documentation
+    runs-on: ubuntu-latest
+    needs: [build-docs, integration-tests]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        
+    - name: Set up Python 3.12
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.12'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install mkdocs mkdocs-material mkdocs-mermaid2-plugin
+        
+    - name: Configure git
+      run: |
+        git config --global user.name 'github-actions[bot]'
+        git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+        
+    - name: Deploy to GitHub Pages
+      run: |
+        mkdocs gh-deploy --force

@@ -123,8 +123,12 @@ class BLFGA:
         self.disable_elitism_gens = params["disable_elitism_gens"]
 
         # Conversão dinâmica de pop_size e initial_blocks se forem proporções
-        self.pop_size = self._resolve_dynamic_param(params["pop_size"], self.n, mode="multiplier")
-        self.initial_blocks = self._resolve_dynamic_param(params["initial_blocks"], self.L, mode="proportion")
+        self.pop_size = self._resolve_dynamic_param(
+            params["pop_size"], self.n, mode="multiplier"
+        )
+        self.initial_blocks = self._resolve_dynamic_param(
+            params["initial_blocks"], self.L, mode="proportion"
+        )
         self.min_block_len = params["min_block_len"]
         self.cross_prob = params["cross_prob"]
         self.mut_prob = params["mut_prob"]
@@ -169,6 +173,41 @@ class BLFGA:
         """Define um callback para relatar o progresso."""
         self.progress_callback = callback
 
+    def update_params(self, **params):
+        """
+        Atualiza parâmetros do algoritmo dinamicamente.
+
+        Args:
+            **params: Parâmetros a serem atualizados
+        """
+        # Atualizar parâmetros básicos
+        for key, value in params.items():
+            if hasattr(self, key):
+                setattr(self, key, value)
+
+        # Reprocessar parâmetros dinâmicos se necessário
+        if "pop_size" in params:
+            self.pop_size = self._resolve_dynamic_param(
+                params["pop_size"], self.n, mode="multiplier"
+            )
+
+        if "initial_blocks" in params:
+            self.initial_blocks = self._resolve_dynamic_param(
+                params["initial_blocks"], self.L, mode="proportion"
+            )
+            # Reinicializar blocos se necessário
+            self.blocks = self._initial_blocking()
+
+        if "no_improve_patience" in params:
+            patience_param = params["no_improve_patience"]
+            if isinstance(patience_param, float) and 0 < patience_param < 1:
+                self.no_improve_patience = max(1, int(patience_param * self.max_gens))
+            else:
+                self.no_improve_patience = int(patience_param)
+
+        if "seed" in params:
+            self.rng = random.Random(params["seed"])
+
     def run(self) -> tuple[String, int, list]:
         start = time.time()
 
@@ -198,7 +237,9 @@ class BLFGA:
             if self.immigrant_freq and gen % self.immigrant_freq == 0:
                 n_imm = int(self.immigrant_ratio * self.pop_size)
                 for _ in range(n_imm):
-                    rand_s = "".join(self.rng.choice(self.alphabet) for _ in range(self.L))
+                    rand_s = "".join(
+                        self.rng.choice(self.alphabet) for _ in range(self.L)
+                    )
                     pop[-(_ + 1)] = rand_s
 
             # --- Diversidade e mutação adaptativa ---
@@ -208,7 +249,8 @@ class BLFGA:
                 mut_adapt_timer = self.mutation_adapt_duration
             # Convergência de fitness
             if len(self.history) > self.mutation_adapt_N and all(
-                self.history[-i] == self.history[-1] for i in range(1, self.mutation_adapt_N + 1)
+                self.history[-i] == self.history[-1]
+                for i in range(1, self.mutation_adapt_N + 1)
             ):
                 self.mut_prob = mut_prob_backup * self.mutation_adapt_factor
                 mut_adapt_timer = self.mutation_adapt_duration
@@ -247,18 +289,27 @@ class BLFGA:
             if self.restart_patience and no_improve >= self.restart_patience:
                 n_restart = int(self.restart_ratio * self.pop_size)
                 for i in range(n_restart):
-                    pop[-(i + 1)] = "".join(self.rng.choice(self.alphabet) for _ in range(self.L))
+                    pop[-(i + 1)] = "".join(
+                        self.rng.choice(self.alphabet) for _ in range(self.L)
+                    )
                 no_improve = 0
 
             # --- Early stopping: encerra se não houver melhoria por X gerações ---
             if self.no_improve_patience and no_improve >= self.no_improve_patience:
                 if self.progress_callback:
-                    self.progress_callback(f"Encerrando por early stopping após {no_improve} gerações sem melhoria.")
+                    self.progress_callback(
+                        f"Encerrando por early stopping após {no_improve} gerações sem melhoria."
+                    )
                 break
 
             # Log apenas a cada 50 gerações ou na última
             if gen % 50 == 0 or gen == self.max_gens or best_val == 0:
-                logger.debug("Geração %s: melhor_dist=%s, diversidade=%.2f", gen, best_val, diversity)
+                logger.debug(
+                    "Geração %s: melhor_dist=%s, diversidade=%.2f",
+                    gen,
+                    best_val,
+                    diversity,
+                )
 
             if best_val == 0:
                 if self.progress_callback:
@@ -272,7 +323,9 @@ class BLFGA:
         return best, best_val, self.history
 
     def _init_population(self) -> Population:
-        consensus = "".join(Counter(pos).most_common(1)[0][0] for pos in zip(*self.strings))
+        consensus = "".join(
+            Counter(pos).most_common(1)[0][0] for pos in zip(*self.strings)
+        )
         pop = [consensus]
         for _ in range(self.pop_size // 3):
             s = list(consensus)
@@ -295,7 +348,9 @@ class BLFGA:
         repo = []
         for l, r in self.blocks:
             symbols = [ind[l:r] for ind in pop if len(ind) >= r]
-            block = "".join(Counter(chars).most_common(1)[0][0] for chars in zip(*symbols))
+            block = "".join(
+                Counter(chars).most_common(1)[0][0] for chars in zip(*symbols)
+            )
             repo.append(block)
         return repo
 
@@ -320,7 +375,9 @@ class BLFGA:
 
     def _apply_mutation(self, ind):
         if self.mutation_type == "multi":
-            return genetic_ops.mutate_multi(ind, self.alphabet, self.rng, n=self.mutation_multi_n)
+            return genetic_ops.mutate_multi(
+                ind, self.alphabet, self.rng, n=self.mutation_multi_n
+            )
         elif self.mutation_type == "inversion":
             return genetic_ops.mutate_inversion(ind, self.rng)
         elif self.mutation_type == "transposition":
@@ -338,7 +395,9 @@ class BLFGA:
         else:
             return ind
 
-    def _next_generation(self, pop: Population, repo: list[String]) -> Population:  # pylint: disable=unused-argument
+    def _next_generation(
+        self, pop: Population, repo: list[String]
+    ) -> Population:  # pylint: disable=unused-argument
         # Avaliar e ordenar população usando paralelismo
         evaluated_pop = self._evaluate_population_parallel(pop)
         pop_sorted = [s for s, _ in evaluated_pop]

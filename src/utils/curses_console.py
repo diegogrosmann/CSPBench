@@ -118,7 +118,11 @@ class SimpleConsole(BaseConsoleManager):
         """Mostra progresso simples."""
         if total > 0:
             percentage = (current / total) * 100
-            self.print(f"\r{message}: {percentage:.1f}% ({current}/{total})", end="", flush=True)
+            self.print(
+                f"\r{message}: {percentage:.1f}% ({current}/{total})",
+                end="",
+                flush=True,
+            )
 
     def hide_progress(self):
         """Esconde progresso (no-op para console simples)."""
@@ -260,7 +264,11 @@ class CursesConsole(BaseConsoleManager):
             # Fallback para progresso simples
             if total > 0:
                 percentage = (current / total) * 100
-                print(f"\r{message}: {percentage:.1f}% ({current}/{total})", end="", flush=True)
+                print(
+                    f"\r{message}: {percentage:.1f}% ({current}/{total})",
+                    end="",
+                    flush=True,
+                )
             return
 
         with self.lock:
@@ -284,11 +292,17 @@ class CursesConsole(BaseConsoleManager):
                     for i in range(bar_width):
                         if i < filled_width:
                             self.progress_win.addch(
-                                bar_y, bar_x + len(progress_text) + 2 + i, "█", curses.color_pair(2)
+                                bar_y,
+                                bar_x + len(progress_text) + 2 + i,
+                                "█",
+                                curses.color_pair(2),
                             )
                         else:
                             self.progress_win.addch(
-                                bar_y, bar_x + len(progress_text) + 2 + i, "░", curses.color_pair(1)
+                                bar_y,
+                                bar_x + len(progress_text) + 2 + i,
+                                "░",
+                                curses.color_pair(1),
                             )
 
                 self.progress_win.refresh()

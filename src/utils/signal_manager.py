@@ -61,7 +61,7 @@ class SignalManager:
             frame: Frame atual de execução
         """
         signal_name = signal.Signals(signum).name
-        logger.info(f"Recebido sinal {signal_name} ({signum})")
+        logger.info("Recebido sinal %s (%s)", signal_name, signum)
 
         with self._lock:
             if self.interrupted:
@@ -86,7 +86,7 @@ class SignalManager:
                 try:
                     callback()
                 except Exception as e:
-                    logger.error(f"Erro em callback de shutdown: {e}")
+                    logger.error("Erro em callback de shutdown: %s", e)
 
     def setup_handlers(self):
         """Configura os handlers padrão de sinais."""

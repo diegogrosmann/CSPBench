@@ -30,6 +30,17 @@ class CSCAlgorithm(CSPAlgorithm):
     default_params = CSC_DEFAULTS
     supports_internal_parallel = False  # CSC não suporta paralelismo interno
 
+    def __init__(self, strings: list[str], alphabet: str, **params):
+        """
+        Inicializa o algoritmo CSC.
+
+        Args:
+            strings: Lista de strings do dataset
+            alphabet: Alfabeto utilizado
+            **params: Parâmetros específicos do algoritmo
+        """
+        super().__init__(strings, alphabet, **params)
+
     def run(self) -> tuple[str, int, dict]:
         """
         Executa o algoritmo CSC e retorna a string central, distância máxima e metadata.
@@ -37,9 +48,13 @@ class CSCAlgorithm(CSPAlgorithm):
         Returns:
             tuple[str, int, dict]: (string_central, distancia_maxima, metadata)
         """
-        self._report_progress(f"Iniciando CSC (d={self.params.get('d')}, n_blocks={self.params.get('n_blocks')})")
+        self._report_progress(
+            f"Iniciando CSC (d={self.params.get('d')}, n_blocks={self.params.get('n_blocks')})"
+        )
 
-        center = heuristic_closest_string(self.strings, d=self.params.get("d"), n_blocks=self.params.get("n_blocks"))
+        center = heuristic_closest_string(
+            self.strings, d=self.params.get("d"), n_blocks=self.params.get("n_blocks")
+        )
 
         if center:
             dist = max_distance(center, self.strings)

@@ -21,7 +21,7 @@ import sys
 # --------------------------------------------------
 # Geral
 # --------------------------------------------------
-DEBUG_DEFAULT = "n"  # Modo debug desabilitado por padrão
+DEBUG_DEFAULT = "S"  # Modo debug desabilitado por padrão
 ALGORITHM_TIMEOUT = 300  # Timeout padrão de 5 minutos para algoritmos
 
 
@@ -30,7 +30,8 @@ def safe_input(prompt: str, default: str = "") -> str:
         # Retorna sempre o default ou vazio para todos os prompts
         return default
     try:
-        return input(prompt).strip()
+        print(prompt, end="", flush=True)  # Garante que o prompt aparece
+        return input().strip()
     except (KeyboardInterrupt, EOFError):
         print("\nOperação cancelada pelo usuário.")
         sys.exit(0)

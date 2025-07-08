@@ -32,7 +32,7 @@ def save_dataset_fasta(sequences: list[str], filename: str, description: str = "
                 header += f" {description}"
             f.write(f"{header}\n{seq}\n")
 
-    logger.debug(f"Dataset salvo em {filepath}")
+    logger.debug("Dataset salvo em %s", filepath)
     return filepath
 
 
@@ -48,7 +48,9 @@ def ask_save_dataset(sequences: list[str], dataset_type: str, params: dict) -> b
     Returns:
         True se o dataset foi salvo, False caso contrário
     """
-    save_choice = safe_input("\nDeseja salvar este dataset para uso futuro? [s/N]: ").lower()
+    save_choice = safe_input(
+        "\nDeseja salvar este dataset para uso futuro? [s/N]: "
+    ).lower()
 
     if save_choice == "s":
         # Gerar nome do arquivo baseado no tipo e parâmetros
@@ -60,13 +62,15 @@ def ask_save_dataset(sequences: list[str], dataset_type: str, params: dict) -> b
             return True
         except Exception as e:
             print(f"Erro ao salvar dataset: {e}")
-            logger.error(f"Erro ao salvar dataset: {e}")
+            logger.error("Erro ao salvar dataset: %s", e)
             return False
 
     return False
 
 
-def _generate_filename_and_description(dataset_type: str, params: dict) -> tuple[str, str]:
+def _generate_filename_and_description(
+    dataset_type: str, params: dict
+) -> tuple[str, str]:
     """
     Gera nome do arquivo e descrição baseados no tipo e parâmetros.
 
@@ -78,13 +82,19 @@ def _generate_filename_and_description(dataset_type: str, params: dict) -> tuple
         Tupla (filename, description)
     """
     if dataset_type == "synthetic":
-        filename = f"synthetic_n{params['n']}_L{params['L']}_noise{params['noise']}.fasta"
+        filename = (
+            f"synthetic_n{params['n']}_L{params['L']}_noise{params['noise']}.fasta"
+        )
         description = f"Synthetic dataset: n={params['n']}, L={params['L']}, alphabet={params['alphabet']}, noise={params['noise']}"
     elif dataset_type == "entrez":
         # Limpar caracteres especiais do termo para nome do arquivo
-        clean_term = "".join(c for c in params["term"] if c.isalnum() or c in "_ -")[:50]
+        clean_term = "".join(c for c in params["term"] if c.isalnum() or c in "_ -")[
+            :50
+        ]
         filename = f"entrez_{params['db']}_{clean_term}_n{params['n']}.fasta"
-        description = f"NCBI dataset: db={params['db']}, term={params['term']}, n={params['n']}"
+        description = (
+            f"NCBI dataset: db={params['db']}, term={params['term']}, n={params['n']}"
+        )
     else:
         filename = f"dataset_{dataset_type}.fasta"
         description = f"Dataset from {dataset_type}"

@@ -21,7 +21,9 @@ def load_dataset(silent: bool = False) -> tuple[list[str], dict[str, Any]]:
     defaults = FILE_DEFAULTS
     datasets_path = ensure_datasets_folder()
     available_files = (
-        list(datasets_path.glob("*.fasta")) + list(datasets_path.glob("*.fa")) + list(datasets_path.glob("*.txt"))
+        list(datasets_path.glob("*.fasta"))
+        + list(datasets_path.glob("*.fa"))
+        + list(datasets_path.glob("*.txt"))
     )
     if silent:
         path_str = defaults["filepath"]
@@ -49,10 +51,12 @@ def load_dataset(silent: bool = False) -> tuple[list[str], dict[str, Any]]:
                 path_str = defaults["filepath"]
         else:
             print("\nNenhum arquivo encontrado na pasta saved_datasets/")
-            path_input = input(f"Caminho do arquivo (.txt ou .fasta) [{defaults['filepath']}]: ").strip()
+            path_input = input(
+                f"Caminho do arquivo (.txt ou .fasta) [{defaults['filepath']}]: "
+            ).strip()
             path_str = path_input if path_input else defaults["filepath"]
     path = Path(path_str)
-    logger.debug(f"Tentando carregar dataset de '{path}'")
+    logger.debug("Tentando carregar dataset de '%s'", path)
 
     if not path.exists():
         raise FileNotFoundError(f"Arquivo não encontrado: {path}")
@@ -63,7 +67,7 @@ def load_dataset(silent: bool = False) -> tuple[list[str], dict[str, Any]]:
         # Converter para maiúsculas
         seqs = [seq.upper() for seq in seqs]
     except Exception as e:
-        logger.error(f"Erro ao carregar dataset: {e}")
+        logger.error("Erro ao carregar dataset: %s", e)
         raise
 
     return seqs, {"filepath": path_str}
@@ -99,7 +103,7 @@ def load_dataset_with_params(
         # Converter para maiúsculas
         sequences = [seq.upper() for seq in sequences]
     except Exception as e:
-        logger.error(f"Erro ao carregar dataset: {e}")
+        logger.error("Erro ao carregar dataset: %s", e)
         raise
 
     if not sequences:
@@ -111,7 +115,7 @@ def load_dataset_with_params(
     if not validation["valid"]:
         # Log dos erros mas continua processamento
         for error in validation["errors"]:
-            logger.warning(f"Validação: {error}")
+            logger.warning("Validação: %s", error)
 
     # Validação de comprimento uniforme
     if not validation["uniform_length"]:
@@ -121,13 +125,17 @@ def load_dataset_with_params(
             if len(seq) == L:
                 valid_sequences.append(seq)
             else:
-                logger.warning(f"Sequência {i+1} tem comprimento {len(seq)}, esperado {L} - ignorada")
+                logger.warning(
+                    f"Sequência {i+1} tem comprimento {len(seq)}, esperado {L} - ignorada"
+                )
 
         if not valid_sequences:
             raise ValueError("Nenhuma sequência com comprimento uniforme encontrada")
 
         if len(valid_sequences) < len(sequences):
-            console.print(f"⚠️ {len(sequences) - len(valid_sequences)} sequências ignoradas por comprimento diferente")
+            console.print(
+                f"⚠️ {len(sequences) - len(valid_sequences)} sequências ignoradas por comprimento diferente"
+            )
 
         sequences = valid_sequences
 

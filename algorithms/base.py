@@ -102,6 +102,28 @@ class CSPAlgorithm(ABC):
             - dict: Metadata da execução (iterações, etc.)
         """
 
+    def set_params(self, **params) -> None:
+        """
+        Define novos parâmetros para o algoritmo.
+
+        Args:
+            **params: Parâmetros a serem atualizados
+        """
+        self.params.update(params)
+
+        # Tentar atualizar instâncias internas se existirem
+        for instance_name in [
+            "blf_ga_instance",
+            "csc_instance",
+            "h3_instance",
+            "dp_instance",
+        ]:
+            if hasattr(self, instance_name):
+                instance = getattr(self, instance_name)
+                for key, value in params.items():
+                    if hasattr(instance, key):
+                        setattr(instance, key, value)
+
     def get_metadata(self) -> dict[str, Any]:
         """
         Retorna metadados do algoritmo.

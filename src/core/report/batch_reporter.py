@@ -62,7 +62,9 @@ class BatchReporter:
         Args:
             output_dir: Diretório de saída para relatórios
         """
-        self.output_dir = Path(output_dir) if output_dir else Path("reports")
+        self.output_dir = (
+            Path(output_dir) if output_dir else Path("outputs") / "reports"
+        )
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.results_formatter = ResultsFormatter()
 
@@ -91,7 +93,9 @@ class BatchReporter:
         if sections is None:
             sections = list(ReportSection)
 
-        logger.info(f"Gerando relatório em lote para: {config.get('nome', 'sem nome')}")
+        logger.info(
+            "Gerando relatório em lote para: %s", config.get("nome", "sem nome")
+        )
 
         # Análise dos resultados
         analysis = self._analyze_batch_results(batch_results, config)
@@ -103,13 +107,15 @@ class BatchReporter:
             try:
                 file_path = self._generate_report_format(analysis, fmt, sections)
                 generated_files[fmt.value] = file_path
-                logger.info(f"Relatório {fmt.value.upper()} gerado: {file_path}")
+                logger.info("Relatório %s gerado: %s", fmt.value.upper(), file_path)
             except Exception as e:
-                logger.error(f"Erro ao gerar relatório {fmt.value}: {e}")
+                logger.error("Erro ao gerar relatório %s: %s", fmt.value, e)
 
         return generated_files
 
-    def _analyze_batch_results(self, batch_results: dict[str, Any], config: dict[str, Any]) -> dict[str, Any]:
+    def _analyze_batch_results(
+        self, batch_results: dict[str, Any], config: dict[str, Any]
+    ) -> dict[str, Any]:
         """
         Analisa resultados de execução em lote.
 
@@ -145,11 +151,15 @@ class BatchReporter:
 
             # Atualizar contadores globais
             analysis["metadata"]["total_executions"] += alg_stats["total_executions"]
-            analysis["metadata"]["successful_executions"] += alg_stats["successful_executions"]
+            analysis["metadata"]["successful_executions"] += alg_stats[
+                "successful_executions"
+            ]
             analysis["metadata"]["failed_executions"] += alg_stats["failed_executions"]
 
         # Análise comparativa
-        analysis["comparison"] = self._generate_comparison_analysis(analysis["algorithm_stats"])
+        analysis["comparison"] = self._generate_comparison_analysis(
+            analysis["algorithm_stats"]
+        )
 
         # Resumo geral
         analysis["summary"] = self._generate_summary(analysis)
@@ -218,26 +228,34 @@ class BatchReporter:
 
             # Calcular estatísticas da base
             if base_stats["success_count"] > 0:
-                successful_executions = [e for e in base_stats["executions"] if e.get("sucesso", False)]
-                base_stats["avg_distance"] = sum(e.get("distancia", 0) for e in successful_executions) / len(
-                    successful_executions
-                )
-                base_stats["avg_time"] = sum(e.get("tempo", 0) for e in successful_executions) / len(
-                    successful_executions
-                )
+                successful_executions = [
+                    e for e in base_stats["executions"] if e.get("sucesso", False)
+                ]
+                base_stats["avg_distance"] = sum(
+                    e.get("distancia", 0) for e in successful_executions
+                ) / len(successful_executions)
+                base_stats["avg_time"] = sum(
+                    e.get("tempo", 0) for e in successful_executions
+                ) / len(successful_executions)
 
             stats["bases"][base_key] = base_stats
 
         # Calcular estatísticas finais
         if stats["successful_executions"] > 0:
-            stats["success_rate"] = stats["successful_executions"] / stats["total_executions"]
+            stats["success_rate"] = (
+                stats["successful_executions"] / stats["total_executions"]
+            )
             stats["avg_distance"] = sum(stats["distances"]) / len(stats["distances"])
             stats["avg_time"] = sum(stats["times"]) / len(stats["times"])
-            stats["avg_iterations"] = sum(stats["iterations"]) / len(stats["iterations"])
+            stats["avg_iterations"] = sum(stats["iterations"]) / len(
+                stats["iterations"]
+            )
 
         return stats
 
-    def _generate_comparison_analysis(self, algorithm_stats: dict[str, Any]) -> dict[str, Any]:
+    def _generate_comparison_analysis(
+        self, algorithm_stats: dict[str, Any]
+    ) -> dict[str, Any]:
         """
         Gera análise comparativa entre algoritmos.
 
@@ -313,10 +331,16 @@ class BatchReporter:
 
         # Normalizar valores (menores são melhores)
         success_score = stats["success_rate"]
-        distance_score = 1.0 / (1.0 + stats["avg_distance"]) if stats["avg_distance"] > 0 else 0.0
+        distance_score = (
+            1.0 / (1.0 + stats["avg_distance"]) if stats["avg_distance"] > 0 else 0.0
+        )
         time_score = 1.0 / (1.0 + stats["avg_time"]) if stats["avg_time"] > 0 else 0.0
 
-        return success_weight * success_score + distance_weight * distance_score + time_weight * time_score
+        return (
+            success_weight * success_score
+            + distance_weight * distance_score
+            + time_weight * time_score
+        )
 
     def _generate_summary(self, analysis: dict[str, Any]) -> dict[str, Any]:
         """
@@ -362,8 +386,14 @@ class BatchReporter:
         """
         config_name = analysis["config"].get("nome", "batch_report")
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+        # Criar pasta específica para cada relatório
+        batch_folder = f"{config_name}_{timestamp}"
+        batch_output_dir = self.output_dir / batch_folder
+        batch_output_dir.mkdir(parents=True, exist_ok=True)
+
         filename = f"{config_name}_{timestamp}.{fmt.value}"
-        output_path = self.output_dir / filename
+        output_path = batch_output_dir / filename
 
         if fmt == ReportFormat.CSV:
             self._generate_csv_report(analysis, output_path, sections)
@@ -376,7 +406,9 @@ class BatchReporter:
 
         return output_path
 
-    def _generate_csv_report(self, analysis: dict[str, Any], output_path: Path, sections: list[ReportSection]):
+    def _generate_csv_report(
+        self, analysis: dict[str, Any], output_path: Path, sections: list[ReportSection]
+    ):
         """Gera relatório em CSV."""
         # Criar DataFrame com resultados detalhados
         rows = []
@@ -398,7 +430,9 @@ class BatchReporter:
         df = pd.DataFrame(rows)
         df.to_csv(output_path, index=False)
 
-    def _generate_json_report(self, analysis: dict[str, Any], output_path: Path, sections: list[ReportSection]):
+    def _generate_json_report(
+        self, analysis: dict[str, Any], output_path: Path, sections: list[ReportSection]
+    ):
         """Gera relatório em JSON."""
         # Filtrar seções
         filtered_analysis = {}
@@ -409,13 +443,17 @@ class BatchReporter:
         with open(output_path, "w", encoding="utf-8") as f:
             json.dump(filtered_analysis, f, indent=2, ensure_ascii=False, default=str)
 
-    def _generate_html_report(self, analysis: dict[str, Any], output_path: Path, sections: list[ReportSection]):
+    def _generate_html_report(
+        self, analysis: dict[str, Any], output_path: Path, sections: list[ReportSection]
+    ):
         """Gera relatório em HTML."""
         html_content = self._create_html_template(analysis, sections)
         with open(output_path, "w", encoding="utf-8") as f:
             f.write(html_content)
 
-    def _generate_txt_report(self, analysis: dict[str, Any], output_path: Path, sections: list[ReportSection]):
+    def _generate_txt_report(
+        self, analysis: dict[str, Any], output_path: Path, sections: list[ReportSection]
+    ):
         """Gera relatório em texto."""
         with open(output_path, "w", encoding="utf-8") as f:
             f.write("RELATÓRIO DE EXECUÇÃO EM LOTE\n")
@@ -450,15 +488,25 @@ class BatchReporter:
                 f.write("\nCOMPARAÇÃO DE ALGORITMOS\n")
                 f.write("-" * 25 + "\n")
                 comparison = analysis["comparison"]
-                f.write(f"Melhor distância: {comparison['best_algorithm']} ({comparison['best_distance']:.3f})\n")
-                f.write(f"Mais rápido: {comparison['fastest_algorithm']} ({comparison['fastest_time']:.3f}s)\n")
-                f.write(f"Mais confiável: {comparison['most_reliable']} ({comparison['highest_success_rate']:.2%})\n")
+                f.write(
+                    f"Melhor distância: {comparison['best_algorithm']} ({comparison['best_distance']:.3f})\n"
+                )
+                f.write(
+                    f"Mais rápido: {comparison['fastest_algorithm']} ({comparison['fastest_time']:.3f}s)\n"
+                )
+                f.write(
+                    f"Mais confiável: {comparison['most_reliable']} ({comparison['highest_success_rate']:.2%})\n"
+                )
 
                 f.write("\nRanking:\n")
                 for i, entry in enumerate(comparison["ranking"], 1):
-                    f.write(f"  {i}. {entry['algorithm']} (score: {entry['score']:.3f})\n")
+                    f.write(
+                        f"  {i}. {entry['algorithm']} (score: {entry['score']:.3f})\n"
+                    )
 
-    def _create_html_template(self, analysis: dict[str, Any], sections: list[ReportSection]) -> str:
+    def _create_html_template(
+        self, analysis: dict[str, Any], sections: list[ReportSection]
+    ) -> str:
         """Cria template HTML para relatório."""
         html = """
         <!DOCTYPE html>

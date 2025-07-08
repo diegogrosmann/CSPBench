@@ -17,7 +17,9 @@ from src.utils.config import ENTREZ_DEFAULTS
 try:
     from Bio import Entrez, SeqIO
 except ImportError as exc:
-    raise ImportError("Biopython não encontrado. Instale com: pip install biopython") from exc
+    raise ImportError(
+        "Biopython não encontrado. Instale com: pip install biopython"
+    ) from exc
 
 logger = logging.getLogger(__name__)
 
@@ -76,7 +78,9 @@ def fetch_dataset_silent(params: dict[str, Any]) -> tuple[list[str], dict[str, A
         raise ValueError(f"Erro na busca no NCBI: {e}") from e
 
     if not isinstance(search_result, dict):
-        raise TypeError(f"Resultado da busca Entrez não é um dicionário: {type(search_result)}")
+        raise TypeError(
+            f"Resultado da busca Entrez não é um dicionário: {type(search_result)}"
+        )
 
     logger.debug("ESearch retornou %s IDs", len(search_result.get("IdList", [])))
 
@@ -86,7 +90,9 @@ def fetch_dataset_silent(params: dict[str, Any]) -> tuple[list[str], dict[str, A
 
     if len(ids) < n:
         logger.warning(
-            "A busca retornou %s IDs, menos que os %s solicitados. Usando todos os IDs encontrados.", len(ids), n
+            "A busca retornou %s IDs, menos que os %s solicitados. Usando todos os IDs encontrados.",
+            len(ids),
+            n,
         )
         n = len(ids)
         sample_ids = ids
@@ -100,11 +106,15 @@ def fetch_dataset_silent(params: dict[str, Any]) -> tuple[list[str], dict[str, A
 
     logger.debug("Iniciando EFetch...")
     try:
-        fetch_handle = Entrez.efetch(db=db, id=",".join(sample_ids), rettype="fasta", retmode="text")
+        fetch_handle = Entrez.efetch(
+            db=db, id=",".join(sample_ids), rettype="fasta", retmode="text"
+        )
         records = list(SeqIO.parse(fetch_handle, "fasta"))
         fetch_handle.close()
     except HTTPError as e:
-        raise ValueError(f"Erro ao baixar sequências do NCBI: HTTP {e.code} - {e.reason}") from e
+        raise ValueError(
+            f"Erro ao baixar sequências do NCBI: HTTP {e.code} - {e.reason}"
+        ) from e
     except Exception as e:
         raise ValueError(f"Erro no processamento das sequências: {e}") from e
     logger.debug("%s sequências baixadas", len(records))
@@ -136,7 +146,9 @@ def fetch_dataset_silent(params: dict[str, Any]) -> tuple[list[str], dict[str, A
             for length in lengths:
                 length_counts[length] = length_counts.get(length, 0) + 1
 
-            most_common_length = max(length_counts.keys(), key=lambda x: length_counts[x])
+            most_common_length = max(
+                length_counts.keys(), key=lambda x: length_counts[x]
+            )
             uniform_seqs = [seq for seq in seqs if len(seq) == most_common_length]
 
             logger.warning(
@@ -150,7 +162,9 @@ def fetch_dataset_silent(params: dict[str, Any]) -> tuple[list[str], dict[str, A
 
             # Verificar se há sequências suficientes
             if len(uniform_seqs) < 2:
-                raise ValueError("Muito poucas sequências de comprimento uniforme encontradas")
+                raise ValueError(
+                    "Muito poucas sequências de comprimento uniforme encontradas"
+                )
 
             seqs = uniform_seqs
 

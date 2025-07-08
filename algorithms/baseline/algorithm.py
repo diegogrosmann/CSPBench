@@ -28,6 +28,17 @@ class BaselineAlg(CSPAlgorithm):
     is_deterministic = True
     supports_internal_parallel = False  # Baseline não suporta paralelismo interno
 
+    def __init__(self, strings: list[str], alphabet: str, **params):
+        """
+        Inicializa o algoritmo Baseline.
+
+        Args:
+            strings: Lista de strings do dataset
+            alphabet: Alfabeto utilizado
+            **params: Parâmetros específicos do algoritmo
+        """
+        super().__init__(strings, alphabet, **params)
+
     def run(self) -> tuple[str, int, dict]:
         """
         Executa o consenso guloso e calcula a maior distância de Hamming.
