@@ -1,0 +1,61 @@
+# Configuração de Análise de Sensibilidade em Lote
+# Arquivo de exemplo para demonstrar funcionalidades
+
+batch_info:
+  nome: "Análise de Sensibilidade - Exemplo Completo"
+  descricao: "Configuração de exemplo para análise de sensibilidade em lote com múltiplos datasets e algoritmos"
+  timeout_global: 3600  # 1 hora
+
+# Configurações da análise de sensibilidade
+sensitivity_config:
+  n_samples: 50  # Número reduzido para exemplo rápido
+  timeout_per_sample: 30  # 30 segundos por amostra
+  method: "morris"  # Método de análise: morris, sobol, fast
+  show_progress: true
+  seed: 42
+  # Parâmetros específicos do método Morris
+  num_levels: 4
+  
+# Algoritmos a serem analisados
+algorithms:
+  - "BLF-GA"
+  - "CSC"
+
+# Configurações de datasets
+datasets:
+  - nome: "DNA Pequeno"
+    tipo: "synthetic"
+    parametros:
+      n: 10
+      L: 30
+      alphabet: "ACGT"
+      noise: 0.1
+      fully_random: false
+      seed: 123
+
+  - nome: "Proteína Micro"
+    tipo: "synthetic"
+    parametros:
+      n: 8
+      L: 25
+      alphabet: "ACDEFGHIKLMNPQRSTVWY"
+      noise: 0.15
+      fully_random: false
+      seed: 456
+
+  - nome: "Binário Teste"
+    tipo: "synthetic"
+    parametros:
+      n: 6
+      L: 20
+      alphabet: "AB"
+      noise: 0.2
+      fully_random: false
+      seed: 789
+
+# Configurações de saída
+output:
+  save_detailed_results: true
+  save_plots: true
+  results_dir: "outputs/batch_sensitivity_exemplo"
+  plot_format: "png"

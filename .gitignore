@@ -4,6 +4,4 @@ __pycache__
 .pytest_cache
 .ruff_cache
 saved_datasets/*
-batch_configs/*
-outputs/logs/*
-outputs/reports/*
+outputs/*

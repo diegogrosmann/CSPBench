@@ -1,0 +1,81 @@
+# Configuração Rápida para Testes de Otimização
+# Este arquivo é otimizado para execução rápida e demonstração
+
+batch_info:
+  nome: "Teste Rápido - Otimização"
+  descricao: "Configuração rápida para testar funcionalidades de otimização"
+  timeout_global: 600  # 10 minutos total
+
+# Configurações de otimização (valores baixos para teste rápido)
+optimization_config:
+  n_trials: 5            # Apenas 5 trials por algoritmo
+  timeout_per_trial: 30  # 30 segundos por trial
+  direction: "minimize"
+  sampler: "TPE"
+  pruner: "Median"
+  save_plots: true
+  save_study: false
+
+# Apenas um algoritmo para teste rápido
+algorithms:
+  - "BLF-GA"
+
+# Datasets pequenos para execução rápida
+datasets:
+  # Dataset muito pequeno
+  - nome: "Teste Micro - 5 seqs"
+    tipo: "synthetic"
+    parametros:
+      n: 5
+      L: 20
+      alphabet: "ACGT"
+      noise: 0.1
+      fully_random: false
+      seed: 42
+      
+  # Dataset pequeno
+  - nome: "Teste Pequeno - 8 seqs"
+    tipo: "synthetic"
+    parametros:
+      n: 8
+      L: 30
+      alphabet: "ACGT"
+      noise: 0.15
+      fully_random: false
+      seed: 123
+      
+  # Dataset binário simples
+  - nome: "Binário Micro"
+    tipo: "synthetic"
+    parametros:
+      n: 6
+      L: 15
+      alphabet: "AB"
+      noise: 0.05
+      fully_random: false
+      seed: 456
+
+# Parâmetros focados para o BLF-GA
+algorithm_params:
+  "BLF-GA":
+    # Focar apenas nos parâmetros principais
+    focus_params:
+      - "pop_size"
+      - "max_gens"
+      - "cross_prob"
+      - "mut_prob"
+    # Fixar muitos parâmetros para acelerar
+    fixed_params:
+      tournament_k: 3
+      elite_rate: 0.1
+      crossover_type: "one_point"
+      mutation_type: "swap"
+      niching: false
+      immigrant_freq: 5
+
+# Configurações de saída simples
+output:
+  save_detailed_results: true
+  save_plots: true
+  results_dir: "outputs/batch_optimization_teste"
+  plot_format: "png"

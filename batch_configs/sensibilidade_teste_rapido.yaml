@@ -1,0 +1,49 @@
+# Configuração de Análise de Sensibilidade - Teste Rápido
+# Arquivo otimizado para execução rápida
+
+batch_info:
+  nome: "Teste Rápido - Análise de Sensibilidade"
+  descricao: "Configuração rápida para testar funcionalidades de análise de sensibilidade"
+  timeout_global: 300  # 5 minutos
+
+# Configurações da análise de sensibilidade
+sensitivity_config:
+  n_samples: 10  # Muito pequeno para teste rápido
+  timeout_per_sample: 15  # 15 segundos por amostra
+  method: "morris"  # Morris é mais rápido
+  show_progress: true
+  seed: 42
+  num_levels: 4
+
+# Algoritmos a serem analisados
+algorithms:
+  - "BLF-GA"
+
+# Configurações de datasets
+datasets:
+  - nome: "Teste Micro - 4 seqs"
+    tipo: "synthetic"
+    parametros:
+      n: 4
+      L: 15
+      alphabet: "AB"
+      noise: 0.1
+      fully_random: false
+      seed: 42
+
+  - nome: "Teste Mini - 6 seqs"
+    tipo: "synthetic"
+    parametros:
+      n: 6
+      L: 20
+      alphabet: "ACGT"
+      noise: 0.1
+      fully_random: false
+      seed: 123
+
+# Configurações de saída
+output:
+  save_detailed_results: true
+  save_plots: false  # Desabilitado para teste rápido
+  results_dir: "outputs/batch_sensitivity_teste"
+  plot_format: "png"

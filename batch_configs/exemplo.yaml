@@ -1,0 +1,33 @@
+batch_info:
+  nome: "Demo Interface Curses"
+  descricao: "Demonstração da interface curses"
+  timeout_global: 300
+
+execucoes:
+  - nome: "Teste Dataset Sintético"
+    dataset:
+      tipo: "synthetic"
+      parametros:
+        n: 10
+        L: 100
+        alphabet: "ACGT"
+        noise: 0.1
+        fully_random: false
+    algoritmos: ["Baseline", "BLF-GA"]
+    runs_per_algorithm_per_base: 2
+    num_bases: 1
+    timeout: 60
+    
+  - nome: "Teste Dataset Pequeno"
+    dataset:
+      tipo: "synthetic"
+      parametros:
+        n: 8
+        L: 50
+        alphabet: "AB"
+        noise: 0.0
+        fully_random: true
+    algoritmos: ["Baseline"]
+    runs_per_algorithm_per_base: 1
+    num_bases: 1
+    timeout: 30

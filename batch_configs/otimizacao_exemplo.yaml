@@ -1,0 +1,88 @@
+# Configuração de Otimização em Lote
+# Este arquivo permite definir múltiplas configurações para otimização de hiperparâmetros
+
+batch_info:
+  nome: "Otimização em Lote - BLF-GA"
+  descricao: "Testa diferentes configurações de dataset para otimização do BLF-GA"
+  timeout_global: 3600  # 1 hora total
+
+# Configurações de otimização
+optimization_config:
+  n_trials: 50           # Trials por algoritmo por configuração
+  timeout_per_trial: 60  # Timeout por trial em segundos
+  direction: "minimize"  # minimize ou maximize
+  sampler: "TPE"        # TPE, CmaEs, Random
+  pruner: "Median"      # Median, SuccessiveHalving, None
+  save_plots: true      # Salvar gráficos de visualização
+
+# Algoritmos para otimizar
+algorithms:
+  - "BLF-GA"
+  - "CSC"
+  - "H³-CSP"
+
+# Configurações de dataset para testar
+datasets:
+  - nome: "DNA Pequeno"
+    tipo: "synthetic"
+    parametros:
+      n: 10
+      L: 50
+      alphabet: "ACGT"
+      noise: 0.1
+      fully_random: false
+      
+  - nome: "DNA Médio"
+    tipo: "synthetic"
+    parametros:
+      n: 20
+      L: 100
+      alphabet: "ACGT"
+      noise: 0.15
+      fully_random: false
+      
+  - nome: "Proteína Pequena"
+    tipo: "synthetic"
+    parametros:
+      n: 8
+      L: 30
+      alphabet: "ACDEFGHIKLMNPQRSTVWY"
+      noise: 0.2
+      fully_random: false
+      
+  - nome: "Binário Simples"
+    tipo: "synthetic"
+    parametros:
+      n: 15
+      L: 80
+      alphabet: "AB"
+      noise: 0.05
+      fully_random: false
+
+# Parâmetros específicos para cada algoritmo (opcional)
+# Se não especificado, usa o espaço de busca padrão
+algorithm_params:
+  "BLF-GA":
+    # Foco em parâmetros principais
+    focus_params:
+      - "pop_size"
+      - "max_gens"
+      - "cross_prob"
+      - "mut_prob"
+      - "elite_rate"
+    # Fixar alguns parâmetros se desejado
+    fixed_params:
+      tournament_k: 3
+      
+  "CSC":
+    focus_params:
+      - "max_iter"
+      - "patience"
+      - "min_improvement"
+
+# Configurações de saída
+output:
+  save_detailed_results: true
+  save_plots: true
+  results_dir: "outputs/batch_optimization"
+  plot_format: "png"  # png, html, both

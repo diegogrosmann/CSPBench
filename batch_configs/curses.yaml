@@ -1,0 +1,35 @@
+batch_info:
+  nome: "Teste Interface Curses"
+  descricao: "Configuração para testar interface curses"
+  timeout_global: 3600
+
+execucoes:
+  - nome: "Teste Synthetic Dataset"
+    dataset:
+      tipo: "synthetic"
+      parametros:
+        n: 5
+        L: 10
+        alphabet: "ACGT"
+        noise: 0.1
+    algoritmos:
+      - "Baseline"
+      - "BLF-GA"
+    runs_per_algorithm_per_base: 2
+    num_bases: 2
+    timeout: 300
+
+  - nome: "Teste Dataset Pequeno"
+    dataset:
+      tipo: "synthetic"
+      parametros:
+        n: 3
+        L: 8
+        alphabet: "ACGT"
+        noise: 0.05
+    algoritmos:
+      - "Baseline"
+      - "CSC"
+    runs_per_algorithm_per_base: 1
+    num_bases: 1
+    timeout: 180
