@@ -311,8 +311,8 @@ A variável de ambiente `INTERNAL_WORKERS` é configurada automaticamente basead
 ### **Método 1: Ambiente Virtual (Recomendado)**
 ```bash
 # Clonar o repositório
-git clone https://github.com/seu-usuario/csp-blfga.git
-cd csp-blfga
+git clone https://github.com/diegogrosmann/CSP.git
+cd CSP
 
 # Criar ambiente virtual
 python -m venv .venv
