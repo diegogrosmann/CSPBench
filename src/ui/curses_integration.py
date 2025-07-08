@@ -462,8 +462,14 @@ class CursesExecutionMonitor:
             # Inicializar rastreadores de algoritmos
             for task in tasks:
                 algorithm_name = task["name"]
+                algorithm_class = task["instance"].__class__
+
+                # Verificar se o algoritmo é determinístico
+                is_deterministic = getattr(algorithm_class, "is_deterministic", False)
+                actual_num_execs = 1 if is_deterministic else num_execs
+
                 self.algorithm_trackers[algorithm_name] = AlgorithmExecutionTracker(
-                    name=algorithm_name, total_runs=num_execs
+                    name=algorithm_name, total_runs=actual_num_execs
                 )
                 results[algorithm_name] = []
 
@@ -473,17 +479,21 @@ class CursesExecutionMonitor:
             # Para cada algoritmo, executar múltiplas vezes EM PARALELO
             for task in tasks:
                 algorithm_name = task["name"]
+                algorithm_class = task["instance"].__class__
                 tracker = self.algorithm_trackers[algorithm_name]
                 algorithm_results = []
 
+                # Verificar se o algoritmo é determinístico
+                is_deterministic = getattr(algorithm_class, "is_deterministic", False)
+                actual_num_execs = 1 if is_deterministic else num_execs
+
                 # Submeter TODAS as execuções do algoritmo atual em paralelo
                 handles = []
-                for exec_idx in range(num_execs):
+                for exec_idx in range(actual_num_execs):
                     # Atualizar tracker - submetendo execução
                     tracker.submit_execution(exec_idx)
 
                     # Criar nova instância do algoritmo para cada execução
-                    algorithm_class = task["instance"].__class__
                     algorithm_instance = algorithm_class(
                         task["strings"], task["alphabet"]
                     )

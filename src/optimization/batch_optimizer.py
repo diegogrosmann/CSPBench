@@ -304,34 +304,12 @@ def display_batch_summary(batch_results: Dict[str, Any]):
 # Função de conveniência para uso na interface
 def run_yaml_optimization_batch():
     """Executa otimização em lote selecionando arquivo YAML."""
+    from src.ui.cli.menu import select_optimization_yaml_file
+
     console.print("\n=== Otimização em Lote (YAML) ===")
 
-    # Listar arquivos de otimização disponíveis
-    config_dir = "batch_configs"
-    if os.path.exists(config_dir):
-        optimization_files = [
-            f
-            for f in os.listdir(config_dir)
-            if f.endswith(".yaml") and "otimizacao" in f.lower()
-        ]
-
-        if optimization_files:
-            console.print("\nArquivos de otimização disponíveis:")
-            for idx, file in enumerate(optimization_files, 1):
-                console.print(f" {idx}) {file}")
-
-            choice = input(f"Escolha o arquivo [1]: ").strip()
-            if choice.isdigit() and 1 <= int(choice) <= len(optimization_files):
-                config_file = os.path.join(
-                    config_dir, optimization_files[int(choice) - 1]
-                )
-            else:
-                config_file = os.path.join(config_dir, optimization_files[0])
-        else:
-            config_file = input("Caminho para arquivo de configuração: ").strip()
-    else:
-        config_file = input("Caminho para arquivo de configuração: ").strip()
-
+    # Selecionar arquivo usando a nova função
+    config_file = select_optimization_yaml_file()
     if not config_file:
         console.print("❌ Nenhum arquivo selecionado.")
         return

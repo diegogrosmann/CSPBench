@@ -181,11 +181,31 @@ def execute_algorithms_core(
                     continue
 
                 AlgClass = global_registry[alg_name]
+
+                # Verificar se o algoritmo é determinístico
+                is_deterministic = getattr(AlgClass, "is_deterministic", False)
+                actual_num_execs = 1 if is_deterministic else num_execs
+
+                if not silent:
+                    if is_deterministic:
+                        print(
+                            f"  🔒 {alg_name} é determinístico - executando apenas 1 vez"
+                        )
+                    else:
+                        print(
+                            f"  🎲 {alg_name} é não-determinístico - executando {actual_num_execs} vezes"
+                        )
+
                 alg_results = []
 
-                for i in range(num_execs):
+                for i in range(actual_num_execs):
                     if not silent:
-                        print(f"  Executando {alg_name} - Run {i+1}/{num_execs}")
+                        if actual_num_execs == 1:
+                            print(f"  Executando {alg_name}")
+                        else:
+                            print(
+                                f"  Executando {alg_name} - Run {i+1}/{actual_num_execs}"
+                            )
 
                     instance = AlgClass(seqs, alphabet)
                     handle = executor.submit(instance)

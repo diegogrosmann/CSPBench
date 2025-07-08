@@ -1,4 +1,47 @@
 """
+Orquestrador da Interface de Linha de Comando (CLI) para o CSP-BLFGA
+
+Este módulo é o coração da aplicação, responsável por:
+- **Processar Argumentos da CLI**: Utiliza `argparse` para interpretar os comandos
+  e parâmetros fornecidos pelo usuário, permitindo a execução em modo
+  interativo ou automatizado (silencioso).
+- **Gerenciar o Fluxo de Execução**: Orquestra as diferentes funcionalidades
+  da aplicação, como:
+  - Execução de algoritmos individuais.
+  - Execução em lote a partir de arquivos de configuração YAML.
+  - Otimização de hiperparâmetros usando Optuna.
+  - Análise de sensibilidade de parâmetros.
+- **Interagir com o Usuário**:
+  - Em modo interativo, utiliza os menus definidos em `src.ui.cli.menu`
+    para guiar o usuário na seleção de datasets, algoritmos e configurações.
+  - Em modo silencioso, opera com base nos argumentos fornecidos, sem
+    interação, ideal para scripts e testes automatizados.
+- **Integrar com o Core do Sistema**:
+  - Cria e gerencia o `SchedulerExecutor`, que executa os algoritmos de
+    forma controlada e robusta.
+  - Invoca a `CursesExecutionMonitor` para fornecer um monitoramento
+    visual em tempo real das execuções, se solicitado.
+- **Coletar e Salvar Resultados**:
+  - Utiliza `ResultsFormatter` para coletar os resultados das execuções.
+  - Gera relatórios detalhados em formato de texto e CSV, salvando-os
+    no diretório `outputs/reports`.
+- **Configurar Logging**: Inicializa o sistema de logging para registrar
+  informações detalhadas sobre a execução em `outputs/logs`.
+
+Fluxos Principais:
+1.  **Execução Padrão**: O usuário seleciona um dataset, um ou mais algoritmos,
+    e o número de execuções. A aplicação executa os algoritmos e apresenta
+    um resumo dos resultados.
+2.  **Execução em Lote**: O usuário fornece um arquivo YAML com múltiplas
+    configurações de execução. A aplicação processa todas as execuções
+    definidas no arquivo.
+3.  **Otimização**: Um workflow guiado para otimizar os hiperparâmetros de um
+    algoritmo em um dataset específico.
+4.  **Análise de Sensibilidade**: Um workflow para analisar o impacto de
+    diferentes parâmetros no desempenho de um algoritmo.
+"""
+
+"""
 Arquivo principal de execução da aplicação Closest String Problem (CSP).
 
 Este módulo orquestra o fluxo principal da aplicação, incluindo:
@@ -199,13 +242,15 @@ def main() -> None:
             if choice == "4":
                 # Execução em lote
                 from src.ui.cli.batch_executor import execute_batch_config
+                from src.ui.cli.menu import select_yaml_batch_file
 
                 try:
-                    config_file = safe_input(
-                        "Arquivo de configuração [batch_configs/exemplo.yaml]: "
-                    ).strip()
+                    config_file = select_yaml_batch_file()
                     if not config_file:
-                        config_file = "batch_configs/exemplo.yaml"
+                        cprint(
+                            "❌ Nenhum arquivo selecionado. Voltando ao menu principal."
+                        )
+                        return
 
                     cprint(f"📋 Executando batch: {config_file}")
 
@@ -237,7 +282,9 @@ def main() -> None:
             elif choice == "6":
                 # Análise de sensibilidade
                 try:
-                    run_sensitivity_workflow()
+                    from src.ui.cli.menu import interactive_sensitivity_menu
+
+                    interactive_sensitivity_menu()
                 except Exception as e:
                     cprint(f"❌ Erro na análise de sensibilidade: {e}")
                     logging.exception("Erro na análise de sensibilidade", exc_info=e)
@@ -401,7 +448,7 @@ def main() -> None:
                 cprint("💡 Usando modo tradicional para monitoramento")
 
         cprint(
-            f"🚀 Executando {len(viable_algs)} algoritmos com {num_execs} execuções cada"
+            f"🚀 Executando {len(viable_algs)} algoritmos (algoritmos determinísticos: 1 execução, não-determinísticos: {num_execs} execuções)"
         )
 
         if use_curses_monitoring:
@@ -506,16 +553,35 @@ def main() -> None:
                         cprint(f"ERRO: Algoritmo '{alg_name}' não encontrado!")
                         continue
 
-                    logging.debug(
-                        f"[ALG_EXEC] Iniciando {alg_name} com {num_execs} execuções"
-                    )
                     AlgClass = global_registry[alg_name]
+
+                    # Verificar se o algoritmo é determinístico
+                    is_deterministic = getattr(AlgClass, "is_deterministic", False)
+                    actual_num_execs = 1 if is_deterministic else num_execs
+
+                    if is_deterministic:
+                        cprint(
+                            f"  🔒 {alg_name} é determinístico - executando apenas 1 vez"
+                        )
+                    else:
+                        cprint(
+                            f"  🎲 {alg_name} é não-determinístico - executando {actual_num_execs} vezes"
+                        )
+
+                    logging.debug(
+                        f"[ALG_EXEC] Iniciando {alg_name} com {actual_num_execs} execuções (determinístico: {is_deterministic})"
+                    )
 
                     executions = []
 
-                    # Submeter múltiplas execuções
-                    for i in range(num_execs):
-                        cprint(f"  Executando {alg_name} - Run {i+1}/{num_execs}")
+                    # Submeter múltiplas execuções baseado no tipo do algoritmo
+                    for i in range(actual_num_execs):
+                        if actual_num_execs == 1:
+                            cprint(f"  Executando {alg_name}")
+                        else:
+                            cprint(
+                                f"  Executando {alg_name} - Run {i+1}/{actual_num_execs}"
+                            )
                         instance = AlgClass(seqs, alphabet)
                         handle = executor.submit(instance)
 
@@ -576,7 +642,7 @@ def main() -> None:
                             "time": best_exec["tempo"],
                         }
                         cprint(
-                            f"  ✅ {alg_name}: {len(valid_results)}/{num_execs} execuções válidas, melhor distância: {best_exec['distancia']}"
+                            f"  ✅ {alg_name}: {len(valid_results)}/{actual_num_execs} execuções válidas, melhor distância: {best_exec['distancia']}"
                         )
                     else:
                         results[alg_name] = {

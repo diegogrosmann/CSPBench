@@ -29,6 +29,7 @@ class CSCAlgorithm(CSPAlgorithm):
     name = "CSC"
     default_params = CSC_DEFAULTS
     supports_internal_parallel = False  # CSC não suporta paralelismo interno
+    is_deterministic = True  # CSC é determinístico
 
     def __init__(self, strings: list[str], alphabet: str, **params):
         """

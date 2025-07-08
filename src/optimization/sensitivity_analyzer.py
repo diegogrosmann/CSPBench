@@ -15,9 +15,12 @@ Funções:
     create_parameter_space: Cria espaço de parâmetros para análise
 """
 
+import json
 import logging
+import os
 import time
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
@@ -151,27 +154,27 @@ class SensitivityAnalyzer:
 
     def _generate_samples(self, problem: Dict[str, Any]) -> np.ndarray:
         """Gera amostras baseado no método escolhido."""
+        # Definir seed globalmente se especificado
+        if self.config.seed is not None:
+            np.random.seed(self.config.seed)
+
         if self.config.method == "sobol":
             return saltelli.sample(
                 problem,
                 self.config.n_samples,
                 calc_second_order=self.config.sobol_calc_second_order,
-                seed=self.config.seed,
             )
         elif self.config.method == "morris":
             return morris_sample.sample(
                 problem,
                 self.config.n_samples,
                 num_levels=self.config.morris_num_levels,
-                grid_jump=self.config.morris_grid_jump,
-                seed=self.config.seed,
             )
         elif self.config.method == "fast":
             return fast_sampler.sample(
                 problem,
                 self.config.n_samples,
                 M=self.config.fast_m,
-                seed=self.config.seed,
             )
         else:
             raise ValueError(f"Método desconhecido: {self.config.method}")
@@ -190,17 +193,53 @@ class SensitivityAnalyzer:
         for i, sample in enumerate(samples):
             try:
                 # Converter amostra para dicionário de parâmetros
-                params = {name: value for name, value in zip(param_names, sample)}
+                # Converter numpy.float64 para tipos Python apropriados
+                params = {}
+                for name, value in zip(param_names, sample):
+                    # Converter para tipos apropriados baseado no nome do parâmetro
+                    if name in [
+                        "pop_size",
+                        "max_gens",
+                        "tournament_k",
+                        "immigrant_freq",
+                        "restart_patience",
+                        "mutation_multi_n",
+                        "refine_iter_limit",
+                        "niching_radius",
+                        "mutation_adapt_duration",
+                        "disable_elitismo_gens",
+                        "max_iter",
+                        "patience",
+                        "max_restarts",
+                        "beam_width",
+                        "max_iterations",
+                        "local_search_iters",
+                        "restart_threshold",
+                        "max_depth",
+                        "memory_limit",
+                        "morris_num_levels",
+                        "morris_grid_jump",
+                        "fast_m",
+                    ]:
+                        params[name] = int(float(value))
+                    else:
+                        params[name] = float(value)
 
                 # Criar instância do algoritmo
+                if self.algorithm_class is None:
+                    raise ValueError(
+                        "Algorithm class not initialized. Make sure analyze() method was called with a valid algorithm name."
+                    )
                 algorithm = self.algorithm_class(self.sequences, self.alphabet)
 
                 # Aplicar parâmetros
                 if hasattr(algorithm, "set_params"):
                     algorithm.set_params(**params)
-                elif hasattr(algorithm, "config"):
+                elif hasattr(algorithm, "config") and algorithm.config is not None:
                     # Atualizar configuração do algoritmo
-                    if hasattr(algorithm.config, "update"):
+                    if hasattr(algorithm.config, "update") and callable(
+                        algorithm.config.update
+                    ):
                         algorithm.config.update(params)
                     else:
                         for key, value in params.items():
@@ -214,7 +253,15 @@ class SensitivityAnalyzer:
 
                 # Executar algoritmo
                 start_time = time.time()
-                center, distance = algorithm.run()
+                result = algorithm.run()
+
+                # Extrair distância do resultado
+                if isinstance(result, tuple) and len(result) >= 2:
+                    center, distance = result[0], result[1]
+                else:
+                    # Fallback para compatibilidade
+                    center, distance = result, float("inf")
+
                 execution_time = time.time() - start_time
 
                 # Verificar timeout
@@ -227,7 +274,7 @@ class SensitivityAnalyzer:
                     )
                     distance = float("inf")
 
-                outputs.append(distance)
+                outputs.append(float(distance))
 
             except Exception as e:
                 logger.error(f"Erro na amostra {i}: {e}")
@@ -239,7 +286,7 @@ class SensitivityAnalyzer:
         if progress_bar:
             progress_bar.close()
 
-        return np.array(outputs)
+        return np.array(outputs, dtype=float)
 
     def _analyze_results(
         self, problem: Dict[str, Any], outputs: np.ndarray
@@ -289,12 +336,17 @@ class SensitivityAnalyzer:
         start_time = time.time()
         outputs = self._evaluate_samples(samples, problem)
 
-        # Filtrar valores inválidos
+        # Filtrar valores inválidos - tratar de forma diferente para Morris
         valid_indices = np.isfinite(outputs)
-        if not np.all(valid_indices):
-            logger.warning(f"Removendo {np.sum(~valid_indices)} amostras inválidas")
-            samples = samples[valid_indices]
-            outputs = outputs[valid_indices]
+        n_invalid = np.sum(~valid_indices)
+
+        if n_invalid > 0:
+            logger.warning(
+                f"Substituindo {n_invalid} amostras inválidas por valores grandes"
+            )
+            # Para Morris, não podemos remover amostras, então substituímos valores inválidos
+            # por um valor grande mas finito
+            outputs[~valid_indices] = 1000.0  # Valor grande para indicar solução ruim
 
         # Executar análise
         logger.info("Executando análise de sensibilidade")
@@ -429,3 +481,73 @@ def analyze_algorithm_sensitivity(
     result = analyzer.analyze(algorithm_name, sequences, alphabet)
 
     return result
+
+
+def run_sensitivity_with_dataset_selection():
+    """
+    Executa análise de sensibilidade com seleção interativa de dataset.
+    """
+    try:
+        from src.ui.cli.menu import (
+            configure_sensitivity_params,
+            select_dataset_for_sensitivity,
+            select_sensitivity_algorithm,
+        )
+
+        # Selecionar dataset
+        sequences, alphabet, dataset_info = select_dataset_for_sensitivity()
+
+        # Selecionar algoritmo
+        algorithm_name = select_sensitivity_algorithm()
+
+        # Configurar parâmetros
+        config_dict = configure_sensitivity_params()
+
+        # Executar análise
+        print(f"\n🔬 Iniciando análise de sensibilidade do {algorithm_name}...")
+        print(
+            f"📊 Dataset: {dataset_info.get('type', 'N/A')} - {len(sequences)} sequências"
+        )
+        print(
+            f"🔬 Amostras: {config_dict.get('n_samples', 1000)} | Método: {config_dict.get('method', 'sobol')}"
+        )
+
+        result = analyze_algorithm_sensitivity(
+            algorithm_name=algorithm_name,
+            sequences=sequences,
+            alphabet=alphabet,
+            n_samples=config_dict.get("n_samples", 1000),
+            method=config_dict.get("method", "sobol"),
+            timeout_per_sample=config_dict.get("timeout", 60),
+            show_progress=True,
+        )
+
+        # Exibir resultados
+        print(f"\n✅ Análise concluída!")
+        print(f"⏱️ Tempo total: {result.analysis_time:.2f} segundos")
+        print(f"📈 Amostras processadas: {result.n_samples}")
+        print(f"🔬 Parâmetros analisados: {len(result.parameter_names)}")
+        print(f"Método: {result.method}")
+
+        # Salvar resultados
+        os.makedirs("outputs/reports", exist_ok=True)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"outputs/reports/sensitivity_{algorithm_name}_{timestamp}.json"
+        report = {
+            "algorithm": algorithm_name,
+            "dataset_info": dataset_info,
+            "method": result.method,
+            "n_samples": result.n_samples,
+            "analysis_time": result.analysis_time,
+            "parameter_names": result.parameter_names,
+            "timestamp": timestamp,
+        }
+        with open(filename, "w", encoding="utf-8") as f:
+            json.dump(report, f, indent=2, default=str, ensure_ascii=False)
+        print(f"💾 Relatório salvo em: {filename}")
+
+    except Exception as e:
+        print(f"❌ Erro na análise de sensibilidade: {e}")
+        import traceback
+
+        traceback.print_exc()
