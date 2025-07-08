@@ -1,0 +1,111 @@
+# Informações gerais sobre este lote de experimentos
+batch_info:
+  nome: "Otimização em Lote - BLF-GA"
+  descricao: "Testa diferentes configurações de dataset para otimização do BLF-GA."
+  timeout_global: 3600 # Tempo total estimado para o lote em segundos (1 hora).
+                       # Por que: Define um limite de tempo para todo o processo de otimização em lote,
+                       # evitando que ele se estenda indefinidamente.
+
+# Configurações globais de Optuna para todos os cenários neste lote
+optimization_config:
+  n_trials: 50           # Número de trials por algoritmo por dataset.
+                         # Por que: Quantas iterações de teste para cada combinação algoritmo-dataset.
+  timeout_per_trial: 60  # Timeout por trial em segundos.
+                         # Por que: Limita o tempo de cada execução individual do algoritmo.
+  direction: "minimize"  # minimize ou maximize.
+                         # Por que: Definido pelo objetivo do CSP (minimizar a distância).
+  sampler: "TPE"         # Tipo de sampler (TPE, CmaEs, Random).
+                         # Por que: TPE é geralmente eficiente e se adapta bem.
+  pruner: "Median"       # Tipo de pruner (Median, SuccessiveHalving, None).
+                         # Por que: Median ajuda a cortar trials ruins precocemente.
+  save_plots: true       # Salvar gráficos de visualização.
+                         # Por que: Essencial para análise visual do progresso da otimização.
+  save_study: false      # Salvar estudo Optuna completo (pode ser grande).
+                         # Por que: Permite continuar otimizações ou analisar dados brutos do estudo.
+
+# Lista de algoritmos a serem otimizados neste lote
+algorithms:
+  - "BLF-GA" # Focar apenas no BLF-GA conforme solicitado.
+
+# Lista de configurações de datasets. Cada uma será usada com todos os algoritmos selecionados.
+datasets:
+  - nome: "DNA Pequeno - Baixo Ruído"
+    tipo: "synthetic"
+    parametros:
+      n: 10
+      L: 50
+      alphabet: "ACGT"
+      noise: 0.05 # Ruído reduzido para um cenário mais fácil.
+      fully_random: false
+      seed: 42
+  - nome: "Proteína Média - Ruído Moderado"
+    tipo: "synthetic"
+    parametros:
+      n: 15
+      L: 80
+      alphabet: "ACDEFGHIKLMNPQRSTVWY" # Alfabeto de 20 aminoácidos.
+      noise: 0.25 # Ruído moderado.
+      fully_random: false
+      seed: 789
+  - nome: "Binário Grande - Alto Ruído"
+    tipo: "synthetic"
+    parametros:
+      n: 20
+      L: 120
+      alphabet: "AB"
+      noise: 0.35 # Ruído elevado para um cenário mais desafiador.
+      fully_random: false
+      seed: 101
+  - nome: "Dataset de Arquivo - Exemplo Customizado"
+    tipo: "file"
+    parametros:
+      file_path: "saved_datasets/dataset_custom.fasta" # Caminho para um arquivo FASTA local.
+  - nome: "Dataset NCBI - Ribosomal RNA"
+    tipo: "entrez"
+    parametros:
+      email: "seu.email@example.com" # Substitua pelo seu email.
+      db: "nucleotide"
+      term: "ribosomal RNA[Title]" # Termo de busca mais específico.
+      n: 12 # Número de sequências a baixar.
+      api_key: null # Opcional: sua chave API do NCBI.
+
+# Seção opcional para configurar parâmetros específicos de busca por algoritmo.
+# Se não especificado, o Optuna usará o espaço de busca padrão do algoritmo.
+algorithm_params:
+  "BLF-GA":
+    # Lista de parâmetros para focar a otimização.
+    # Por que: Reduz o espaço de busca, acelerando a otimização ao concentrar-se nos parâmetros mais impactantes.
+    focus_params:
+      - "pop_size" # Tamanho da população.
+      - "max_gens" # Número máximo de gerações.
+      - "cross_prob" # Probabilidade de crossover.
+      - "mut_prob" # Probabilidade de mutação.
+      - "elite_rate" # Taxa de elitismo.
+      - "initial_blocks" # Número inicial de blocos.
+      - "rediv_freq" # Frequência de redivisão de blocos.
+      - "immigrant_ratio" # Proporção de imigrantes.
+      - "diversity_threshold" # Limiar de diversidade.
+      - "mutation_adapt_factor" # Fator de adaptação da mutação.
+      - "no_improve_patience" # Paciência para early stopping.
+    # Parâmetros que serão mantidos fixos em seus valores especificados.
+    # Por que: Fixar parâmetros conhecidos ou menos importantes para simplificar a otimização.
+    fixed_params:
+      tournament_k: 3
+      crossover_type: "one_point"
+      mutation_type: "multi"
+      niching: false
+      refinement_type: "greedy"
+      refine_elites: "best"
+      restart_patience: 20
+      restart_ratio: 0.3
+
+# Configurações de saída para os resultados do lote
+output:
+  save_detailed_results: true # Salvar resultados detalhados em JSON/CSV.
+                              # Por que: Para análise aprofundada posterior e arquivamento.
+  save_plots: true            # Salvar todos os gráficos gerados durante a otimização de lote.
+                              # Por que: Visualização consolidada dos experimentos.
+  results_dir: "outputs/batch_optimization" # Diretório para salvar os resultados.
+                                            # Por que: Organização dos outputs de diferentes lotes.
+  plot_format: "png"          # Formato dos gráficos (png, html, both).
+                              # Por que: Compatibilidade e interatividade.

@@ -181,6 +181,7 @@ def execute_optimization_batch(config_file: str) -> Dict[str, Any]:
                         sampler=opt_config.get("sampler", "TPE"),
                         pruner=opt_config.get("pruner", "Median"),
                         show_progress=True,
+                        yaml_config=config,
                     )
 
                     dataset_results["algorithms"][alg_name] = {

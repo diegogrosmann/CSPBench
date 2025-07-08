@@ -17,6 +17,12 @@ optimization_config:
   pruner: "Median"      # Median, SuccessiveHalving, Hyperband, None
   save_plots: true      # Salvar gráficos de visualização
   save_study: true      # Salvar estudos completos do Optuna
+  
+  # Configurações de paralelismo
+  parallel:
+    n_jobs: -1          # Número de jobs paralelos para Optuna (auto=-1, usa todos os CPUs)
+    storage: "sqlite:///outputs/optuna_studies.db"  # Storage para estudos
+    study_name: null    # Nome do estudo (auto-gerado se null)
 
 # Algoritmos para otimizar
 algorithms:

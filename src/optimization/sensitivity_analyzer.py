@@ -3,7 +3,7 @@ Módulo de análise de sensibilidade para algoritmos CSP usando SALib.
 
 Este módulo fornece funcionalidades para analisar a sensibilidade dos algoritmos
 CSP aos seus hiperparâmetros, utilizando diferentes métodos de análise como
-Sobol, Morris e FAST.
+Sobol, Morris e FAST, com suporte a execução paralela.
 
 Classes:
     SensitivityConfig: Configuração para análise de sensibilidade
@@ -50,6 +50,9 @@ class SensitivityConfig:
     morris_num_levels: int = 4
     morris_grid_jump: int = 2
     fast_m: int = 4
+
+    # Configurações de paralelismo
+    n_jobs: int = 1  # Número de jobs paralelos
 
 
 @dataclass
@@ -183,102 +186,28 @@ class SensitivityAnalyzer:
         self, samples: np.ndarray, problem: Dict[str, Any]
     ) -> np.ndarray:
         """Avalia amostras executando o algoritmo."""
-        outputs = []
         param_names = problem["names"]
+
+        if self.config.n_jobs == 1:
+            # Execução serial com barra de progresso
+            return self._evaluate_samples_serial(samples, param_names)
+        else:
+            # Execução paralela
+            return self._evaluate_samples_parallel(samples, param_names)
+
+    def _evaluate_samples_serial(
+        self, samples: np.ndarray, param_names: List[str]
+    ) -> np.ndarray:
+        """Avalia amostras em modo serial."""
+        outputs = []
 
         progress_bar = None
         if self.config.show_progress:
             progress_bar = tqdm(total=len(samples), desc="Avaliando amostras")
 
         for i, sample in enumerate(samples):
-            try:
-                # Converter amostra para dicionário de parâmetros
-                # Converter numpy.float64 para tipos Python apropriados
-                params = {}
-                for name, value in zip(param_names, sample):
-                    # Converter para tipos apropriados baseado no nome do parâmetro
-                    if name in [
-                        "pop_size",
-                        "max_gens",
-                        "tournament_k",
-                        "immigrant_freq",
-                        "restart_patience",
-                        "mutation_multi_n",
-                        "refine_iter_limit",
-                        "niching_radius",
-                        "mutation_adapt_duration",
-                        "disable_elitismo_gens",
-                        "max_iter",
-                        "patience",
-                        "max_restarts",
-                        "beam_width",
-                        "max_iterations",
-                        "local_search_iters",
-                        "restart_threshold",
-                        "max_depth",
-                        "memory_limit",
-                        "morris_num_levels",
-                        "morris_grid_jump",
-                        "fast_m",
-                    ]:
-                        params[name] = int(float(value))
-                    else:
-                        params[name] = float(value)
-
-                # Criar instância do algoritmo
-                if self.algorithm_class is None:
-                    raise ValueError(
-                        "Algorithm class not initialized. Make sure analyze() method was called with a valid algorithm name."
-                    )
-                algorithm = self.algorithm_class(self.sequences, self.alphabet)
-
-                # Aplicar parâmetros
-                if hasattr(algorithm, "set_params"):
-                    algorithm.set_params(**params)
-                elif hasattr(algorithm, "config") and algorithm.config is not None:
-                    # Atualizar configuração do algoritmo
-                    if hasattr(algorithm.config, "update") and callable(
-                        algorithm.config.update
-                    ):
-                        algorithm.config.update(params)
-                    else:
-                        for key, value in params.items():
-                            if hasattr(algorithm.config, key):
-                                setattr(algorithm.config, key, value)
-                else:
-                    # Tentar definir parâmetros diretamente
-                    for key, value in params.items():
-                        if hasattr(algorithm, key):
-                            setattr(algorithm, key, value)
-
-                # Executar algoritmo
-                start_time = time.time()
-                result = algorithm.run()
-
-                # Extrair distância do resultado
-                if isinstance(result, tuple) and len(result) >= 2:
-                    center, distance = result[0], result[1]
-                else:
-                    # Fallback para compatibilidade
-                    center, distance = result, float("inf")
-
-                execution_time = time.time() - start_time
-
-                # Verificar timeout
-                if (
-                    self.config.timeout_per_sample
-                    and execution_time > self.config.timeout_per_sample
-                ):
-                    logger.warning(
-                        f"Amostra {i} excedeu timeout: {execution_time:.2f}s"
-                    )
-                    distance = float("inf")
-
-                outputs.append(float(distance))
-
-            except Exception as e:
-                logger.error(f"Erro na amostra {i}: {e}")
-                outputs.append(float("inf"))
+            output = self._evaluate_single_sample(sample, param_names, i)
+            outputs.append(output)
 
             if progress_bar:
                 progress_bar.update(1)
@@ -287,6 +216,149 @@ class SensitivityAnalyzer:
             progress_bar.close()
 
         return np.array(outputs, dtype=float)
+
+    def _evaluate_samples_parallel(
+        self, samples: np.ndarray, param_names: List[str]
+    ) -> np.ndarray:
+        """Avalia amostras em modo paralelo."""
+        from concurrent.futures import ProcessPoolExecutor, as_completed
+
+        logger.info(f"Executando análise paralela com {self.config.n_jobs} workers")
+
+        # Preparar dados para execução paralela
+        tasks = [(i, sample, param_names) for i, sample in enumerate(samples)]
+
+        # Executar em paralelo
+        outputs: List[float] = [0.0] * len(samples)  # Preservar ordem
+
+        progress_bar = None
+        if self.config.show_progress:
+            progress_bar = tqdm(
+                total=len(samples), desc="Avaliando amostras (paralelo)"
+            )
+
+        with ProcessPoolExecutor(max_workers=self.config.n_jobs) as executor:
+            # Submeter tarefas
+            future_to_index = {
+                executor.submit(self._evaluate_sample_worker, task): task[0]
+                for task in tasks
+            }
+
+            # Coletar resultados preservando ordem
+            for future in as_completed(future_to_index):
+                index = future_to_index[future]
+                try:
+                    output = future.result()
+                    outputs[index] = output
+                except Exception as e:
+                    logger.error(f"Erro na amostra {index}: {e}")
+                    outputs[index] = float("inf")
+
+                if progress_bar:
+                    progress_bar.update(1)
+
+        if progress_bar:
+            progress_bar.close()
+
+        return np.array(outputs, dtype=float)
+
+    def _evaluate_sample_worker(self, task: Tuple[int, np.ndarray, List[str]]) -> float:
+        """Worker para avaliação paralela de uma amostra."""
+        index, sample, param_names = task
+        return self._evaluate_single_sample(sample, param_names, index)
+
+    def _evaluate_single_sample(
+        self, sample: np.ndarray, param_names: List[str], index: int
+    ) -> float:
+        """Avalia uma única amostra."""
+        try:
+            # Converter amostra para dicionário de parâmetros
+            # Converter numpy.float64 para tipos Python apropriados
+            params = {}
+            for name, value in zip(param_names, sample):
+                # Converter para tipos apropriados baseado no nome do parâmetro
+                if name in [
+                    "pop_size",
+                    "max_gens",
+                    "tournament_k",
+                    "immigrant_freq",
+                    "restart_patience",
+                    "mutation_multi_n",
+                    "refine_iter_limit",
+                    "niching_radius",
+                    "mutation_adapt_duration",
+                    "disable_elitismo_gens",
+                    "max_iter",
+                    "patience",
+                    "max_restarts",
+                    "beam_width",
+                    "max_iterations",
+                    "local_search_iters",
+                    "restart_threshold",
+                    "max_depth",
+                    "memory_limit",
+                    "morris_num_levels",
+                    "morris_grid_jump",
+                    "fast_m",
+                ]:
+                    params[name] = int(float(value))
+                else:
+                    params[name] = float(value)
+
+            # Criar instância do algoritmo
+            if self.algorithm_class is None:
+                raise ValueError(
+                    "Algorithm class not initialized. Make sure analyze() method was called with a valid algorithm name."
+                )
+            algorithm = self.algorithm_class(self.sequences, self.alphabet)
+
+            # Aplicar parâmetros
+            if hasattr(algorithm, "set_params"):
+                algorithm.set_params(**params)
+            elif hasattr(algorithm, "config") and algorithm.config is not None:
+                # Atualizar configuração do algoritmo
+                if hasattr(algorithm.config, "update") and callable(
+                    algorithm.config.update
+                ):
+                    algorithm.config.update(params)
+                else:
+                    for key, value in params.items():
+                        if hasattr(algorithm.config, key):
+                            setattr(algorithm.config, key, value)
+            else:
+                # Tentar definir parâmetros diretamente
+                for key, value in params.items():
+                    if hasattr(algorithm, key):
+                        setattr(algorithm, key, value)
+
+            # Executar algoritmo
+            start_time = time.time()
+            result = algorithm.run()
+
+            # Extrair distância do resultado
+            if isinstance(result, tuple) and len(result) >= 2:
+                center, distance = result[0], result[1]
+            else:
+                # Fallback para compatibilidade
+                center, distance = result, float("inf")
+
+            execution_time = time.time() - start_time
+
+            # Verificar timeout
+            if (
+                self.config.timeout_per_sample
+                and execution_time > self.config.timeout_per_sample
+            ):
+                logger.warning(
+                    f"Amostra {index} excedeu timeout: {execution_time:.2f}s"
+                )
+                distance = float("inf")
+
+            return float(distance)
+
+        except Exception as e:
+            logger.error(f"Erro na amostra {index}: {e}")
+            return float("inf")
 
     def _analyze_results(
         self, problem: Dict[str, Any], outputs: np.ndarray
@@ -436,6 +508,7 @@ def analyze_algorithm_sensitivity(
     timeout_per_sample: Optional[float] = 60.0,
     show_progress: bool = True,
     seed: Optional[int] = None,
+    yaml_config: Optional[Dict] = None,
     **kwargs,
 ) -> SensitivityResult:
     """
@@ -450,11 +523,34 @@ def analyze_algorithm_sensitivity(
         timeout_per_sample: Timeout por amostra (segundos)
         show_progress: Mostrar barra de progresso
         seed: Seed para reprodutibilidade
+        yaml_config: Configuração do YAML para paralelismo
         **kwargs: Parâmetros adicionais específicos do método
 
     Returns:
         SensitivityResult: Resultado da análise
     """
+    from src.utils.worker_calculator import get_worker_config
+
+    # Calcular configuração de workers
+    worker_config = get_worker_config(
+        yaml_config=yaml_config,
+        context="salib",
+        algorithm_name=algorithm_name,
+        n_samples=n_samples,
+    )
+
+    # Extrair configurações de paralelismo do YAML se disponível
+    n_jobs = 1
+    if yaml_config and "sensitivity_config" in yaml_config:
+        sens_config = yaml_config["sensitivity_config"]
+        if "parallel" in sens_config:
+            yaml_n_jobs = sens_config["parallel"].get("n_jobs", 1)
+            if yaml_n_jobs == -1:
+                n_jobs = worker_config["salib_workers"]
+            else:
+                n_jobs = (
+                    yaml_n_jobs if yaml_n_jobs > 0 else worker_config["salib_workers"]
+                )
 
     # Criar configuração
     config = SensitivityConfig(
@@ -463,6 +559,7 @@ def analyze_algorithm_sensitivity(
         timeout_per_sample=timeout_per_sample,
         show_progress=show_progress,
         seed=seed,
+        n_jobs=n_jobs,
     )
 
     # Aplicar parâmetros específicos do método

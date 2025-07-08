@@ -3,7 +3,7 @@ Módulo de otimização de hiperparâmetros usando Optuna.
 
 Este módulo fornece funcionalidades para otimizar hiperparâmetros de algoritmos
 CSP usando o framework Optuna, incluindo diferentes estratégias de amostragem,
-poda de trials e salvamento de resultados.
+poda de trials, salvamento de resultados e execução paralela.
 
 Classes:
     OptimizationConfig: Configuração para otimização
@@ -50,6 +50,10 @@ class OptimizationConfig:
     n_startup_trials: int = 10
     n_ei_candidates: int = 24
     seed: Optional[int] = None
+
+    # Configurações de paralelismo
+    n_jobs: int = 1  # Número de jobs paralelos
+    internal_workers: Optional[int] = None  # Workers internos para algoritmos
 
 
 @dataclass
@@ -303,6 +307,13 @@ class OptunaOptimizer:
         self.sequences = sequences
         self.alphabet = alphabet
 
+        # Configurar workers internos para algoritmos
+        if self.config.internal_workers:
+            import os
+
+            os.environ["INTERNAL_WORKERS"] = str(self.config.internal_workers)
+            logger.info(f"Configurado INTERNAL_WORKERS={self.config.internal_workers}")
+
         # Criar sampler e pruner
         sampler = self._create_sampler()
         pruner = self._create_pruner()
@@ -311,6 +322,15 @@ class OptunaOptimizer:
         study_name = (
             self.config.study_name or f"optimize_{algorithm_name}_{int(time.time())}"
         )
+
+        # Criar estudo com storage seguro para multiprocessamento
+        if self.config.storage and self.config.n_jobs > 1:
+            # Garantir que o diretório existe para SQLite
+            if self.config.storage.startswith("sqlite:///"):
+                import os
+
+                storage_path = self.config.storage[10:]  # Remove "sqlite:///"
+                os.makedirs(os.path.dirname(storage_path), exist_ok=True)
 
         self.study = optuna.create_study(
             direction=self.config.direction,
@@ -324,8 +344,8 @@ class OptunaOptimizer:
         # Executar otimização
         start_time = time.time()
 
-        if self.config.show_progress:
-            # Usar tqdm para mostrar progresso
+        if self.config.show_progress and self.config.n_jobs == 1:
+            # Usar tqdm para mostrar progresso (apenas para execução serial)
             with tqdm(total=self.config.n_trials, desc="Otimizando") as pbar:
 
                 def callback(study, trial):
@@ -337,12 +357,16 @@ class OptunaOptimizer:
                     n_trials=self.config.n_trials,
                     timeout=self.config.timeout,
                     callbacks=[callback],
+                    n_jobs=self.config.n_jobs,
                 )
         else:
+            # Execução paralela ou sem progresso
+            logger.info(f"Executando otimização com {self.config.n_jobs} jobs")
             self.study.optimize(
                 lambda trial: self._objective(trial, algorithm_name),
                 n_trials=self.config.n_trials,
                 timeout=self.config.timeout,
+                n_jobs=self.config.n_jobs,
             )
 
         optimization_time = time.time() - start_time
@@ -428,6 +452,7 @@ def optimize_algorithm(
     load_if_exists: bool = True,
     show_progress: bool = True,
     seed: Optional[int] = None,
+    yaml_config: Optional[Dict] = None,
 ) -> OptimizationResult:
     """
     Otimiza hiperparâmetros de um algoritmo CSP.
@@ -447,10 +472,36 @@ def optimize_algorithm(
         load_if_exists: Carregar estudo existente se existir
         show_progress: Mostrar barra de progresso
         seed: Seed para reprodutibilidade
+        yaml_config: Configuração do YAML para paralelismo
 
     Returns:
         OptimizationResult: Resultado da otimização
     """
+    from src.utils.worker_calculator import get_worker_config
+
+    # Calcular configuração de workers
+    worker_config = get_worker_config(
+        yaml_config=yaml_config, context="optuna", algorithm_name=algorithm_name
+    )
+
+    # Extrair configurações de paralelismo do YAML se disponível
+    n_jobs = 1
+    yaml_storage = None
+    yaml_study_name = None
+
+    if yaml_config and "optimization_config" in yaml_config:
+        opt_config = yaml_config["optimization_config"]
+        if "parallel" in opt_config:
+            parallel_config = opt_config["parallel"]
+            yaml_n_jobs = parallel_config.get("n_jobs", 1)
+            if yaml_n_jobs == -1:
+                n_jobs = worker_config["optuna_workers"]
+            else:
+                n_jobs = (
+                    yaml_n_jobs if yaml_n_jobs > 0 else worker_config["optuna_workers"]
+                )
+            yaml_storage = parallel_config.get("storage", storage)
+            yaml_study_name = parallel_config.get("study_name", study_name)
 
     # Criar configuração
     config = OptimizationConfig(
@@ -460,11 +511,13 @@ def optimize_algorithm(
         direction=direction,
         sampler=sampler,
         pruner=pruner,
-        study_name=study_name,
-        storage=storage,
+        study_name=yaml_study_name or study_name,
+        storage=yaml_storage or storage,
         load_if_exists=load_if_exists,
         show_progress=show_progress,
         seed=seed,
+        n_jobs=n_jobs,
+        internal_workers=worker_config["internal_workers"],
     )
 
     # Criar otimizador
