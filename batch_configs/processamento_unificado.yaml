@@ -1,0 +1,88 @@
+# =====================================================================
+# ESTRUTURA PADRONIZADA CSP-BLFGA - PROCESSAMENTO (v1.3)
+# =====================================================================
+
+batch_info:
+  nome: "Processamento Unificado"
+  descricao: "Execução de algoritmos em múltiplos datasets"
+  autor: "Diego Grosmann"
+  versao: "1.3"
+  timeout_global: 1800
+
+# ---------------------------------------------------------------------
+# DATASETS (bases) — referenciados por id
+# ---------------------------------------------------------------------
+datasets:
+  - id: dna_pequeno
+    nome: "DNA Pequeno"
+    tipo: "synthetic"
+    parametros:
+      n: 8
+      L: 10
+      alphabet: "ACGT"
+      noise: 0.10
+      fully_random: false
+      seed: 42
+
+  - id: dna_medio
+    nome: "DNA Médio"
+    tipo: "synthetic"
+    parametros:
+      n: 8
+      L: 12
+      alphabet: "ACGT"
+      noise: 0.4
+      fully_random: false
+      seed: 42
+
+# ---------------------------------------------------------------------
+# TAREFA — EXECUTION
+# ---------------------------------------------------------------------
+task:
+  type: "execution"
+
+  execution:
+    executions:
+      - nome: "Execução DNA Pequeno"
+        dataset: dna_pequeno
+        runs_per_algorithm_per_base: 1
+        num_bases: 1
+        timeout: 60
+      - nome: "Execução DNA Médio"
+        dataset: dna_medio
+        runs_per_algorithm_per_base: 1
+        num_bases: 1
+        timeout: 120
+
+# ---------------------------------------------------------------------
+# ALGORITMOS E PARÂMETROS FIXOS
+# ---------------------------------------------------------------------
+#algorithms: ["Baseline", "BLF-GA", "CSC", "DP-CSP", "H3-CSP"]
+algorithms: ["Baseline", "CSC", "H3-CSP"]
+
+
+algorithm_params:
+  "BLF-GA":
+    tournament_k: 3
+  "CSC":
+    max_iter: 1000
+    patience: 50
+
+# ---------------------------------------------------------------------
+# SAÍDA
+# ---------------------------------------------------------------------
+output:
+  save_results: true
+  save_detailed_results: true
+  save_plots: true
+  plot_format: "png"
+  results_dir: "outputs/batch_processamento"
+
+# ---------------------------------------------------------------------
+# OPÇÕES GLOBAIS
+# ---------------------------------------------------------------------
+advanced:
+  use_curses: true
+  parallel:
+    n_jobs: -1
+  log_level: "INFO"

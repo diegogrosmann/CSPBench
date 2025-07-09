@@ -1,94 +1,126 @@
-# Configuração de Otimização em Lote
-# Este arquivo permite definir múltiplas configurações para otimização de hiperparâmetros
+# =====================================================================
+# ESTRUTURA PADRONIZADA CSP-BLFGA - OTIMIZAÇÃO (v1.3)
+# =====================================================================
 
 batch_info:
-  nome: "Otimização em Lote - BLF-GA"
-  descricao: "Testa diferentes configurações de dataset para otimização do BLF-GA"
-  timeout_global: 3600  # 1 hora total
+  nome: "Otimização Unificada"
+  descricao: "Otimização de hiperparâmetros dos algoritmos"
+  autor: "Diego Grosmann"
+  versao: "1.3"
+  timeout_global: 7200
 
-# Configurações de otimização
-optimization_config:
-  n_trials: 50           # Trials por algoritmo por configuração
-  timeout_per_trial: 60  # Timeout por trial em segundos
-  direction: "minimize"  # minimize ou maximize
-  sampler: "TPE"        # TPE, CmaEs, Random
-  pruner: "Median"      # Median, SuccessiveHalving, None
-  save_plots: true      # Salvar gráficos de visualização
-  
-  # Configurações de paralelismo
-  parallel:
-    n_jobs: -1          # Número de jobs paralelos para Optuna (auto=-1, usa todos os CPUs)
-    storage: null       # Storage para Optuna (ex: "sqlite:///optuna.db")
-    study_name: null    # Nome do estudo (auto-gerado se null)
-
-# Algoritmos para otimizar
-algorithms:
-  - "BLF-GA"
-  - "CSC"
-  - "H³-CSP"
-
-# Configurações de dataset para testar
+# ---------------------------------------------------------------------
+# DATASETS (bases) — referenciados por id
+# ---------------------------------------------------------------------
 datasets:
-  - nome: "DNA Pequeno"
+  - id: dna_otimizacao
+    nome: "DNA para Otimização"
     tipo: "synthetic"
     parametros:
-      n: 10
-      L: 50
+      n: 5
+      L: 10
       alphabet: "ACGT"
       noise: 0.1
       fully_random: false
-      
-  - nome: "DNA Médio"
-    tipo: "synthetic"
-    parametros:
-      n: 20
-      L: 100
-      alphabet: "ACGT"
-      noise: 0.15
-      fully_random: false
-      
-  - nome: "Proteína Pequena"
-    tipo: "synthetic"
-    parametros:
-      n: 8
-      L: 30
-      alphabet: "ACDEFGHIKLMNPQRSTVWY"
-      noise: 0.2
-      fully_random: false
-      
-  - nome: "Binário Simples"
-    tipo: "synthetic"
-    parametros:
-      n: 15
-      L: 80
-      alphabet: "AB"
-      noise: 0.05
-      fully_random: false
+      seed: 42
 
-# Parâmetros específicos para cada algoritmo (opcional)
-# Se não especificado, usa o espaço de busca padrão
+  - id: proteina_otimizacao
+    nome: "Proteína para Otimização"
+    tipo: "synthetic"
+    parametros:
+      n: 5
+      L: 8
+      alphabet: "ACDEFGHIKLMNPQRSTVWY"
+      noise: 0.4
+      fully_random: false
+      seed: 42
+
+# ---------------------------------------------------------------------
+# TAREFA — OPTIMIZATION
+# ---------------------------------------------------------------------
+task:
+  type: "optimization"
+
+  optimization:
+    studies:
+      - nome: "Opt-BLF-GA DNA"
+        datasets: [dna_otimizacao]
+        n_trials: 5
+        timeout_per_trial: 60
+        direction: "minimize"
+        sampler: "TPE"
+        pruner: "Median"
+        save_study: true
+#        storage: "sqlite:///outputs/optuna_blfga_dna.db"
+        study_name: null
+        param_space:
+          "BLF-GA":
+            pop_size:      ["loguniform", 50, 400]
+ #           max_gens:      ["int", 100, 500]
+ #           cross_prob:    ["uniform", 0.6, 0.95]
+ #           mut_prob:      ["uniform", 0.01, 0.2]
+ #           elite_rate:    ["uniform", 0.01, 0.1]
+      
+ #     - nome: "Opt-CSC DNA"
+ #       datasets: [dna_otimizacao]
+ #       n_trials: 30
+ #       timeout_per_trial: 45
+ #       direction: "minimize"
+ #       sampler: "Random"
+ #       pruner: "Median"
+ #       save_study: true
+ #       storage: "sqlite:///outputs/optuna_csc_dna.db"
+ #       study_name: null
+ #       param_space:
+ #         "CSC":
+ #           max_iter:        ["int", 500, 2000]
+ #           patience:        ["int", 20, 150]
+ #           min_improvement: ["loguniform", 1e-4, 1e-2]
+      
+ #     - nome: "Opt-BLF-GA Proteína"
+ #       datasets: [proteina_otimizacao]
+ #       n_trials: 40
+ #       timeout_per_trial: 75
+ #       direction: "minimize"
+ #       sampler: "TPE"
+ #       pruner: "Median"
+ #       save_study: true
+ #       storage: "sqlite:///outputs/optuna_blfga_proteina.db"
+ #       study_name: null
+ #       param_space:
+ #         "BLF-GA":
+ #           pop_size:      ["loguniform", 30, 300]
+ #           max_gens:      ["int", 80, 400]
+ #           cross_prob:    ["uniform", 0.65, 0.9]
+ #           mut_prob:      ["uniform", 0.005, 0.15]
+ #           elite_rate:    ["uniform", 0.02, 0.08]
+
+# ---------------------------------------------------------------------
+# ALGORITMOS E PARÂMETROS FIXOS
+# ---------------------------------------------------------------------
+algorithms: ["BLF-GA", "CSC"]
+
 algorithm_params:
   "BLF-GA":
-    # Foco em parâmetros principais
-    focus_params:
-      - "pop_size"
-      - "max_gens"
-      - "cross_prob"
-      - "mut_prob"
-      - "elite_rate"
-    # Fixar alguns parâmetros se desejado
-    fixed_params:
-      tournament_k: 3
-      
+    tournament_k: 3
   "CSC":
-    focus_params:
-      - "max_iter"
-      - "patience"
-      - "min_improvement"
+    max_iter: 1000
 
-# Configurações de saída
+# ---------------------------------------------------------------------
+# SAÍDA
+# ---------------------------------------------------------------------
 output:
+  save_results: true
   save_detailed_results: true
   save_plots: true
-  results_dir: "outputs/batch_optimization"
-  plot_format: "png"  # png, html, both
+  plot_format: "png"
+  results_dir: "outputs/batch_otimizacao"
+
+# ---------------------------------------------------------------------
+# OPÇÕES GLOBAIS
+# ---------------------------------------------------------------------
+advanced:
+  use_curses: false  # Desabilitar curses para otimização
+  parallel:
+    n_jobs: -1
+  log_level: "INFO"

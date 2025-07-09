@@ -1,0 +1,103 @@
+# =====================================================================
+# ESTRUTURA PADRONIZADA CSP-BLFGA - SENSIBILIDADE (v1.3)
+# =====================================================================
+
+batch_info:
+  nome: "Análise de Sensibilidade Unificada"
+  descricao: "Análise de sensibilidade de parâmetros dos algoritmos"
+  autor: "Diego Grosmann"
+  versao: "1.3"
+  timeout_global: 3600
+
+# ---------------------------------------------------------------------
+# DATASETS (bases) — referenciados por id
+# ---------------------------------------------------------------------
+datasets:
+  - id: dna_sensibilidade
+    nome: "DNA para Sensibilidade"
+    tipo: "synthetic"
+    parametros:
+      n: 8
+      L: 20
+      alphabet: "ACGT"
+      noise: 0.2
+      fully_random: false
+      seed: 42
+
+  # - id: proteina_sensibilidade
+  #   nome: "Proteína para Sensibilidade"
+  #   tipo: "synthetic"
+  #   parametros:
+  #     n: 8
+  #     L: 25
+  #     alphabet: "ACDEFGHIKLMNPQRSTVWY"
+  #     noise: 0.18
+  #     fully_random: false
+  #     seed: 22222
+
+# ---------------------------------------------------------------------
+# TAREFA — SENSITIVITY
+# ---------------------------------------------------------------------
+task:
+  type: "sensitivity"
+
+  sensitivity:
+    analyses:
+      - nome: "Sens-BLF-GA Morris"
+        datasets: [dna_sensibilidade]
+        n_samples: 5
+        timeout_per_sample: 30
+        method: "morris"
+        num_levels: 24
+        show_progress: true
+        param_space:
+          "BLF-GA": ["pop_size", "max_gens", "cross_prob", "mut_prob", "elite_rate"]
+      
+      # - nome: "Sens-CSC Sobol"
+      #   datasets: [dna_sensibilidade]
+      #   n_samples: 100
+      #   timeout_per_sample: 25
+      #   method: "sobol"
+      #   show_progress: true
+      #   param_space:
+      #     "CSC": ["max_iter", "patience", "min_improvement"]
+      
+      # - nome: "Sens-Proteína Morris"
+      #   datasets: [proteina_sensibilidade]
+      #   n_samples: 40
+      #   timeout_per_sample: 35
+      #   method: "morris"
+      #   num_levels: 4
+      #   show_progress: true
+      #   param_space:
+      #     "BLF-GA": ["pop_size", "max_gens", "cross_prob", "mut_prob"]
+
+# ---------------------------------------------------------------------
+# ALGORITMOS E PARÂMETROS FIXOS
+# ---------------------------------------------------------------------
+algorithms: ["BLF-GA", "CSC"]
+
+algorithm_params:
+  "BLF-GA":
+    tournament_k: 3
+  "CSC":
+    max_iter: 1000
+
+# ---------------------------------------------------------------------
+# SAÍDA
+# ---------------------------------------------------------------------
+output:
+  save_results: true
+  save_detailed_results: true
+  save_plots: true
+  plot_format: "png"
+  results_dir: "outputs/batch_sensibilidade"
+
+# ---------------------------------------------------------------------
+# OPÇÕES GLOBAIS
+# ---------------------------------------------------------------------
+advanced:
+  use_curses: false  # Desabilitar curses para análise de sensibilidade
+  parallel:
+    n_jobs: -1
+  log_level: "INFO"

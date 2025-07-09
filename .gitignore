@@ -5,3 +5,9 @@ __pycache__
 .ruff_cache
 saved_datasets/*
 outputs/*
+
+# Ignorar todos os arquivos em batch_configs, exceto os exemplos
+batch_configs/*
+!batch_configs/otimizacao_exemplo.yaml
+!batch_configs/processamento_unificado.yaml
+!batch_configs/sensibilidade_unificado.yaml
