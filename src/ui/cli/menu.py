@@ -30,21 +30,22 @@ def menu() -> str:
     print("           CLOSEST STRING PROBLEM - CSP-BLFGA")
     print("=" * 60)
     print("")
-    print("� EXECUÇÃO:")
+    print("📊 EXECUÇÃO:")
     print("   1) Dataset sintético")
     print("   2) Dataset de arquivo")
     print("   3) Dataset do NCBI")
-    print("   4) Execução em lote")
     print("")
-    print("🔬 OTIMIZAÇÃO:")
+    print("🚀 BATCH UNIFICADO:")
+    print("   4) Execução em lote unificada")
+    print("")
+    print("🔬 OTIMIZAÇÃO (LEGADO):")
     print("   5) Otimização de hiperparâmetros")
     print("   6) Análise de sensibilidade")
     print("")
     print("💡 SOBRE AS OPÇÕES:")
     print("   • Opções 1-3: Executa algoritmos em datasets individuais")
-    print("   • Opção 4: Executa múltiplos algoritmos em configurações batch")
-    print("   • Opção 5: Encontra os melhores parâmetros usando Optuna")
-    print("   • Opção 6: Analisa sensibilidade dos parâmetros dos algoritmos")
+    print("   • Opção 4: Sistema unificado para execução, otimização e sensibilidade")
+    print("   • Opções 5-6: Workflows legados (use opção 4 para novos projetos)")
     print("")
 
     while True:
@@ -1356,3 +1357,66 @@ def select_sensitivity_yaml_file() -> str:
                 return os.path.join(config_dir, selected_file)
 
         print("❌ Opção inválida. Tente novamente.")
+
+
+def select_unified_batch_file() -> str | None:
+    """
+    Permite ao usuário selecionar um arquivo de configuração batch unificado.
+
+    Returns:
+        str: Caminho para o arquivo selecionado ou None se cancelado
+    """
+    import glob
+
+    # Buscar arquivos YAML na pasta batch_configs
+    batch_files = glob.glob("batch_configs/*.yaml")
+
+    if not batch_files:
+        print("❌ Nenhum arquivo de configuração encontrado em batch_configs/")
+        return None
+
+    print("\nArquivos de configuração disponíveis:")
+    print("0) Cancelar")
+
+    for idx, file_path in enumerate(batch_files, 1):
+        filename = file_path.split("/")[-1]  # Extrair apenas o nome do arquivo
+        print(f"{idx}) {filename}")
+
+    print("\n💡 Dica: Você também pode especificar um caminho personalizado")
+
+    while True:
+        choice = safe_input(
+            "\nEscolha uma opção (0 para cancelar, ou digite um caminho): "
+        ).strip()
+
+        if choice == "0":
+            return None
+
+        # Se é um número, tentar selecionar da lista
+        if choice.isdigit():
+            idx = int(choice)
+            if 1 <= idx <= len(batch_files):
+                return batch_files[idx - 1]
+            else:
+                print(f"❌ Opção inválida. Escolha entre 0 e {len(batch_files)}")
+                continue
+
+        # Se não é um número, tratar como caminho personalizado
+        if choice:
+            # Adicionar extensão .yaml se não tiver
+            if not choice.endswith(".yaml") and not choice.endswith(".yml"):
+                choice += ".yaml"
+
+            # Se não tem caminho completo, assumir batch_configs/
+            if "/" not in choice:
+                choice = f"batch_configs/{choice}"
+
+            import os
+
+            if os.path.exists(choice):
+                return choice
+            else:
+                print(f"❌ Arquivo não encontrado: {choice}")
+                continue
+
+        print("❌ Entrada inválida. Digite um número ou caminho de arquivo.")
