@@ -93,6 +93,9 @@ LOGS_DIR = "outputs/logs"
 os.makedirs(RESULTS_DIR, exist_ok=True)
 os.makedirs(LOGS_DIR, exist_ok=True)
 
+# Logger para o módulo principal
+logger = logging.getLogger(__name__)
+
 
 def signal_handler(signum, frame):
     """Handler para sinais de interrupção.
@@ -162,8 +165,8 @@ def main() -> None:
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
         uid = uuid.uuid4().hex[:8]
         base_name = f"{ts}_{uid}"
-        # Passa silent para setup_logging
-        setup_logging(base_name, silent=silent)
+        # Configurar logging inicial sem console para batch
+        setup_logging(base_name, silent=silent, console=False)
 
         # Verificar se foi fornecido arquivo de batch
         if args.batch:
@@ -172,6 +175,24 @@ def main() -> None:
                 if not os.path.exists(args.batch):
                     cprint(f"❌ Arquivo de configuração não encontrado: {args.batch}")
                     return
+
+                # Primeiro, extrair configuração de log do batch para reconfigurar logging
+                try:
+                    from src.ui.cli.batch_config_extractor import BatchConfigExtractor
+
+                    batch_extractor = BatchConfigExtractor(args.batch)
+                    batch_log_level = batch_extractor.get_log_level()
+
+                    # Reconfigurar logging com o nível específico do batch
+                    setup_logging(
+                        base_name, silent=silent, level=batch_log_level, console=False
+                    )
+                    logger.info(f"Logging reconfigurado com nível: {batch_log_level}")
+
+                except Exception as e:
+                    logger.warning(
+                        f"Erro ao configurar logging do batch, usando padrão: {e}"
+                    )
 
                 cprint(f"🚀 Processando batch unificado: {args.batch}")
 

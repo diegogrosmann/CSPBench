@@ -110,6 +110,7 @@ def setup_logging(
     base_name: str,
     silent: bool = False,
     debug: bool = False,
+    level: Optional[str] = None,
     console: bool = True,
     log_dir: Optional[str] = None,
     max_bytes: int = DEFAULT_MAX_BYTES,
@@ -128,6 +129,7 @@ def setup_logging(
         base_name (str): Nome base para o arquivo de log (sem extensão)
         silent (bool): Se True, desabilita completamente o logging
         debug (bool): Se True, ativa nível DEBUG; senão usa INFO
+        level (str, optional): Nível de logging como string (DEBUG, INFO, WARNING, ERROR, CRITICAL)
         console (bool): Se True, também envia logs para console
         log_dir (str, optional): Diretório para arquivos de log
         max_bytes (int): Tamanho máximo por arquivo antes da rotação
@@ -145,8 +147,8 @@ def setup_logging(
         >>> # Configuração para desenvolvimento
         >>> setup_logging("dev_session", debug=True, console=True)
 
-        >>> # Configuração para produção
-        >>> setup_logging("production", console=False, max_bytes=50*1024*1024)
+        >>> # Configuração por nível
+        >>> setup_logging("production", level="WARNING", console=False)
 
         >>> # Modo silencioso para testes
         >>> setup_logging("test", silent=True)
@@ -155,6 +157,7 @@ def setup_logging(
         - Em modo silencioso, todos os logs são suprimidos
         - Rotação automática previne crescimento descontrolado de arquivos
         - Thread-safe para uso em ambientes paralelos
+        - O parâmetro level tem precedência sobre debug
         - Configuração persiste para toda a aplicação
     """
     # Desabilitar logging completamente em modo silencioso
@@ -178,7 +181,12 @@ def setup_logging(
     formatter = logging.Formatter(format_string, date_format)
 
     # Determinar nível de logging
-    log_level = logging.DEBUG if debug else logging.INFO
+    if level and level.upper() in LOG_LEVELS:
+        log_level = LOG_LEVELS[level.upper()]
+    elif debug:
+        log_level = logging.DEBUG
+    else:
+        log_level = logging.INFO
 
     # Obter logger raiz
     root_logger = logging.getLogger()

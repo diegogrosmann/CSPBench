@@ -1,20 +1,21 @@
 # =====================================================================
-# ESTRUTURA PADRONIZADA CSP-BLFGA - OTIMIZAÇÃO (v1.3)
+# ESTRUTURA PADRONIZADA CSP-BLFGA - OTIMIZAÇÃO COMPLETA (v1.3)
 # =====================================================================
 
 batch_info:
-  nome: "Otimização Unificada"
-  descricao: "Otimização de hiperparâmetros dos algoritmos"
+  nome: "Otimização Completa - Todos os Algoritmos"
+  descricao: "Exemplo completo de otimização de hiperparâmetros com todas as configurações possíveis"
   autor: "Diego Grosmann"
   versao: "1.3"
-  timeout_global: 7200
+  timeout_global: 14400  # 4 horas para otimização completa
 
 # ---------------------------------------------------------------------
 # DATASETS (bases) — referenciados por id
 # ---------------------------------------------------------------------
 datasets:
-  - id: dna_otimizacao
-    nome: "DNA para Otimização"
+  # === DATASETS SINTÉTICOS ===
+  - id: dna_pequeno
+    nome: "DNA Pequeno (Teste Rápido)"
     tipo: "synthetic"
     parametros:
       n: 5
@@ -24,16 +25,82 @@ datasets:
       fully_random: false
       seed: 42
 
-  - id: proteina_otimizacao
-    nome: "Proteína para Otimização"
+  - id: dna_medio
+    nome: "DNA Médio (Balanceado)"
+    tipo: "synthetic"
+    parametros:
+      n: 12
+      L: 25
+      alphabet: "ACGT"
+      noise: 0.15
+      fully_random: false
+      seed: 123
+
+  - id: dna_grande
+    nome: "DNA Grande (Complexo)"
+    tipo: "synthetic"
+    parametros:
+      n: 20
+      L: 50
+      alphabet: "ACGT"
+      noise: 0.2
+      fully_random: false
+      seed: 456
+
+  - id: proteina_pequena
+    nome: "Proteína Pequena"
     tipo: "synthetic"
     parametros:
       n: 5
       L: 8
       alphabet: "ACDEFGHIKLMNPQRSTVWY"
-      noise: 0.4
+      noise: 0.3
       fully_random: false
-      seed: 42
+      seed: 789
+
+  - id: proteina_media
+    nome: "Proteína Média"
+    tipo: "synthetic"
+    parametros:
+      n: 10
+      L: 20
+      alphabet: "ACDEFGHIKLMNPQRSTVWY"
+      noise: 0.35
+      fully_random: false
+      seed: 101112
+
+  - id: binario_teste
+    nome: "Alfabeto Binário"
+    tipo: "synthetic"
+    parametros:
+      n: 8
+      L: 15
+      alphabet: "01"
+      noise: 0.25
+      fully_random: false
+      seed: 131415
+
+  # === DATASETS DE ARQUIVO ===
+  - id: arquivo_salvo_teste
+    nome: "Arquivo FASTA Teste"
+    tipo: "file"
+    parametros:
+      filename: "saved_datasets/teste.fasta"
+
+  - id: arquivo_salvo_coi
+    nome: "Arquivo FASTA COI Gene"
+    tipo: "file"
+    parametros:
+      filename: "saved_datasets/entrez_nucleotide_COIGene AND 600650SLEN_n20.fasta"
+
+  # === DATASETS ENTREZ (NCBI) ===
+  - id: entrez_custom
+    nome: "Entrez Customizado"
+    tipo: "entrez"
+    parametros:
+      query: "COIGene AND 600:650[SLEN]"
+      db: "nucleotide"
+      retmax: 15
 
 # ---------------------------------------------------------------------
 # TAREFA — OPTIMIZATION
@@ -43,84 +110,409 @@ task:
 
   optimization:
     studies:
-      - nome: "Opt-BLF-GA DNA"
-        datasets: [dna_otimizacao]
-        n_trials: 5
-        timeout_per_trial: 60
+      # === ESTUDO 1: BLF-GA OTIMIZAÇÃO COMPLETA ===
+      - nome: "BLF-GA Completo - DNA Pequeno"
+        datasets: [dna_pequeno]
+        n_trials: 10    # Número de trials para otimização
+        timeout_per_trial: 120  # Timeout por trial em segundos
+        direction: "minimize"   # Direção da otimização: minimize | maximize
+        sampler: "TPE"         # Sampler: TPE | CmaEs | Random
+        pruner: "Median"       # Pruner: Median | SuccessiveHalving | null
+        save_study: true       # Salvar estudo no disco
+        storage: "sqlite:///outputs/optuna_blfga_completo.db"  # Armazenamento persistente
+        study_name: "blfga_dna_pequeno_completo"  # Nome do estudo
+        param_space:
+          "BLF-GA":
+            # === PARÂMETROS DE POPULAÇÃO ===
+            pop_size:         ["int", 30, 200]           # Tamanho da população
+            # === PARÂMETROS DE GERAÇÕES ===
+            max_gens:         ["int", 50, 300]           # Número máximo de gerações
+            # === OPERADORES GENÉTICOS ===
+            cross_prob:       ["uniform", 0.6, 0.95]     # Probabilidade de crossover
+            mut_prob:         ["uniform", 0.01, 0.3]     # Probabilidade de mutação
+            elite_rate:       ["uniform", 0.01, 0.15]    # Taxa de elitismo
+            tournament_k:     ["int", 2, 8]              # Tamanho do torneio
+            # === DIVERSIDADE ===
+            immigrant_freq:   ["int", 5, 20]             # Frequência de imigrantes
+            immigrant_ratio:  ["uniform", 0.1, 0.4]      # Proporção de imigrantes
+            diversity_threshold: ["uniform", 0.2, 0.8]   # Limiar de diversidade
+            # === CONTROLE DE PARADA ===
+            no_improve_patience: ["uniform", 0.1, 0.5]   # Paciência sem melhoria
+            restart_patience: ["int", 10, 50]            # Paciência para restart
+            restart_ratio:    ["uniform", 0.2, 0.6]      # Proporção de restart
+            # === OPERADORES CATEGÓRICOS ===
+            crossover_type:   ["categorical", ["one_point", "uniform", "blend_blocks"]]
+            mutation_type:    ["categorical", ["multi", "inversion", "transposition"]]
+            mutation_multi_n: ["int", 1, 5]              # Número de mutações multi
+            refinement_type:  ["categorical", ["greedy", "swap", "insertion", "2opt"]]
+            refine_elites:    ["categorical", ["best", "all"]]
+            refine_iter_limit: ["int", 50, 200]          # Limite de iterações do refinamento
+            # === NICHING ===
+            niching:          ["categorical", [true, false]]
+            niching_radius:   ["int", 2, 8]              # Raio do niching
+            # === MUTAÇÃO ADAPTATIVA ===
+            mutation_adapt_factor: ["uniform", 1.5, 3.0]  # Fator de adaptação
+            mutation_adapt_duration: ["int", 3, 10]       # Duração da adaptação
+            disable_elitism_gens: ["int", 3, 10]          # Frequência de disable elitismo
+      
+      # === ESTUDO 2: CSC OTIMIZAÇÃO COMPLETA ===
+      - nome: "CSC Completo - DNA Médio"
+        datasets: [dna_medio]
+        n_trials: 15
+        timeout_per_trial: 90
+        direction: "minimize"
+        sampler: "CmaEs"       # Sampler diferente para demonstrar variação
+        pruner: "SuccessiveHalving"
+        save_study: true
+        storage: "sqlite:///outputs/optuna_csc_completo.db"
+        study_name: "csc_dna_medio_completo"
+        param_space:
+          "CSC":
+            # === PARÂMETROS PRINCIPAIS ===
+            max_iter:         ["int", 100, 1000]         # Iterações máximas
+            patience:         ["int", 10, 100]           # Paciência sem melhoria
+            min_improvement:  ["loguniform", 1e-6, 1e-3] # Melhoria mínima
+            # === RESTART ===
+            random_restart:   ["categorical", [true, false]]
+            restart_patience: ["int", 20, 100]           # Paciência para restart
+            max_restarts:     ["int", 1, 10]             # Número máximo de restarts
+      
+      # === ESTUDO 3: H3-CSP OTIMIZAÇÃO COMPLETA ===
+      - nome: "H3-CSP Completo - Proteína Pequena"
+        datasets: [proteina_pequena]
+        n_trials: 12
+        timeout_per_trial: 150
+        direction: "minimize"
+        sampler: "Random"      # Sampler aleatório
+        pruner: null           # Sem poda
+        save_study: true
+        storage: "sqlite:///outputs/optuna_h3csp_completo.db"
+        study_name: "h3csp_proteina_pequena_completo"
+        param_space:
+          "H3-CSP":
+            # === PARÂMETROS DE BUSCA ===
+            beam_width:       ["int", 5, 50]             # Largura do beam search
+            max_iterations:   ["int", 50, 500]           # Iterações máximas
+            diversity_factor: ["uniform", 0.1, 0.9]      # Fator de diversidade
+            # === BUSCA LOCAL ===
+            local_search:     ["categorical", [true, false]]
+            local_search_iters: ["int", 10, 100]         # Iterações de busca local
+            # === RESTART ===
+            restart_threshold: ["int", 10, 100]          # Limiar para restart
+            max_restarts:     ["int", 1, 10]             # Número máximo de restarts
+      
+      # === ESTUDO 4: DP-CSP OTIMIZAÇÃO COMPLETA ===
+      - nome: "DP-CSP Completo - Binário Teste"
+        datasets: [binario_teste]
+        n_trials: 8
+        timeout_per_trial: 200
         direction: "minimize"
         sampler: "TPE"
         pruner: "Median"
         save_study: true
-#        storage: "sqlite:///outputs/optuna_blfga_dna.db"
-        study_name: null
+        storage: "sqlite:///outputs/optuna_dpcsp_completo.db"
+        study_name: "dpcsp_binario_teste_completo"
+        param_space:
+          "DP-CSP":
+            # === PARÂMETROS DE BUSCA ===
+            max_depth:        ["int", 5, 20]             # Profundidade máxima
+            pruning_threshold: ["uniform", 0.1, 0.9]     # Limiar de poda
+            # === HEURÍSTICA ===
+            use_heuristic:    ["categorical", [true, false]]
+            memory_limit:     ["int", 100, 1000]         # Limite de memória
+      
+      # === ESTUDO 5: OTIMIZAÇÃO MULTI-DATASET ===
+      - nome: "BLF-GA Multi-Dataset"
+        datasets: [dna_pequeno, dna_medio, proteina_pequena]  # Múltiplos datasets
+        n_trials: 20
+        timeout_per_trial: 180
+        direction: "minimize"
+        sampler: "TPE"
+        pruner: "Median"
+        save_study: true
+        storage: "sqlite:///outputs/optuna_blfga_multi.db"
+        study_name: "blfga_multi_dataset"
         param_space:
           "BLF-GA":
-            pop_size:      ["loguniform", 50, 400]
- #           max_gens:      ["int", 100, 500]
- #           cross_prob:    ["uniform", 0.6, 0.95]
- #           mut_prob:      ["uniform", 0.01, 0.2]
- #           elite_rate:    ["uniform", 0.01, 0.1]
+            # === PARÂMETROS ESSENCIAIS PARA MULTI-DATASET ===
+            pop_size:         ["loguniform", 50, 400]    # Log-uniforme para escalabilidade
+            max_gens:         ["int", 100, 500]          # Mais gerações para datasets maiores
+            cross_prob:       ["uniform", 0.6, 0.95]
+            mut_prob:         ["uniform", 0.01, 0.2]
+            elite_rate:       ["uniform", 0.01, 0.1]
+            tournament_k:     ["int", 2, 5]
+            immigrant_freq:   ["int", 5, 15]
+            immigrant_ratio:  ["uniform", 0.1, 0.3]
+            diversity_threshold: ["uniform", 0.2, 0.6]
+            no_improve_patience: ["uniform", 0.1, 0.4]
+            restart_patience: ["int", 15, 40]
+            restart_ratio:    ["uniform", 0.2, 0.5]
       
- #     - nome: "Opt-CSC DNA"
- #       datasets: [dna_otimizacao]
- #       n_trials: 30
- #       timeout_per_trial: 45
- #       direction: "minimize"
- #       sampler: "Random"
- #       pruner: "Median"
- #       save_study: true
- #       storage: "sqlite:///outputs/optuna_csc_dna.db"
- #       study_name: null
- #       param_space:
- #         "CSC":
- #           max_iter:        ["int", 500, 2000]
- #           patience:        ["int", 20, 150]
- #           min_improvement: ["loguniform", 1e-4, 1e-2]
+      # === ESTUDO 6: OTIMIZAÇÃO COM DATASET DE ARQUIVO ===
+      - nome: "Todos Algoritmos - Arquivo Teste"
+        datasets: [arquivo_salvo_teste]
+        n_trials: 25
+        timeout_per_trial: 300
+        direction: "minimize"
+        sampler: "TPE"
+        pruner: "Median"
+        save_study: true
+        storage: "sqlite:///outputs/optuna_arquivo_teste.db"
+        study_name: "todos_algoritmos_arquivo_teste"
+        param_space:
+          "BLF-GA":
+            # === PARÂMETROS OTIMIZADOS PARA ARQUIVO REAL ===
+            pop_size:         ["int", 50, 300]
+            max_gens:         ["int", 80, 400]
+            cross_prob:       ["uniform", 0.7, 0.9]
+            mut_prob:         ["uniform", 0.02, 0.15]
+            elite_rate:       ["uniform", 0.02, 0.08]
+            tournament_k:     ["int", 2, 6]
+            immigrant_freq:   ["int", 8, 25]
+            immigrant_ratio:  ["uniform", 0.1, 0.35]
+            diversity_threshold: ["uniform", 0.3, 0.7]
+            no_improve_patience: ["uniform", 0.15, 0.45]
+            restart_patience: ["int", 20, 60]
+            restart_ratio:    ["uniform", 0.25, 0.55]
+          "CSC":
+            max_iter:         ["int", 200, 1500]
+            patience:         ["int", 20, 150]
+            min_improvement:  ["loguniform", 1e-5, 1e-2]
+            random_restart:   ["categorical", [true, false]]
+            restart_patience: ["int", 30, 120]
+            max_restarts:     ["int", 2, 8]
+          "H3-CSP":
+            beam_width:       ["int", 8, 64]
+            max_iterations:   ["int", 100, 800]
+            diversity_factor: ["uniform", 0.2, 0.8]
+            local_search:     ["categorical", [true, false]]
+            local_search_iters: ["int", 5, 50]
+            restart_threshold: ["int", 20, 150]
+            max_restarts:     ["int", 1, 6]
       
- #     - nome: "Opt-BLF-GA Proteína"
- #       datasets: [proteina_otimizacao]
- #       n_trials: 40
- #       timeout_per_trial: 75
- #       direction: "minimize"
- #       sampler: "TPE"
- #       pruner: "Median"
- #       save_study: true
- #       storage: "sqlite:///outputs/optuna_blfga_proteina.db"
- #       study_name: null
- #       param_space:
- #         "BLF-GA":
- #           pop_size:      ["loguniform", 30, 300]
- #           max_gens:      ["int", 80, 400]
- #           cross_prob:    ["uniform", 0.65, 0.9]
- #           mut_prob:      ["uniform", 0.005, 0.15]
- #           elite_rate:    ["uniform", 0.02, 0.08]
+      # === ESTUDO 7: OTIMIZAÇÃO COM ENTREZ ===
+      - nome: "CSC + H3-CSP - Entrez Custom"
+        datasets: [entrez_custom]
+        n_trials: 18
+        timeout_per_trial: 240
+        direction: "minimize"
+        sampler: "TPE"
+        pruner: "Median"
+        save_study: true
+        storage: "sqlite:///outputs/optuna_entrez_custom.db"
+        study_name: "csc_h3csp_entrez_custom"
+        param_space:
+          "CSC":
+            max_iter:         ["int", 150, 1200]
+            patience:         ["int", 15, 80]
+            min_improvement:  ["loguniform", 1e-5, 1e-2]
+            random_restart:   ["categorical", [true, false]]
+            restart_patience: ["int", 25, 100]
+            max_restarts:     ["int", 1, 6]
+          "H3-CSP":
+            beam_width:       ["int", 10, 40]
+            max_iterations:   ["int", 80, 600]
+            diversity_factor: ["uniform", 0.1, 0.9]
+            local_search:     ["categorical", [true, false]]
+            local_search_iters: ["int", 3, 30]
+            restart_threshold: ["int", 15, 100]
+            max_restarts:     ["int", 1, 5]
 
 # ---------------------------------------------------------------------
 # ALGORITMOS E PARÂMETROS FIXOS
 # ---------------------------------------------------------------------
-algorithms: ["BLF-GA", "CSC"]
+algorithms: ["Baseline", "BLF-GA", "CSC", "DP-CSP", "H3-CSP"]
 
 algorithm_params:
+  # === BASELINE ===
+  "Baseline":
+    tie_break: "lex"  # Critério de desempate: lex | random | first
+  
+  # === BLF-GA ===
   "BLF-GA":
-    tournament_k: 3
+    # === PARÂMETROS FIXOS (não otimizados) ===
+    seed: 42                    # Semente para reprodutibilidade
+    initial_blocks: 0.2         # Número inicial de blocos (float 0-1 para proporção)
+    min_block_len: 1            # Tamanho mínimo do bloco
+    rediv_freq: 10              # Frequência de redivisão de blocos
+    max_time: 1200.0            # Tempo máximo em segundos
+    min_pop_size: 20            # Tamanho mínimo da população
+    mutation_adapt_N: 10        # Gerações para detectar convergência
+    refine_elites: "best"       # Refinamento: best | all
+    
+  # === CSC ===
   "CSC":
-    max_iter: 1000
+    # === PARÂMETROS FIXOS ===
+    min_d: 2                    # Distância mínima
+    d_factor: 0.8               # Fator de redução da distância
+    min_blocks: 2               # Número mínimo de blocos
+    max_blocks: 4               # Número máximo de blocos
+    n_div: 6                    # Divisor para n
+    l_div: 25                   # Divisor para L
+    
+  # === H3-CSP ===
+  "H3-CSP":
+    # === PARÂMETROS FIXOS ===
+    auto_blocks: true           # Usar divisão automática por √L
+    min_block_size: 2           # Tamanho mínimo de bloco
+    max_blocks: null            # Máximo de blocos (null = automático)
+    block_size: 2               # Tamanho base de bloco
+    block_strategy: null        # Estratégia de divisão
+    block_small: 2              # Limite para blocos pequenos
+    block_medium: 4             # Limite para blocos médios
+    block_large: 8              # Limite para blocos grandes
+    exhaustive_limit: 10000     # Limite para busca exaustiva
+    k_candidates: 5             # Número de candidatos por bloco
+    local_iters: 3              # Iterações de busca local
+    max_time: 300               # Tempo máximo em segundos
+    seed: null                  # Semente para reprodutibilidade
+    diversity_threshold: 1      # Limiar de diversidade
+    fallback_enabled: true      # Habilitar fallback
+    
+  # === DP-CSP ===
+  "DP-CSP":
+    # === PARÂMETROS FIXOS ===
+    max_d: null                 # Distância máxima (null = automático)
+    warn_threshold: 9           # Alerta se (d+1)^n > 10^9
+    max_time: 300               # Timeout em segundos
 
 # ---------------------------------------------------------------------
-# SAÍDA
+# SAÍDA E VISUALIZAÇÃO
 # ---------------------------------------------------------------------
 output:
-  save_results: true
-  save_detailed_results: true
-  save_plots: true
-  plot_format: "png"
-  results_dir: "outputs/batch_otimizacao"
-
+  save_results: true                    # Salvar resultados
+  save_detailed_results: true          # Salvar resultados detalhados
+  save_plots: true                      # Salvar gráficos
+  plot_format: "png"                    # Formato dos gráficos: png | svg | pdf
+  results_dir: "outputs/batch_otimizacao_completo"  # Diretório de resultados
+  
+  # === CONFIGURAÇÕES DE PLOTAGEM ===
+  plot_history: true                    # Gráfico de histórico de otimização
+  plot_importance: true                 # Gráfico de importância dos parâmetros
+  plot_parallel_coordinate: true        # Gráfico de coordenadas paralelas
+  plot_optimization_history: true      # Histórico detalhado
+  plot_slice: true                      # Gráfico de slices
+  plot_contour: true                    # Gráfico de contorno
+  plot_edf: true                        # Função de distribuição empírica
+  
+  # === CONFIGURAÇÕES DE RELATÓRIO ===
+  generate_report: true                 # Gerar relatório HTML
+  report_format: "html"                 # Formato do relatório: html | pdf
+  include_best_params: true             # Incluir melhores parâmetros
+  include_trial_details: true          # Incluir detalhes dos trials
+  include_convergence_analysis: true    # Incluir análise de convergência
+  
 # ---------------------------------------------------------------------
-# OPÇÕES GLOBAIS
+# CONFIGURAÇÕES AVANÇADAS
 # ---------------------------------------------------------------------
 advanced:
-  use_curses: false  # Desabilitar curses para otimização
+  # === INTERFACE ===
+  use_curses: false                     # Desabilitar curses para otimização
+  show_progress: true                   # Mostrar barra de progresso
+  verbose: true                         # Modo verboso
+  
+  # === PARALELISMO ===
   parallel:
-    n_jobs: -1
-  log_level: "INFO"
+    n_jobs: -1                          # Workers externos (Optuna): -1 = todos os CPUs
+    internal_workers: 1                 # Workers internos (algoritmos): 1 para otimização
+    optuna_workers: 4                   # Workers específicos do Optuna
+    storage_workers: 2                  # Workers para armazenamento
+    
+  # === OPTUNA ESPECÍFICO ===
+  optuna:
+    n_startup_trials: 10                # Trials de aquecimento
+    n_ei_candidates: 24                 # Candidatos para EI
+    multivariate: true                  # Usar amostragem multivariada
+    warn_independent_sampling: true     # Avisar sobre amostragem independente
+    
+  # === ARMAZENAMENTO ===
+  storage:
+    engine_kwargs:
+      pool_size: 10                     # Tamanho do pool de conexões
+      max_overflow: 20                  # Overflow máximo
+      pool_timeout: 30                  # Timeout do pool
+      pool_recycle: 3600                # Reciclagem do pool
+    
+  # === PRUNING ===
+  pruning:
+    median_n_startup_trials: 5          # Trials de aquecimento para Median
+    median_n_warmup_steps: 10           # Steps de aquecimento para Median
+    successive_halving_min_resource: 1  # Recurso mínimo para SuccessiveHalving
+    successive_halving_reduction_factor: 4  # Fator de redução
+    
+  # === LOGS ===
+  log_level: "INFO"                     # Nível de log: DEBUG | INFO | WARNING | ERROR
+  log_optuna: true                      # Logar eventos do Optuna
+  log_trials: true                      # Logar trials individuais
+  log_parameters: true                  # Logar parâmetros sugeridos
+  log_results: true                     # Logar resultados
+  
+  # === TIMEOUT E CONTROLE ===
+  timeout_buffer: 60                    # Buffer de timeout (segundos)
+  max_memory_mb: 8192                   # Máximo de memória em MB
+  cleanup_temp_files: true              # Limpar arquivos temporários
+  save_intermediate_results: true       # Salvar resultados intermediários
+  
+  # === EXPERIMENTAÇÃO ===
+  experiment:
+    enable_pruning: true                # Habilitar poda
+    enable_caching: true                # Habilitar cache
+    enable_logging: true                # Habilitar logging detalhado
+    enable_profiling: false             # Habilitar profiling (impacta performance)
+    enable_debugging: false             # Habilitar debugging (muito verboso)
+    
+  # === CONFIGURAÇÕES DE SAMPLER ===
+  sampler_config:
+    tpe_n_startup_trials: 10           # Trials de aquecimento para TPE
+    tpe_n_ei_candidates: 24            # Candidatos EI para TPE
+    tpe_multivariate: true             # TPE multivariado
+    tpe_group: false                   # TPE em grupo
+    cmaes_n_startup_trials: 1          # Trials de aquecimento para CMA-ES
+    cmaes_sigma0: 0.1                  # Sigma inicial para CMA-ES
+    random_seed: null                  # Seed para Random sampler
+    
+  # === CONFIGURAÇÕES DE ESTUDO ===
+  study_config:
+    load_if_exists: true               # Carregar estudo existente
+    directions: ["minimize"]           # Direções da otimização
+    
+# ---------------------------------------------------------------------
+# COMENTÁRIOS SOBRE TIPOS DE PARÂMETROS
+# ---------------------------------------------------------------------
+# 
+# TIPOS DE PARÂMETROS SUPORTADOS:
+# 
+# ["int", min, max]              - Inteiro no intervalo [min, max]
+# ["float", min, max]            - Float no intervalo [min, max]
+# ["uniform", min, max]          - Distribuição uniforme no intervalo [min, max]
+# ["loguniform", min, max]       - Distribuição log-uniforme no intervalo [min, max]
+# ["categorical", [val1, val2]]  - Valores categóricos
+# ["discrete_uniform", min, max, step] - Valores discretos com step
+# 
+# SAMPLERS DISPONÍVEIS:
+# 
+# "TPE"         - Tree-structured Parzen Estimator (recomendado)
+# "CmaEs"       - CMA-ES (bom para problemas contínuos)
+# "Random"      - Amostragem aleatória (baseline)
+# "Grid"        - Busca em grade (não implementado neste exemplo)
+# "Partial"     - Busca parcial (não implementado neste exemplo)
+# 
+# PRUNERS DISPONÍVEIS:
+# 
+# "Median"            - Median Pruner (recomendado para a maioria dos casos)
+# "SuccessiveHalving" - Successive Halving Pruner (agressivo)
+# null                - Sem poda (usa todos os trials)
+# 
+# DIREÇÕES DE OTIMIZAÇÃO:
+# 
+# "minimize"    - Minimizar função objetivo
+# "maximize"    - Maximizar função objetivo
+# 
+# FORMATOS DE ARMAZENAMENTO:
+# 
+# "sqlite:///path/to/file.db"     - SQLite local
+# "postgresql://user:pass@host/db" - PostgreSQL
+# "mysql://user:pass@host/db"     - MySQL
+# null                            - Memória (não persistente)
+# 
+# =====================================================================
