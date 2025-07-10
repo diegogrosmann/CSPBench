@@ -135,12 +135,12 @@ n_blocks = max(min_blocks, min(max_blocks, n_strings/n_div, L_strings/l_div))
 ### Complexidade Temporal
 - **Clusterização**: O(n² × L) onde n = número de strings, L = comprimento
 - **Consenso**: O(k × m × L) onde k = clusters, m = strings por cluster
-- **Recombinação**: O(k^n_blocks × L) - exponencial no número de blocos
+- **Recombinação**: O(k<sup>n_blocks</sup> × L) - exponencial no número de blocos
 - **Busca Local**: O(iterações × L × |alfabeto|)
-- **Total**: O(n² × L + k^n_blocks × L)
+- **Total**: O(n² × L + k<sup>n_blocks</sup> × L)
 
 ### Complexidade Espacial
-- **Armazenamento**: O(n × L + k × L + k^n_blocks × L)
+- **Armazenamento**: O(n × L + k × L + k<sup>n_blocks</sup> × L)
 - **Pico de Memória**: Durante geração de candidatos
 
 ### Performance Esperada
@@ -207,7 +207,7 @@ if not metadata['sucesso']:
 ## ⚠️ Limitações
 
 ### Limitações Técnicas
-1. **Explosão Combinatorial**: k^n_blocks candidatos podem ser muitos
+1. **Explosão Combinatorial**: k<sup>n_blocks</sup> candidatos podem ser muitos
 2. **Sensibilidade a Parâmetros**: d e n_blocks afetam drasticamente os resultados
 3. **Qualidade de Clusters**: DBSCAN pode falhar com dados esparsos
 4. **Overhead de Memória**: Armazena todos os candidatos simultaneamente
@@ -218,17 +218,7 @@ if not metadata['sucesso']:
 3. **Tempo de Execução**: Pode ser lento comparado a heurísticas simples
 4. **Determinismo Limitado**: Dependente da implementação do DBSCAN
 
-### Cenários Problemáticos
-```python
-# Caso 1: Todas as strings são únicas (sem clusters)
-strings = ["AAAA", "TTTT", "GGGG", "CCCC"]  # d_max = 4
 
-# Caso 2: Muitos clusters pequenos
-strings = ["ACAT", "ACGT", "TCAT", "TGGT", "GCAA", "GCTT"]
-
-# Caso 3: Strings muito longas com muitos blocos
-strings = ["A"*1000, "T"*1000, "G"*1000]  # n_blocks pode ser alto
-```
 
 ## 🔗 Integração com CSPBench
 

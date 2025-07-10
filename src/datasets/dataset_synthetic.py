@@ -552,7 +552,7 @@ def generate_perturbations(
     for i in range(n_strings):
         # Criar string com exatamente max_distance diferenças
         new_string = list(base_string)
-        positions = rng.choice(L, size=max_distance, replace=False)
+        positions = rng.sample(range(L), min(max_distance, L))
 
         func_logger.debug("[GENERATOR] String %s: posições alteradas: %s", i, positions)
 

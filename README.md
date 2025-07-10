@@ -155,7 +155,7 @@ CSPBench/
 ├── main.py                       # 🎯 Ponto de entrada
 └── requirements.txt              # 📋 Dependências
 ```
-```
+
 
 ## 🚀 Instalação e Configuração
 
@@ -220,25 +220,6 @@ python main.py --help
 ```bash
 # Executar interface interativa
 python main.py
-
-# Executar com monitoramento visual
-python main.py --visual
-
-# Executar com logging detalhado
-python main.py --debug
-```
-
-### **Execução Silenciosa (Automação)**
-
-```bash
-# Execução automatizada para benchmarks
-python main.py --silent --dataset synthetic --algorithms Baseline BLF-GA CSC --num-execs 10
-
-# Execução com configuração específica
-python main.py --silent --dataset file --algorithms H3-CSP --timeout 600
-
-# Execução com paralelismo configurado
-python main.py --silent --dataset synthetic --algorithms "BLF-GA" --workers 8
 ```
 
 ### **Execução em Lote**
@@ -449,15 +430,7 @@ Consulte `algorithms/*/README.md` para exemplos de documentação.
 
 ### **Otimização de Hiperparâmetros**
 
-O CSPBench integra o **Optuna** para otimização automática de hiperparâmetros:
-
-```bash
-# Otimização via CLI
-python main.py --optimize --algorithm BLF-GA --dataset synthetic --trials 100
-
-# Otimização em lote via YAML
-python main.py --batch batch_configs/otimizacao_exemplo.yaml
-```
+O CSPBench integra o **Optuna** para otimização automática de hiperparâmetros.
 
 **Configuração YAML para Otimização:**
 ```yaml
@@ -478,15 +451,7 @@ task:
 
 ### **Análise de Sensibilidade**
 
-Integração com **SALib** para análise de sensibilidade de parâmetros:
-
-```bash
-# Análise de sensibilidade via CLI
-python main.py --sensitivity --algorithm BLF-GA --param population_size --range 50,200
-
-# Análise em lote via YAML
-python main.py --batch batch_configs/sensibilidade_unificado.yaml
-```
+Integração com **SALib** para análise de sensibilidade de parâmetros.
 
 **Configuração YAML para Sensibilidade:**
 ```yaml
@@ -506,10 +471,8 @@ task:
 
 #### **Tipos de Relatórios Gerados**
 
-1. **Relatórios JSON**: Dados estruturados completos
-2. **Relatórios CSV**: Dados tabulares para análise externa
-3. **Relatórios HTML**: Visualizações interativas
-4. **Logs Detalhados**: Rastreamento completo de execuções
+1. **Relatórios CSV**: Dados tabulares para análise externa
+2. **Logs Detalhados**: Rastreamento completo de execuções
 
 #### **Estrutura de Resultados**
 
@@ -623,12 +586,6 @@ sequences, info = fetch_dataset(
 )
 ```
 
-#### **Cache Inteligente**
-- **Persistência Automática**: Datasets salvos automaticamente
-- **Recuperação Rápida**: Reload instantâneo de datasets processados
-- **Validação de Integridade**: Verificação de consistência dos dados
-- **Gestão de Espaço**: Limpeza automática de cache antigo
-
 ### **Análise Estatística Avançada**
 
 #### **Testes Estatísticos**
@@ -718,51 +675,17 @@ Cada algoritmo possui documentação completa em seu diretório:
 - **`algorithms/dp_csp/README.md`**: Programação Dinâmica Exata
 - **`algorithms/h3_csp/README.md`**: Hybrid Hierarchical Hamming Search
 
-### **Seleção de Algoritmos**
-
-#### **Para Benchmarks Rápidos**
-```bash
-python main.py --algorithms Baseline
-```
-
-#### **Para Análise Completa**
-```bash
-python main.py --algorithms Baseline BLF-GA CSC H3-CSP
-```
-
-#### **Para Instâncias Pequenas com Solução Ótima**
-```bash
-python main.py --algorithms DP-CSP Baseline
-```
-
-#### **Para Instâncias Grandes**
-```bash
-python main.py --algorithms BLF-GA CSC --workers 8
-```
-
 ## � Debugging e Troubleshooting
 
 ### **Logs e Diagnósticos**
 
 #### **Ativando Logging Detalhado**
 ```bash
-# Logging completo
-python main.py --debug
-
 # Verificar logs em tempo real
 tail -f outputs/logs/$(ls -t outputs/logs/ | head -1)
 
 # Análise de logs específicos
 grep "ERROR\|WARNING" outputs/logs/20250709_120000_abcd1234.log
-```
-
-#### **Monitoramento de Recursos**
-```bash
-# Monitoramento em tempo real
-python main.py --visual --resource-monitor
-
-# Configuração de limites de recursos
-python main.py --cpu-limit 80 --memory-limit 4096
 ```
 
 ### **Problemas Comuns e Soluções**
@@ -793,24 +716,6 @@ print(alg.run())
 python -c "
 import numpy, biopython, optuna, matplotlib
 print('Todas as dependências OK')
-"
-```
-
-### **Performance e Profiling**
-
-#### **Benchmark de Performance**
-```bash
-# Benchmark automático
-python benchmark/benchmark_parallel.py --verbose
-
-# Profiling detalhado
-python -m cProfile -o profile.stats main.py --silent --dataset synthetic --algorithms BLF-GA
-
-# Análise de profiling
-python -c "
-import pstats
-p = pstats.Stats('profile.stats')
-p.sort_stats('cumulative').print_stats(20)
 "
 ```
 
@@ -937,47 +842,6 @@ ci: atualiza pipeline de CI
 ### **Contato**
 
 - **Email**: diegogrosmann@gmail.com
-- **GitHub Issues**: [Reportar problemas](https://github.com/diegogrosmann/CSPBench/issues)
-- **Discussions**: [Fórum da comunidade](https://github.com/diegogrosmann/CSPBench/discussions)
-
-### **Documentação Adicional**
-
-- **API Reference**: `docs/api/`
-- **Tutoriais**: `docs/tutorials/`
-- **Developer Guide**: `docs/DEVELOPER_GUIDE.md`
-- **Architecture Guide**: `docs/ARCHITECTURE.md`
-
-### **Roadmap**
-
-#### **Próximas Versões**
-
-**v1.1.0 - Visualizações Avançadas**
-- [ ] Dashboard web interativo
-- [ ] Gráficos de convergência em tempo real
-- [ ] Visualização de paisagem de fitness
-- [ ] Comparação visual entre algoritmos
-
-**v1.2.0 - Algoritmos Avançados**
-- [ ] Algoritmos evolutivos multi-objetivo
-- [ ] Algoritmos de enxame (PSO, ACO)
-- [ ] Machine Learning para CSP
-- [ ] Algoritmos aproximados
-
-**v1.3.0 - Infraestrutura Distribuída**
-- [ ] Execução em cluster
-- [ ] API REST para execução remota
-- [ ] Integração com Kubernetes
-- [ ] Cache distribuído
-
-### **Histórico de Versões**
-
-#### **v1.0.0 - Versão Inicial**
-- ✅ Framework base implementado
-- ✅ 5 algoritmos CSP incluídos
-- ✅ Sistema de execução paralela
-- ✅ Integração Optuna/SALib
-- ✅ Interface curses
-- ✅ Relatórios automatizados
 
 ## 📄 Licença
 
@@ -1009,15 +873,10 @@ SOFTWARE.
 
 ## 🙏 Agradecimentos
 
-- **Comunidade Python**: Pelas excelentes bibliotecas científicas
-- **Pesquisadores em Bioinformática**: Pela inspiração e validação científica
-- **Contribuidores Open Source**: Por melhorar continuamente o projeto
-- **Universidades e Institutos**: Pelo suporte à pesquisa científica
+- **IFMA e UFMA**: Pelo suporte à pesquisa científica
 
 ---
 
 **CSPBench** - Framework experimental robusto para teste e análise de algoritmos do Closest String Problem.
 
 *Desenvolvido com ❤️ para a comunidade científica*
-
-

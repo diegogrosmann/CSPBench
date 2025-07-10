@@ -58,18 +58,6 @@ O algoritmo Baseline **não possui parâmetros configuráveis**, garantindo:
 - Ausência de tuning necessário
 - Comportamento consistente
 
-## 📈 Performance
-
-### **Datasets Típicos**
-- **Instâncias Pequenas** (n≤20, L≤50): ~1ms
-- **Instâncias Médias** (n≤100, L≤200): ~10ms  
-- **Instâncias Grandes** (n≤500, L≤1000): ~100ms
-
-### **Qualidade da Solução**
-- **Dados Estruturados**: 80-95% da qualidade ótima
-- **Dados Aleatórios**: 60-80% da qualidade ótima
-- **Alto Ruído**: 40-70% da qualidade ótima
-
 ## 💻 Exemplo de Uso
 
 ### **Uso Básico**
@@ -178,38 +166,6 @@ def visualize_consensus(strings, alphabet):
     plt.show()
 ```
 
-## 🧪 Casos de Teste
-
-### **Teste 1: Consenso Perfeito**
-```python
-strings = ["AAAA", "AAAA", "AAAA"]
-expected_center = "AAAA"
-expected_distance = 0
-```
-
-### **Teste 2: Caso com Empates**
-```python
-strings = ["ACGT", "TGCA"]
-expected_center = "ACGT"  # Tie-breaking alfabético
-expected_distance = 4
-```
-
-### **Teste 3: Dataset Real**
-```python
-strings = ["ACGTACGT", "AGGTACGT", "ACGTAAGT"]
-expected_center = "ACGTACGT"
-expected_distance = 2
-```
-
-## 📊 Comparação com Outros Algoritmos
-
-| Métrica | Baseline | BLF-GA | CSC | DP-CSP | H³-CSP |
-|---------|----------|--------|-----|--------|--------|
-| **Tempo** | ⭐⭐⭐⭐⭐ | ⭐⭐ | ⭐⭐⭐ | ⭐ | ⭐⭐⭐⭐ |
-| **Qualidade** | ⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ |
-| **Simplicidade** | ⭐⭐⭐⭐⭐ | ⭐⭐ | ⭐⭐⭐ | ⭐⭐ | ⭐⭐⭐ |
-| **Determinismo** | ⭐⭐⭐⭐⭐ | ❌ | ❌ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ |
-
 ## 🔗 Integração com CSPBench
 
 O Baseline está totalmente integrado ao framework através de:
@@ -219,20 +175,6 @@ O Baseline está totalmente integrado ao framework através de:
 - **Execução Paralela**: Compatível com sistema de execução
 - **Relatórios**: Gera metadados estruturados
 - **Monitoramento**: Suporte a callbacks de progresso
-
-## 🚀 Extensões Futuras
-
-### **Melhorias Possíveis**
-1. **Baseline Ponderado**: Usar pesos por posição
-2. **Baseline com Janela**: Considerar contexto local
-3. **Baseline Probabilístico**: Escolha baseada em probabilidades
-4. **Baseline Multi-Critério**: Considerar múltiplas métricas
-
-### **Variantes**
-- **Majority Voting**: Votação simples por posição
-- **Weighted Consensus**: Consenso com pesos
-- **Context-Aware**: Considera posições vizinhas
-- **Probabilistic**: Amostragem baseada em frequências
 
 ---
 

@@ -156,14 +156,14 @@ max_d = baseline  # garante que pelo menos uma solução existe
 ### Complexidade Temporal
 - **Busca Externa**: O(d_ótimo × F(n,d,L))
 - **DP Interno**: O(L × |Σ| × estados_únicos)
-- **Estados Únicos**: O((d+1)^n) no pior caso
-- **Total**: O(d × L × |Σ| × (d+1)^n)
+- **Estados Únicos**: O((d+1)<sup>n</sup>) no pior caso
+- **Total**: O(d × L × |Σ| × (d+1)<sup>n</sup>)
 
 ### Complexidade Espacial
-- **Armazenamento de Estados**: O((d+1)^n)
+- **Armazenamento de Estados**: O((d+1)<sup>n</sup>)
 - **Tabela de Transições**: O(L × |Σ| × (d+1)^n)
 - **Backtracking**: O(L)
-- **Total**: O(L × |Σ| × (d+1)^n)
+- **Total**: O(L × |Σ| × (d+1)<sup>n</sup>)
 
 ### Explosão Exponencial
 ```
@@ -253,7 +253,7 @@ test_limits()
 ## ⚠️ Limitações
 
 ### Limitações Fundamentais
-1. **Explosão Exponencial**: (d+1)^n estados crescem exponencialmente
+1. **Explosão Exponencial**: (d+1)<sup>n</sup> estados crescem exponencialmente
 2. **Limite de Memória**: Pode consumir gigabytes de RAM rapidamente
 3. **Timeout**: Execução pode demorar horas/dias para instâncias grandes
 4. **Escalabilidade**: Impraticável para n > 8-10 strings

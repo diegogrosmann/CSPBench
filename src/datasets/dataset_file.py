@@ -283,6 +283,12 @@ def load_dataset_with_params(
 
         sequences = valid_sequences
 
+    # Aplicar limite de sequências se especificado
+    n_sequences = params.get("n_sequences", -1)
+    if n_sequences > 0 and len(sequences) > n_sequences:
+        sequences = sequences[:n_sequences]
+        logger.info(f"Limitando a {n_sequences} sequências conforme solicitado")
+
     # Obter informações detalhadas do arquivo
     file_info = get_file_info(file_path)
 
@@ -290,6 +296,7 @@ def load_dataset_with_params(
     used_params = {
         "filepath": str(file_path.absolute()),
         "n": len(sequences),
+        "n_sequences": len(sequences),  # Alias para compatibilidade
         "L": len(sequences[0]) if sequences else 0,
         "format": file_info["detected_format"],
         "original_count": validation["count"],
