@@ -178,12 +178,7 @@ class CursesConsoleAdapter:
                 if hasattr(self.curses_interface, "show_task_end"):
                     self.curses_interface.show_task_end(slot, success, message, error)
                 elif hasattr(self.curses_interface, "update_task_status"):
-                    status_msg = (
-                        message
-                        if success
-                        else f"ERRO: {
-                        error or message}"
-                    )
+                    status_msg = message if success else f"ERRO: {error or message}"
                     self.curses_interface.update_task_status(
                         slot.slot_id, slot.name, status_msg
                     )
