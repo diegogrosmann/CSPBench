@@ -96,7 +96,13 @@ def run_yaml_sensitivity_batch():
             seqs, _ = generate_dataset_from_params(**params)
             alphabet = params.get("alphabet", "ACGT")
         elif tipo == "file":
-            seqs, _ = load_dataset(silent=True)
+            # Usar load_dataset_with_params para carregar arquivo específico
+            if "filename" in params:
+                from src.datasets.dataset_file import load_dataset_with_params
+
+                seqs, _ = load_dataset_with_params({"filepath": params["filename"]})
+            else:
+                seqs, _ = load_dataset(silent=True)
             alphabet = "".join(sorted(set("".join(seqs))))
         elif tipo == "entrez":
             seqs, _ = fetch_dataset()

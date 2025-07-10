@@ -92,11 +92,15 @@ def generate_dataset_from_config(
         return seqs, batch_params
 
     elif dataset_type == "file":
-        # Para arquivo, usar parâmetros específicos
+        # Usar load_dataset_with_params para carregar arquivo específico
         if "filename" in params:
-            os.environ["DATASET_FILE"] = params["filename"]
+            from src.datasets.dataset_file import load_dataset_with_params
 
-        seqs, file_params = load_dataset(silent=silent)
+            seqs, file_params = load_dataset_with_params(
+                {"filepath": params["filename"]}
+            )
+        else:
+            seqs, file_params = load_dataset(silent=silent)
 
         batch_params = {"dataset_source": "2"}  # 2 = arquivo
         batch_params.update(file_params)

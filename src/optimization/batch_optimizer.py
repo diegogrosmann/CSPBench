@@ -74,9 +74,9 @@ def generate_dataset_from_config(dataset_config: Dict[str, Any]) -> tuple:
         }
 
     elif dataset_type == "file":
-        file_path = dataset_config.get("parametros", {}).get("file_path")
+        file_path = dataset_config.get("parametros", {}).get("filename")
         if not file_path:
-            raise ValueError("file_path é obrigatório para dataset tipo 'file'")
+            raise ValueError("filename é obrigatório para dataset tipo 'file'")
         from src.datasets.dataset_file import load_dataset_with_params
 
         seqs, dataset_params = load_dataset_with_params({"filepath": file_path})
