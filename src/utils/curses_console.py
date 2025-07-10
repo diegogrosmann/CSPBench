@@ -1,17 +1,68 @@
 """
-Console Manager baseado em curses para CSP-BLFGA.
+Gerenciador de Console Avançado com Curses - CSPBench
 
-Este módulo implementa uma interface de console avançada usando curses
-para melhor experiência do usuário em terminais compatíveis.
+Este módulo implementa um sistema avançado de gerenciamento de console baseado
+em curses, fornecendo interfaces visuais aprimoradas para interação com o usuário
+em terminais compatíveis, com fallback automático para terminais simples.
 
-Classes:
-    BaseConsoleManager: Interface base para console managers
-    CursesConsole: Console manager baseado em curses
-    SimpleConsole: Console manager simples (fallback)
+Arquitetura:
+    O módulo implementa um padrão Strategy com:
+    - Interface base abstrata para console managers
+    - Implementação curses para terminais avançados
+    - Implementação simples para fallback
+    - Detecção automática de capacidades do terminal
+    - Factory pattern para criação apropriada
 
-Funções:
-    detect_tty_support(): Detecta se o terminal suporta curses
-    create_console_manager(): Factory para criar console apropriado
+Funcionalidades:
+    - Interface curses avançada com cores e formatação
+    - Fallback automático para terminais simples
+    - Gerenciamento de layout e janelas
+    - Sistema de progress bars visuais
+    - Detecção de capacidades do terminal
+    - Thread-safety para uso em ambientes paralelos
+
+Classes Principais:
+    - BaseConsoleManager: Interface abstrata base
+    - CursesConsole: Implementação avançada com curses
+    - SimpleConsole: Implementação simples para fallback
+
+Detecção de Recursos:
+    - Suporte a TTY: Verifica se terminal suporta interação
+    - Capacidades curses: Testa disponibilidade da biblioteca
+    - Cores e formatação: Detecta suporte a recursos visuais
+    - Dimensões do terminal: Adapta layout automaticamente
+
+Exemplo de Uso:
+    ```python
+    from src.utils.curses_console import create_console_manager
+
+    # Criar console manager apropriado
+    console = create_console_manager()
+
+    # Usar funcionalidades básicas
+    console.set_title("CSPBench - Execução")
+    console.print("Iniciando execução...")
+    console.show_progress("Processando", 50, 100)
+
+    # Limpar e finalizar
+    console.clear()
+    ```
+
+Compatibilidade:
+    - Terminais Unix/Linux com suporte a curses
+    - Terminais Windows com limitações
+    - SSH e ambientes remotos
+    - IDEs e editores com terminais integrados
+    - Fallback automático para ambientes não suportados
+
+Thread Safety:
+    - Locks para operações concorrentes
+    - Sincronização de atualizações visuais
+    - Prevenção de corrupção de display
+    - Suporte a múltiplas threads
+
+Autor: CSPBench Development Team
+Data: 2024
 """
 
 import curses
@@ -19,34 +70,94 @@ import os
 import sys
 import threading
 from abc import ABC, abstractmethod
+from typing import Any, Optional
 
 
 class BaseConsoleManager(ABC):
     """
-    Interface base para console managers.
+    Interface base abstrata para console managers.
 
-    Define os métodos que devem ser implementados por todos os
-    console managers para garantir compatibilidade.
+    Esta classe define o contrato que deve ser implementado por todos os
+    console managers, garantindo compatibilidade e intercambiabilidade
+    entre diferentes implementações.
+
+    Funcionalidades Requeridas:
+        - Impressão de mensagens formatadas
+        - Limpeza de tela
+        - Configuração de título
+        - Exibição de progresso
+        - Gerenciamento de estado
+
+    Padrão de Design:
+        Implementa o padrão Strategy, permitindo que diferentes
+        implementações de console sejam usadas de forma intercambiável
+        baseadas nas capacidades do terminal.
+
+    Exemplo de Implementação:
+        ```python
+        class MyConsole(BaseConsoleManager):
+            def print(self, *args, **kwargs):
+                # Implementação específica
+                pass
+
+            def clear(self):
+                # Implementação específica
+                pass
+
+            # ... outros métodos
+        ```
     """
 
     @abstractmethod
-    def print(self, *args, **kwargs):
-        """Imprime uma mensagem no console."""
+    def print(self, *args, **kwargs) -> None:
+        """
+        Imprime uma mensagem no console.
+
+        Args:
+            *args: Argumentos posicionais para impressão
+            **kwargs: Argumentos nomeados para formatação
+
+        Nota:
+            Deve suportar formatação similar ao print() built-in
+        """
         raise NotImplementedError
 
     @abstractmethod
-    def clear(self):
-        """Limpa a tela."""
+    def clear(self) -> None:
+        """
+        Limpa a tela do console.
+
+        Remove todo o conteúdo visível e reposiciona cursor
+        no início da tela.
+        """
         raise NotImplementedError
 
     @abstractmethod
-    def set_title(self, title: str):
-        """Define título da janela."""
+    def set_title(self, title: str) -> None:
+        """
+        Define título da janela ou seção do console.
+
+        Args:
+            title (str): Título a ser exibido
+
+        Nota:
+            Comportamento pode variar entre implementações
+        """
         raise NotImplementedError
 
     @abstractmethod
-    def show_progress(self, message: str, current: int, total: int):
-        """Mostra progresso."""
+    def show_progress(self, message: str, current: int, total: int) -> None:
+        """
+        Mostra progresso de uma operação.
+
+        Args:
+            message (str): Mensagem descritiva da operação
+            current (int): Valor atual do progresso
+            total (int): Valor total/máximo do progresso
+
+        Nota:
+            Implementações podem variar na visualização
+        """
         raise NotImplementedError
 
     @abstractmethod

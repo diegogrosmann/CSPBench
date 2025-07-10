@@ -1,6 +1,6 @@
-# Guia para Adição de Novos Algoritmos ao CSP
+# Guia para Adição de Novos Algoritmos ao CSPBench
 
-A plataforma CSP possui uma interface padronizada e documentação detalhada (Google style docstrings) em todos os arquivos, facilitando a integração de novos algoritmos sem modificar o código principal (`main.py`). O registro é automático via decorador.
+O framework CSPBench possui uma interface padronizada e documentação detalhada (Google style docstrings) em todos os arquivos, facilitando a integração de novos algoritmos sem modificar o código principal (`main.py`). O registro é automático via decorador.
 
 ## Estrutura Recomendada
 
@@ -63,7 +63,7 @@ algorithms/
     @register_algorithm
     class MeuAlgoritmo(Algorithm):
         """
-        Wrapper para integração do MeuAlgoritmo ao framework CSP.
+        Wrapper para integração do MeuAlgoritmo ao framework CSPBench.
         """
         name = "Meu Algoritmo"
         default_params = MEU_ALGORITMO_DEFAULTS
