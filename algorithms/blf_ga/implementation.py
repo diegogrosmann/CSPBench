@@ -83,6 +83,7 @@ Version: Otimizada para CSP com mecanismos adaptativos avançados
 """
 
 import logging
+import os
 import random
 import time
 from collections import Counter
@@ -222,8 +223,7 @@ class BLFGA:
         self.alphabet = alphabet
 
         # Configurar workers internos a partir da variável de ambiente
-        # Temporariamente desabilitado para debug
-        self.internal_workers = 1  # int(os.environ.get('INTERNAL_WORKERS', '1'))
+        self.internal_workers = int(os.environ.get("INTERNAL_WORKERS", "1"))
 
         # Carrega parâmetros do dicionário de defaults, permite sobrescrever via argumentos
         params = {**BLF_GA_DEFAULTS}
@@ -1505,7 +1505,18 @@ class BLFGA:
         # MODO SEQUENCIAL: Para casos simples ou debug
         if self.internal_workers <= 1:
             # Avaliação sequencial simples
+            logger.debug(
+                f"[PARALLEL-LOG] BLF-GA usando avaliação SEQUENCIAL (internal_workers={self.internal_workers})"
+            )
             return [(s, max_distance(s, self.strings)) for s in pop]
+
+        # Log temporário: paralelismo interno
+        import threading
+
+        thread_id = threading.get_ident()
+        logger.debug(
+            f"[PARALLEL-LOG] BLF-GA usando avaliação PARALELA com {self.internal_workers} workers internos (Thread principal: {thread_id})"
+        )
 
         # FUNÇÃO DE AVALIAÇÃO INDIVIDUAL
         # Encapsula lógica para uso com ThreadPoolExecutor
@@ -1520,6 +1531,10 @@ class BLFGA:
             # Cada thread processa uma string independentemente
             # list() coleta resultados mantendo ordem original
             results = list(executor.map(evaluate_string, pop))
+
+        logger.debug(
+            f"[PARALLEL-LOG] BLF-GA avaliação paralela CONCLUÍDA - {len(pop)} indivíduos processados"
+        )
 
         # ORDENAÇÃO POR FITNESS
         # Ordena do melhor (menor distância) para o pior (maior distância)

@@ -50,7 +50,7 @@ task:
         timeout: 60
       - nome: "Execução DNA Médio"
         dataset: dna_medio
-        runs_per_algorithm_per_base: 1
+        runs_per_algorithm_per_base: 5
         num_bases: 1
         timeout: 120
 
@@ -58,7 +58,7 @@ task:
 # ALGORITMOS E PARÂMETROS FIXOS
 # ---------------------------------------------------------------------
 #algorithms: ["Baseline", "BLF-GA", "CSC", "DP-CSP", "H3-CSP"]
-algorithms: ["Baseline", "CSC", "H3-CSP"]
+algorithms: ["BLF-GA", "CSC", "H3-CSP"]
 
 
 algorithm_params:
@@ -82,7 +82,8 @@ output:
 # OPÇÕES GLOBAIS
 # ---------------------------------------------------------------------
 advanced:
-  use_curses: true
+  use_curses: false
   parallel:
     n_jobs: -1
+    internal_workers: 2
   log_level: "INFO"

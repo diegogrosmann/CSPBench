@@ -217,9 +217,20 @@ class OptunaOptimizer:
 
     def _objective(self, trial: optuna.Trial, algorithm_name: str) -> float:
         """Função objetivo para otimização."""
+        import os
+        import threading
+
+        # Log temporário: início da execução
+        thread_id = threading.get_ident()
+        process_id = os.getpid()
+        logger.info(
+            f"[PARALLEL-LOG] Trial {trial.number} INICIADO - Thread: {thread_id}, PID: {process_id}, Algoritmo: {algorithm_name}"
+        )
+
         try:
             # Sugerir parâmetros
             params = self._suggest_parameters(trial, algorithm_name)
+            logger.info(f"[PARALLEL-LOG] Trial {trial.number} - Parâmetros: {params}")
 
             # Criar instância do algoritmo
             if self.algorithm_class is None:
@@ -246,6 +257,11 @@ class OptunaOptimizer:
                 for key, value in params.items():
                     if hasattr(algorithm, key):
                         setattr(algorithm, key, value)
+
+            # Log temporário: início da execução do algoritmo
+            logger.info(
+                f"[PARALLEL-LOG] Trial {trial.number} - Executando algoritmo (Thread: {thread_id})"
+            )
 
             # Executar algoritmo
             start_time = time.time()
@@ -279,6 +295,11 @@ class OptunaOptimizer:
             trial.set_user_attr("center", center)
             trial.set_user_attr("distance", distance)
 
+            # Log temporário: fim da execução
+            logger.info(
+                f"[PARALLEL-LOG] Trial {trial.number} CONCLUÍDO - Tempo: {execution_time:.2f}s, Distância: {distance}, Thread: {thread_id}"
+            )
+
             # Retornar valor baseado na direção
             if self.config.direction == "minimize":
                 return distance
@@ -286,7 +307,9 @@ class OptunaOptimizer:
                 return -distance
 
         except Exception as e:
-            logger.error(f"Erro no trial {trial.number}: {e}")
+            logger.error(
+                f"[PARALLEL-LOG] Trial {trial.number} ERRO - Thread: {thread_id}, Erro: {e}"
+            )
             # Retornar valor que indica falha
             if self.config.direction == "minimize":
                 return float("inf")
@@ -346,6 +369,7 @@ class OptunaOptimizer:
 
         if self.config.show_progress and self.config.n_jobs == 1:
             # Usar tqdm para mostrar progresso (apenas para execução serial)
+            logger.info(f"[PARALLEL-LOG] Executando otimização SEQUENCIAL com 1 job")
             with tqdm(total=self.config.n_trials, desc="Otimizando") as pbar:
 
                 def callback(study, trial):
@@ -361,7 +385,12 @@ class OptunaOptimizer:
                 )
         else:
             # Execução paralela ou sem progresso
-            logger.info(f"Executando otimização com {self.config.n_jobs} jobs")
+            logger.info(
+                f"[PARALLEL-LOG] Executando otimização PARALELA com {self.config.n_jobs} jobs"
+            )
+            logger.info(
+                f"[PARALLEL-LOG] Workers internos configurados: {self.config.internal_workers}"
+            )
             self.study.optimize(
                 lambda trial: self._objective(trial, algorithm_name),
                 n_trials=self.config.n_trials,
@@ -485,14 +514,25 @@ def optimize_algorithm(
     )
 
     # Extrair configurações de paralelismo do YAML se disponível
-    n_jobs = 1
+    n_jobs = worker_config["optuna_workers"]  # Usar valor calculado como padrão
     yaml_storage = None
     yaml_study_name = None
 
-    if yaml_config and "optimization_config" in yaml_config:
-        opt_config = yaml_config["optimization_config"]
-        if "parallel" in opt_config:
-            parallel_config = opt_config["parallel"]
+    # Verificar formato novo (advanced) primeiro, depois legado (optimization_config)
+    if yaml_config:
+        parallel_config = None
+
+        # Formato novo: advanced.parallel
+        if "advanced" in yaml_config and "parallel" in yaml_config["advanced"]:
+            parallel_config = yaml_config["advanced"]["parallel"]
+        # Formato legado: optimization_config.parallel
+        elif (
+            "optimization_config" in yaml_config
+            and "parallel" in yaml_config["optimization_config"]
+        ):
+            parallel_config = yaml_config["optimization_config"]["parallel"]
+
+        if parallel_config:
             yaml_n_jobs = parallel_config.get("n_jobs", 1)
             if yaml_n_jobs == -1:
                 n_jobs = worker_config["optuna_workers"]

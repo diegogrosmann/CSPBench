@@ -418,6 +418,7 @@ class UnifiedBatchProcessor:
                 timeout_per_sample=timeout_per_sample,
                 show_progress=not self.silent,
                 method=method,
+                yaml_config=self.extractor.config,  # 🔧 CORREÇÃO: Passar configuração YAML
             )
 
             return {
@@ -456,6 +457,7 @@ class UnifiedBatchProcessor:
                 n_trials=n_trials,
                 timeout_per_trial=timeout_per_trial,
                 show_progress=not self.silent,
+                yaml_config=self.extractor.config,  # Usar config do extrator
             )
 
             return {

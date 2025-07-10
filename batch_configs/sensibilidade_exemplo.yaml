@@ -36,6 +36,14 @@ datasets:
   #     seed: 22222
 
 # ---------------------------------------------------------------------
+# CONFIGURAÇÃO AVANÇADA
+# ---------------------------------------------------------------------
+advanced:
+  parallel:
+    n_jobs: -1  # Usar todos os CPUs para análise de sensibilidade
+    internal_workers: 2
+
+# ---------------------------------------------------------------------
 # TAREFA — SENSITIVITY
 # ---------------------------------------------------------------------
 task:
@@ -45,7 +53,7 @@ task:
     analyses:
       - nome: "Sens-BLF-GA Morris"
         datasets: [dna_sensibilidade]
-        n_samples: 5
+        n_samples: 20  # Aumentar para justificar paralelismo
         timeout_per_sample: 30
         method: "morris"
         num_levels: 24
@@ -99,5 +107,6 @@ output:
 advanced:
   use_curses: false  # Desabilitar curses para análise de sensibilidade
   parallel:
-    n_jobs: -1
-  log_level: "INFO"
+    n_jobs: -1           # Workers externos (SALib): -1 = número de CPUs
+    internal_workers: 1  # Workers internos (algoritmo): mínimo 1, para sensibilidade geralmente 1
+  log_level: "DEBUG"     # DEBUG para ver logs de paralelismo

@@ -131,7 +131,7 @@ SEQUENTIAL_ALGORITHMS = ["Baseline", "DP-CSP", "H³-CSP"]
 # Configurações padrão
 DEFAULT_MIN_WORKERS = 1
 DEFAULT_MAX_WORKERS_PER_CORE = 2
-DEFAULT_SAMPLES_PER_WORKER = 5
+DEFAULT_SAMPLES_PER_WORKER = 2  # Reduzido de 5 para 2 para permitir mais paralelismo
 
 
 @lru_cache(maxsize=1)
@@ -247,8 +247,10 @@ def calculate_optuna_workers(
         >>> print(f"Optuna: {optuna_w}, Internal: {internal_w}")
 
     Note:
-        - yaml_config["optimization_config"]["parallel"]["n_jobs"] = -1 usa todos os CPUs
-        - Algoritmos com paralelismo interno recebem mais workers internos
+        - yaml_config["advanced"]["parallel"]["n_jobs"] = -1 usa todos os CPUs
+        - yaml_config["advanced"]["parallel"]["internal_workers"] = N define workers internos
+        - yaml_config["optimization_config"]["parallel"]["n_jobs"] = -1 (formato legado)
+        - Algoritmos com paralelismo interno recebem mais workers internos se não especificado
         - Mínimo de 1 worker sempre garantido para cada contexto
     """
     if total_cpus is None:
@@ -256,10 +258,23 @@ def calculate_optuna_workers(
 
     # Extrair configuração do YAML se disponível
     yaml_optuna_workers = None
-    if yaml_config and "optimization_config" in yaml_config:
-        opt_config = yaml_config["optimization_config"]
-        if "parallel" in opt_config:
-            yaml_optuna_workers = opt_config["parallel"].get("n_jobs")
+    yaml_internal_workers = None
+    if yaml_config:
+        # Tentar extrair de optimization_config (formato antigo)
+        if "optimization_config" in yaml_config:
+            opt_config = yaml_config["optimization_config"]
+            if "parallel" in opt_config:
+                yaml_optuna_workers = opt_config["parallel"].get("n_jobs")
+                yaml_internal_workers = opt_config["parallel"].get("internal_workers")
+
+        # Tentar extrair de advanced (formato novo)
+        if "advanced" in yaml_config:
+            advanced_config = yaml_config["advanced"]
+            if "parallel" in advanced_config:
+                yaml_optuna_workers = advanced_config["parallel"].get("n_jobs")
+                yaml_internal_workers = advanced_config["parallel"].get(
+                    "internal_workers"
+                )
 
     # Determinar workers Optuna baseado na configuração
     if yaml_optuna_workers is not None:
@@ -278,8 +293,11 @@ def calculate_optuna_workers(
             # Algoritmos sequenciais: maximizar workers Optuna
             optuna_workers = total_cpus
 
-    # Calcular workers internos baseado no algoritmo e workers Optuna
-    if algorithm_name in INTERNAL_PARALLEL_ALGORITHMS:
+    # Calcular workers internos baseado na configuração YAML ou algoritmo
+    if yaml_internal_workers is not None:
+        # Usar configuração explícita do YAML, garantindo mínimo de 1
+        internal_workers = max(1, yaml_internal_workers)
+    elif algorithm_name in INTERNAL_PARALLEL_ALGORITHMS:
         # Permitir paralelismo interno proporcional aos recursos disponíveis
         available_per_trial = max(1, total_cpus // optuna_workers)
         internal_workers = min(DEFAULT_MAX_WORKERS_PER_CORE, available_per_trial)
@@ -333,17 +351,23 @@ def calculate_salib_workers(
     Note:
         - Mínimo DEFAULT_SAMPLES_PER_WORKER amostras por worker
         - Máximo igual ao número de CPUs disponíveis
-        - yaml_config["sensitivity_config"]["parallel"]["n_jobs"] = -1 usa todos CPUs
+        - yaml_config["advanced"]["parallel"]["n_jobs"] = -1 usa todos CPUs
+        - yaml_config["sensitivity_config"]["parallel"]["n_jobs"] = -1 (formato legado)
     """
     if total_cpus is None:
         total_cpus = get_cpu_count()
 
     # Extrair configuração do YAML se disponível
     yaml_salib_workers = None
-    if yaml_config and "sensitivity_config" in yaml_config:
-        sens_config = yaml_config["sensitivity_config"]
-        if "parallel" in sens_config:
-            yaml_salib_workers = sens_config["parallel"].get("n_jobs")
+    if yaml_config:
+        # Tentar extrair de advanced (formato novo)
+        if "advanced" in yaml_config and "parallel" in yaml_config["advanced"]:
+            yaml_salib_workers = yaml_config["advanced"]["parallel"].get("n_jobs")
+        # Formato legado: sensitivity_config.parallel
+        elif "sensitivity_config" in yaml_config:
+            sens_config = yaml_config["sensitivity_config"]
+            if "parallel" in sens_config:
+                yaml_salib_workers = sens_config["parallel"].get("n_jobs")
 
     # Determinar workers baseado na configuração
     if yaml_salib_workers is not None:

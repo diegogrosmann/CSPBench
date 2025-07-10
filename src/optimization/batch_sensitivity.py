@@ -120,6 +120,16 @@ def run_yaml_sensitivity_batch():
             current_run += 1
             print(f"\n🔬 [{current_run}/{total_runs}] Analisando {alg}...")
 
+            # Log temporário: início da análise
+            import logging
+
+            logger = logging.getLogger(__name__)
+            logger.info(
+                "[PARALLEL-LOG] Batch Sensibilidade - Iniciando %s em dataset %s",
+                alg,
+                dataset.get("nome", "Sem nome"),
+            )
+
             try:
                 result = analyze_algorithm_sensitivity(
                     algorithm_name=alg,
@@ -127,6 +137,14 @@ def run_yaml_sensitivity_batch():
                     alphabet=alphabet,
                     yaml_config=config,
                     **sensitivity_config,
+                )
+
+                # Log temporário: fim da análise
+                logger.info(
+                    "[PARALLEL-LOG] Batch Sensibilidade - Concluído %s: %s amostras em %.2f s",
+                    alg,
+                    result.n_samples,
+                    result.analysis_time,
                 )
 
                 print(

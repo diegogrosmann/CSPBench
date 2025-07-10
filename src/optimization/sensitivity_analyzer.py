@@ -188,11 +188,22 @@ class SensitivityAnalyzer:
         """Avalia amostras executando o algoritmo."""
         param_names = problem["names"]
 
+        # Log temporário para debug
+        logger.info(
+            "[DEBUG] _evaluate_samples: n_jobs=%d, samples=%d",
+            self.config.n_jobs,
+            len(samples),
+        )
+
         if self.config.n_jobs == 1:
             # Execução serial com barra de progresso
+            logger.info("[DEBUG] Usando execução SERIAL")
             return self._evaluate_samples_serial(samples, param_names)
         else:
             # Execução paralela
+            logger.info(
+                "[DEBUG] Usando execução PARALELA com %d jobs", self.config.n_jobs
+            )
             return self._evaluate_samples_parallel(samples, param_names)
 
     def _evaluate_samples_serial(
@@ -221,9 +232,23 @@ class SensitivityAnalyzer:
         self, samples: np.ndarray, param_names: List[str]
     ) -> np.ndarray:
         """Avalia amostras em modo paralelo."""
+        import os
+        import threading
         from concurrent.futures import ProcessPoolExecutor, as_completed
 
-        logger.info(f"Executando análise paralela com {self.config.n_jobs} workers")
+        # Log temporário: início do paralelismo
+        thread_id = threading.get_ident()
+        process_id = os.getpid()
+        logger.info(
+            "[PARALLEL-LOG] Análise de sensibilidade PARALELA iniciada - %d workers, %d amostras",
+            self.config.n_jobs,
+            len(samples),
+        )
+        logger.info(
+            "[PARALLEL-LOG] Processo principal: PID %d, Thread %d",
+            process_id,
+            thread_id,
+        )
 
         # Preparar dados para execução paralela
         tasks = [(i, sample, param_names) for i, sample in enumerate(samples)]
@@ -237,6 +262,7 @@ class SensitivityAnalyzer:
                 total=len(samples), desc="Avaliando amostras (paralelo)"
             )
 
+        completed_count = 0
         with ProcessPoolExecutor(max_workers=self.config.n_jobs) as executor:
             # Submeter tarefas
             future_to_index = {
@@ -250,8 +276,18 @@ class SensitivityAnalyzer:
                 try:
                     output = future.result()
                     outputs[index] = output
-                except Exception as e:
-                    logger.error(f"Erro na amostra {index}: {e}")
+                    completed_count += 1
+
+                    # Log a cada 10% das amostras
+                    if completed_count % max(1, len(samples) // 10) == 0:
+                        logger.info(
+                            "[PARALLEL-LOG] Progresso: %d/%d amostras concluídas",
+                            completed_count,
+                            len(samples),
+                        )
+
+                except Exception as exc:
+                    logger.error("[PARALLEL-LOG] Erro na amostra %d: %s", index, exc)
                     outputs[index] = float("inf")
 
                 if progress_bar:
@@ -260,12 +296,36 @@ class SensitivityAnalyzer:
         if progress_bar:
             progress_bar.close()
 
+        logger.info(
+            "[PARALLEL-LOG] Análise de sensibilidade PARALELA concluída - %d amostras processadas",
+            len(samples),
+        )
         return np.array(outputs, dtype=float)
 
     def _evaluate_sample_worker(self, task: Tuple[int, np.ndarray, List[str]]) -> float:
         """Worker para avaliação paralela de uma amostra."""
+        import threading
+
         index, sample, param_names = task
-        return self._evaluate_single_sample(sample, param_names, index)
+
+        # Log temporário: worker iniciado
+        process_id = os.getpid()
+        thread_id = threading.get_ident()
+        logger.debug(
+            "[PARALLEL-LOG] Worker INICIADO - Amostra %d, PID %d, Thread %d",
+            index,
+            process_id,
+            thread_id,
+        )
+
+        result = self._evaluate_single_sample(sample, param_names, index)
+
+        # Log temporário: worker concluído
+        logger.debug(
+            "[PARALLEL-LOG] Worker CONCLUÍDO - Amostra %d, Resultado: %f", index, result
+        )
+
+        return result
 
     def _evaluate_single_sample(
         self, sample: np.ndarray, param_names: List[str], index: int
@@ -537,20 +597,33 @@ def analyze_algorithm_sensitivity(
         context="salib",
         algorithm_name=algorithm_name,
         n_samples=n_samples,
-    )
-
-    # Extrair configurações de paralelismo do YAML se disponível
+    )  # Extrair configurações de paralelismo do YAML se disponível
     n_jobs = 1
-    if yaml_config and "sensitivity_config" in yaml_config:
-        sens_config = yaml_config["sensitivity_config"]
-        if "parallel" in sens_config:
-            yaml_n_jobs = sens_config["parallel"].get("n_jobs", 1)
+
+    if yaml_config:
+        # Tentar extrair de advanced (formato novo)
+        if "advanced" in yaml_config and "parallel" in yaml_config["advanced"]:
+            parallel_config = yaml_config["advanced"]["parallel"]
+            yaml_n_jobs = parallel_config.get("n_jobs", 1)
             if yaml_n_jobs == -1:
                 n_jobs = worker_config["salib_workers"]
             else:
                 n_jobs = (
                     yaml_n_jobs if yaml_n_jobs > 0 else worker_config["salib_workers"]
                 )
+        # Formato legado: sensitivity_config.parallel
+        elif "sensitivity_config" in yaml_config:
+            sens_config = yaml_config["sensitivity_config"]
+            if "parallel" in sens_config:
+                yaml_n_jobs = sens_config["parallel"].get("n_jobs", 1)
+                if yaml_n_jobs == -1:
+                    n_jobs = worker_config["salib_workers"]
+                else:
+                    n_jobs = (
+                        yaml_n_jobs
+                        if yaml_n_jobs > 0
+                        else worker_config["salib_workers"]
+                    )
 
     # Criar configuração
     config = SensitivityConfig(
