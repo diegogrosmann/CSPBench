@@ -5,11 +5,12 @@ __pycache__
 .ruff_cache
 
 saved_datasets/*
-!saved_datasets/entrez_nucleotide_COIGene AND 600650SLEN_n20.fasta
-!saved_datasets/synthetic_n10_L20_noise0.1.fasta
-!saved_datasets/synthetic_n20_L50_noise0.1.fasta
-!saved_datasets/synthetic_n30_L100_noise0.1.fasta
 !saved_datasets/teste.fasta
+!saved_datasets/entrez_nucleotide_COIGene AND 600650SLEN_n20.fasta
+!saved_datasets/synthetic_n10_L20_noise0.1_ACTG.fasta
+!saved_datasets/synthetic_n20_L50_noise0.1_01.fasta
+!saved_datasets/synthetic_n20_L50_noise0.1_ACTG.fasta
+!saved_datasets/synthetic_n30_L100_noise0.1_ACTG.fasta
 
 outputs/logs/*
 outputs/reports/*
