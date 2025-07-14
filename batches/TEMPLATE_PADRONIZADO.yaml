@@ -511,39 +511,14 @@ plots:
 # =====================================================================
 # Configurações para monitoramento em tempo real da execução
 monitoring:
-  # Dashboard web para acompanhar progresso
-  dashboard:
-    enabled: false                    # bool: Habilitar dashboard web
-    port: 8080                       # int: Porta para servir dashboard (8080-9000)
-    host: "localhost"                # string: Host para bind (localhost ou 0.0.0.0)
-    auto_refresh: 5                  # int: Intervalo de refresh em segundos
-    
-  # Notificações de progresso
-  notifications:
-    enabled: false                   # bool: Habilitar notificações
-    email:
-      enabled: false                 # bool: Notificações por email
-      smtp_server: "smtp.gmail.com" # string: Servidor SMTP
-      smtp_port: 587                # int: Porta SMTP
-      username: ""                  # string: Usuário SMTP (usar variável de ambiente)
-      password: ""                  # string: Senha SMTP (usar variável de ambiente)
-      to_addresses: []              # list: Emails destinatários
-      
-    slack:
-      enabled: false                 # bool: Notificações Slack
-      webhook_url: ""               # string: URL do webhook Slack
-      
-  # Métricas de sistema
-  system_metrics:
-    enabled: true                    # bool: Coletar métricas de sistema
-    interval: 10                     # int: Intervalo de coleta em segundos
-    include:                         # list: Métricas a coletar
-      - "cpu_usage"                  # Uso de CPU
-      - "memory_usage"               # Uso de memória
-      - "disk_usage"                 # Uso de disco
-      # - "gpu_usage"                # Uso de GPU (se disponível)
-      # - "network_usage"            # Uso de rede
-
+  # Monitoramento geral
+  enabled: true                      # bool: Habilitar monitoramento
+  interface: "simple"                # string: Tipo de interface
+                                    # "simple" = interface simples no terminal (padrão)
+                                    # "tui" = interface avançada com curses
+  update_interval: 3                 # int: Intervalo de atualização em segundos (1-10)
+  
+ 
 # =====================================================================
 # SEÇÃO 10: CONFIGURAÇÕES DE RECURSOS (OPCIONAL)
 # =====================================================================

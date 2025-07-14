@@ -22,14 +22,29 @@ datasets:
     parametros:
       filename: "teste.fasta"
 
+  - id: teste_pequeno_2
+    nome: "Teste Médio 2"
+    tipo: "file" 
+    parametros:
+      filename: "test_dataset.fasta"
+
 # Algoritmos padronizados
 algorithms:
+
+  - id: "todos_teste"
+    nome: "Teste Algoritmos"
+    descricao: "Configuração padrão para teste"
+    algorithms:
+      - "Baseline"
+      - "BLF-GA" 
+      - "CSC"
+
   - id: "todos_algoritmos"
     nome: "Todos os Algoritmos"
     descricao: "Configuração padrão para todos os algoritmos"
     algorithms:
       - "Baseline"
-      - "BLF-GA"
+      - "BLF-GA" 
       - "CSC"
       - "H³-CSP"
       - "DP-CSP"
@@ -50,7 +65,7 @@ algorithms:
         immigrant_ratio: 0.2
         crossover_type: "one_point"
         mutation_type: "multi"
-        selection_type: "tournament"
+        tournament_k: 2
         refinement_type: "greedy"
         no_improve_patience: 0.3
       
@@ -81,14 +96,27 @@ task:
 execution:
   executions:
     - nome: "Execução Completa"
+      datasets: ["teste_pequeno", "teste_pequeno_2"]
+      algorithms: ["todos_algoritmos", "todos_teste"]
+      repetitions: 5
+
+    - nome: "Execução Parcial"
       datasets: ["teste_pequeno"]
-      algorithms: ["todos_algoritmos"]
-      repetitions: 3
+      algorithms: ["todos_algoritmos", "todos_teste"]
+      repetitions: 2
+
+monitoring:
+  # Monitoramento geral
+  enabled: true                      # bool: Habilitar monitoramento
+  interface: "simple"                # string: Tipo de interface
+                                    # "simple" = interface simples no terminal (padrão)
+                                    # "tui" = interface avançada com curses
+  update_interval: 3                 # int: Intervalo de atualização em segundos (1-10)
 
 # Configurações padrão
 export:
   enabled: true
-  destination: "outputs/{session_folder}/processamento_padrao"
+#  destination: "outputs/{session_folder}/processamento_padrao"
   formats:
     csv: true
     json: true
@@ -119,7 +147,7 @@ plots:
     - "pdf"
 
 logging:
-  level: "INFO"
+  level: "DEBUG"
   output:
     console: true
     file: true

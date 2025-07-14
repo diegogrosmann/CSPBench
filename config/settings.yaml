@@ -25,7 +25,7 @@ infrastructure:
   
   # Executor de algoritmos
   executor:
-    type: "SequentialExecutor"
+    type: "Executor"
     config:
       timeout_default: 300
   

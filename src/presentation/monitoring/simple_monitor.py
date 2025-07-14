@@ -1,55 +1,49 @@
 """Monitor simples para terminal."""
 
-import sys
-import time
 from datetime import datetime
-from typing import Dict, Any
+from typing import Any, Dict, Optional
 
-from .interfaces import MonitoringInterface, TaskType, MonitoringData
+from .interfaces import (
+    ExecutionLevel,
+    HierarchicalContext,
+    MonitoringInterface,
+    TaskType,
+)
 
 
 class SimpleMonitor(MonitoringInterface):
     """Monitor simples que exibe progresso no terminal."""
-    
+
     def __init__(self):
-        self.task_type: TaskType = None
-        self.batch_name: str = ""
-        self.start_time: datetime = None
-        self.current_line_algorithm: str = ""
+        self.task_type: Optional[TaskType] = None
+        self.task_name: str = ""
+        self.start_time: Optional[datetime] = None
         self.header_printed: bool = False
-        self.last_update_time: float = 0
-        self.update_interval: float = 3.0  # 3 segundos
-    
-    def start_monitoring(self, task_type: TaskType, config: Dict[str, Any]) -> None:
-        """Inicia o monitoramento."""
+
+        # Controle hierárquico
+        self.current_config_id: Optional[str] = None
+        self.current_config_index: int = 0
+        self.total_configs: int = 0
+
+        self.current_dataset_id: Optional[str] = None
+        self.current_dataset_index: int = 0
+        self.total_datasets: int = 0
+
+        # Estado dos algoritmos do dataset atual
+        self.current_algorithms: Dict[str, Dict[str, Any]] = {}
+        self.algorithm_order: list[str] = []
+
+    def start_task(
+        self, task_type: TaskType, task_name: str, config: Dict[str, Any]
+    ) -> None:
+        """Inicia monitoramento de uma tarefa."""
         self.task_type = task_type
-        self.batch_name = config.get("batch_name", "Batch Sem Nome")
+        self.task_name = task_name
         self.start_time = datetime.now()
         self.header_printed = False
-        self.current_line_algorithm = ""
-        
-    def update_progress(self, progress_data: MonitoringData) -> None:
-        """Atualiza informações de progresso."""
-        current_time = time.time()
-        
-        # Controle de frequência de atualização
-        if current_time - self.last_update_time < self.update_interval:
-            return
-        
-        self.last_update_time = current_time
-        
-        if not self.header_printed:
-            self._print_header(progress_data)
-            self.header_printed = True
-            
-        if self.task_type == TaskType.EXECUTION:
-            self._update_execution_progress(progress_data.execution_data)
-        elif self.task_type == TaskType.OPTIMIZATION:
-            self._update_optimization_progress(progress_data.optimization_data)
-        elif self.task_type == TaskType.SENSITIVITY:
-            self._update_sensitivity_progress(progress_data.sensitivity_data)
-    
-    def _print_header(self, progress_data: MonitoringData) -> None:
+        self._print_header()
+
+    def _print_header(self) -> None:
         """Imprime cabeçalho do monitor."""
         if self.task_type == TaskType.EXECUTION:
             print("CSPBench - Monitoramento de Execução")
@@ -57,184 +51,198 @@ class SimpleMonitor(MonitoringInterface):
             print("CSPBench - Monitoramento de Otimização")
         elif self.task_type == TaskType.SENSITIVITY:
             print("CSPBench - Análise de Sensibilidade")
-            
+        else:
+            print("CSPBench - Monitoramento")
+
         print("=" * 50)
-        print(f"📋 Batch: {self.batch_name}")
-        print(f"⏰ Iniciado: {self.start_time.strftime('%Y-%m-%d %H:%M:%S')}")
+        print(f"📋\tBatch: {self.task_name}")
+        if self.start_time:
+            print(f"⏰\tIniciado: {self.start_time.strftime('%Y-%m-%d %H:%M:%S')}")
         print()
-    
-    def _update_execution_progress(self, data):
-        """Atualiza progresso de execução."""
-        if not data:
-            return
-            
-        # Informações da execução atual
-        exec_num = data.completed_executions + 1
-        print(f"📊 Execução: {data.current_execution} ({exec_num}/{data.total_executions})")
-        print(f"🗂️  Dataset: {data.current_dataset} ({data.current_dataset_index}/{data.total_datasets})")
-        print(f"🧠 Algoritmos: {data.total_algorithms} total")
-        print()
-        
-        # Barra de progresso geral
-        if data.total_algorithms > 0:
-            algo_progress = (data.completed_algorithms / data.total_algorithms) * 100
-            progress_bar = self._create_progress_bar(algo_progress)
-            print(f"Status Atual:")
-            print(f"{progress_bar} {algo_progress:.0f}% ({data.completed_algorithms}/{data.total_algorithms})")
-            print()
-        
-        # Algoritmos concluídos (linhas fixas)
-        for algo, result in data.algorithm_results.items():
-            if result.get('completed', False):
-                distance = result.get('distance', 'N/A')
-                exec_time = result.get('execution_time', 0)
-                print(f"✅ {algo:<12} [{'█' * 20}] 100% - {exec_time:.2f}s - dist: {distance}")
-        
-        # Algoritmo atual (linha que será reescrita)
-        if data.current_algorithm and not data.algorithm_results.get(data.current_algorithm, {}).get('completed', False):
-            progress = data.algorithm_progress.get(data.current_algorithm, 0)
-            callback_info = data.algorithm_callback_info.get(data.current_algorithm, "processando...")
-            task_info = f" - {data.current_task_info}" if data.current_task_info else ""
-            progress_bar = self._create_progress_bar(progress, width=20)
-            
-            # Limpa linha anterior se necessário
-            if self.current_line_algorithm and self.current_line_algorithm != data.current_algorithm:
+        self.header_printed = True
+
+    def update_hierarchy(
+        self,
+        level: ExecutionLevel,
+        level_id: str,
+        progress: float,
+        message: str = "",
+        data: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """Atualiza progresso hierárquico."""
+        if level == ExecutionLevel.EXECUTION:
+            # Nova configuração
+            if level_id != self.current_config_id:
+                self.current_config_id = level_id
+                if data:
+                    self.current_config_index = data.get("config_index", 1)
+                    self.total_configs = data.get("total_configs", 1)
+
+                # Reset dataset tracking quando nova configuração
+                self.current_dataset_id = None
+
+        elif level == ExecutionLevel.DATASET:
+            # Novo dataset
+            if level_id != self.current_dataset_id:
+                self.current_dataset_id = level_id
+                if data:
+                    self.current_dataset_index = data.get("dataset_index", 1)
+                    self.total_datasets = data.get("total_datasets", 1)
+                    total_algorithms = data.get("total_algorithms", 0)
+
+                # Reset algoritmos quando novo dataset
+                self.current_algorithms = {}
+                self.algorithm_order = []
+
+                # Exibir informações do dataset
+                print(
+                    f"\tConfiguração: ({self.current_config_index}/{self.total_configs})"
+                )
+                print(
+                    f"🗂️\tDataset: {level_id} ({self.current_dataset_index}/{self.total_datasets})"
+                )
+                print(f"🧠\tAlgoritmos: {total_algorithms} total")
                 print()
-            
-            line = f"⏳ {data.current_algorithm:<12} [{progress_bar}] {progress:.0f}%{task_info} - {callback_info}"
-            print(f"\r{line}", end="", flush=True)
-            self.current_line_algorithm = data.current_algorithm
-        
-        # Resultados parciais
-        if data.best_distance is not None:
-            print(f"\n\n📊 Resultados Parciais:")
-            print(f"   Melhor distância: {data.best_distance}")
-            elapsed = (datetime.now() - self.start_time).total_seconds()
-            print(f"   Tempo total: {elapsed:.2f}s")
-    
-    def _update_optimization_progress(self, data):
-        """Atualiza progresso de otimização."""
-        if not data:
-            return
-            
-        # Informações da otimização atual
-        opt_num = data.completed_optimizations + 1
-        print(f"📊 Otimização: {data.current_optimization} ({opt_num}/{data.total_optimizations})")
-        print(f"🗂️  Dataset: {data.current_dataset} ({data.current_dataset_index}/{data.total_datasets})")
-        print(f"🎯 Estudo: {data.study_name}")
-        print()
-        
-        # Barra de progresso geral
-        if data.n_trials > 0:
-            trial_progress = (data.completed_trials / data.n_trials) * 100
-            progress_bar = self._create_progress_bar(trial_progress)
-            print(f"Progresso:")
-            print(f"{progress_bar} {trial_progress:.0f}% ({data.completed_trials}/{data.n_trials})")
-            print()
-        
-        # Trial atual (linha que será reescrita)
-        if data.current_trial is not None:
-            task_info = f" - {data.current_task_info}" if data.current_task_info else ""
-            callback_info = data.trial_callback_info if data.trial_callback_info else ""
-            
-            # Limpa linha anterior se necessário
-            if self.current_line_algorithm:
-                print(f"\r", end="")
-            
-            line = f"⏳ Trial {data.current_trial}/{data.n_trials} executando...{task_info} {callback_info}"
-            print(line, end="", flush=True)
-            self.current_line_algorithm = f"trial_{data.current_trial}"
-        
-        # Resultados parciais
-        if data.best_value is not None:
-            print(f"\n\n🏆 Melhor até agora: {data.best_value}")
-            elapsed = (datetime.now() - self.start_time).total_seconds()
-            print(f"⏰ Tempo decorrido: {elapsed/60:.0f}m {elapsed%60:.0f}s")
-    
-    def _update_sensitivity_progress(self, data):
-        """Atualiza progresso de análise de sensibilidade."""
-        if not data:
-            return
-            
-        # Informações da análise atual
-        analysis_num = data.completed_analyses + 1
-        print(f"📊 Análise: {data.current_analysis} ({analysis_num}/{data.total_analyses})")
-        print(f"🗂️  Dataset: {data.current_dataset} ({data.current_dataset_index}/{data.total_datasets})")
-        print(f"🔬 Método: {data.analysis_method} ({data.method_details})")
-        print(f"📊 Parâmetros: {len(data.parameters)} ({', '.join(data.parameters)})")
-        print()
-        
-        # Barra de progresso geral
-        if data.n_samples > 0:
-            sample_progress = (data.completed_samples / data.n_samples) * 100
-            progress_bar = self._create_progress_bar(sample_progress)
-            print(f"Progresso Geral:")
-            print(f"{progress_bar} {sample_progress:.0f}% ({data.completed_samples}/{data.n_samples} amostras)")
-            print()
-        
-        # Parâmetros analisados
-        print("Parâmetros Analisados:")
-        for param in data.parameters:
-            if param in data.sensitivity_results:
-                # Parâmetro concluído
-                results = data.sensitivity_results[param]
-                mu_star = results.get('mu_star', 0)
-                sigma = results.get('sigma', 0)
-                print(f"✅ {param:<12} [{'█' * 20}] 100% - μ*={mu_star:.3f}, σ={sigma:.3f}")
-            elif param == data.current_parameter:
-                # Parâmetro atual
-                progress = data.parameter_progress.get(param, 0)
-                progress_bar = self._create_progress_bar(progress, width=20)
-                task_info = f" - {data.current_task_info}" if data.current_task_info else ""
-                callback_info = data.callback_info if data.callback_info else "processando..."
-                
-                # Limpa linha anterior se necessário
-                if self.current_line_algorithm and self.current_line_algorithm != param:
-                    print()
-                
-                line = f"⏳ {param:<12} [{progress_bar}] {progress:.0f}%{task_info} - {callback_info}"
-                print(f"\r{line}", end="", flush=True)
-                self.current_line_algorithm = param
-        
-        # Resultados preliminares
-        if data.sensitivity_results:
-            print(f"\n\n🔍 Sensibilidade Preliminar:")
-            sorted_params = sorted(data.sensitivity_results.items(), 
-                                   key=lambda x: x[1].get('mu_star', 0), reverse=True)
-            for i, (param, results) in enumerate(sorted_params[:3], 1):
-                mu_star = results.get('mu_star', 0)
-                if mu_star > 0.2:
-                    level = "ALTA"
-                elif mu_star > 0.1:
-                    level = "MÉDIA"
+                print("Progresso por algoritmo:")
+
+    def update_item(
+        self,
+        item_id: str,
+        progress: float,
+        message: str = "",
+        context: Optional[HierarchicalContext] = None,
+    ) -> None:
+        """Atualiza um item individual (algoritmo)."""
+        algorithm_name = item_id  # item_id é o nome do algoritmo
+
+        if context and context.algorithm_id:
+            algorithm_name = context.algorithm_id
+
+        # Primeiro algoritmo - adiciona à lista de ordem
+        if algorithm_name not in self.current_algorithms:
+            self.algorithm_order.append(algorithm_name)
+            self.current_algorithms[algorithm_name] = {
+                "progress": 0.0,
+                "completed": False,
+                "current_rep": 0,
+                "total_rep": 1,
+                "name_printed": False,
+            }
+
+        # Atualizar status
+        algo_status = self.current_algorithms[algorithm_name]
+        old_progress = algo_status["progress"]
+        algo_status["progress"] = progress
+        algo_status["completed"] = progress >= 100.0
+
+        # Extrair informações de repetições se disponível no context
+        if context and context.repetition_id:
+            # Tentar extrair números de repetição do ID se for formatado como "1/10"
+            rep_parts = context.repetition_id.split("/")
+            if len(rep_parts) == 2:
+                try:
+                    algo_status["current_rep"] = int(rep_parts[0])
+                    algo_status["total_rep"] = int(rep_parts[1])
+                except ValueError:
+                    pass
+
+        # Decidir se deve imprimir/atualizar
+        significant_change = (
+            not algo_status["name_printed"]
+            or abs(progress - old_progress) >= 10.0  # Mudança de 10% ou mais
+            or algo_status["completed"]
+        )
+
+        if significant_change:
+            if not algo_status["name_printed"]:
+                print(f"• {algorithm_name}:")
+                algo_status["name_printed"] = True
+
+            # Criar linha de progresso
+            progress_bar = self._create_progress_bar(progress)
+
+            if algo_status["completed"]:
+                if algo_status["total_rep"] == 1:
+                    status_line = f"  {progress_bar} ✅ 100%"
                 else:
-                    level = "BAIXA"
-                print(f"   {i}. {param}: {level} (maior impacto)")
-        
-        elapsed = (datetime.now() - self.start_time).total_seconds()
-        print(f"\n⏰ Tempo: {elapsed/60:.0f}m {elapsed%60:.0f}s")
-    
-    def _create_progress_bar(self, progress: float, width: int = 30) -> str:
-        """Cria uma barra de progresso ASCII."""
-        filled_length = int(width * progress // 100)
-        bar = '█' * filled_length + '░' * (width - filled_length)
-        return f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" if width == 30 else f"[{bar}]"
-    
-    def finish_monitoring(self, results: Dict[str, Any]) -> None:
-        """Finaliza o monitoramento."""
-        if self.current_line_algorithm:
-            print()  # Nova linha final
-        
-        print("\n✅ Monitoramento concluído!")
-        elapsed = (datetime.now() - self.start_time).total_seconds()
-        print(f"⏰ Tempo total: {elapsed/60:.0f}m {elapsed%60:.0f}s")
+                    status_line = f"  {progress_bar} ✅ 100%"
+            else:
+                if algo_status["total_rep"] > 1:
+                    rep_info = (
+                        f"({algo_status['current_rep']}/{algo_status['total_rep']}) "
+                    )
+                else:
+                    rep_info = ""
+                status_line = f"  {progress_bar} {rep_info}{progress:.0f}%"
+
+            print(status_line)
+
+    def algorithm_callback(
+        self,
+        algorithm_name: str,
+        progress: float,
+        message: str,
+        item_id: Optional[str] = None,
+    ) -> None:
+        """Callback direto do algoritmo durante execução."""
+        # Atualizar progresso interno através do algoritmo callback
+        context = HierarchicalContext(algorithm_id=algorithm_name)
+        self.update_item(item_id or algorithm_name, progress, message, context)
+
+    def finish_item(
+        self,
+        item_id: str,
+        success: bool = True,
+        result: Optional[Dict[str, Any]] = None,
+        error: Optional[str] = None,
+    ) -> None:
+        """Finaliza um item individual."""
+        # Marcar como 100% se bem sucedido
+        if success:
+            context = HierarchicalContext(algorithm_id=item_id)
+            self.update_item(item_id, 100.0, "Concluído", context)
+
+    def finish_task(
+        self,
+        success: bool = True,
+        final_results: Optional[Dict[str, Any]] = None,
+        error_message: str = "",
+    ) -> None:
+        """Finaliza monitoramento da tarefa."""
+        print()
+        if success:
+            print("✅ Monitoramento concluído!")
+        else:
+            print(f"❌ Erro: {error_message}")
+
+        if self.start_time:
+            elapsed = (datetime.now() - self.start_time).total_seconds()
+            print(f"⏰ Tempo total: {elapsed/60:.0f}m {elapsed%60:.0f}s")
         print("=" * 50)
-    
+
+    def _create_progress_bar(self, progress: float) -> str:
+        """Cria uma barra de progresso ASCII."""
+        return "━" * 32  # Barra completa como no exemplo
+
+    def get_summary(self) -> Dict[str, Any]:
+        """Retorna resumo consolidado da execução atual."""
+        return {
+            "task_type": self.task_type.value if self.task_type else "unknown",
+            "task_name": self.task_name,
+            "start_time": self.start_time.isoformat() if self.start_time else None,
+            "current_config": self.current_config_id,
+            "current_dataset": self.current_dataset_id,
+            "algorithms": dict(self.current_algorithms),
+        }
+
     def show_error(self, error: str) -> None:
-        """Exibe erro."""
+        """Exibe erro ao usuário."""
         print(f"\n❌ Erro: {error}")
-    
+
+    def stop(self) -> None:
+        """Para monitoramento."""
+        pass
+
     def close(self) -> None:
-        """Fecha e limpa recursos do monitor."""
-        if self.current_line_algorithm:
-            print()  # Garante nova linha final
+        """Fecha sistema de monitoramento."""
+        pass

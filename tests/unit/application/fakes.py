@@ -153,32 +153,6 @@ class FakeExecutorPort:
         """Configura para falhar em algoritmo específico (para testes)."""
         self._fail_on_algorithm = algorithm_name
 
-    def execute_single(
-        self,
-        algorithm_name: str,
-        dataset: Dataset,
-        params: Optional[Dict[str, Any]] = None,
-        timeout: Optional[int] = None,
-    ) -> Dict[str, Any]:
-        """Executa algoritmo único."""
-        self._execution_count += 1
-
-        if algorithm_name == self._fail_on_algorithm:
-            from src.domain import AlgorithmExecutionError
-
-            raise AlgorithmExecutionError(f"Falha simulada para {algorithm_name}")
-
-        # Simular execução bem-sucedida
-        return {
-            "algorithm": algorithm_name,
-            "dataset_size": dataset.size,
-            "result": "ACGT" * (dataset.length // 4),
-            "distance": 2,
-            "execution_time": 1.5,
-            "status": "success",
-            "metadata": {"params": params or {}, "timeout": timeout},
-        }
-
     def execute_batch(self, batch_config: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Executa batch de experimentos."""
         results = []
@@ -190,10 +164,26 @@ class FakeExecutorPort:
                     n=10, length=20, alphabet="ACGT", seed=42
                 )
 
-                result = self.execute_single(
-                    exp["algorithm"], dataset, exp.get("params", {})
-                )
-                result["dataset"] = exp["dataset"]
+                # Simular execução direta em vez de chamar execute_single
+                self._execution_count += 1
+
+                if exp["algorithm"] == self._fail_on_algorithm:
+                    from src.domain import AlgorithmExecutionError
+
+                    raise AlgorithmExecutionError(
+                        f"Falha simulada para {exp['algorithm']}"
+                    )
+
+                result = {
+                    "algorithm": exp["algorithm"],
+                    "dataset_size": dataset.size,
+                    "result": "ACGT" * (dataset.length // 4),
+                    "distance": 2,
+                    "execution_time": 1.5,
+                    "status": "success",
+                    "metadata": {"params": exp.get("params", {})},
+                    "dataset": exp["dataset"],
+                }
                 results.append(result)
 
             except Exception as e:

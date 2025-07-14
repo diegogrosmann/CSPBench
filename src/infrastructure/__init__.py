@@ -5,7 +5,7 @@ Contém implementações de portas e adaptadores para sistemas externos.
 """
 
 from .io.exporters import CsvExporter, FileExporter, JsonExporter, TxtExporter
-from .orchestrators.executors import SequentialExecutor
+from .orchestrators.executors import Executor
 from .persistence.algorithm_registry import DomainAlgorithmRegistry
 from .persistence.dataset_repository import (
     FastaDatasetRepository,
@@ -21,6 +21,6 @@ __all__ = [
     "CsvExporter",
     "JsonExporter",
     "TxtExporter",
-    "SequentialExecutor",
+    "Executor",
     "SessionManager",
 ]

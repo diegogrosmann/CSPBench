@@ -53,7 +53,7 @@ Comandos Específicos:
     ```
 
 Variáveis de Ambiente:
-    - EXECUTOR_IMPL: Override do executor (SequentialExecutor)
+    - EXECUTOR_IMPL: Override do executor (Executor)
     - EXPORT_FORMAT: Override do formato de exportação (json, csv, txt)
     - DATASET_PATH: Override do caminho base de datasets
     - NCBI_EMAIL: Email para API do NCBI
@@ -78,9 +78,9 @@ from src.domain import SyntheticDatasetGenerator
 from src.infrastructure import (
     CsvExporter,
     DomainAlgorithmRegistry,
+    Executor,
     FileDatasetRepository,
     JsonExporter,
-    SequentialExecutor,
     SessionManager,
     TxtExporter,
 )
@@ -130,17 +130,15 @@ def create_algorithm_registry(config: Dict[str, Any]) -> DomainAlgorithmRegistry
     return DomainAlgorithmRegistry()
 
 
-def create_executor(config: Dict[str, Any]) -> SequentialExecutor:
+def create_executor(config: Dict[str, Any]) -> Executor:
     """Cria executor baseado na configuração."""
-    executor_impl = os.getenv("EXECUTOR_IMPL", "SequentialExecutor")
+    executor_impl = os.getenv("EXECUTOR_IMPL", "Executor")
 
-    if executor_impl == "SequentialExecutor":
-        return SequentialExecutor()
+    if executor_impl == "Executor":
+        return Executor()
     else:
-        typer.echo(
-            f"⚠️  Executor '{executor_impl}' não implementado, usando SequentialExecutor"
-        )
-        return SequentialExecutor()
+        typer.echo(f"⚠️  Executor '{executor_impl}' não implementado, usando Executor")
+        return Executor()
 
 
 def create_exporter(config: Dict[str, Any]):
@@ -172,6 +170,13 @@ def create_exporter(config: Dict[str, Any]):
     else:
         typer.echo(f"⚠️  Formato '{export_fmt}' não suportado, usando JSON")
         return JsonExporter(output_path, config)  # Passar configuração completa
+
+
+def create_monitoring_service(config: Dict[str, Any]):
+    """Cria serviço de monitoramento baseado na configuração."""
+    from src.application.services.basic_monitoring_service import BasicMonitoringService
+
+    return BasicMonitoringService(config)
 
 
 def _initialize_logging(config: Dict[str, Any]) -> None:
@@ -266,6 +271,7 @@ def initialize_service() -> ExperimentService:
         algo_registry = create_algorithm_registry(config)
         executor = create_executor(config)
         exporter = create_exporter(config)
+        monitoring_service = create_monitoring_service(config)
 
         # Cria serviço com DI
         experiment_service = ExperimentService(
@@ -273,6 +279,7 @@ def initialize_service() -> ExperimentService:
             exporter=exporter,
             executor=executor,
             algo_registry=algo_registry,
+            monitoring_service=monitoring_service,
         )
 
         typer.echo("✅ CSPBench inicializado com sucesso!")

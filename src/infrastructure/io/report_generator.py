@@ -7,6 +7,7 @@ dos resultados dos experimentos do CSPBench.
 
 import json
 import os
+import warnings
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -17,6 +18,12 @@ from jinja2 import Environment, FileSystemLoader
 from scipy import stats
 
 from .history_plotter import HistoryPlotGenerator
+
+# Configurar warnings para suprimir avisos do seaborn sobre NaN
+warnings.filterwarnings("ignore", category=RuntimeWarning, module="seaborn")
+
+# Importar logger
+from src.infrastructure.logging_config import get_logger
 
 
 class AdvancedReportGenerator:
@@ -36,6 +43,7 @@ class AdvancedReportGenerator:
         self.session_path = session_path
         self.report_config = config["infrastructure"]["result"]["report"]
         self.export_config = config["infrastructure"]["result"]["export"]
+        self.logger = get_logger(__name__)
 
         # Inicializar gerador de gráficos de histórico
         self.history_plotter = HistoryPlotGenerator(config, session_path)
@@ -90,20 +98,47 @@ class AdvancedReportGenerator:
     def _process_results_data(self, results_data: Dict[str, Any]) -> pd.DataFrame:
         """Converte dados de resultados em DataFrame do pandas."""
         try:
-            if "results" not in results_data:
+            # Extrair experimentos da estrutura de batch_results
+            experiments = []
+
+            # Verificar se temos batch_results
+            if "batch_results" in results_data and results_data["batch_results"]:
+                for batch in results_data["batch_results"]:
+                    if "batch_summary" in batch and "results" in batch["batch_summary"]:
+                        experiments.extend(batch["batch_summary"]["results"])
+            # Fallback para estrutura antiga
+            elif "results" in results_data:
+                experiments = results_data["results"]
+            else:
                 return pd.DataFrame()
 
-            # Extrair dados dos experimentos
-            experiments = []
-            for result in results_data["results"]:
+            # Processar cada experimento
+            processed_experiments = []
+            for result in experiments:
                 exp_data = {
-                    "algorithm": result.get("algorithm", "Unknown"),
-                    "dataset": result.get("dataset_id", "Unknown"),
+                    "algorithm": result.get(
+                        "algorithm", result.get("algorithm_name", "Unknown")
+                    ),
+                    "dataset": result.get(
+                        "dataset_id", result.get("dataset", "Unknown")
+                    ),
+                    "execution_name": result.get("execution_name", "Unknown"),
                     "max_distance": result.get("max_distance", 0),
                     "runtime": result.get("execution_time", 0),
                     "success": result.get("status") == "success",
-                    "best_string": result.get("result_string", ""),
+                    "best_string": result.get("best_string", ""),
+                    "repetition": result.get("repetition", 1),
+                    "total_repetitions": result.get("total_repetitions", 1),
                 }
+
+                # Adicionar classificação por tempo de execução
+                runtime = exp_data["runtime"]
+                if runtime <= 0.001:
+                    exp_data["time_bin"] = "Rápido"
+                elif runtime <= 1.0:
+                    exp_data["time_bin"] = "Médio"
+                else:
+                    exp_data["time_bin"] = "Lento"
 
                 # Consolidar parâmetros em uma única coluna estruturada
                 if "params" in result and result["params"]:
@@ -114,15 +149,18 @@ class AdvancedReportGenerator:
                     exp_data["metadata"] = result["metadata"]
 
                 # Adicionar informações do dataset se disponíveis
-                if "dataset_info" in result and result["dataset_info"]:
-                    exp_data["dataset_info"] = result["dataset_info"]
+                if "dataset" in result and isinstance(result["dataset"], dict):
+                    exp_data["dataset_info"] = result["dataset"]
 
-                experiments.append(exp_data)
+                processed_experiments.append(exp_data)
 
-            return pd.DataFrame(experiments)
+            return pd.DataFrame(processed_experiments)
 
         except Exception as e:
             print(f"❌ Erro ao processar dados: {e}")
+            import traceback
+
+            traceback.print_exc()
             return pd.DataFrame()
 
     def _generate_plots(self, df: pd.DataFrame, report_dir: Path) -> None:
@@ -250,8 +288,31 @@ class AdvancedReportGenerator:
         if len(numeric_cols) < 2:
             return
 
+        # Filtrar colunas com variância zero ou dados insuficientes
+        valid_cols = []
+        for col in numeric_cols:
+            col_data = df[col].dropna()
+            if len(col_data) > 1 and col_data.var() > 0:
+                valid_cols.append(col)
+
+        if len(valid_cols) < 2:
+            self.logger.warning("Heatmap: Dados insuficientes para correlação")
+            return
+
         plt.figure(figsize=(10, 8))
-        correlation_matrix = df[numeric_cols].corr()
+
+        # Calcular matriz de correlação e verificar se contém dados válidos
+        correlation_matrix = df[valid_cols].corr()
+
+        # Verificar se a matriz contém valores válidos (não apenas NaN)
+        valid_data = correlation_matrix.dropna(axis=0, how="all").dropna(
+            axis=1, how="all"
+        )
+        if valid_data.empty or valid_data.isna().all().all():
+            self.logger.warning("Heatmap: Matriz de correlação contém apenas NaN")
+            plt.close()
+            return
+
         sns.heatmap(
             correlation_matrix,
             annot=True,
@@ -259,6 +320,7 @@ class AdvancedReportGenerator:
             center=0,
             square=True,
             fmt=".2f",
+            cbar_kws={"shrink": 0.8},
         )
         plt.title("Matriz de Correlação entre Métricas")
         plt.tight_layout()
@@ -360,6 +422,25 @@ class AdvancedReportGenerator:
                     "distance_std": algo_data["max_distance"].std(),
                     "distance_median": algo_data["max_distance"].median(),
                 }
+
+            # Estatísticas por execução (se disponível)
+            if "execution_name" in df.columns:
+                statistics["by_execution"] = {}
+                for exec_name in df["execution_name"].unique():
+                    exec_data = df[df["execution_name"] == exec_name]
+                    statistics["by_execution"][exec_name] = {
+                        "count": len(exec_data),
+                        "algorithms_count": exec_data["algorithm"].nunique(),
+                        "datasets_count": exec_data["dataset"].nunique(),
+                        "success_rate": exec_data["success"].mean(),
+                        "runtime_mean": exec_data["runtime"].mean(),
+                        "runtime_std": exec_data["runtime"].std(),
+                        "distance_mean": exec_data["max_distance"].mean(),
+                        "distance_std": exec_data["max_distance"].std(),
+                        "distance_median": exec_data["max_distance"].median(),
+                        "algorithms_used": exec_data["algorithm"].unique().tolist(),
+                        "datasets_used": exec_data["dataset"].unique().tolist(),
+                    }
 
             # Testes estatísticos se habilitado
             if self.report_config.get("statistical_tests", True):
@@ -534,6 +615,26 @@ class AdvancedReportGenerator:
         </table>
         {% endfor %}
     </div>
+    
+    {% if stats.by_execution %}
+    <div class="section">
+        <h2>Estatísticas por Execução</h2>
+        {% for exec_name, data in stats.by_execution.items() %}
+        <h3>{{ exec_name }}</h3>
+        <table class="stats-table">
+            <tr><td>Número de Experimentos</td><td>{{ data.count }}</td></tr>
+            <tr><td>Algoritmos Únicos</td><td>{{ data.algorithms_count }}</td></tr>
+            <tr><td>Datasets Únicos</td><td>{{ data.datasets_count }}</td></tr>
+            <tr><td>Taxa de Sucesso</td><td>{{ "%.1f%%" | format(data.success_rate * 100) }}</td></tr>
+            <tr><td>Tempo Médio</td><td>{{ "%.2f ± %.2f segundos" | format(data.runtime_mean, data.runtime_std) }}</td></tr>
+            <tr><td>Distância Média</td><td>{{ "%.2f ± %.2f" | format(data.distance_mean, data.distance_std) }}</td></tr>
+            <tr><td>Distância Mediana</td><td>{{ "%.2f" | format(data.distance_median) }}</td></tr>
+            <tr><td>Algoritmos Usados</td><td>{{ data.algorithms_used | join(", ") }}</td></tr>
+            <tr><td>Datasets Usados</td><td>{{ data.datasets_used | join(", ") }}</td></tr>
+        </table>
+        {% endfor %}
+    </div>
+    {% endif %}
     
 </body>
 </html>

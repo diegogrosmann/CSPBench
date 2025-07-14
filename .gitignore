@@ -14,8 +14,7 @@ datasets/*
 !datasets/synthetic_n20_L50_noise0.1_ACTG.fasta
 !datasets/synthetic_n30_L100_noise0.1_ACTG.fasta
 
-outputs/logs/*
-outputs/reports/*
+outputs/*
 
 # Ignorar todos os arquivos em batches, exceto os exemplos
 batches/*

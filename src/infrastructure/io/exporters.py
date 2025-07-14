@@ -223,8 +223,9 @@ class JsonExporter(FileExporter):
                     return json_path
 
                 # Construir dados do batch para o relatório (apenas para execução normal)
+                # Os batch_results já contêm a estrutura completa
                 batch_data = {
-                    "results": batch_results,
+                    "batch_results": batch_results,
                     "summary": {"total_experiments": len(batch_results)},
                 }
 

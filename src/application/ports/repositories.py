@@ -198,33 +198,15 @@ class ExportPort(Protocol):
 class ExecutorPort(Protocol):
     """Port para execução de algoritmos."""
 
-    def execute_single(
-        self,
-        algorithm_name: str,
-        dataset: Dataset,
-        params: Optional[Dict[str, Any]] = None,
-        timeout: Optional[int] = None,
-    ) -> Dict[str, Any]:
-        """
-        Executa algoritmo único.
-
-        Args:
-            algorithm_name: Nome do algoritmo
-            dataset: Dataset para execução
-            params: Parâmetros do algoritmo
-            timeout: Timeout em segundos
-
-        Returns:
-            Dict[str, Any]: Resultados da execução
-        """
-        ...
-
-    def execute_batch(self, batch_config: Dict[str, Any]) -> List[Dict[str, Any]]:
+    def execute_batch(
+        self, batch_config: Dict[str, Any], monitoring_service=None
+    ) -> List[Dict[str, Any]]:
         """
         Executa batch de experimentos.
 
         Args:
             batch_config: Configuração do batch
+            monitoring_service: Serviço de monitoramento (opcional)
 
         Returns:
             List[Dict[str, Any]]: Lista de resultados
@@ -381,17 +363,6 @@ class AbstractExportPort(ABC):
 
 class AbstractExecutorPort(ABC):
     """Interface ABC para execução de algoritmos."""
-
-    @abstractmethod
-    def execute_single(
-        self,
-        algorithm_name: str,
-        dataset: Dataset,
-        params: Optional[Dict[str, Any]] = None,
-        timeout: Optional[int] = None,
-    ) -> Dict[str, Any]:
-        """Executa algoritmo único."""
-        pass
 
     @abstractmethod
     def execute_batch(self, batch_config: Dict[str, Any]) -> List[Dict[str, Any]]:

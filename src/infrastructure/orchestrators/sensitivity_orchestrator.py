@@ -21,16 +21,18 @@ from src.domain.errors import SensitivityExecutionError
 class SensitivityOrchestrator:
     """Orchestrator para análises de sensibilidade com SALib."""
 
-    def __init__(self, algorithm_registry, executor):
+    def __init__(self, algorithm_registry, executor, monitoring_service=None):
         """
         Inicializa orchestrator de sensibilidade.
 
         Args:
             algorithm_registry: Registry de algoritmos
             executor: Executor para execução de algoritmos
+            monitoring_service: Serviço de monitoramento (opcional)
         """
         self._algorithm_registry = algorithm_registry
         self._executor = executor
+        self._monitoring_service = monitoring_service
         self._logger = logging.getLogger(__name__)
 
     def execute_sensitivity_analysis(
@@ -238,34 +240,57 @@ class SensitivityOrchestrator:
             # Converter amostra para parâmetros
             params = self._sample_to_params(sample, problem_def)
 
-            # Executar com repetições
-            sample_results = {"distance": [], "execution_time": [], "fitness_calls": []}
+            # Executar com repetições (potencialmente paralelas)
+            try:
+                # Usar o método público de repetições paralelas do executor
+                sample_results_list = []
 
-            for rep in range(repetitions):
-                try:
-                    result = self._executor.execute_single(
-                        algorithm_name, dataset, params, timeout=600
-                    )
+                for rep in range(repetitions):
+                    try:
+                        result = self._executor.execute_single(
+                            algorithm_name, dataset, params, timeout=600
+                        )
+                        sample_results_list.append(result)
+                    except (RuntimeError, ValueError, TimeoutError) as e:
+                        self._logger.warning("Erro na execução %d: %s", rep, e)
+                        sample_results_list.append(None)
 
-                    sample_results["distance"].append(result["max_distance"])
-                    sample_results["execution_time"].append(result["execution_time"])
-                    sample_results["fitness_calls"].append(
-                        result.get("metadata", {}).get("fitness_calls", 0)
-                    )
+                # Processar resultados das repetições
+                sample_results = {
+                    "distance": [],
+                    "execution_time": [],
+                    "fitness_calls": [],
+                }
 
-                except (RuntimeError, ValueError, TimeoutError) as e:
-                    self._logger.warning("Erro na execução %d: %s", rep, e)
-                    # Usar valores de penalidade para falhas
-                    sample_results["distance"].append(float("inf"))
-                    sample_results["execution_time"].append(600.0)  # timeout
-                    sample_results["fitness_calls"].append(0)
+                for result in sample_results_list:
+                    if result is not None:
+                        sample_results["distance"].append(result["max_distance"])
+                        sample_results["execution_time"].append(
+                            result["execution_time"]
+                        )
+                        sample_results["fitness_calls"].append(
+                            result.get("metadata", {}).get("fitness_calls", 0)
+                        )
+                    else:
+                        # Resultado com falha
+                        sample_results["distance"].append(float("inf"))
+                        sample_results["execution_time"].append(600.0)  # timeout
+                        sample_results["fitness_calls"].append(0)
 
-            # Agregar repetições (média)
-            for metric in results.keys():
-                valid_values = [v for v in sample_results[metric] if not np.isinf(v)]
-                if valid_values:
-                    results[metric].append(np.mean(valid_values))
-                else:
+                # Agregar repetições (média)
+                for metric in results.keys():
+                    valid_values = [
+                        v for v in sample_results[metric] if not np.isinf(v)
+                    ]
+                    if valid_values:
+                        results[metric].append(np.mean(valid_values))
+                    else:
+                        results[metric].append(float("inf"))
+
+            except Exception as e:
+                self._logger.warning("Erro na execução da amostra %d: %s", i, e)
+                # Usar valores de penalidade para falhas completas da amostra
+                for metric in results.keys():
                     results[metric].append(float("inf"))
 
         return results

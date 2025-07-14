@@ -59,7 +59,7 @@ class CSPAlgorithm(ABC):
         self.strings = strings
         self.alphabet = alphabet
         self.params = {**self.default_params, **params}
-        self.progress_callback: Optional[Callable[[str], None]] = None
+        self.progress_callback: Optional[Callable[[str, float], None]] = None
         self.warning_callback: Optional[Callable[[str], None]] = None
 
         # Configurações de histórico
@@ -69,7 +69,7 @@ class CSPAlgorithm(ABC):
         )  # A cada N iterações
         self.history = []
 
-    def set_progress_callback(self, callback: Callable[[str], None]) -> None:
+    def set_progress_callback(self, callback: Callable[[str, float], None]) -> None:
         """Define callback para relatar progresso do algoritmo."""
         self.progress_callback = callback
 
@@ -77,10 +77,10 @@ class CSPAlgorithm(ABC):
         """Define callback para relatar warnings do algoritmo."""
         self.warning_callback = callback
 
-    def _report_progress(self, message: str) -> None:
+    def _report_progress(self, message: str, progress: float = 0.0) -> None:
         """Relata progresso se callback estiver definido."""
         if self.progress_callback:
-            self.progress_callback(message)
+            self.progress_callback(message, progress)
 
     def _report_warning(self, message: str) -> None:
         """Relata warning se callback estiver definido."""

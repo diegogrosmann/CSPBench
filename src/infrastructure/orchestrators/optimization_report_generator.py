@@ -23,6 +23,7 @@ from src.infrastructure.logging_config import get_logger
 
 # Configurar matplotlib para não mostrar warnings
 warnings.filterwarnings("ignore", category=UserWarning)
+warnings.filterwarnings("ignore", category=RuntimeWarning, module="seaborn")
 plt.style.use("seaborn-v0_8")
 
 
@@ -468,14 +469,30 @@ class OptimizationReportGenerator:
 
         for param_col in param_cols:
             param_values = completed_trials[param_col].dropna()
-            if param_values.dtype != "object":
+            # Verificar se é numérico e tem variância
+            if (
+                param_values.dtype != "object"
+                and len(param_values) > 1
+                and param_values.var() > 0
+            ):
                 numeric_params.append(param_col)
 
         if len(numeric_params) < 2:
+            self.logger.warning(
+                "Heatmap: Parâmetros numéricos insuficientes para correlação"
+            )
             return
 
         # Criar matriz de correlação
         correlation_data = completed_trials[numeric_params + ["value"]].corr()
+
+        # Verificar se a matriz contém dados válidos
+        valid_data = correlation_data.dropna(axis=0, how="all").dropna(
+            axis=1, how="all"
+        )
+        if valid_data.empty or valid_data.isna().all().all():
+            self.logger.warning("Heatmap: Matriz de correlação contém apenas NaN")
+            return
 
         # Renomear colunas
         correlation_data.columns = [

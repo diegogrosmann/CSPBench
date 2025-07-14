@@ -13,9 +13,9 @@ from src.application.services.experiment_service import ExperimentService
 from src.infrastructure import (
     CsvExporter,
     DomainAlgorithmRegistry,
+    Executor,
     FileDatasetRepository,
     JsonExporter,
-    SequentialExecutor,
 )
 
 app = typer.Typer(
@@ -29,7 +29,7 @@ dataset_repository = FileDatasetRepository(
     "/home/diego_grosmann/CSPBench/saved_datasets"
 )
 algorithm_registry = DomainAlgorithmRegistry()
-executor = SequentialExecutor()
+executor = Executor()
 exporter = JsonExporter("./outputs")
 
 experiment_service = ExperimentService(

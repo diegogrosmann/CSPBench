@@ -18,6 +18,7 @@ from src.application.services.config_parser import (
     ConfigurationValidator,
 )
 from src.domain import (
+    AlgorithmExecutionError,
     AlgorithmNotFoundError,
     BatchConfigurationError,
     BatchExecutionError,
@@ -30,6 +31,7 @@ from src.domain import (
 )
 from src.domain.dataset import SyntheticDatasetGenerator
 from src.infrastructure.logging_config import LoggerConfig, get_logger
+from src.presentation.monitoring.interfaces import TaskType
 
 
 class ExperimentService:
@@ -46,6 +48,7 @@ class ExperimentService:
         exporter: ExportPort,
         executor: ExecutorPort,
         algo_registry: AlgorithmRegistry,
+        monitoring_service: Optional[Any] = None,
     ):
         """
         Inicializa o serviço de experimentos.
@@ -55,17 +58,30 @@ class ExperimentService:
             exporter: Port para exportação de resultados
             executor: Port para execução de algoritmos
             algo_registry: Registry de algoritmos
+            monitoring_service: Serviço de monitoramento (opcional)
         """
         self._dataset_repo = dataset_repo
         self._exporter = exporter
         self._executor = executor
         self._algo_registry = algo_registry
+        self._monitoring_service = monitoring_service
         self._logger = get_logger(__name__)
 
     def _update_batch_logging(self, batch_config: Dict[str, Any]) -> None:
         """Atualiza configuração de logging baseado no batch específico."""
         try:
-            if "advanced" in batch_config and "logs" in batch_config["advanced"]:
+            # Verificar configuração de logging no formato atual
+            if "logging" in batch_config:
+                log_config = batch_config["logging"]
+
+                # Atualizar nível se especificado
+                if "level" in log_config:
+                    new_level = log_config["level"]
+                    LoggerConfig.set_level(new_level)
+                    self._logger.info(f"Nível de log atualizado para: {new_level}")
+
+            # Suportar formato legado também
+            elif "advanced" in batch_config and "logs" in batch_config["advanced"]:
                 log_config = batch_config["advanced"]["logs"]
 
                 # Verificar se logs estão habilitados
@@ -131,8 +147,8 @@ class ExperimentService:
             consolidated_results = self._consolidate_batch_results(results["results"])
 
             total_experiments = len(results["results"])
-            successful = consolidated_results.get("successful", 0)
-            failed = consolidated_results.get("failed", 0)
+            successful = consolidated_results.get("summary", {}).get("successful", 0)
+            failed = consolidated_results.get("summary", {}).get("failed", 0)
             self._logger.info(
                 f"Batch concluído: {total_experiments} experimentos, {successful} sucessos, {failed} falhas"
             )
@@ -147,22 +163,28 @@ class ExperimentService:
             ) or export_config.get("enabled", False)
 
             if should_export:
+                # Determinar nome do arquivo baseado no tipo de task
+                default_filename = f"{task_type}_results.json"
+
                 # Usar configurações de export se disponível, senão usar padrões
                 format_type = (
                     export_config.get("formats", {}).get("json", True)
                     and "json"
                     or "txt"
                 )
-                destination = export_config.get(
-                    "destination", "sensitivity_results.json"
-                )
+                destination = export_config.get("destination", default_filename)
 
-                # Para análises de sensibilidade, incluir os resultados detalhados
+                # Estruturar dados de export baseado no tipo de task
                 export_data = {
                     "batch_summary": consolidated_results,
                     "detailed_results": results.get("results", []),
-                    "sensitivity_summaries": results.get("sensitivity_summaries", []),
                 }
+
+                # Adicionar campos específicos por tipo
+                if task_type == "sensitivity":
+                    export_data["sensitivity_summaries"] = results.get(
+                        "sensitivity_summaries", []
+                    )
 
                 export_path = self._export_batch_results(
                     export_data,
@@ -336,8 +358,32 @@ class ExperimentService:
         # Carregar dataset
         dataset = self._load_dataset(dataset_id)
 
-        # Executar algoritmo
-        return self._executor.execute_single(algorithm_name, dataset, params, timeout)
+        # Criar configuração de batch para execução única
+        batch_config = {
+            "task": {"type": "execution"},
+            "experiments": [
+                {
+                    "algorithm": algorithm_name,
+                    "dataset": dataset_id,
+                    "params": params or {},
+                }
+            ],
+        }
+
+        # Adicionar timeout se fornecido
+        if timeout is not None:
+            batch_config["experiments"][0]["timeout"] = timeout
+
+        # Executar como batch e retornar primeiro resultado
+        results = self._executor.execute_batch(batch_config)
+        if results:
+            result = results[0]
+            # Garantir que timeout está nos metadados se foi fornecido
+            if timeout is not None and "metadata" in result:
+                result["metadata"]["timeout"] = timeout
+            return result
+        else:
+            raise AlgorithmExecutionError(f"Erro na execução de {algorithm_name}")
 
     def list_available_algorithms(self) -> List[str]:
         """Lista algoritmos disponíveis."""
@@ -367,8 +413,28 @@ class ExperimentService:
             Dict[str, Any]: Resultados da execução
         """
         self._logger.info("Processando batch de execução")
-        results = self._executor.execute_batch(batch_config)
-        return {"results": results}
+
+        # Iniciar monitoramento se disponível
+        if self._monitoring_service:
+            batch_name = batch_config.get("metadados", {}).get("nome", "Execução")
+            self._monitoring_service.start_monitoring(TaskType.EXECUTION, batch_name)
+
+        try:
+            results = self._executor.execute_batch(
+                batch_config, self._monitoring_service
+            )
+
+            # Finalizar monitoramento
+            if self._monitoring_service:
+                self._monitoring_service.finish_monitoring({"results": results})
+
+            return {"results": results}
+        except Exception as e:
+            # Mostrar erro no monitoramento
+            if self._monitoring_service:
+                self._monitoring_service.show_error(str(e))
+                self._monitoring_service.finish_monitoring({})
+            raise
 
     def _process_optimization_batch(
         self, batch_config: Dict[str, Any]
@@ -384,97 +450,109 @@ class ExperimentService:
         """
         self._logger.info("Processando batch de otimização")
 
-        # Parsear configurações de otimização usando novo parser
-        optimization_configs = ConfigurationParser.parse_optimization_configs(
-            batch_config
-        )
+        # Iniciar monitoramento se disponível
+        if self._monitoring_service:
+            batch_name = batch_config.get("metadados", {}).get("nome", "Otimização")
+            self._monitoring_service.start_monitoring(TaskType.OPTIMIZATION, batch_name)
 
-        all_results = []
-        optimization_summaries = []
+        try:
+            # Parsear configurações de otimização usando novo parser
+            optimization_configs = ConfigurationParser.parse_optimization_configs(
+                batch_config
+            )
 
-        for opt_config in optimization_configs:
-            self._logger.info(f"Executando otimização: {opt_config.nome}")
+            all_results = []
+            optimization_summaries = []
 
-            # Processar cada dataset na configuração
-            for dataset_id in opt_config.target_datasets:
-                self._logger.info(f"Processando dataset: {dataset_id}")
+            for opt_config in optimization_configs:
+                self._logger.info(f"Executando otimização: {opt_config.nome}")
 
-                try:
-                    # Resolver configuração do dataset e carregá-lo
-                    dataset_config = self._resolve_dataset_config(
-                        dataset_id, batch_config.get("datasets", [])
-                    )
+                # Processar cada dataset na configuração
+                for dataset_id in opt_config.target_datasets:
+                    self._logger.info(f"Processando dataset: {dataset_id}")
 
-                    # Carregar dataset baseado na configuração
-                    if dataset_config["tipo"] == "file":
-                        filename = dataset_config["parametros"]["filename"]
-                        dataset = self._load_dataset(filename)
-                    else:
-                        # Para datasets sintéticos, criar usando o método existente
-                        dataset = self._create_dataset_from_config(dataset_config)
+                    try:
+                        # Resolver configuração do dataset e carregá-lo
+                        dataset_config = self._resolve_dataset_config(
+                            dataset_id, batch_config.get("datasets", [])
+                        )
 
-                    self._logger.info(
-                        f"Dataset {dataset_id} carregado: {len(dataset.sequences)} sequências"
-                    )
+                        # Carregar dataset baseado na configuração
+                        if dataset_config["tipo"] == "file":
+                            filename = dataset_config["parametros"]["filename"]
+                            dataset = self._load_dataset(filename)
+                        else:
+                            # Para datasets sintéticos, criar usando o método existente
+                            dataset = self._create_dataset_from_config(dataset_config)
 
-                    # Extrair configurações de recursos
-                    resources_config = ConfigurationParser.parse_resources_config(
-                        batch_config
-                    )
+                        self._logger.info(
+                            f"Dataset {dataset_id} carregado: {len(dataset.sequences)} sequências"
+                        )
 
-                    # Preparar configuração para o executor
-                    executor_config = {
-                        "study_name": opt_config.study_name,
-                        "direction": opt_config.direction,
-                        "n_trials": opt_config.n_trials,
-                        "timeout_per_trial": opt_config.timeout_per_trial,
-                        "parameters": opt_config.parameters,
-                        "optuna_config": opt_config.optuna_config or {},
-                        "resources": resources_config,  # Incluir configurações de recursos
-                        "internal_jobs": resources_config.get(
-                            "internal_jobs", 4
-                        ),  # Paralelismo interno
-                    }
+                        # Extrair configurações de recursos
+                        resources_config = ConfigurationParser.parse_resources_config(
+                            batch_config
+                        )
 
-                    # Executar otimização
-                    optimization_results = self._executor.execute_optimization(
-                        opt_config.target_algorithm, dataset, executor_config
-                    )
+                        # Preparar configuração para o executor
+                        executor_config = {
+                            "study_name": opt_config.study_name,
+                            "direction": opt_config.direction,
+                            "n_trials": opt_config.n_trials,
+                            "timeout_per_trial": opt_config.timeout_per_trial,
+                            "parameters": opt_config.parameters,
+                            "optuna_config": opt_config.optuna_config or {},
+                            "resources": resources_config,  # Incluir configurações de recursos
+                            "internal_jobs": resources_config.get(
+                                "internal_jobs", 4
+                            ),  # Paralelismo interno
+                        }
 
-                    all_results.append(optimization_results)
+                        # Executar otimização
+                        optimization_results = self._executor.execute_optimization(
+                            opt_config.target_algorithm, dataset, executor_config
+                        )
 
-                    # Criar sumário para esta otimização
-                    optimization_summaries.append(
-                        {
+                        all_results.append(optimization_results)
+
+                        # Criar sumário para esta otimização
+                        optimization_summaries.append(
+                            {
+                                "optimization_name": opt_config.nome,
+                                "algorithm": opt_config.target_algorithm,
+                                "dataset": dataset_id,
+                                "best_value": optimization_results.get("best_value"),
+                                "best_params": optimization_results.get("best_params"),
+                                "n_trials": optimization_results.get("n_trials"),
+                                "total_time": optimization_results.get("total_time"),
+                            }
+                        )
+
+                        self._logger.info(f"Otimização concluída para {dataset_id}")
+
+                    except Exception as e:
+                        self._logger.error(f"Erro na otimização de {dataset_id}: {e}")
+                        # Adicionar resultado de erro
+                        error_result = {
                             "optimization_name": opt_config.nome,
                             "algorithm": opt_config.target_algorithm,
                             "dataset": dataset_id,
-                            "best_value": optimization_results.get("best_value"),
-                            "best_params": optimization_results.get("best_params"),
-                            "n_trials": optimization_results.get("n_trials"),
-                            "total_time": optimization_results.get("total_time"),
+                            "error": str(e),
+                            "status": "failed",
                         }
-                    )
+                        all_results.append(error_result)
+                        optimization_summaries.append(error_result)
 
-                    self._logger.info(f"Otimização concluída para {dataset_id}")
-
-                except Exception as e:
-                    self._logger.error(f"Erro na otimização de {dataset_id}: {e}")
-                    # Adicionar resultado de erro
-                    error_result = {
-                        "optimization_name": opt_config.nome,
-                        "algorithm": opt_config.target_algorithm,
-                        "dataset": dataset_id,
-                        "error": str(e),
-                        "status": "failed",
-                    }
-                    all_results.append(error_result)
-                    optimization_summaries.append(error_result)
-
-        return {
-            "results": all_results,
-            "optimization_summaries": optimization_summaries,
-        }
+            return {
+                "results": all_results,
+                "optimization_summaries": optimization_summaries,
+            }
+        except Exception as e:
+            # Mostrar erro no monitoramento
+            if self._monitoring_service:
+                self._monitoring_service.show_error(str(e))
+                self._monitoring_service.finish_monitoring({})
+            raise
 
     def _process_sensitivity_batch(
         self, batch_config: Dict[str, Any]
@@ -490,99 +568,133 @@ class ExperimentService:
         """
         self._logger.info("Processando batch de análise de sensibilidade")
 
-        # Parsear configurações de sensibilidade usando novo parser
-        sensitivity_configs = ConfigurationParser.parse_sensitivity_configs(
-            batch_config
-        )
+        # Iniciar monitoramento se disponível
+        if self._monitoring_service:
+            batch_name = batch_config.get("metadados", {}).get(
+                "nome", "Análise de Sensibilidade"
+            )
+            self._monitoring_service.start_monitoring(TaskType.SENSITIVITY, batch_name)
 
-        all_results = []
-        sensitivity_summaries = []
-
-        for sens_config in sensitivity_configs:
-            self._logger.info(
-                f"Executando análise de sensibilidade: {sens_config.nome}"
+        try:
+            # Parsear configurações de sensibilidade usando novo parser
+            sensitivity_configs = ConfigurationParser.parse_sensitivity_configs(
+                batch_config
             )
 
-            # Processar cada dataset na configuração
-            for dataset_id in sens_config.target_datasets:
-                self._logger.info(f"Processando dataset: {dataset_id}")
+            all_results = []
+            sensitivity_summaries = []
 
-                try:
-                    # Resolver configuração do dataset e carregá-lo
-                    dataset_config = self._resolve_dataset_config(
-                        dataset_id, batch_config.get("datasets", [])
-                    )
+            for sens_config in sensitivity_configs:
+                self._logger.info(
+                    f"Executando análise de sensibilidade: {sens_config.nome}"
+                )
 
-                    # Carregar dataset baseado na configuração
-                    if dataset_config["tipo"] == "file":
-                        filename = dataset_config["parametros"]["filename"]
-                        dataset = self._load_dataset(filename)
-                    else:
-                        # Para datasets sintéticos, criar usando o método existente
-                        dataset = self._create_dataset_from_config(dataset_config)
+                # Processar cada dataset na configuração
+                for dataset_id in sens_config.target_datasets:
+                    self._logger.info(f"Processando dataset: {dataset_id}")
 
-                    self._logger.info(
-                        f"Dataset {dataset_id} carregado: {len(dataset.sequences)} sequências"
-                    )
+                    try:
+                        # Resolver configuração do dataset e carregá-lo
+                        dataset_config = self._resolve_dataset_config(
+                            dataset_id, batch_config.get("datasets", [])
+                        )
 
-                    # Extrair configurações de recursos
-                    resources_config = ConfigurationParser.parse_resources_config(
-                        batch_config
-                    )
+                        # Carregar dataset baseado na configuração
+                        if dataset_config["tipo"] == "file":
+                            filename = dataset_config["parametros"]["filename"]
+                            dataset = self._load_dataset(filename)
+                        else:
+                            # Para datasets sintéticos, criar usando o método existente
+                            dataset = self._create_dataset_from_config(dataset_config)
 
-                    # Preparar configuração para o executor
-                    executor_config = {
-                        "analysis_method": sens_config.analysis_method,
-                        "n_samples": sens_config.n_samples,
-                        "repetitions_per_sample": sens_config.repetitions_per_sample,
-                        "parameters": sens_config.parameters,
-                        "output_metrics": sens_config.output_metrics,
-                        "method_config": sens_config.method_config or {},
-                        "resources": resources_config,  # Incluir configurações de recursos
-                        "internal_jobs": resources_config.get(
-                            "internal_jobs", 4
-                        ),  # Paralelismo interno
-                    }
+                        self._logger.info(
+                            f"Dataset {dataset_id} carregado: {len(dataset.sequences)} sequências"
+                        )
 
-                    # Executar análise de sensibilidade
-                    sensitivity_results = self._executor.execute_sensitivity_analysis(
-                        sens_config.target_algorithm, dataset, executor_config
-                    )
+                        # Extrair configurações de recursos
+                        resources_config = ConfigurationParser.parse_resources_config(
+                            batch_config
+                        )
 
-                    all_results.append(sensitivity_results)
+                        # Preparar configuração para o executor
+                        executor_config = {
+                            "analysis_method": sens_config.analysis_method,
+                            "n_samples": sens_config.n_samples,
+                            "repetitions_per_sample": sens_config.repetitions_per_sample,
+                            "parameters": sens_config.parameters,
+                            "output_metrics": sens_config.output_metrics,
+                            "method_config": sens_config.method_config or {},
+                            "resources": resources_config,  # Incluir configurações de recursos
+                            "internal_jobs": resources_config.get(
+                                "internal_jobs", 4
+                            ),  # Paralelismo interno
+                        }
 
-                    # Criar sumário para esta análise
-                    sensitivity_summaries.append(
-                        {
+                        # Executar análise de sensibilidade
+                        sensitivity_results = (
+                            self._executor.execute_sensitivity_analysis(
+                                sens_config.target_algorithm, dataset, executor_config
+                            )
+                        )
+
+                        all_results.append(sensitivity_results)
+
+                        # Criar sumário para esta análise
+                        sensitivity_summaries.append(
+                            {
+                                "analysis_name": sens_config.nome,
+                                "algorithm": sens_config.target_algorithm,
+                                "dataset": dataset_id,
+                                "n_samples": sensitivity_results.get("n_samples"),
+                                "parameters_analyzed": list(
+                                    sens_config.parameters.keys()
+                                ),
+                                "total_time": sensitivity_results.get("total_time"),
+                            }
+                        )
+
+                        self._logger.info(
+                            f"Análise de sensibilidade concluída para {dataset_id}"
+                        )
+
+                    except Exception as e:
+                        self._logger.error(
+                            f"Erro na análise de sensibilidade de {dataset_id}: {e}"
+                        )
+                        # Adicionar resultado de erro
+                        error_result = {
                             "analysis_name": sens_config.nome,
                             "algorithm": sens_config.target_algorithm,
                             "dataset": dataset_id,
-                            "n_samples": sensitivity_results.get("n_samples"),
-                            "parameters_analyzed": list(sens_config.parameters.keys()),
-                            "total_time": sensitivity_results.get("total_time"),
+                            "error": str(e),
+                            "status": "failed",
                         }
-                    )
+                        all_results.append(error_result)
+                        sensitivity_summaries.append(error_result)
 
-                    self._logger.info(
-                        f"Análise de sensibilidade concluída para {dataset_id}"
-                    )
+        except Exception as e:
+            # Mostrar erro no monitoramento
+            if self._monitoring_service:
+                self._monitoring_service.show_error(str(e))
+                self._monitoring_service.finish_monitoring({})
+            raise
 
-                except Exception as e:
-                    self._logger.error(
-                        f"Erro na análise de sensibilidade de {dataset_id}: {e}"
-                    )
-                    # Adicionar resultado de erro
-                    error_result = {
-                        "analysis_name": sens_config.nome,
-                        "algorithm": sens_config.target_algorithm,
-                        "dataset": dataset_id,
-                        "error": str(e),
-                        "status": "failed",
-                    }
-                    all_results.append(error_result)
-                    sensitivity_summaries.append(error_result)
+        # Finalizar monitoramento
+        if self._monitoring_service:
+            self._monitoring_service.finish_monitoring({})
 
-        return {"results": all_results, "sensitivity_summaries": sensitivity_summaries}
+        # Retornar resultados consolidados
+        return {
+            "results": all_results,
+            "sensitivity_summaries": sensitivity_summaries,
+            "summary": {
+                "total_analyses": len(sensitivity_summaries),
+                "successful": len(
+                    [r for r in all_results if r.get("status") != "failed"]
+                ),
+                "failed": len([r for r in all_results if r.get("status") == "failed"]),
+            },
+        }
 
     def _parse_batch_config(self, batch_cfg: str) -> Dict[str, Any]:
         """Parseia configuração de batch."""

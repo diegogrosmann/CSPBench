@@ -428,6 +428,7 @@ refactor/<descricao>    # Refatorações
 - ❌ **Imports Diretos**: Aplicação NÃO pode importar plugins diretamente
 - ❌ **Domain Purity**: Domain layer NÃO pode ter I/O ou dependências externas
 - ❌ **Credenciais**: NUNCA hardcodar ou versionar credenciais
+- ❌ **Adaptadores**: NUNCA use adaptadores para codigos legados, remova codigo legado.
 
 ### 10.5 Qualidade e Padrões
 
