@@ -26,7 +26,7 @@ datasets:
     nome: "Teste Médio 2"
     tipo: "file" 
     parametros:
-      filename: "test_dataset.fasta"
+      filename: "datasets/synthetic_n20_L50_noise0.1_ACTG.fasta"
 
 # Algoritmos padronizados
 algorithms:
@@ -98,12 +98,12 @@ execution:
     - nome: "Execução Completa"
       datasets: ["teste_pequeno", "teste_pequeno_2"]
       algorithms: ["todos_algoritmos", "todos_teste"]
-      repetitions: 5
+      repetitions: 20
 
     - nome: "Execução Parcial"
       datasets: ["teste_pequeno"]
       algorithms: ["todos_algoritmos", "todos_teste"]
-      repetitions: 2
+      repetitions: 10
 
 monitoring:
   # Monitoramento geral
@@ -160,8 +160,8 @@ logging:
 resources:
   parallel:
     enabled: true
-    max_workers: null
-    internal_jobs: 4
+    max_workers: 8
+    internal_jobs: 1
     backend: "threading"
   timeouts:
     per_algorithm_run: 3600

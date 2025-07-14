@@ -571,78 +571,21 @@ class ExecutionOrchestrator(BaseOrchestrator):
                 # Obter parâmetros específicos do algoritmo
                 params = algorithm_params.get(algorithm_name, {})
 
-                # Executar repetições
-                for rep in range(repetitions):
-                    rep_id = f"{algorithm_name}_{dataset_id}_{rep+1}"
+                # Executar repetições com paralelismo
+                algorithm_results = self._execute_algorithm_repetitions_parallel(
+                    algorithm_name=algorithm_name,
+                    dataset=dataset,
+                    params=params,
+                    repetitions=repetitions,
+                    execution_context={
+                        "execution_name": execution.get("nome", "unknown"),
+                        "dataset_id": dataset_id,
+                        "algorithm_id": algorithm_config["id"],
+                    },
+                    monitoring_service=monitoring_service,
+                )
 
-                    try:
-                        # Notificar monitoramento de novo item
-                        if monitoring_service:
-                            from src.presentation.monitoring.interfaces import (
-                                HierarchicalContext,
-                            )
-
-                            context = HierarchicalContext(
-                                dataset_id=dataset_id,
-                                algorithm_id=algorithm_name,
-                                repetition_id=f"{rep+1}/{repetitions}",
-                            )
-                            monitoring_service.update_item(
-                                rep_id, 0.0, "Iniciando", context
-                            )
-
-                        # Executar algoritmo
-                        result = self.execute_single(
-                            algorithm_name, dataset, params, monitoring_service
-                        )
-
-                        # Adicionar informações de contexto
-                        result.update(
-                            {
-                                "execution_name": execution.get("nome", "unknown"),
-                                "dataset_id": dataset_id,
-                                "algorithm_id": algorithm_config["id"],
-                                "algorithm_name": algorithm_name,
-                                "repetition": rep + 1,
-                                "total_repetitions": repetitions,
-                                "status": "success",
-                            }
-                        )
-
-                        results.append(result)
-
-                        # Notificar monitoramento de conclusão
-                        if monitoring_service:
-                            monitoring_service.finish_item(rep_id, True, result)
-
-                        self._logger.debug(
-                            f"Algoritmo {algorithm_name} executado com sucesso (rep {rep+1}/{repetitions})"
-                        )
-
-                    except Exception as e:
-                        self._logger.error(
-                            f"Erro na execução do algoritmo {algorithm_name} (rep {rep+1}): {e}"
-                        )
-
-                        error_result = {
-                            "execution_name": execution.get("nome", "unknown"),
-                            "dataset_id": dataset_id,
-                            "algorithm_id": algorithm_config["id"],
-                            "algorithm_name": algorithm_name,
-                            "repetition": rep + 1,
-                            "total_repetitions": repetitions,
-                            "status": "error",
-                            "error": str(e),
-                            "execution_time": 0.0,
-                        }
-
-                        results.append(error_result)
-
-                        # Notificar monitoramento de erro
-                        if monitoring_service:
-                            monitoring_service.finish_item(
-                                rep_id, False, error_result, str(e)
-                            )
+                results.extend(algorithm_results)
 
         except Exception as e:
             self._logger.error(
@@ -659,6 +602,88 @@ class ExecutionOrchestrator(BaseOrchestrator):
             )
 
         return results
+
+    def _execute_single_repetition(
+        self,
+        algorithm_name: str,
+        dataset: Dataset,
+        params: Dict[str, Any],
+        execution_context: Dict[str, Any],
+        rep_number: int,
+        total_repetitions: int,
+    ) -> Dict[str, Any]:
+        """
+        Executa uma única repetição de um algoritmo.
+
+        Este método é projetado para ser usado com ProcessPoolExecutor,
+        portanto deve ser independente de estado do orchestrator.
+
+        Args:
+            algorithm_name: Nome do algoritmo a executar
+            dataset: Dataset para processamento
+            params: Parâmetros do algoritmo
+            execution_context: Contexto da execução (nomes, IDs, etc.)
+            rep_number: Número da repetição (1-based)
+            total_repetitions: Total de repetições
+
+        Returns:
+            Dict[str, Any]: Resultado da execução com contexto
+        """
+        try:
+            # Executar algoritmo (sem monitoring_service pois não é thread-safe)
+            result = self.execute_single(
+                algorithm_name, dataset, params, monitoring_service=None
+            )
+
+            # Adicionar informações de contexto
+            result.update(
+                {
+                    "execution_name": execution_context.get(
+                        "execution_name", "unknown"
+                    ),
+                    "dataset_id": execution_context.get("dataset_id", "unknown"),
+                    "algorithm_id": execution_context.get("algorithm_id", "unknown"),
+                    "algorithm_name": algorithm_name,
+                    "repetition": rep_number,
+                    "total_repetitions": total_repetitions,
+                    "status": "success",
+                }
+            )
+
+            return result
+
+        except Exception as e:
+            error_result = {
+                "execution_name": execution_context.get("execution_name", "unknown"),
+                "dataset_id": execution_context.get("dataset_id", "unknown"),
+                "algorithm_id": execution_context.get("algorithm_id", "unknown"),
+                "algorithm_name": algorithm_name,
+                "repetition": rep_number,
+                "total_repetitions": total_repetitions,
+                "status": "error",
+                "error": str(e),
+                "execution_time": 0.0,
+            }
+
+            return error_result
+
+    def _get_max_workers(self) -> int:
+        """
+        Obtém o número máximo de workers para paralelização.
+
+        Returns:
+            int: Número de workers a usar
+        """
+        if self._current_batch_config:
+            resources = self._current_batch_config.get("resources", {})
+            parallel_config = resources.get("parallel", {})
+            max_workers = parallel_config.get("max_workers")
+
+            if max_workers is not None and max_workers > 0:
+                return max_workers
+
+        # Fallback para número de CPUs
+        return cpu_count() or 1
 
     def _execute_dataset_algorithms(
         self,
@@ -717,78 +742,21 @@ class ExecutionOrchestrator(BaseOrchestrator):
                     # Obter parâmetros específicos do algoritmo
                     params = algorithm_params.get(algorithm_name, {})
 
-                    # Executar repetições
-                    for rep in range(repetitions):
-                        rep_id = f"{algorithm_name}_{dataset_id}_{rep+1}"
+                    # Executar repetições com paralelismo
+                    algorithm_results = self._execute_algorithm_repetitions_parallel(
+                        algorithm_name=algorithm_name,
+                        dataset=dataset,
+                        params=params,
+                        repetitions=repetitions,
+                        execution_context={
+                            "execution_name": execution.get("nome", "unknown"),
+                            "dataset_id": dataset_id,
+                            "algorithm_id": algorithm_id,
+                        },
+                        monitoring_service=monitoring_service,
+                    )
 
-                        try:
-                            # Notificar monitoramento de novo item
-                            if monitoring_service:
-                                from src.presentation.monitoring.interfaces import (
-                                    HierarchicalContext,
-                                )
-
-                                context = HierarchicalContext(
-                                    dataset_id=dataset_id,
-                                    algorithm_id=algorithm_name,
-                                    repetition_id=f"{rep+1}/{repetitions}",
-                                )
-                                monitoring_service.update_item(
-                                    rep_id, 0.0, "Iniciando", context
-                                )
-
-                            # Executar algoritmo
-                            result = self.execute_single(
-                                algorithm_name, dataset, params, monitoring_service
-                            )
-
-                            # Adicionar informações de contexto
-                            result.update(
-                                {
-                                    "execution_name": execution.get("nome", "unknown"),
-                                    "dataset_id": dataset_id,
-                                    "algorithm_id": algorithm_id,
-                                    "algorithm_name": algorithm_name,
-                                    "repetition": rep + 1,
-                                    "total_repetitions": repetitions,
-                                    "status": "success",
-                                }
-                            )
-
-                            results.append(result)
-
-                            # Notificar monitoramento de conclusão
-                            if monitoring_service:
-                                monitoring_service.finish_item(rep_id, True, result)
-
-                            self._logger.debug(
-                                f"Algoritmo {algorithm_name} executado com sucesso (rep {rep+1}/{repetitions})"
-                            )
-
-                        except Exception as e:
-                            self._logger.error(
-                                f"Erro na execução do algoritmo {algorithm_name} (rep {rep+1}): {e}"
-                            )
-
-                            error_result = {
-                                "execution_name": execution.get("nome", "unknown"),
-                                "dataset_id": dataset_id,
-                                "algorithm_id": algorithm_id,
-                                "algorithm_name": algorithm_name,
-                                "repetition": rep + 1,
-                                "total_repetitions": repetitions,
-                                "status": "error",
-                                "error": str(e),
-                                "execution_time": 0.0,
-                            }
-
-                            results.append(error_result)
-
-                            # Notificar monitoramento de erro
-                            if monitoring_service:
-                                monitoring_service.finish_item(
-                                    rep_id, False, error_result, str(e)
-                                )
+                    results.extend(algorithm_results)
 
         except Exception as e:
             self._logger.error(
@@ -867,3 +835,249 @@ class ExecutionOrchestrator(BaseOrchestrator):
             return True
 
         return False
+
+    def _execute_algorithm_repetitions_parallel(
+        self,
+        algorithm_name: str,
+        dataset: Dataset,
+        params: Dict[str, Any],
+        repetitions: int,
+        execution_context: Dict[str, Any],
+        monitoring_service=None,
+    ) -> List[Dict[str, Any]]:
+        """
+        Executa repetições de um algoritmo em paralelo usando ProcessPoolExecutor.
+
+        Args:
+            algorithm_name: Nome do algoritmo
+            dataset: Dataset para processamento
+            params: Parâmetros do algoritmo
+            repetitions: Número de repetições
+            execution_context: Contexto da execução
+            monitoring_service: Serviço de monitoramento
+
+        Returns:
+            List[Dict[str, Any]]: Lista de resultados das repetições
+        """
+        max_workers = self._get_max_workers()
+
+        # Se max_workers = 1, usar execução sequencial
+        if max_workers == 1:
+            return self._execute_algorithm_repetitions_sequential(
+                algorithm_name,
+                dataset,
+                params,
+                repetitions,
+                execution_context,
+                monitoring_service,
+            )
+
+        # Execução paralela
+        self._logger.debug(
+            f"Executando {repetitions} repetições de {algorithm_name} com {max_workers} workers"
+        )
+
+        results = []
+
+        # Preparar argumentos para ProcessPoolExecutor
+        args_list = []
+        for rep in range(repetitions):
+            args_list.append(
+                (
+                    algorithm_name,
+                    dataset,
+                    params,
+                    execution_context,
+                    rep + 1,  # 1-based
+                    repetitions,
+                )
+            )
+
+        # Executar em paralelo
+        with ProcessPoolExecutor(max_workers=max_workers) as executor:
+            # Submeter todas as tarefas
+            future_to_rep = {}
+            for i, args in enumerate(args_list):
+                future = executor.submit(self._execute_single_repetition, *args)
+                future_to_rep[future] = i + 1
+
+            # Coletar resultados conforme completam
+            for future in as_completed(future_to_rep):
+                rep_number = future_to_rep[future]
+                rep_id = f"{algorithm_name}_{execution_context.get('dataset_id', 'unknown')}_{rep_number}"
+
+                try:
+                    # Inicializar monitoramento se disponível
+                    if monitoring_service:
+                        from src.presentation.monitoring.interfaces import (
+                            HierarchicalContext,
+                        )
+
+                        context = HierarchicalContext(
+                            dataset_id=execution_context.get("dataset_id", "unknown"),
+                            algorithm_id=algorithm_name,
+                            repetition_id=f"{rep_number}/{repetitions}",
+                        )
+                        monitoring_service.update_item(
+                            rep_id, 0.0, "Iniciando", context
+                        )
+
+                    # Obter resultado
+                    result = future.result()
+
+                    # Verificar se houve erro
+                    if result.get("status") == "error":
+                        self._logger.error(
+                            f"Erro na execução do algoritmo {algorithm_name} (rep {rep_number}): {result.get('error')}"
+                        )
+
+                        # Notificar monitoramento de erro
+                        if monitoring_service:
+                            monitoring_service.finish_item(
+                                rep_id,
+                                False,
+                                result,
+                                result.get("error", "Unknown error"),
+                            )
+                    else:
+                        self._logger.debug(
+                            f"Algoritmo {algorithm_name} executado com sucesso (rep {rep_number}/{repetitions})"
+                        )
+
+                        # Notificar monitoramento de conclusão
+                        if monitoring_service:
+                            monitoring_service.finish_item(rep_id, True, result)
+
+                    results.append(result)
+
+                except Exception as e:
+                    self._logger.error(
+                        f"Erro ao processar resultado da repetição {rep_number} de {algorithm_name}: {e}"
+                    )
+
+                    error_result = {
+                        "execution_name": execution_context.get(
+                            "execution_name", "unknown"
+                        ),
+                        "dataset_id": execution_context.get("dataset_id", "unknown"),
+                        "algorithm_id": execution_context.get(
+                            "algorithm_id", "unknown"
+                        ),
+                        "algorithm_name": algorithm_name,
+                        "repetition": rep_number,
+                        "total_repetitions": repetitions,
+                        "status": "error",
+                        "error": str(e),
+                        "execution_time": 0.0,
+                    }
+
+                    results.append(error_result)
+
+                    # Notificar monitoramento de erro
+                    if monitoring_service:
+                        monitoring_service.finish_item(
+                            rep_id, False, error_result, str(e)
+                        )
+
+        return results
+
+    def _execute_algorithm_repetitions_sequential(
+        self,
+        algorithm_name: str,
+        dataset: Dataset,
+        params: Dict[str, Any],
+        repetitions: int,
+        execution_context: Dict[str, Any],
+        monitoring_service=None,
+    ) -> List[Dict[str, Any]]:
+        """
+        Executa repetições de um algoritmo sequencialmente (fallback).
+
+        Args:
+            algorithm_name: Nome do algoritmo
+            dataset: Dataset para processamento
+            params: Parâmetros do algoritmo
+            repetitions: Número de repetições
+            execution_context: Contexto da execução
+            monitoring_service: Serviço de monitoramento
+
+        Returns:
+            List[Dict[str, Any]]: Lista de resultados das repetições
+        """
+        results = []
+
+        for rep in range(repetitions):
+            rep_id = f"{algorithm_name}_{execution_context.get('dataset_id', 'unknown')}_{rep+1}"
+
+            try:
+                # Notificar monitoramento de novo item
+                if monitoring_service:
+                    from src.presentation.monitoring.interfaces import (
+                        HierarchicalContext,
+                    )
+
+                    context = HierarchicalContext(
+                        dataset_id=execution_context.get("dataset_id", "unknown"),
+                        algorithm_id=algorithm_name,
+                        repetition_id=f"{rep+1}/{repetitions}",
+                    )
+                    monitoring_service.update_item(rep_id, 0.0, "Iniciando", context)
+
+                # Executar algoritmo
+                result = self.execute_single(
+                    algorithm_name, dataset, params, monitoring_service
+                )
+
+                # Adicionar informações de contexto
+                result.update(
+                    {
+                        "execution_name": execution_context.get(
+                            "execution_name", "unknown"
+                        ),
+                        "dataset_id": execution_context.get("dataset_id", "unknown"),
+                        "algorithm_id": execution_context.get(
+                            "algorithm_id", "unknown"
+                        ),
+                        "algorithm_name": algorithm_name,
+                        "repetition": rep + 1,
+                        "total_repetitions": repetitions,
+                        "status": "success",
+                    }
+                )
+
+                results.append(result)
+
+                # Notificar monitoramento de conclusão
+                if monitoring_service:
+                    monitoring_service.finish_item(rep_id, True, result)
+
+                self._logger.debug(
+                    f"Algoritmo {algorithm_name} executado com sucesso (rep {rep+1}/{repetitions})"
+                )
+
+            except Exception as e:
+                self._logger.error(
+                    f"Erro na execução do algoritmo {algorithm_name} (rep {rep+1}): {e}"
+                )
+
+                error_result = {
+                    "execution_name": execution_context.get(
+                        "execution_name", "unknown"
+                    ),
+                    "dataset_id": execution_context.get("dataset_id", "unknown"),
+                    "algorithm_id": execution_context.get("algorithm_id", "unknown"),
+                    "algorithm_name": algorithm_name,
+                    "repetition": rep + 1,
+                    "total_repetitions": repetitions,
+                    "status": "error",
+                    "error": str(e),
+                    "execution_time": 0.0,
+                }
+
+                results.append(error_result)
+
+                # Notificar monitoramento de erro
+                if monitoring_service:
+                    monitoring_service.finish_item(rep_id, False, error_result, str(e))
+
+        return results
