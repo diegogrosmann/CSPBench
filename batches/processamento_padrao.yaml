@@ -1,0 +1,140 @@
+# ===================================================================
+# EXEMPLO PADRONIZADO - PROCESSAMENTO/EXECUÇÃO
+# ===================================================================
+# Baseado no template padronizado CSPBench v0.2
+# Tipo: execution - Executa algoritmos em datasets com parâmetros fixos
+
+metadados:
+  nome: "Processamento Padrão - Algoritmos CSP"
+  descricao: "Execução de todos os algoritmos CSP em múltiplos datasets"
+  autor: "CSPBench User"
+  versao: "1.0"
+  data_criacao: "2025-07-13"
+  tags: ["processamento", "execução", "padrão"]
+  timeout_global: 3600
+
+# Datasets padronizados
+datasets:
+  
+  - id: teste_pequeno
+    nome: "Teste Médio"
+    tipo: "file"
+    parametros:
+      filename: "teste.fasta"
+
+# Algoritmos padronizados
+algorithms:
+  - id: "todos_algoritmos"
+    nome: "Todos os Algoritmos"
+    descricao: "Configuração padrão para todos os algoritmos"
+    algorithms:
+      - "Baseline"
+      - "BLF-GA"
+      - "CSC"
+      - "H³-CSP"
+      - "DP-CSP"
+    
+    algorithm_params:
+      "Baseline":
+        tie_break: "lex"
+      
+      "BLF-GA":
+        pop_size: 100
+        max_gens: 200
+        cross_prob: 0.8
+        mut_prob: 0.1
+        elite_rate: 0.05
+        initial_blocks: 0.2
+        rediv_freq: 10
+        immigrant_freq: 15
+        immigrant_ratio: 0.2
+        crossover_type: "one_point"
+        mutation_type: "multi"
+        selection_type: "tournament"
+        refinement_type: "greedy"
+        no_improve_patience: 0.3
+      
+      "CSC":
+        min_d: 2
+        d_factor: 0.75
+        min_blocks: 4
+        max_blocks: 8
+        l_div: 25
+      
+      "H³-CSP":
+        auto_blocks: true
+        min_block_size: 2
+        block_size: 4
+        k_candidates: 5
+        local_iters: 3
+        fallback_enabled: true
+      
+      "DP-CSP":
+        max_d: 5
+        warn_threshold: 50
+        seed: null
+
+# Tarefa específica
+task:
+  type: "execution"
+
+execution:
+  executions:
+    - nome: "Execução Completa"
+      datasets: ["teste_pequeno"]
+      algorithms: ["todos_algoritmos"]
+      repetitions: 3
+
+# Configurações padrão
+export:
+  enabled: true
+  destination: "outputs/{session_folder}/processamento_padrao"
+  formats:
+    csv: true
+    json: true
+    pickle: false
+  csv_config:
+    separator: ","
+    encoding: "utf-8"
+    include_index: true
+  json_config:
+    indent: 2
+    ensure_ascii: false
+  include:
+    - "summary"
+    - "detailed_results"
+    - "plots"
+
+plots:
+  enabled: true
+  plot_convergence: true
+  plot_comparison: true
+  plot_boxplots: true
+  plot_runtime: true
+  style: "seaborn-v0_8"
+  figure_size: [12, 8]
+  dpi: 300
+  formats:
+    - "png"
+    - "pdf"
+
+logging:
+  level: "INFO"
+  output:
+    console: true
+    file: true
+  file_config:
+    filename: "processamento.log"
+    max_size_mb: 100
+    backup_count: 5
+
+# Configurações de recursos
+resources:
+  parallel:
+    enabled: true
+    max_workers: null
+    internal_jobs: 4
+    backend: "threading"
+  timeouts:
+    per_algorithm_run: 3600
+    total_batch: 7200

@@ -1,0 +1,232 @@
+# ===================================================================
+# EXEMPLO DE CONFIGURAÇÃO PARA OTIMIZAÇÃO DE HIPERPARÂMETROS
+# ===================================================================
+# Este arquivo demonstra como configurar otimizações usando Optuna.
+# Tipo: optimization - Otimiza hiperparâmetros com busca inteligente
+# Uso: python main.py batches/otimizacao_padrao.yaml
+
+# =====================================================================
+# SEÇÃO 1: METADADOS (OBRIGATÓRIO)
+# =====================================================================
+metadados:
+  nome: "Otimização Padrão - Teste"
+  descricao: "Exemplo de otimização de hiperparâmetros para diferentes algoritmos usando Optuna"
+  autor: "Diego Grosmann"
+  versao: "1.0"
+  data_criacao: "2025-07-13"
+  tags: ["otimização", "optuna", "hiperparâmetros"]
+  timeout_global: 7200  # 2 horas para otimização completa
+
+# =====================================================================
+# SEÇÃO 2: CONFIGURAÇÕES DE INFRAESTRUTURA (OPCIONAL)
+# =====================================================================
+infrastructure:
+  history:
+    save_history: true
+    plot_history: true
+    history_frequency: 10  # Salvar a cada 10 trials
+    history_plots:
+      plot_convergence: true
+      plot_fitness_evolution: true
+      plot_format: "png"
+
+# =====================================================================
+# SEÇÃO 3: DATASETS - USANDO DATASETS REAIS DISPONÍVEIS
+# =====================================================================
+datasets:
+  - id: dataset_pequeno
+    nome: "Dataset Pequeno Existente"
+    tipo: "file"
+    parametros:
+      filename: "teste.fasta"
+
+# =====================================================================
+# SEÇÃO 4: ALGORITMOS
+# =====================================================================
+algorithms:
+  - id: "config_otimizacao"
+    nome: "Configuração para Otimização"
+    descricao: "Parâmetros base para otimização"
+    algorithms:
+      - "BLF-GA"
+      - "CSC"
+      - "H³-CSP"
+    
+    algorithm_params:
+      "BLF-GA":
+        # Parâmetros base que serão otimizados
+        pop_size: 100
+        max_gens: 200
+        cross_prob: 0.8
+        mut_prob: 0.1
+        elite_rate: 0.05
+        crossover_type: "one_point"
+        mutation_type: "multi"
+        
+      "CSC":
+        min_d: 2
+        d_factor: 0.75
+        min_blocks: 4
+        max_blocks: 8
+
+# =====================================================================
+# SEÇÃO 5: TIPO DE TAREFA
+# =====================================================================
+task:
+  type: "optimization"
+
+# =====================================================================
+# SEÇÃO 6B: CONFIGURAÇÃO DE OTIMIZAÇÃO
+# =====================================================================
+optimization:
+  method: "optuna"
+  
+  # Configurações globais do Optuna
+  global_optuna_config:
+    sampler: "TPESampler"
+    pruner: "MedianPruner"
+    n_startup_trials: 20
+    n_warmup_steps: 10
+    interval_steps: 5
+    multivariate: true
+    n_ei_candidates: 24
+    storage: null
+  
+  # Lista de otimizações
+  optimizations:
+    # Otimização 1: BLF-GA em dataset pequeno
+    - nome: "Otimização BLF-GA - Dataset Pequeno"
+      study_name: "blfga_pequeno"
+      direction: "minimize"
+      n_trials: 10
+      timeout_per_trial: 300
+      target_datasets: ["dataset_pequeno"]
+      target_algorithm: "BLF-GA"
+      
+      parameters:
+        pop_size:
+          type: "int"
+          low: 50
+          high: 200
+          step: 10
+        max_gens:
+          type: "int"
+          low: 100
+          high: 500
+          step: 25
+        cross_prob:
+          type: "uniform"
+          low: 0.6
+          high: 0.95
+        mut_prob:
+          type: "uniform"
+          low: 0.01
+          high: 0.3
+        crossover_type:
+          type: "categorical"
+          choices: ["one_point", "uniform", "blend_blocks"]
+        mutation_type:
+          type: "categorical"
+          choices: ["multi", "inversion", "transposition"]
+    
+    # Otimização 3: CSC em dataset médio
+    - nome: "Otimização CSC - Dataset Médio"
+      study_name: "csc_exemplo"
+      direction: "minimize"
+      n_trials: 80
+      timeout_per_trial: 240
+      target_datasets: ["dataset_pequeno"]
+      target_algorithm: "CSC"
+      
+      parameters:
+        min_d:
+          type: "int"
+          low: 1
+          high: 5
+        d_factor:
+          type: "uniform"
+          low: 0.5
+          high: 1.0
+        min_blocks:
+          type: "int"
+          low: 2
+          high: 8
+        max_blocks:
+          type: "int"
+          low: 4
+          high: 16
+        l_div:
+          type: "int"
+          low: 10
+          high: 50
+          step: 5
+      
+      # Configuração específica para CSC
+      optuna_config:
+        sampler: "RandomSampler"  # Para CSC, usar amostragem aleatória
+        pruner: "SuccessiveHalvingPruner"
+
+# =====================================================================
+# SEÇÃO 7: CONFIGURAÇÕES DE EXPORTAÇÃO
+# =====================================================================
+export:
+  enabled: true
+  #destination: "outputs/{session_folder}"
+  formats:
+    csv: true
+    json: true
+    parquet: false
+    pickle: false
+  include:
+    - "summary"
+    - "detailed_results"
+    - "plots"
+    - "logs"
+
+# =====================================================================
+# SEÇÃO 8: CONFIGURAÇÕES DE VISUALIZAÇÃO
+# =====================================================================
+plots:
+  enabled: true
+  plot_convergence: true
+  plot_comparison: true
+  plot_boxplots: true
+  plot_scatter: true
+  plot_heatmap: true
+  plot_runtime: true
+  plot_optimization_history: true
+  plot_parameter_importance: true
+  plot_parallel_coordinate: true
+  style: "seaborn-v0_8"
+  figure_size: [12, 8]
+  dpi: 300
+  color_palette: "Set2"
+  formats:
+    - "png"
+    - "pdf"
+
+# =====================================================================
+# SEÇÃO 10: CONFIGURAÇÕES DE RECURSOS
+# =====================================================================
+resources:
+  parallel:
+    enabled: true
+    max_workers: 4
+    internal_jobs: 4  # Número máximo de jobs paralelos internos por algoritmo
+    backend: "threading"
+  timeouts:
+    per_algorithm_run: 1800  # 30 minutos por execução
+    total_batch: 7200        # 2 horas total
+
+# =====================================================================
+# SEÇÃO 11: CONFIGURAÇÕES DE LOGGING
+# =====================================================================
+logging:
+  level: "INFO"
+  output:
+    console: true
+    file: true
+  file_config:
+    filename: "optimization.log"
+    max_size_mb: 100
+    backup_count: 3

@@ -7,7 +7,7 @@ Classes:
 
 from collections.abc import Callable
 
-from algorithms.base import CSPAlgorithm, register_algorithm
+from src.domain.algorithms import CSPAlgorithm, register_algorithm
 
 from .config import BLF_GA_DEFAULTS
 from .implementation import BLFGA
@@ -48,7 +48,20 @@ class BLFGAAlgorithm(CSPAlgorithm):
 
     def __init__(self, strings: list[str], alphabet: str, **params):
         super().__init__(strings, alphabet, **params)
-        self.blf_ga_instance = BLFGA(self.strings, self.alphabet, **self.params)
+
+        # Filtrar parâmetros para passar apenas os que a implementação BLFGA conhece
+        # Remover parâmetros específicos do framework de histórico
+        blfga_params = {
+            k: v
+            for k, v in self.params.items()
+            if k not in ["save_history", "history_frequency"]
+        }
+
+        self.blf_ga_instance = BLFGA(self.strings, self.alphabet, **blfga_params)
+
+        # Configurar callback de histórico se habilitado
+        if self.save_history:
+            self.blf_ga_instance.set_history_callback(self._save_dynamic_history_entry)
 
     def set_params(self, **params) -> None:
         """
@@ -98,21 +111,60 @@ class BLFGAAlgorithm(CSPAlgorithm):
         start_time = time.time()
 
         try:
-            best, best_val, history = self.blf_ga_instance.run()
+            # Limpar histórico anterior
+            self.clear_history()
+
+            self._report_progress("Iniciando BLF-GA...")
+
+            # Salvar estado inicial
+            self._save_history_entry(
+                0,
+                phase="initialization",
+                population_size=self.blf_ga_instance.pop_size,
+                max_generations=self.blf_ga_instance.max_gens,
+                initial_fitness=None,
+            )
+
+            best, best_val, ga_history = self.blf_ga_instance.run()
             execution_time = time.time() - start_time
+
+            # Processar histórico do GA para nosso formato padrão
+            if ga_history and self.save_history:
+                for i, fitness in enumerate(ga_history):
+                    self._save_history_entry(
+                        i + 1,
+                        phase="evolution",
+                        generation=i,
+                        best_fitness=fitness,
+                        improvement=(
+                            ga_history[0] - fitness
+                            if i == 0
+                            else ga_history[i - 1] - fitness
+                        ),
+                    )
+
+            # Salvar estado final
+            self._save_history_entry(
+                len(ga_history) if ga_history else 1,
+                phase="completion",
+                final_solution=best,
+                final_fitness=best_val,
+                total_generations=len(ga_history) if ga_history else 0,
+                execution_time=execution_time,
+            )
 
             # Metadata detalhada da execução
             metadata = {
                 "algorithm": "BLF-GA",
                 "status": "completed",
                 "execution_time_seconds": execution_time,
-                "generations_executed": len(history) if history else 0,
+                "generations_executed": len(ga_history) if ga_history else 0,
                 "best_fitness": best_val,
                 "convergence_info": {
-                    "initial_fitness": history[0] if history else None,
+                    "initial_fitness": ga_history[0] if ga_history else None,
                     "final_fitness": best_val,
-                    "improvement": (history[0] - best_val) if history else 0,
-                    "fitness_history_length": len(history) if history else 0,
+                    "improvement": (ga_history[0] - best_val) if ga_history else 0,
+                    "fitness_history_length": len(ga_history) if ga_history else 0,
                 },
                 "algorithm_config": {
                     "population_size": self.blf_ga_instance.pop_size,
@@ -127,10 +179,13 @@ class BLFGAAlgorithm(CSPAlgorithm):
                     "block_redivision": self.blf_ga_instance.rediv_freq > 0,
                     "elite_refinement": self.blf_ga_instance.refine_elites != "none",
                 },
+                # Histórico detalhado se habilitado
+                "history": self.get_history() if self.save_history else [],
+                "ga_fitness_history": ga_history if ga_history else [],
                 # Compatibilidade com versão anterior
-                "iteracoes": len(history) if history else 0,
+                "iteracoes": len(ga_history) if ga_history else 0,
                 "melhor_distancia": best_val,
-                "historico_completo": len(history) if history else 0,
+                "historico_completo": len(ga_history) if ga_history else 0,
             }
 
             return best, best_val, metadata
@@ -144,9 +199,22 @@ class BLFGAAlgorithm(CSPAlgorithm):
                 "execution_time_seconds": execution_time,
                 "generations_executed": 0,
                 "best_fitness": float("inf"),
+                "history": self.get_history() if self.save_history else [],
             }
             # Re-raise the exception but with metadata available if needed
             raise RuntimeError(f"BLF-GA execution failed: {e}") from e
+
+    def _save_blfga_history(
+        self, generation: int, best_fitness: float, **kwargs
+    ) -> None:
+        """Callback para salvar histórico durante execução do BLF-GA."""
+        self._save_history_entry(
+            generation,
+            phase="evolution",
+            generation=generation,
+            best_fitness=best_fitness,
+            **kwargs,
+        )
 
     def run_with_history(self) -> tuple[str, int, list]:
         """
@@ -195,3 +263,22 @@ class BLFGAAlgorithm(CSPAlgorithm):
         # Merge dos metadados
         base_metadata.update(blfga_metadata)
         return base_metadata
+
+    def _save_dynamic_history_entry(self, generation: int, event_data: dict) -> None:
+        """
+        Callback para registrar eventos dinâmicos durante execução do BLF-GA.
+
+        Args:
+            generation: Geração atual
+            event_data: Dicionário com dados do evento incluindo 'event' e demais informações
+        """
+        if self.save_history:
+            # Extrair o tipo de evento e demais dados
+            event_type = event_data.pop("event", "unknown_event")
+            self._save_history_entry(
+                generation + 1,  # +1 porque iteration 0 é initialization
+                phase="dynamic_event",
+                generation=generation,
+                event_type=event_type,
+                **event_data,
+            )

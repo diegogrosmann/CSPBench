@@ -5,8 +5,8 @@ Classes:
     DPCSPAlgorithm: Implementação do algoritmo exato por programação dinâmica.
 """
 
-from algorithms.base import CSPAlgorithm, register_algorithm
-from src.utils.distance import max_distance
+from src.domain.algorithms import CSPAlgorithm, register_algorithm
+from src.domain.metrics import max_distance
 
 from .config import DP_CSP_DEFAULTS
 from .implementation import exact_dp_closest_string
@@ -40,11 +40,7 @@ class DPCSPAlgorithm(CSPAlgorithm):
             alphabet: Alfabeto utilizado
             **params: Parâmetros específicos do algoritmo
         """
-        self.strings = strings
-        self.alphabet = alphabet
-        self.params = {**self.default_params, **params}
-        self.progress_callback = None
-        self.warning_callback = None
+        super().__init__(strings, alphabet, **params)
 
     def run(self) -> tuple[str, int, dict]:
         """
@@ -53,6 +49,15 @@ class DPCSPAlgorithm(CSPAlgorithm):
         Returns:
             tuple[str, int, dict]: (string_central, distancia_maxima, metadata)
         """
+        # Salvar estado inicial no histórico se habilitado
+        if self.save_history:
+            self._save_history_entry(
+                0,
+                phase="initialization",
+                parameters=self.params,
+                message="Iniciando algoritmo DP-CSP",
+            )
+
         max_d = self.params.get("max_d")
         if max_d is None:
             # Usa baseline como upper bound
@@ -75,10 +80,29 @@ class DPCSPAlgorithm(CSPAlgorithm):
                 "centro_encontrado": center,
             }
 
+            # Salvar estado final no histórico se habilitado
+            if self.save_history:
+                self._save_history_entry(
+                    1,
+                    phase="completion",
+                    best_fitness=dist,
+                    best_solution=center,
+                    message="Algoritmo DP-CSP finalizado com sucesso",
+                )
+
+                # Adicionar histórico aos metadados
+                metadata["history"] = self.get_history()
+
             return center, dist, metadata
         except RuntimeError as e:
             # DP-CSP falhou devido a limitações de memória/tempo
             self._report_warning(f"DP-CSP falhou: {e}")
+
+            # Salvar estado de falha no histórico se habilitado
+            if self.save_history:
+                self._save_history_entry(
+                    1, phase="error", message=f"Algoritmo DP-CSP falhou: {e}"
+                )
 
             # Re-raise a exceção para indicar falha real
             raise RuntimeError(f"DP-CSP falhou: {e}") from e

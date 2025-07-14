@@ -55,13 +55,13 @@ algorithms/
 
 4. **Criar o wrapper (`algorithm.py`)**
     ```python
-    from algorithms.base import Algorithm, register_algorithm
+    from cspbench.domain.algorithms import CSPAlgorithm, register_algorithm
     from .config import MEU_ALGORITMO_DEFAULTS
     from .implementation import meu_algoritmo_funcao
     from utils.distance import max_hamming
 
     @register_algorithm
-    class MeuAlgoritmo(Algorithm):
+    class MeuAlgoritmo(CSPAlgorithm):
         """
         Wrapper para integração do MeuAlgoritmo ao framework CSPBench.
         """

@@ -117,7 +117,7 @@ import time
 from collections import Counter
 from collections.abc import Callable, Sequence
 
-from src.utils.distance import max_distance
+from src.domain.metrics import max_distance
 
 from .config import H3_CSP_DEFAULTS
 

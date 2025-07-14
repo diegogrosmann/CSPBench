@@ -17,7 +17,7 @@ Classes:
 
 from collections.abc import Callable
 
-from algorithms.base import CSPAlgorithm, register_algorithm
+from src.domain.algorithms import CSPAlgorithm, register_algorithm
 
 from .config import H3_CSP_DEFAULTS
 from .implementation import H3CSP
@@ -143,6 +143,15 @@ class H3CSPAlgorithm(CSPAlgorithm):
             >>> center, distance, metadata = alg.run()
             >>> print(f"Solução: {center} com distância {distance}")
         """
+        # Salvar estado inicial no histórico se habilitado
+        if self.save_history:
+            self._save_history_entry(
+                0,
+                phase="initialization",
+                parameters=self.params,
+                message="Iniciando algoritmo H³-CSP",
+            )
+
         center, dist = self.h3_csp_instance.run()
 
         metadata = {
@@ -151,5 +160,18 @@ class H3CSPAlgorithm(CSPAlgorithm):
             "parametros_usados": self.params,
             "centro_encontrado": center,
         }
+
+        # Salvar estado final no histórico se habilitado
+        if self.save_history:
+            self._save_history_entry(
+                metadata["iteracoes"],
+                phase="completion",
+                best_fitness=dist,
+                best_solution=center,
+                message="Algoritmo H³-CSP finalizado",
+            )
+
+            # Adicionar histórico aos metadados
+            metadata["history"] = self.get_history()
 
         return center, dist, metadata

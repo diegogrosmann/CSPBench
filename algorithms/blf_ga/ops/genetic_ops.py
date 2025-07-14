@@ -514,7 +514,7 @@ def refine_greedy(ind: String, strings: list[String]) -> String:
         - Complexidade O(k * n * |Σ|) onde k é número de iterações, n é comprimento, |Σ| é tamanho do alfabeto
         - Muito eficaz para refinamento final de soluções
     """
-    from src.utils.distance import max_distance
+    from src.domain.metrics import max_distance
 
     # Extrai alfabeto das strings de referência
     alphabet = set()
@@ -593,7 +593,7 @@ def refine_swap(ind: String, strings: list[String]) -> String:
         - Útil quando a ordem dos símbolos importa mais que sua identidade
         - Pode ser combinado com outros operadores de refinamento
     """
-    from src.utils.distance import max_distance
+    from src.domain.metrics import max_distance
 
     best_ind = ind
     best_fitness = max_distance(best_ind, strings)
@@ -655,7 +655,7 @@ def refine_insertion(ind: String, strings: list[String]) -> String:
         - Útil para reorganizar estruturas locais
         - Trabalha com segmentos pequenos para evitar disrupção excessiva
     """
-    from src.utils.distance import max_distance
+    from src.domain.metrics import max_distance
 
     best_ind = ind
     best_fitness = max_distance(best_ind, strings)
@@ -725,7 +725,7 @@ def refine_2opt(ind: String, strings: list[String]) -> String:
         - Útil para reorganizar estruturas invertidas
         - Pode encontrar soluções que outras buscas locais não conseguem
     """
-    from src.utils.distance import max_distance
+    from src.domain.metrics import max_distance
 
     best_ind = ind
     best_fitness = max_distance(best_ind, strings)

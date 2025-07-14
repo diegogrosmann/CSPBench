@@ -90,7 +90,7 @@ import time
 from collections.abc import Callable, Sequence
 from typing import Any, TypeAlias, cast
 
-from src.utils.distance import max_distance
+from src.domain.metrics import max_distance
 
 from .config import DP_CSP_DEFAULTS
 
@@ -247,7 +247,7 @@ def _dp_decision(strings: Sequence[String], alphabet: str, d: int) -> String | N
     result = "".join(center_chars)
 
     # VALIDAÇÃO FINAL: Verifica se solução é realmente válida
-    from src.utils.distance import hamming_distance
+    from src.domain.metrics import hamming_distance
 
     max_dist = max(hamming_distance(result, s) for s in strings)
     if max_dist > d:
@@ -437,7 +437,7 @@ def exact_dp_closest_string(
             # SUCESSO: Encontrou solução com raio d
 
             # VALIDAÇÃO FINAL RIGOROSA
-            from src.utils.distance import hamming_distance
+            from src.domain.metrics import hamming_distance
 
             max_dist = max(hamming_distance(center, s) for s in strings)
 

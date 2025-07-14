@@ -89,10 +89,11 @@ import time
 from collections import Counter
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
+from typing import Optional
 
 import numpy as np
 
-from src.utils.distance import hamming_distance, max_distance
+from src.domain.metrics import hamming_distance, max_distance
 
 from .config import BLF_GA_DEFAULTS
 from .ops import genetic_ops
@@ -292,6 +293,9 @@ class BLFGA:
         self.max_time = params["max_time"]
         self.rng = random.Random(params["seed"])
         self.progress_callback: Callable[[str], None] | None = None
+        self.history_callback: Callable[[int, dict], None] | None = (
+            None  # Callback para eventos dinâmicos
+        )
 
         # Inicializa os blocos após todos os parâmetros necessários
         self.blocks = self._initial_blocking()
@@ -436,6 +440,26 @@ class BLFGA:
         if "seed" in params:
             self.rng = random.Random(params["seed"])
 
+    def set_history_callback(
+        self, callback: Optional[Callable[[int, dict], None]]
+    ) -> None:
+        """
+        Define o callback para registrar eventos dinâmicos durante a evolução.
+
+        Args:
+            callback: Função que recebe (generation, event_data) onde event_data
+                     contém informações sobre operações dinâmicas como:
+                     - disable_elitism_gens: quando elitismo é desabilitado
+                     - adaptive_mutation: mudanças na taxa de mutação
+                     - immigrant_injection: quando imigrantes são adicionados
+                     - block_redivision: quando blocos são redivididos
+                     - restart_mechanism: quando população é reiniciada
+                     - early_stopping: quando algoritmo para por convergência
+                     - elite_refinement: quando melhores soluções são refinadas
+                     - adaptive_blocking: mudanças dinâmicas nos blocos
+        """
+        self.history_callback = callback
+
     def run(self) -> tuple[String, int, list]:
         """
         Executa o algoritmo BLF-GA para encontrar a string mais próxima.
@@ -520,28 +544,94 @@ class BLFGA:
                     )
                     pop[-(_ + 1)] = rand_s
 
+                # Log da operação dinâmica
+                if self.history_callback:
+                    self.history_callback(
+                        gen,
+                        {
+                            "event": "immigrant_injection",
+                            "description": f"Injetados {n_imm} imigrantes na geração {gen} (a cada {self.immigrant_freq} gerações)",
+                            "immigrant_count": n_imm,
+                            "immigrant_ratio": self.immigrant_ratio,
+                            "pop_size": self.pop_size,
+                            "replaced_positions": list(
+                                range(self.pop_size - n_imm, self.pop_size)
+                            ),
+                        },
+                    )
+
             # --- MECANISMO 2: MUTAÇÃO ADAPTATIVA ---
             # Ajusta taxa de mutação baseada na diversidade populacional e convergência
             diversity = genetic_ops.mean_hamming_distance(pop)
 
             # Se diversidade baixa, aumenta mutação temporariamente
             if diversity < self.diversity_threshold * self.L:
+                old_mut_prob = self.mut_prob
                 self.mut_prob = mut_prob_backup * self.mutation_adapt_factor
                 mut_adapt_timer = self.mutation_adapt_duration
+
+                # Log da operação dinâmica
+                if self.history_callback:
+                    self.history_callback(
+                        gen,
+                        {
+                            "event": "adaptive_mutation_diversity",
+                            "description": f"Mutação aumentada por baixa diversidade: {old_mut_prob:.4f} → {self.mut_prob:.4f}",
+                            "trigger": "low_diversity",
+                            "diversity": diversity,
+                            "threshold": self.diversity_threshold * self.L,
+                            "old_mutation_rate": old_mut_prob,
+                            "new_mutation_rate": self.mut_prob,
+                            "adaptation_factor": self.mutation_adapt_factor,
+                            "timer_duration": self.mutation_adapt_duration,
+                        },
+                    )
 
             # Se fitness estagnado por N gerações, aumenta mutação
             if len(self.history) > self.mutation_adapt_N and all(
                 self.history[-i] == self.history[-1]
                 for i in range(1, self.mutation_adapt_N + 1)
             ):
+                old_mut_prob = self.mut_prob
                 self.mut_prob = mut_prob_backup * self.mutation_adapt_factor
                 mut_adapt_timer = self.mutation_adapt_duration
+
+                # Log da operação dinâmica
+                if self.history_callback:
+                    self.history_callback(
+                        gen,
+                        {
+                            "event": "adaptive_mutation_stagnation",
+                            "description": f"Mutação aumentada por estagnação de {self.mutation_adapt_N} gerações: {old_mut_prob:.4f} → {self.mut_prob:.4f}",
+                            "trigger": "fitness_stagnation",
+                            "stagnation_gens": self.mutation_adapt_N,
+                            "stagnant_fitness": self.history[-1],
+                            "old_mutation_rate": old_mut_prob,
+                            "new_mutation_rate": self.mut_prob,
+                            "adaptation_factor": self.mutation_adapt_factor,
+                            "timer_duration": self.mutation_adapt_duration,
+                        },
+                    )
 
             # Decrementa timer da mutação adaptativa
             if mut_adapt_timer > 0:
                 mut_adapt_timer -= 1
                 if mut_adapt_timer == 0:
+                    old_mut_prob = self.mut_prob
                     self.mut_prob = mut_prob_backup
+
+                    # Log da operação dinâmica
+                    if self.history_callback:
+                        self.history_callback(
+                            gen,
+                            {
+                                "event": "adaptive_mutation_reset",
+                                "description": f"Mutação voltou ao normal após período adaptativo: {old_mut_prob:.4f} → {self.mut_prob:.4f}",
+                                "old_mutation_rate": old_mut_prob,
+                                "normal_mutation_rate": self.mut_prob,
+                                "adaptation_ended": True,
+                            },
+                        )
 
             # --- MECANISMO 3: APRENDIZADO POR BLOCOS ---
             # Extrai conhecimento local de cada bloco através de consenso
@@ -560,18 +650,70 @@ class BLFGA:
             k = max(1, int(self.elite_rate * self.pop_size))
             if self.disable_elitism_gens and (gen % self.disable_elitism_gens == 0):
                 elites = []  # Desabilita elitismo para aumentar diversidade
+                # Log da operação dinâmica
+                if self.history_callback:
+                    self.history_callback(
+                        gen,
+                        {
+                            "event": "disable_elitism",
+                            "description": f"Elitismo desabilitado na geração {gen} (a cada {self.disable_elitism_gens} gerações)",
+                            "elite_rate": self.elite_rate,
+                            "pop_size": self.pop_size,
+                            "expected_elites": k,
+                        },
+                    )
             else:
                 elites = pop[:k]
 
             # --- MECANISMO 6: REFINAMENTO LOCAL ---
             # Aplica busca local intensiva nos melhores indivíduos
             if self.refine_elites == "all":
+                old_elites_fitness = [max_distance(e, self.strings) for e in elites]
                 pop[:k] = self._refine_elites(elites)  # Refina todos os elites
+                new_elites_fitness = [
+                    max_distance(pop[i], self.strings) for i in range(k)
+                ]
+
+                # Log da operação dinâmica
+                if self.history_callback:
+                    improvements = [
+                        old - new
+                        for old, new in zip(old_elites_fitness, new_elites_fitness)
+                    ]
+                    self.history_callback(
+                        gen,
+                        {
+                            "event": "elite_refinement_all",
+                            "description": f"Refinamento aplicado a todos os {k} elites",
+                            "elite_count": k,
+                            "refinement_type": self.refine_elites,
+                            "old_fitness": old_elites_fitness,
+                            "new_fitness": new_elites_fitness,
+                            "improvements": improvements,
+                            "total_improvement": sum(improvements),
+                        },
+                    )
             else:
                 if elites:
+                    old_best_fitness = max_distance(elites[0], self.strings)
                     pop[0] = self._refine_elites([elites[0]])[
                         0
                     ]  # Refina apenas o melhor
+                    new_best_fitness = max_distance(pop[0], self.strings)
+
+                    # Log da operação dinâmica
+                    if self.history_callback:
+                        self.history_callback(
+                            gen,
+                            {
+                                "event": "elite_refinement_best",
+                                "description": "Refinamento aplicado ao melhor elite",
+                                "refinement_type": self.refine_elites,
+                                "old_fitness": old_best_fitness,
+                                "new_fitness": new_best_fitness,
+                                "improvement": old_best_fitness - new_best_fitness,
+                            },
+                        )
 
             cur_best = pop[0]
             cur_val = max_distance(cur_best, self.strings)
@@ -588,10 +730,30 @@ class BLFGA:
             # Reinicia parte da população se estagnada por muito tempo
             if self.restart_patience and no_improve >= self.restart_patience:
                 n_restart = int(self.restart_ratio * self.pop_size)
+                restarted_positions = []
                 for i in range(n_restart):
-                    pop[-(i + 1)] = "".join(
+                    pos = -(i + 1)
+                    pop[pos] = "".join(
                         self.rng.choice(self.alphabet) for _ in range(self.L)
                     )
+                    restarted_positions.append(self.pop_size + pos)  # Posição absoluta
+
+                # Log da operação dinâmica
+                if self.history_callback:
+                    self.history_callback(
+                        gen,
+                        {
+                            "event": "restart_mechanism",
+                            "description": f"Restart de {n_restart} indivíduos após {no_improve} gerações de estagnação",
+                            "restarted_count": n_restart,
+                            "restart_ratio": self.restart_ratio,
+                            "stagnation_count": no_improve,
+                            "restart_patience": self.restart_patience,
+                            "restarted_positions": restarted_positions,
+                            "pop_size": self.pop_size,
+                        },
+                    )
+
                 no_improve = 0
 
             # --- CRITÉRIO DE PARADA 1: EARLY STOPPING ---
@@ -600,6 +762,21 @@ class BLFGA:
                 if self.progress_callback:
                     self.progress_callback(
                         f"Encerrando por early stopping após {no_improve} gerações sem melhoria."
+                    )
+
+                # Log da operação dinâmica
+                if self.history_callback:
+                    self.history_callback(
+                        gen,
+                        {
+                            "event": "early_stopping",
+                            "description": f"Algoritmo parado por early stopping após {no_improve} gerações sem melhoria",
+                            "no_improve_count": no_improve,
+                            "patience_threshold": self.no_improve_patience,
+                            "current_generation": gen,
+                            "best_fitness": best_val,
+                            "reason": "fitness_stagnation",
+                        },
                     )
                 break
 
@@ -623,7 +800,23 @@ class BLFGA:
             # Redefine blocos baseado na entropia das posições
             # Permite adaptação dinâmica da estrutura de blocos
             if gen % self.rediv_freq == 0:
+                old_blocks = self.blocks.copy()
                 self.blocks = self._adaptive_blocking(pop)
+
+                # Log da operação dinâmica
+                if self.history_callback:
+                    self.history_callback(
+                        gen,
+                        {
+                            "event": "block_redivision",
+                            "description": f"Blocos redivididos na geração {gen} (a cada {self.rediv_freq} gerações)",
+                            "old_blocks": old_blocks,
+                            "new_blocks": self.blocks,
+                            "old_block_count": len(old_blocks),
+                            "new_block_count": len(self.blocks),
+                            "redivision_frequency": self.rediv_freq,
+                        },
+                    )
 
         # === FASE 3: FINALIZAÇÃO ===
         return best, best_val, self.history
@@ -1252,7 +1445,7 @@ class BLFGA:
         with ThreadPoolExecutor() as executor:
             # map() aplica função refine a cada elemento de pop
             # list() coleta resultados mantendo ordem original
-            refined = list(executor.map(refine, pop))
+            refined: Population = list(executor.map(refine, pop))
 
         return refined
 

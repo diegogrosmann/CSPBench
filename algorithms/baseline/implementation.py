@@ -181,7 +181,7 @@ def greedy_consensus(strings: list[str], alphabet: str) -> str:
 
     # VALIDAÇÃO E LOG DO RESULTADO
     # Import local para evitar conflito de nomes
-    from src.utils.distance import max_distance as calc_max_distance
+    from src.domain.metrics import max_distance as calc_max_distance
 
     final_distance = calc_max_distance(result, strings)
     logger.info("[CONSENSUS] Consenso: %s, distância: %d", result, final_distance)
@@ -242,7 +242,7 @@ def max_distance(center: str, strings: list[str]) -> int:
         do módulo baseline, delegando o cálculo para implementação otimizada.
     """
     # Import local para usar implementação otimizada
-    from src.utils.distance import hamming_distance
+    from src.domain.metrics import hamming_distance
 
     # CÁLCULO DE TODAS AS DISTÂNCIAS
     # Calcula distância de Hamming entre center e cada string

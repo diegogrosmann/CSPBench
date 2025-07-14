@@ -3,20 +3,23 @@ __pycache__
 .vscode
 .pytest_cache
 .ruff_cache
+.env
 
-saved_datasets/*
-!saved_datasets/teste.fasta
-!saved_datasets/entrez_nucleotide_COIGene AND 600650SLEN_n20.fasta
-!saved_datasets/synthetic_n10_L20_noise0.1_ACTG.fasta
-!saved_datasets/synthetic_n20_L50_noise0.1_01.fasta
-!saved_datasets/synthetic_n20_L50_noise0.1_ACTG.fasta
-!saved_datasets/synthetic_n30_L100_noise0.1_ACTG.fasta
+# Ignorar todos os arquivos em datasets, exceto os exemplos
+datasets/*
+!datasets/teste.fasta
+!datasets/entrez_nucleotide_COIGene AND 600650SLEN_n20.fasta
+!datasets/synthetic_n10_L20_noise0.1_ACTG.fasta
+!datasets/synthetic_n20_L50_noise0.1_01.fasta
+!datasets/synthetic_n20_L50_noise0.1_ACTG.fasta
+!datasets/synthetic_n30_L100_noise0.1_ACTG.fasta
 
 outputs/logs/*
 outputs/reports/*
 
-# Ignorar todos os arquivos em batch_configs, exceto os exemplos
-batch_configs/*
-!batch_configs/otimizacao_exemplo.yaml
-!batch_configs/processamento_exemplo.yaml
-!batch_configs/sensibilidade_exemplo.yaml
+# Ignorar todos os arquivos em batches, exceto os exemplos
+batches/*
+!batches/TEMPLATE_PADRONIZADO.yaml
+!batches/otimizacao_padrao.yaml
+!batches/processamento_padrao.yaml
+!batches/sensibilidade_padrao.yaml

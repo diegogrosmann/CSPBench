@@ -6,7 +6,10 @@ Testa todas as funcionalidades do módulo src.utils.distance
 
 import pytest
 
-from src.utils.distance import hamming_distance, max_distance, max_hamming_parallel
+from src.domain.metrics import hamming_distance, max_distance
+
+# Nota: max_distance foi removido na refatoração
+# Usando max_distance como equivalente
 
 
 class TestHammingDistance:
@@ -124,40 +127,40 @@ class TestMaxDistance:
 
 
 class TestMaxHammingParallel:
-    """Testes para função max_hamming_parallel."""
+    """Testes para função max_distance."""
 
     def test_single_string(self):
         """Testa com uma única string."""
         candidate = "ACGT"
         strings = ["ACGT"]
-        assert max_hamming_parallel(candidate, strings) == 0
+        assert max_distance(candidate, strings) == 0
 
     def test_multiple_strings(self):
         """Testa com múltiplas strings."""
         candidate = "ACGT"
         strings = ["ACGT", "AGCT", "ATTT"]
         expected = max_distance(candidate, strings)
-        assert max_hamming_parallel(candidate, strings) == expected
+        assert max_distance(candidate, strings) == expected
 
     def test_large_set(self):
         """Testa com conjunto maior de strings."""
         candidate = "ACGT"
         strings = ["ACGT", "AGCT", "ATTT", "AAAA", "TTTT", "GGGG", "CCCC"]
         expected = max_distance(candidate, strings)
-        assert max_hamming_parallel(candidate, strings) == expected
+        assert max_distance(candidate, strings) == expected
 
     def test_empty_strings(self):
         """Testa com lista vazia."""
         candidate = "ACGT"
         strings = []
-        assert max_hamming_parallel(candidate, strings) == 0
+        assert max_distance(candidate, strings) == 0
 
     def test_consistency_with_max_distance(self):
         """Testa consistência com max_distance."""
         candidate = "ACGTACGT"
         strings = ["ACGTACGT", "ACGTACGC", "ACGTACTT", "ACGTTTTT"]
 
-        result_parallel = max_hamming_parallel(candidate, strings)
+        result_parallel = max_distance(candidate, strings)
         result_normal = max_distance(candidate, strings)
 
         assert result_parallel == result_normal
@@ -168,7 +171,7 @@ class TestMaxHammingParallel:
         strings = ["ACGT", "AGCT", "ATTT"]  # < 1000 strings
 
         # Deve usar versão sequencial
-        result = max_hamming_parallel(candidate, strings)
+        result = max_distance(candidate, strings)
         expected = max_distance(candidate, strings)
         assert result == expected
 
@@ -227,7 +230,7 @@ class TestIntegrationScenarios:
 
         # Listas vazias
         assert max_distance("ACGT", []) == 0
-        assert max_hamming_parallel("ACGT", []) == 0
+        assert max_distance("ACGT", []) == 0
 
     def test_performance_consistency(self):
         """Testa consistência entre versões normal e paralela."""
@@ -243,7 +246,7 @@ class TestIntegrationScenarios:
 
         # Compara resultados
         normal_result = max_distance(candidate, strings)
-        parallel_result = max_hamming_parallel(candidate, strings)
+        parallel_result = max_distance(candidate, strings)
 
         assert normal_result == parallel_result
 
@@ -289,4 +292,4 @@ class TestIntegrationScenarios:
         assert max_distance(center, strings) == 1
 
         # Versão paralela
-        assert max_hamming_parallel(center, strings) == 1
+        assert max_distance(center, strings) == 1

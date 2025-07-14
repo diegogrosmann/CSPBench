@@ -5,8 +5,8 @@ Classes:
     CSCAlgorithm: Implementação do algoritmo CSC.
 """
 
-from algorithms.base import CSPAlgorithm, register_algorithm
-from src.utils.distance import max_distance
+from src.domain.algorithms import CSPAlgorithm, register_algorithm
+from src.domain.metrics import max_distance
 
 from .config import CSC_DEFAULTS
 from .implementation import heuristic_closest_string
@@ -49,6 +49,15 @@ class CSCAlgorithm(CSPAlgorithm):
         Returns:
             tuple[str, int, dict]: (string_central, distancia_maxima, metadata)
         """
+        # Salvar estado inicial no histórico se habilitado
+        if self.save_history:
+            self._save_history_entry(
+                0,
+                phase="initialization",
+                parameters=self.params,
+                message="Iniciando algoritmo CSC",
+            )
+
         self._report_progress(
             f"Iniciando CSC (d={self.params.get('d')}, n_blocks={self.params.get('n_blocks')})"
         )
@@ -68,6 +77,20 @@ class CSCAlgorithm(CSPAlgorithm):
                 "centro_encontrado": center,
                 "sucesso": True,
             }
+
+            # Salvar estado final no histórico se habilitado
+            if self.save_history:
+                self._save_history_entry(
+                    1,
+                    phase="completion",
+                    best_fitness=dist,
+                    best_solution=center,
+                    message="Algoritmo CSC finalizado com sucesso",
+                )
+
+                # Adicionar histórico aos metadados
+                metadata["history"] = self.get_history()
+
             return center, dist, metadata
         else:
             # Fallback para primeira string se falhar
@@ -85,5 +108,18 @@ class CSCAlgorithm(CSPAlgorithm):
                 "sucesso": False,
                 "fallback_usado": True,
             }
+
+            # Salvar estado final no histórico se habilitado (com fallback)
+            if self.save_history:
+                self._save_history_entry(
+                    1,
+                    phase="completion",
+                    best_fitness=fallback_dist,
+                    best_solution=fallback_center,
+                    message="Algoritmo CSC falhou, usando fallback",
+                )
+
+                # Adicionar histórico aos metadados
+                metadata["history"] = self.get_history()
 
             return fallback_center, fallback_dist, metadata

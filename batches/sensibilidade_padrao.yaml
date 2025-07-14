@@ -1,0 +1,197 @@
+# ===================================================================
+# EXEMPLO DE CONFIGURAÇÃO PARA ANÁLISE DE SENSIBILIDADE
+# ===================================================================
+# Este arquivo demonstra como configurar análises de sensibilidade usando SALib.
+# Tipo: sensitivity - Analisa sensibilidade de parâmetros
+# Uso: python main.py batches/sensibilidade_padrao.yaml
+
+# =====================================================================
+# SEÇÃO 1: METADADOS (OBRIGATÓRIO)
+# =====================================================================
+metadados:
+  nome: "Análise de Sensibilidade - Múltiplos Algoritmos"
+  descricao: "Exemplo de análise de sensibilidade para diferentes algoritmos usando SALib"
+  autor: "Diego Grosmann"
+  versao: "1.0"
+  data_criacao: "2025-07-13"
+  tags: ["sensibilidade", "salib", "análise"]
+  timeout_global: 10800  # 3 horas para análise completa
+
+# =====================================================================
+# SEÇÃO 2: CONFIGURAÇÕES DE INFRAESTRUTURA (OPCIONAL)
+# =====================================================================
+infrastructure:
+  history:
+    save_history: true
+    plot_history: true
+    history_frequency: 50  # Salvar a cada 50 amostras
+    history_plots:
+      plot_convergence: true
+      plot_fitness_evolution: true
+      plot_format: "png"
+
+# =====================================================================
+# SEÇÃO 3: DATASETS
+# =====================================================================
+datasets:
+
+  - id: dataset_pequeno
+    nome: "Dataset de Arquivo Real"
+    tipo: "file"
+    parametros:
+      filename: "teste.fasta"
+
+# =====================================================================
+# SEÇÃO 4: ALGORITMOS
+# =====================================================================
+algorithms:
+  - id: "config_sensibilidade"
+    nome: "Configuração para Análise de Sensibilidade"
+    descricao: "Parâmetros base para análise de sensibilidade"
+    algorithms:
+      - "BLF-GA"
+      - "CSC"
+      - "H³-CSP"
+    
+    algorithm_params:
+      "BLF-GA":
+        # Parâmetros base que serão analisados
+        pop_size: 100
+        max_gens: 200
+        cross_prob: 0.8
+        mut_prob: 0.1
+        elite_rate: 0.05
+        crossover_type: "one_point"
+        mutation_type: "multi"
+        
+      "CSC":
+        min_d: 2
+        d_factor: 0.75
+        min_blocks: 4
+        max_blocks: 8
+        
+      "H³-CSP":
+        auto_blocks: true
+        min_block_size: 2
+        block_size: 4
+        k_candidates: 5
+
+# =====================================================================
+# SEÇÃO 5: TIPO DE TAREFA
+# =====================================================================
+task:
+  type: "sensitivity"
+
+# =====================================================================
+# SEÇÃO 6C: CONFIGURAÇÃO DE ANÁLISE DE SENSIBILIDADE
+# =====================================================================
+sensitivity:
+  method: "SALib"
+  
+  # Configurações globais do SALib
+  global_salib_config:
+    n_samples: 100
+    repetitions_per_sample: 3
+    seed: 42
+    parallel: true
+  
+  # Lista de análises de sensibilidade
+  analyses:
+    # Análise 1: Morris para BLF-GA (screening inicial)
+    - nome: "Análise Morris BLF-GA - Screening"
+      analysis_method: "morris"
+      target_datasets: ["dataset_pequeno"]
+      target_algorithm: "BLF-GA"
+      
+      n_samples: 10
+      repetitions_per_sample: 1
+      
+      parameters:
+        pop_size:
+          type: "integer"
+          bounds: [50, 200]
+          default: 100
+        max_gens:
+          type: "integer"
+          bounds: [100, 500]
+          default: 200
+        cross_prob:
+          type: "float"
+          bounds: [0.6, 0.95]
+          default: 0.8
+        
+      morris:
+        num_levels: 6
+        grid_jump: 3
+        num_trajectories: 30
+        optimal_trajectories: 8
+      
+      output_metrics:
+        - "distance"
+        - "execution_time"
+        - "convergence_rate"
+    
+# =====================================================================
+# SEÇÃO 7: CONFIGURAÇÕES DE EXPORTAÇÃO
+# =====================================================================
+export:
+  enabled: true
+#  destination: "outputs/{session_folder}"
+  formats:
+    csv: true
+    json: true
+    parquet: false
+    pickle: false
+  include:
+    - "summary"
+    - "detailed_results"
+    - "plots"
+    - "logs"
+
+# =====================================================================
+# SEÇÃO 8: CONFIGURAÇÕES DE VISUALIZAÇÃO
+# =====================================================================
+plots:
+  enabled: true
+  plot_convergence: true
+  plot_comparison: true
+  plot_boxplots: true
+  plot_scatter: true
+  plot_heatmap: true
+  plot_runtime: true
+  plot_sensitivity_indices: true
+  plot_morris_trajectories: true
+  plot_interaction_effects: true
+  style: "seaborn-v0_8"
+  figure_size: [12, 8]
+  dpi: 300
+  color_palette: "Set2"
+  formats:
+    - "png"
+    - "pdf"
+
+# =====================================================================
+# SEÇÃO 10: CONFIGURAÇÕES DE RECURSOS
+# =====================================================================
+resources:
+  parallel:
+    enabled: true
+    max_workers: 6
+    internal_jobs: 4  # Número máximo de jobs paralelos internos por algoritmo
+    backend: "multiprocessing"  # Para análise de sensibilidade, usar multiprocessing
+  timeouts:
+    per_algorithm_run: 1200  # 20 minutos por execução
+    total_batch: 10800       # 3 horas total
+
+# =====================================================================
+# SEÇÃO 11: CONFIGURAÇÕES DE LOGGING
+# =====================================================================
+logging:
+  level: "INFO"
+  output:
+    console: true
+    file: true
+  file_config:
+    filename: "sensitivity.log"
+    max_size_mb: 150
+    backup_count: 5

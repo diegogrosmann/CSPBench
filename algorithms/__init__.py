@@ -7,16 +7,15 @@ automaticamente registrados no registry global.
 
 ALGORITMOS IMPLEMENTADOS:
 
-1. **BLF-GA (Blockwise Learning Fusion + Genetic Algorithm)**:
+1. **Baseline (Algoritmos Simples)**:
+   - Greedy Consensus: Consenso por votação majoritária
+   - Baselines para comparação de performance
+
+2. **BLF-GA (Blockwise Learning Fusion + Genetic Algorithm)**:
    - Metaheurística híbrida avançada
    - Combina aprendizado por blocos com evolução genética
    - Mecanismos adaptativos para diversidade e convergência
    - Paralelização eficiente e configurabilidade avançada
-
-2. **Baseline (Algoritmos Simples)**:
-   - Greedy Consensus: Consenso por votação majoritária
-   - Max Distance: Busca exaustiva limitada
-   - Baselines para comparação de performance
 
 3. **CSC (Consensus String Clustering)**:
    - Estratégia de divisão e conquista
@@ -40,32 +39,52 @@ registry global.
 
 EXEMPLO DE USO:
 ```python
-from algorithms import global_registry
+from cspbench.domain.algorithms import global_registry
 
 # Listar algoritmos disponíveis
 print("Algoritmos disponíveis:")
 for name, cls in global_registry.items():
     print(f"  {name}: {cls.__doc__.split('.')[0]}")
 
-# Instanciar algoritmo dinamicamente
-algorithm_class = global_registry["BLF-GA"]
-algorithm = algorithm_class(strings, alphabet, **params)
-solution, distance, metadata = algorithm.run()
+# Usar um algoritmo específico
+algorithm_class = global_registry["Baseline"]
+algorithm = algorithm_class(strings=["ATCG", "ATCC"], alphabet="ATCG")
+result_string, max_distance, metadata = algorithm.run()
 ```
 
-Exports:
-    global_registry: Dicionário com todos os algoritmos registrados
-    register_algorithm: Decorador para registro de novos algoritmos
+ESTRUTURA:
+Cada algoritmo deve estar em seu próprio subpacote com:
+- __init__.py: Exposição da classe principal
+- algorithm.py: Wrapper com decorador @register_algorithm
+- implementation.py: Lógica específica do algoritmo
+- config.py: Configurações e parâmetros padrão
+- README.md: Documentação detalhada
 """
-
-# algorithms package
 
 import importlib
 import pkgutil
+from pathlib import Path
 
-from .base import global_registry, register_algorithm
+# Importa o registry do domínio
+from src.domain.algorithms import global_registry, register_algorithm
 
-# Auto-import subpackages to register algorithms
-for _, name, ispkg in pkgutil.iter_modules(__path__):
-    if ispkg:
-        importlib.import_module(f"{__name__}.{name}")
+
+# Auto-descoberta e importação de algoritmos
+def _discover_algorithms():
+    """Descobre e importa automaticamente todos os algoritmos."""
+    algorithms_path = Path(__file__).parent
+
+    for importer, modname, ispkg in pkgutil.iter_modules([str(algorithms_path)]):
+        if ispkg and not modname.startswith("_"):
+            try:
+                # Importa o subpacote para ativar o registro automático
+                importlib.import_module(f"algorithms.{modname}")
+            except ImportError as e:
+                # Algoritmo pode ter dependências opcionais
+                print(f"Aviso: Algoritmo '{modname}' não pôde ser carregado: {e}")
+
+
+# Executa auto-descoberta na importação
+_discover_algorithms()
+
+__all__ = ["global_registry", "register_algorithm"]
