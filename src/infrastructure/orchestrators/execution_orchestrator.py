@@ -270,59 +270,93 @@ class ExecutionOrchestrator(BaseOrchestrator):
 
         results = []
         execution_index = 0
-        dataset_execution_index = 0
 
         for execution in executions:
             execution_index += 1
             execution_name = execution.get("nome", f"Execução {execution_index}")
 
-            # Atualizar configuração atual
-            if monitoring_service:
-                self._update_execution_monitoring(
-                    execution,
-                    execution_index,
-                    execution_name,
-                    datasets_config,
-                    algorithms_config,
-                    monitoring_service,
-                )
+            # Iterar sobre configurações de algoritmo
+            algorithm_ids = execution["algorithms"]
+            for algo_config_idx, algorithm_id in enumerate(algorithm_ids, 1):
 
-            # Resolver datasets
-            dataset_ids = execution["datasets"]
-            for dataset_id in dataset_ids:
-                dataset_execution_index += 1
-
-                dataset_config = next(
-                    (d for d in datasets_config if d["id"] == dataset_id), None
+                # Resolver configuração do algoritmo
+                algorithm_config = next(
+                    (a for a in algorithms_config if a["id"] == algorithm_id), None
                 )
-                if not dataset_config:
-                    results.append(
-                        {
-                            "execution_name": execution.get("nome", "unknown"),
-                            "dataset_id": dataset_id,
-                            "status": "error",
-                            "error": f"Dataset com ID '{dataset_id}' não encontrado",
-                        }
+                if not algorithm_config:
+                    self._logger.error(
+                        f"Algoritmo com ID '{algorithm_id}' não encontrado"
                     )
                     continue
 
-                # Carregar dataset e executar algoritmos
-                dataset_results = self._execute_dataset_algorithms(
-                    execution,
-                    dataset_config,
-                    dataset_id,
-                    dataset_repo,
-                    algorithms_config,
-                    monitoring_service,
-                )
-                results.extend(dataset_results)
+                # Resolver datasets para esta configuração
+                dataset_ids = execution["datasets"]
+                for dataset_idx, dataset_id in enumerate(dataset_ids, 1):
 
-            # Atualizar configurações completadas
-            if monitoring_service:
-                monitoring_service.update_execution_data(
-                    completed_configs=execution_index,
-                    completed_executions=execution_index,
-                )
+                    dataset_config = next(
+                        (d for d in datasets_config if d["id"] == dataset_id), None
+                    )
+                    if not dataset_config:
+                        results.append(
+                            {
+                                "execution_name": execution.get("nome", "unknown"),
+                                "dataset_id": dataset_id,
+                                "status": "error",
+                                "error": f"Dataset com ID '{dataset_id}' não encontrado",
+                            }
+                        )
+                        continue
+
+                    # Atualizar informações do dataset no monitoramento
+                    if monitoring_service:
+                        # Contar algoritmos únicos desta configuração
+                        unique_algorithms = set(algorithm_config["algorithms"])
+
+                        # Atualizar hierarquia de dataset (que já inclui execução)
+                        from src.presentation.monitoring.interfaces import (
+                            ExecutionLevel,
+                        )
+
+                        # Obter nome do dataset
+                        dataset_name = dataset_config.get("nome", dataset_id)
+
+                        # Obter nome da configuração de algoritmo
+                        algorithm_config_name = algorithm_config.get(
+                            "nome", "Algoritmos"
+                        )
+
+                        monitoring_service.monitor.update_hierarchy(
+                            level=ExecutionLevel.DATASET,
+                            level_id=f"{dataset_id}_{algorithm_id}",
+                            progress=0.0,
+                            message=f"Processando dataset {dataset_name}",
+                            data={
+                                "execution_name": execution_name,
+                                "config_index": execution_index,
+                                "total_configs": len(executions),
+                                "dataset_name": dataset_name,
+                                "dataset_index": dataset_idx,
+                                "total_datasets": len(dataset_ids),
+                                "algorithm_config_name": algorithm_config_name,
+                                "algorithm_config_index": algo_config_idx,
+                                "total_algorithm_configs": len(algorithm_ids),
+                                "total_algorithms": len(unique_algorithms),
+                            },
+                        )
+
+                    # Carregar dataset e executar algoritmos desta configuração
+                    dataset_results = self._execute_dataset_algorithms_for_config(
+                        execution,
+                        dataset_config,
+                        dataset_id,
+                        dataset_repo,
+                        algorithm_config,
+                        monitoring_service,
+                    )
+                    results.extend(dataset_results)
+
+            # Configurações completadas são controladas pela hierarquia
+            # Não precisamos mais usar update_execution_data
 
         return results
 
@@ -459,23 +493,8 @@ class ExecutionOrchestrator(BaseOrchestrator):
 
         total_algorithms = len(unique_algorithms)
 
-        # Atualizar dados iniciais
-        monitoring_service.update_execution_data(
-            current_execution=(
-                executions[0].get("nome", "Execução 1") if executions else "Execução"
-            ),
-            total_executions=len(executions),
-            completed_executions=0,
-            total_algorithms=total_algorithms,
-            completed_algorithms=0,
-            total_datasets=total_dataset_executions,
-            current_dataset_index=0,
-            current_config_name=(
-                executions[0].get("nome", "Execução 1") if executions else "Execução"
-            ),
-            total_configs=len(executions),
-            completed_configs=0,
-        )
+        # Dados iniciais configurados, mas não usamos mais update_execution_data
+        # O monitoramento agora é feito através de update_hierarchy
 
         # Forçar primeira atualização para mostrar interface
         time.sleep(0.1)
@@ -499,15 +518,147 @@ class ExecutionOrchestrator(BaseOrchestrator):
             if algo_config:
                 execution_algorithms.update(algo_config["algorithms"])
 
-        # Criar descrição da execução
-        execution_desc = f"{execution_name} ({len(execution['datasets'])} datasets, {len(execution_algorithms)} algoritmos)"
+        # Atualizar hierarquia de execução
+        from src.presentation.monitoring.interfaces import ExecutionLevel
 
-        monitoring_service.update_execution_data(
-            current_execution=execution_desc,
-            current_config_name=execution_name,
-            completed_configs=execution_index - 1,
-            current_task_info=f"Iniciando execução {execution_name}",
+        # Obter total de execuções do contexto (será passado pelo orchestrator)
+        # Por enquanto, usando o index como fallback
+        total_executions = execution_index  # Isso será melhorado no orchestrator
+
+        monitoring_service.monitor.update_hierarchy(
+            level=ExecutionLevel.EXECUTION,
+            level_id=execution_name,
+            progress=0.0,
+            message=f"Iniciando execução {execution_name}",
+            data={
+                "execution_name": execution_name,
+                "config_index": execution_index,
+                "total_configs": total_executions,
+            },
         )
+
+    def _execute_dataset_algorithms_for_config(
+        self,
+        execution,
+        dataset_config,
+        dataset_id,
+        dataset_repo,
+        algorithm_config,
+        monitoring_service,
+    ):
+        """Executa algoritmos de uma configuração específica para um dataset."""
+        results = []
+
+        try:
+            # Carregar dataset
+            if dataset_config["tipo"] == "file":
+                filename = dataset_config["parametros"]["filename"]
+                dataset = dataset_repo.load(filename)
+            else:
+                # Para datasets sintéticos, criar usando gerador
+                dataset = self._create_dataset_from_config(dataset_config)
+
+            self._logger.info(
+                f"Dataset {dataset_id} carregado: {len(dataset.sequences)} sequências"
+            )
+
+            # Executar algoritmos desta configuração
+            algorithm_names = algorithm_config["algorithms"]
+            algorithm_params = algorithm_config.get("algorithm_params", {})
+            repetitions = execution.get("repetitions", 1)
+
+            for algorithm_name in algorithm_names:
+                # Obter parâmetros específicos do algoritmo
+                params = algorithm_params.get(algorithm_name, {})
+
+                # Executar repetições
+                for rep in range(repetitions):
+                    rep_id = f"{algorithm_name}_{dataset_id}_{rep+1}"
+
+                    try:
+                        # Notificar monitoramento de novo item
+                        if monitoring_service:
+                            from src.presentation.monitoring.interfaces import (
+                                HierarchicalContext,
+                            )
+
+                            context = HierarchicalContext(
+                                dataset_id=dataset_id,
+                                algorithm_id=algorithm_name,
+                                repetition_id=f"{rep+1}/{repetitions}",
+                            )
+                            monitoring_service.update_item(
+                                rep_id, 0.0, "Iniciando", context
+                            )
+
+                        # Executar algoritmo
+                        result = self.execute_single(
+                            algorithm_name, dataset, params, monitoring_service
+                        )
+
+                        # Adicionar informações de contexto
+                        result.update(
+                            {
+                                "execution_name": execution.get("nome", "unknown"),
+                                "dataset_id": dataset_id,
+                                "algorithm_id": algorithm_config["id"],
+                                "algorithm_name": algorithm_name,
+                                "repetition": rep + 1,
+                                "total_repetitions": repetitions,
+                                "status": "success",
+                            }
+                        )
+
+                        results.append(result)
+
+                        # Notificar monitoramento de conclusão
+                        if monitoring_service:
+                            monitoring_service.finish_item(rep_id, True, result)
+
+                        self._logger.debug(
+                            f"Algoritmo {algorithm_name} executado com sucesso (rep {rep+1}/{repetitions})"
+                        )
+
+                    except Exception as e:
+                        self._logger.error(
+                            f"Erro na execução do algoritmo {algorithm_name} (rep {rep+1}): {e}"
+                        )
+
+                        error_result = {
+                            "execution_name": execution.get("nome", "unknown"),
+                            "dataset_id": dataset_id,
+                            "algorithm_id": algorithm_config["id"],
+                            "algorithm_name": algorithm_name,
+                            "repetition": rep + 1,
+                            "total_repetitions": repetitions,
+                            "status": "error",
+                            "error": str(e),
+                            "execution_time": 0.0,
+                        }
+
+                        results.append(error_result)
+
+                        # Notificar monitoramento de erro
+                        if monitoring_service:
+                            monitoring_service.finish_item(
+                                rep_id, False, error_result, str(e)
+                            )
+
+        except Exception as e:
+            self._logger.error(
+                f"Erro no carregamento/processamento do dataset {dataset_id}: {e}"
+            )
+            results.append(
+                {
+                    "execution_name": execution.get("nome", "unknown"),
+                    "dataset_id": dataset_id,
+                    "status": "error",
+                    "error": str(e),
+                    "execution_time": 0.0,
+                }
+            )
+
+        return results
 
     def _execute_dataset_algorithms(
         self,

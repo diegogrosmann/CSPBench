@@ -163,36 +163,3 @@ class BasicMonitoringService:
                 self.logger.error(
                     f"Erro no callback do algoritmo {algorithm_name}: {e}"
                 )
-
-    # Métodos de compatibilidade com código legado
-    def update_execution_data(self, **kwargs) -> None:
-        """Método de compatibilidade - não implementado no monitor simples."""
-        pass
-
-    def update_optimization_data(self, **kwargs) -> None:
-        """Método de compatibilidade - não implementado no monitor simples."""
-        pass
-
-    def update_sensitivity_data(self, **kwargs) -> None:
-        """Método de compatibilidade - não implementado no monitor simples."""
-        pass
-
-    def start_repetition(self, *args, **kwargs) -> None:
-        """Método de compatibilidade - não implementado no monitor simples."""
-        pass
-
-    def update_repetition_progress(self, *args, **kwargs) -> None:
-        """Método de compatibilidade - não implementado no monitor simples."""
-        pass
-
-    def finish_repetition(self, *args, **kwargs) -> None:
-        """Método de compatibilidade - não implementado no monitor simples."""
-        pass
-
-    def report_algorithm_progress(self, *args, **kwargs) -> None:
-        """Método de compatibilidade - não implementado no monitor simples."""
-        pass
-
-    def report_algorithm_completion(self, *args, **kwargs) -> None:
-        """Método de compatibilidade - não implementado no monitor simples."""
-        pass

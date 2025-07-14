@@ -71,18 +71,27 @@ class SimpleMonitor(MonitoringInterface):
     ) -> None:
         """Atualiza progresso hierárquico."""
         if level == ExecutionLevel.EXECUTION:
-            # Nova configuração
+            # Nova configuração (sempre reexibir)
             if level_id != self.current_config_id:
                 self.current_config_id = level_id
                 if data:
                     self.current_config_index = data.get("config_index", 1)
                     self.total_configs = data.get("total_configs", 1)
 
+                    # Extrair nome da execução se disponível
+                    execution_name = data.get("execution_name", level_id)
+                    self.current_execution_name = execution_name  # Salvar para reexibir
+
+                    # Exibir informações da execução
+                    print(
+                        f"⚡\tExecução: {execution_name} ({self.current_config_index}/{self.total_configs})"
+                    )
+
                 # Reset dataset tracking quando nova configuração
                 self.current_dataset_id = None
 
         elif level == ExecutionLevel.DATASET:
-            # Novo dataset
+            # Sempre reexibir informações do dataset (incluindo execução)
             if level_id != self.current_dataset_id:
                 self.current_dataset_id = level_id
                 if data:
@@ -90,16 +99,38 @@ class SimpleMonitor(MonitoringInterface):
                     self.total_datasets = data.get("total_datasets", 1)
                     total_algorithms = data.get("total_algorithms", 0)
 
+                    # Extrair dados de execução e dataset
+                    execution_name = data.get("execution_name", "Execução")
+                    config_index = data.get("config_index", 1)
+                    total_configs = data.get("total_configs", 1)
+
+                    dataset_name = data.get("dataset_name", level_id)
+                    algorithm_config_name = data.get(
+                        "algorithm_config_name", "Algoritmos"
+                    )
+                    algorithm_config_index = data.get("algorithm_config_index", 1)
+                    total_algorithm_configs = data.get("total_algorithm_configs", 1)
+
+                    # Salvar dados de execução para controle
+                    self.current_execution_name = execution_name
+                    self.current_config_index = config_index
+                    self.total_configs = total_configs
+
+                    # Sempre reexibir informações da execução atual
+                    print(
+                        f"⚡\tExecução: {execution_name} ({config_index}/{total_configs})"
+                    )
+
                 # Reset algoritmos quando novo dataset
                 self.current_algorithms = {}
                 self.algorithm_order = []
 
                 # Exibir informações do dataset
                 print(
-                    f"\tConfiguração: ({self.current_config_index}/{self.total_configs})"
+                    f"📊\tConfiguração do Algoritmo: {algorithm_config_name} ({algorithm_config_index}/{total_algorithm_configs})"
                 )
                 print(
-                    f"🗂️\tDataset: {level_id} ({self.current_dataset_index}/{self.total_datasets})"
+                    f"🗂️\tDataset: {dataset_name} ({self.current_dataset_index}/{self.total_datasets})"
                 )
                 print(f"🧠\tAlgoritmos: {total_algorithms} total")
                 print()

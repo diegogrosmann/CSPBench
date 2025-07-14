@@ -100,6 +100,7 @@ class FileExporter(ExportPort):
             file_path = self.output_path / filename
         else:
             from datetime import datetime
+
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             file_path = self.output_path / f"export_{timestamp}.json"
 

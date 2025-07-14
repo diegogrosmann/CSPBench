@@ -15,7 +15,7 @@ import pandas as pd
 import seaborn as sns
 
 
-class HistoryPlotGenerator:
+class HistoryPlotter:
     """
     Gerador de gráficos e exportação de dados para histórico de algoritmos.
     Trabalha com dados genéricos independentes do tipo de algoritmo.
