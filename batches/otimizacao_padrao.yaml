@@ -44,21 +44,19 @@ datasets:
     nome: "Dataset Médio Existente"
     tipo: "file"
     parametros:
-      filename: "synthetic_n20_L50_noise0.1_ACTG.fasta
+      filename: "synthetic_n20_L50_noise0.1_ACTG.fasta"
 
 
 # =====================================================================
 # SEÇÃO 4: ALGORITMOS
 # =====================================================================
 algorithms:
-  - id: "config_otimizacao"
-    nome: "Configuração para Otimização"
-    descricao: "Parâmetros base para otimização"
+  - id: "blfga_otimizacao"
+    nome: "BLF-GA para Otimização"
+    descricao: "Configuração BLF-GA com parâmetros base para otimização"
     algorithms:
       - "BLF-GA"
       - "CSC"
-      - "H³-CSP"
-    
     algorithm_params:
       "BLF-GA":
         # Parâmetros base que serão otimizados
@@ -69,12 +67,25 @@ algorithms:
         elite_rate: 0.05
         crossover_type: "one_point"
         mutation_type: "multi"
-        
       "CSC":
         min_d: 2
         d_factor: 0.75
         min_blocks: 4
         max_blocks: 8
+        l_div: 25
+        
+  - id: "csc_otimizacao"
+    nome: "CSC para Otimização"
+    descricao: "Configuração CSC com parâmetros base para otimização"
+    algorithms:
+      - "CSC"
+    algorithm_params:
+      "CSC":
+        min_d: 2
+        d_factor: 0.75
+        min_blocks: 4
+        max_blocks: 8
+        l_div: 25
 
 # =====================================================================
 # SEÇÃO 5: TIPO DE TAREFA
@@ -102,71 +113,98 @@ optimization:
   # Lista de otimizações
   optimizations:
     # Otimização 1: BLF-GA em dataset pequeno
-    - nome: "Otimizaçcão BLF-GA - Dataset Pequeno"
+    - nome: "Otimização BLF-GA - Dataset Pequeno"
       study_name: "blfga_pequeno"
       direction: "minimize"
       n_trials: 10
       timeout_per_trial: 300
       target_datasets: ["dataset_pequeno", "dataset_medio"]
-      target_algorithm: "BLF-GA"
+      target_algorithm: "blfga_otimizacao"  # Referencia ID de configuração
       
       parameters:
-        pop_size:
-          type: "int"
-          low: 50
-          high: 200
-          step: 10
-        max_gens:
-          type: "int"
-          low: 100
-          high: 500
-          step: 25
-        cross_prob:
-          type: "uniform"
-          low: 0.6
-          high: 0.95
-        mut_prob:
-          type: "uniform"
-          low: 0.01
-          high: 0.3
-        crossover_type:
-          type: "categorical"
-          choices: ["one_point", "uniform", "blend_blocks"]
-        mutation_type:
-          type: "categorical"
-          choices: ["multi", "inversion", "transposition"]
+        "BLF-GA":  # Estrutura por algoritmo
+          pop_size:
+            type: "int"
+            low: 50
+            high: 200
+            step: 10
+          max_gens:
+            type: "int"
+            low: 100
+            high: 500
+            step: 25
+          cross_prob:
+            type: "uniform"
+            low: 0.6
+            high: 0.95
+          mut_prob:
+            type: "uniform"
+            low: 0.01
+            high: 0.3
+          crossover_type:
+            type: "categorical"
+            choices: ["one_point", "uniform", "blend_blocks"]
+          mutation_type:
+            type: "categorical"
+            choices: ["multi", "inversion", "transposition"]
+
+        "CSC":  # Estrutura por algoritmo
+          min_d:
+            type: "int"
+            low: 1
+            high: 5
+          d_factor:
+            type: "uniform"
+            low: 0.5
+            high: 1.0
+          min_blocks:
+            type: "int"
+            low: 2
+            high: 8
+          max_blocks:
+            type: "int"
+            low: 4
+            high: 16
+          l_div:
+            type: "int"
+            low: 10
+            high: 50
+            step: 5
+            
+
     
-    # Otimização 3: CSC em dataset médio
+    # Otimização 2: CSC em dataset médio
     - nome: "Otimização CSC - Dataset Médio"
       study_name: "csc_exemplo"
       direction: "minimize"
       n_trials: 80
       timeout_per_trial: 240
       target_datasets: ["dataset_pequeno"]
-      target_algorithm: "CSC"
+      target_algorithm: "csc_otimizacao"  # Referencia ID de configuração
       
       parameters:
-        min_d:
-          type: "int"
-          low: 1
-          high: 5
-        d_factor:
-          type: "uniform"
-          low: 0.5
-          high: 1.0
-        min_blocks:
-          type: "int"
-          low: 2
-          high: 8
-        max_blocks:
-          type: "int"
-          low: 4
-          high: 16
-        l_div:
-          type: "int"
-          low: 10
-          high: 50
-          step: 5
+        "CSC":  # Estrutura por algoritmo
+          min_d:
+            type: "int"
+            low: 1
+            high: 5
+          d_factor:
+            type: "uniform"
+            low: 0.5
+            high: 1.0
+          min_blocks:
+            type: "int"
+            low: 2
+            high: 8
+          max_blocks:
+            type: "int"
+            low: 4
+            high: 16
+          l_div:
+            type: "int"
+            low: 10
+            high: 50
+            step: 5
       
       # Configuração específica para CSC
       optuna_config:
@@ -238,7 +276,7 @@ resources:
 # SEÇÃO 11: CONFIGURAÇÕES DE LOGGING
 # =====================================================================
 logging:
-  level: "INFO"
+  level: "DEBUG"
   output:
     console: true
     file: true

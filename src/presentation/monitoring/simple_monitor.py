@@ -19,6 +19,7 @@ class SimpleMonitor(MonitoringInterface):
         self.task_name: str = ""
         self.start_time: Optional[datetime] = None
         self.header_printed: bool = False
+        self.last_execution_name: str = ""  # Controlar duplicação
 
         # Controle hierárquico
         self.current_config_id: Optional[str] = None
@@ -101,12 +102,21 @@ class SimpleMonitor(MonitoringInterface):
             # Imprimir nome do algoritmo na primeira repetição
             if not self.current_algorithms[algorithm_name]["name_printed"]:
                 print("")
-                print(f"• {algorithm_name}:")
+
+                # Extrair informações do contexto ou item_id para mostrar detalhes
+                dataset_info = ""
+                if context and context.dataset_id:
+                    dataset_info = f" | Dataset: {context.dataset_id}"
+                elif "_" in item_id:
+                    # Extrair dataset do item_id se formatado como algorithm_dataset
+                    parts = item_id.split("_", 1)
+                    if len(parts) > 1:
+                        dataset_info = f" | Dataset: {parts[1]}"
 
                 # Mostrar barra de progresso inicial
                 progress_bar = self._create_progress_bar(0.0)
                 rep_info = f"(0/{total_rep}) " if total_rep > 1 else ""
-                status_line = f"  {progress_bar} {rep_info}0%"
+                status_line = f"• {algorithm_name} {progress_bar} {rep_info}0%"
                 print(f"{status_line}     ", end="", flush=True)
 
                 self.current_algorithms[algorithm_name]["name_printed"] = True
@@ -148,12 +158,11 @@ class SimpleMonitor(MonitoringInterface):
 
                     # Extrair nome da execução se disponível
                     execution_name = data.get("execution_name", level_id)
-                    self.current_execution_name = execution_name  # Salvar para reexibir
 
-                    # Exibir informações da execução
-                    print(
-                        f"⚡\tExecução: {execution_name} ({self.current_config_index}/{self.total_configs})"
-                    )
+                    # Armazenar para uso posterior no dataset, mas não exibir aqui
+                    self.pending_execution_name = execution_name
+                    self.pending_config_index = self.current_config_index
+                    self.pending_total_configs = self.total_configs
 
                 # Reset dataset tracking quando nova configuração
                 self.current_dataset_id = None
@@ -184,10 +193,34 @@ class SimpleMonitor(MonitoringInterface):
                     self.current_config_index = config_index
                     self.total_configs = total_configs
 
-                    # Sempre reexibir informações da execução atual
-                    print(
-                        f"\n\n⚡\tExecução: {execution_name} ({config_index}/{total_configs})"
+                    # Exibir linha de execução apenas se for diferente da anterior
+                    # Usar dados armazenados do nível EXECUTION se disponíveis
+                    display_execution_name = getattr(
+                        self, "pending_execution_name", execution_name
                     )
+                    display_config_index = getattr(
+                        self, "pending_config_index", config_index
+                    )
+                    display_total_configs = getattr(
+                        self, "pending_total_configs", total_configs
+                    )
+
+                    # Criar nome de execução mais descritivo
+                    exec_name_display = f"{display_execution_name} - {dataset_name}"
+
+                    if exec_name_display != self.last_execution_name:
+                        print(
+                            f"\n\n⚡ Execução: {exec_name_display} ({display_config_index}/{display_total_configs})"
+                        )
+                        self.last_execution_name = exec_name_display
+
+                    # Limpar dados pendentes
+                    if hasattr(self, "pending_execution_name"):
+                        delattr(self, "pending_execution_name")
+                    if hasattr(self, "pending_config_index"):
+                        delattr(self, "pending_config_index")
+                    if hasattr(self, "pending_total_configs"):
+                        delattr(self, "pending_total_configs")
 
                 # Reset algoritmos quando novo dataset
                 self.current_algorithms = {}
@@ -195,15 +228,25 @@ class SimpleMonitor(MonitoringInterface):
                 self.algorithm_repetitions = {}
 
                 # Exibir informações do dataset
-                print(
-                    f"📊\tConfiguração do Algoritmo: {algorithm_config_name} ({algorithm_config_index}/{total_algorithm_configs})"
-                )
-                print(
-                    f"🗂️\tDataset: {dataset_name} ({self.current_dataset_index}/{self.total_datasets})"
-                )
-                print(f"🧠\tAlgoritmos: {total_algorithms} total")
+                print(f"📊 Configuração do Algoritmo: {algorithm_config_name}")
+                print(f"🗂️ Dataset: {dataset_name}")
 
-                print(f"\nProgresso por algoritmo:")
+                # Obter lista de algoritmos da configuração
+                algorithms_config = data.get("algorithms_config", {})
+                algorithm_names = algorithms_config.get("algorithms", [])
+
+                # Listar todos os algoritmos da configuração
+                for algo_name in algorithm_names:
+                    print(f"• {algo_name}")
+                    print(f"[░░░░░░░░░░░░░░░░░░░░] 0%")
+
+                # Adicionar informações do tipo de task se for otimização
+                if self.task_type == TaskType.OPTIMIZATION:
+                    print("💡 Tipo: Otimização de Hiperparâmetros")
+                elif self.task_type == TaskType.SENSITIVITY:
+                    print("💡 Tipo: Análise de Sensibilidade")
+                elif self.task_type == TaskType.EXECUTION:
+                    print("💡 Tipo: Execução de Algoritmos")
 
     def update_item(
         self,
@@ -300,7 +343,7 @@ class SimpleMonitor(MonitoringInterface):
             progress_bar = self._create_progress_bar(total_progress)
 
             if algo_status["completed"]:
-                status_line = f"  {progress_bar} ✅ 100%"
+                status_line = f"• {algorithm_name} {progress_bar} ✅ 100%"
             else:
                 # Mostrar progresso no formato: (finalizadas+em_progresso/total) porcentagem%
                 if total_rep > 1:
@@ -310,9 +353,16 @@ class SimpleMonitor(MonitoringInterface):
                         rep_info = f"({completed_reps}/{total_rep}) "
                 else:
                     rep_info = ""
-                status_line = f"  {progress_bar} {rep_info}{total_progress:.0f}%"
 
-            print(f"\r{status_line}     ", end="", flush=True)
+                # Adicionar informações do message se disponível (trials, etc.)
+                message_info = ""
+                if message and "Trial" in message:
+                    message_info = f" | {message}"
+
+                status_line = f"• {algorithm_name} {progress_bar} {rep_info}{total_progress:.0f}%{message_info}"
+
+            # Limpar linha completamente e imprimir nova
+            print(f"\r{' ' * 80}\r{status_line}", end="", flush=True)
 
     def algorithm_callback(
         self,
@@ -370,16 +420,14 @@ class SimpleMonitor(MonitoringInterface):
                     progress_bar = self._create_progress_bar(total_progress)
 
                     if algo_status["completed"]:
-                        status_line = f"  {progress_bar} ✅ 100%"
+                        status_line = f"• {algorithm_name} {progress_bar} ✅ 100%"
+                        print(f"\r{' ' * 80}\r{status_line}")
                     else:
                         rep_info = (
                             f"({completed_reps}/{total_rep}) " if total_rep > 1 else ""
                         )
-                        status_line = (
-                            f"  {progress_bar} {rep_info}{total_progress:.0f}%"
-                        )
-
-                    print(f"\r{status_line}      ", end="", flush=True)
+                        status_line = f"• {algorithm_name} {progress_bar} {rep_info}{total_progress:.0f}%"
+                        print(f"\r{' ' * 80}\r{status_line}", end="", flush=True)
 
     def finish_task(
         self,

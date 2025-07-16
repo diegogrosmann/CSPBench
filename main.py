@@ -460,11 +460,11 @@ def execute_batch_file(batch_file: str):
 
         if not batch_path.exists():
             print(f"❌ Arquivo não encontrado: {batch_file}")
-            raise typer.Exit(1)
+            sys.exit(1)
 
         if not batch_path.suffix.lower() in [".yaml", ".yml"]:
             print(f"❌ Arquivo deve ser .yaml ou .yml: {batch_file}")
-            raise typer.Exit(1)
+            sys.exit(1)
 
         # Executar batch
         service = initialize_service()
@@ -473,9 +473,13 @@ def execute_batch_file(batch_file: str):
         result = service.run_batch(str(batch_path))
         print(f"✅ Batch concluído: {result.get('summary', 'Concluído')}")
 
+    except KeyboardInterrupt:
+        print("\n🚫 Operação cancelada pelo usuário (Ctrl+C)")
+        print("📋 Batch interrompido durante a execução")
+        sys.exit(0)  # Exit com código 0 para indicar cancelamento intencional
     except Exception as e:
         print(f"❌ Erro no batch: {e}")
-        raise typer.Exit(1)
+        sys.exit(1)
 
 
 # Registrar todos os comandos da CLI
@@ -489,37 +493,49 @@ def main(args: Optional[list] = None):
     if args is None:
         args = sys.argv[1:]
 
-    # Se for um arquivo de batch, executar diretamente
-    if len(args) == 1 and args[0].endswith((".yaml", ".yml")):
-        execute_batch_file(args[0])
-        return
-
-    # Caso contrário, usar o sistema de comandos do Typer
-    original_argv = sys.argv[:]
     try:
-        sys.argv = ["main.py"] + args
-        app()
-    finally:
-        sys.argv = original_argv
+        # Se for um arquivo de batch, executar diretamente
+        if len(args) == 1 and args[0].endswith((".yaml", ".yml")):
+            execute_batch_file(args[0])
+            return
+
+        # Caso contrário, usar o sistema de comandos do Typer
+        original_argv = sys.argv[:]
+        try:
+            sys.argv = ["main.py"] + args
+            app()
+        finally:
+            sys.argv = original_argv
+
+    except KeyboardInterrupt:
+        print("\n🚫 Operação cancelada pelo usuário (Ctrl+C)")
+        sys.exit(0)
+    except SystemExit:
+        # Permitir SystemExit (incluindo sys.exit) passar sem tratamento
+        raise
+    except Exception as e:
+        print(f"❌ Erro inesperado: {e}")
+        sys.exit(1)
 
 
 if __name__ == "__main__":
     import sys
 
-    # Se executado sem argumentos, mostra interface interativa
-    if len(sys.argv) == 1:
-        show_interactive_menu()
-    elif len(sys.argv) == 2:
-        arg = sys.argv[1]
+    try:
+        # Se executado sem argumentos, mostra interface interativa
+        if len(sys.argv) == 1:
+            show_interactive_menu()
+        elif len(sys.argv) == 2:
+            arg = sys.argv[1]
 
-        # Implementar flags especiais
-        if arg == "--algorithms":
-            show_algorithms_and_exit()
-        elif arg == "--datasetsave":
-            show_datasetsave_and_exit()
-        elif arg == "--help":
-            print(
-                """
+            # Implementar flags especiais
+            if arg == "--algorithms":
+                show_algorithms_and_exit()
+            elif arg == "--datasetsave":
+                show_datasetsave_and_exit()
+            elif arg == "--help":
+                print(
+                    """
 CSPBench v0.1.0 - Framework para Closest String Problem
 
 Uso:
@@ -547,17 +563,26 @@ Exemplos:
     python main.py batch batches/exemplo.yaml
     python main.py batches/exemplo.yaml
 """
-            )
-            sys.exit(0)
-        elif not arg.startswith("-") and (
-            arg.endswith(".yaml") or arg.endswith(".yml")
-        ):
-            # É um arquivo de batch - executar diretamente
-            execute_batch_file(arg)
-            sys.exit(0)
+                )
+                sys.exit(0)
+            elif not arg.startswith("-") and (
+                arg.endswith(".yaml") or arg.endswith(".yml")
+            ):
+                # É um arquivo de batch - executar diretamente
+                execute_batch_file(arg)
+                sys.exit(0)
+            else:
+                # Usar CLI normal do Typer
+                app()
         else:
             # Usar CLI normal do Typer
             app()
-    else:
-        # Usar CLI normal do Typer
-        app()
+    except KeyboardInterrupt:
+        print("\n🚫 Operação cancelada pelo usuário (Ctrl+C)")
+        sys.exit(0)
+    except SystemExit:
+        # Permitir SystemExit (incluindo sys.exit) passar sem tratamento
+        raise
+    except Exception as e:
+        print(f"❌ Erro inesperado: {e}")
+        sys.exit(1)

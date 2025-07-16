@@ -101,23 +101,24 @@ sensitivity:
     - nome: "Análise Morris BLF-GA - Screening"
       analysis_method: "morris"
       target_datasets: ["dataset_pequeno"]
-      target_algorithm: "BLF-GA"
+      target_algorithm: "config_sensibilidade"  # Referencia ID de configuração de algoritmo
       
       n_samples: 10
       repetitions_per_sample: 1
       
       parameters:
-        pop_size:
-          type: "integer"
-          bounds: [50, 200]
-          default: 100
-        max_gens:
-          type: "integer"
-          bounds: [100, 500]
-          default: 200
-        cross_prob:
-          type: "float"
-          bounds: [0.6, 0.95]
+        "BLF-GA":  # Estrutura por algoritmo
+          pop_size:
+            type: "integer"
+            bounds: [50, 200]
+            default: 100
+          max_gens:
+            type: "integer"
+            bounds: [100, 500]
+            default: 200
+          cross_prob:
+            type: "float"
+            bounds: [0.6, 0.95]
           default: 0.8
         
       morris:

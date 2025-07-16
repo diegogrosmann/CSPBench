@@ -72,6 +72,11 @@ class Executor(ExecutorInterface):
         dataset: Dataset,
         optimization_config: Dict[str, Any],
         monitoring_service=None,
+        config_index: int = 1,
+        total_configs: int = 1,
+        dataset_index: int = 1,
+        total_datasets: int = 1,
+        dataset_name: str | None = None,
     ) -> Dict[str, Any]:
         """
         Executa otimização de hiperparâmetros delegando para OptimizationOrchestrator.
@@ -81,6 +86,11 @@ class Executor(ExecutorInterface):
             dataset: Dataset para otimização
             optimization_config: Configuração da otimização
             monitoring_service: Serviço de monitoramento opcional
+            config_index: Índice da configuração atual
+            total_configs: Total de configurações
+            dataset_index: Índice do dataset atual
+            total_datasets: Total de datasets
+            dataset_name: Nome original do dataset (opcional)
 
         Returns:
             Dict[str, Any]: Resultado da otimização
@@ -98,8 +108,13 @@ class Executor(ExecutorInterface):
             algorithm_registry = DomainAlgorithmRegistry()
             dataset_repository = FileDatasetRepository("./datasets")
 
+            # Usar nome original do dataset se fornecido, senão usar temporário
+            if dataset_name:
+                dataset_id = dataset_name
+            else:
+                dataset_id = f"temp_optimization_{int(time.time())}"
+
             # Salvar o dataset temporariamente no repositório para o orquestrador
-            dataset_id = f"temp_optimization_{int(time.time())}"
             dataset_repository.save(dataset, dataset_id)
 
             # Criar configuração completa para o orquestrador
@@ -119,16 +134,21 @@ class Executor(ExecutorInterface):
                 dataset_repository=dataset_repository,
                 config=full_config,
                 monitoring_service=monitoring_service,
+                config_index=config_index,
+                total_configs=total_configs,
+                dataset_index=dataset_index,
+                total_datasets=total_datasets,
             )
 
             # Executar otimização
             results = orchestrator.run_optimization()
 
-            # Limpar dataset temporário
-            try:
-                dataset_repository.delete(dataset_id)
-            except:
-                pass
+            # Limpar dataset temporário apenas se era temporário
+            if not dataset_name:
+                try:
+                    dataset_repository.delete(dataset_id)
+                except:
+                    pass
 
             return results
 

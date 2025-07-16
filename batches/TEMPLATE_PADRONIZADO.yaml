@@ -244,36 +244,37 @@ optimization:
       
       # Datasets e algoritmo específicos para otimizar
       target_datasets: ["dataset_teste"] # list: IDs dos datasets a usar (referência à seção 3)
-      target_algorithm: "BLF-GA"       # string: Nome do algoritmo a otimizar
+      target_algorithm: "config_padrao" # string: ID da configuração de algoritmo (referência à seção 4)
       
       # Parâmetros a otimizar (sobrepõem algorithm_params da seção 4)
       # Tipos suportados: int, uniform (float), categorical
       parameters:
-        pop_size:                      # Nome do parâmetro (deve existir no algoritmo)
-          type: "int"                  # string: Tipo do parâmetro
-          low: 50                      # int: Valor mínimo (para int/uniform)
-          high: 200                    # int: Valor máximo (para int/uniform)
-          step: 10                     # int: Passo para valores inteiros (opcional)
-        
-        max_gens:
-          type: "int"
-          low: 100
-          high: 500
-          step: 25
-        
-        cross_prob:
-          type: "uniform"              # float uniforme entre low e high
-          low: 0.6
-          high: 0.95
-        
-        mut_prob:
-          type: "uniform"
-          low: 0.01
-          high: 0.3
-        
-        crossover_type:
-          type: "categorical"          # Escolha entre valores discretos
-          choices: ["one_point", "uniform", "blend_blocks"]  # list: Opções disponíveis
+        "BLF-GA":                      # string: Nome do algoritmo (deve existir na configuração)
+          pop_size:                    # Nome do parâmetro (deve existir no algoritmo)
+            type: "int"                # string: Tipo do parâmetro
+            low: 50                    # int: Valor mínimo (para int/uniform)
+            high: 200                  # int: Valor máximo (para int/uniform)
+            step: 10                   # int: Passo para valores inteiros (opcional)
+          
+          max_gens:
+            type: "int"
+            low: 100
+            high: 500
+            step: 25
+          
+          cross_prob:
+            type: "uniform"            # float uniforme entre low e high
+            low: 0.6
+            high: 0.95
+          
+          mut_prob:
+            type: "uniform"
+            low: 0.01
+            high: 0.3
+          
+          crossover_type:
+            type: "categorical"        # Escolha entre valores discretos
+            choices: ["one_point", "uniform", "blend_blocks"]  # list: Opções disponíveis
       
       # Configurações específicas do Optuna (opcional - sobrepõe global_optuna_config)
       optuna_config:
@@ -288,16 +289,17 @@ optimization:
     #   n_trials: 50
     #   timeout_per_trial: 180
     #   target_datasets: ["dataset_teste", "dataset_arquivo"]
-    #   target_algorithm: "CSC"
+    #   target_algorithm: "config_padrao"  # Referencia ID de configuração
     #   parameters:
-    #     min_d:
-    #       type: "int"
-    #       low: 1
-    #       high: 5
-    #     d_factor:
-    #       type: "uniform"
-    #       low: 0.5
-    #       high: 1.0
+    #     "CSC":                       # Nome do algoritmo na configuração
+    #       min_d:
+    #         type: "int"
+    #         low: 1
+    #         high: 5
+    #       d_factor:
+    #         type: "uniform"
+    #         low: 0.5
+    #         high: 1.0
 
 # =====================================================================
 # SEÇÃO 6C: CONFIGURAÇÃO ESPECÍFICA - SENSITIVITY

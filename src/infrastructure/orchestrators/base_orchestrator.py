@@ -4,6 +4,7 @@ Base para Orquestradores
 Fornece funcionalidade comum para todos os orquestradores,
 incluindo integração padronizada com sistema de monitoramento.
 """
+
 from abc import ABC, abstractmethod
 from typing import Any, Dict, Optional
 
@@ -82,7 +83,7 @@ class BaseOrchestrator(ABC):
         if context:
             error_msg += f" ({context})"
         error_msg += f": {error}"
-        
+
         self._logger.error(error_msg)
 
     def _log_info(self, message: str) -> None:

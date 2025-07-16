@@ -415,9 +415,13 @@ refactor/<descricao>    # Refatorações
    - Mostrar plano de implementação
    - Aguardar aprovação para mudanças significativas
 
+
 ### 10.3 Implementação
 
-- ✅ **Ferramentas**: Usar ferramentas apropriadas (não codeblocks)
+- ✅ **Ferramentas**: Usar métodos internos sempre que possível (APIs, funções Python, tasks VS Code) para executar comandos como run, test, read, format, etc.
+- ✅ **Prioridade Interna**: Sempre priorizar métodos internos para execução de tarefas, evitando comandos externos (shell, terminal) ou que exijam aprovação manual.
+- ✅ **Automação**: Não solicitar aprovação para ações que podem ser realizadas internamente.
+- ❌ **Comandos Externos**: Só utilizar comandos externos se não houver alternativa interna viável.
 - ✅ **Incrementalidade**: Fazer mudanças pequenas e testáveis
 - ✅ **Validação**: Testar após cada mudança significativa
 - ✅ **Cleanup**: Remover código obsoleto

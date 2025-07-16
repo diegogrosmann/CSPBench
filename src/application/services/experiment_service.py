@@ -467,87 +467,151 @@ class ExperimentService:
             all_results = []
             optimization_summaries = []
 
+            # Calcular totais para monitoramento
+            total_optimizations = len(optimization_configs)
+
+            # Calcular total de execuções (datasets × algoritmos por configuração)
+            total_executions = 0
             for opt_config in optimization_configs:
+                # Resolver algoritmos para calcular total
+                algorithm_names, _ = self._resolve_algorithm_configuration(
+                    opt_config.target_algorithm, batch_config
+                )
+                total_executions += len(opt_config.target_datasets) * len(
+                    algorithm_names
+                )
+
+            total_datasets = sum(
+                len(config.target_datasets) for config in optimization_configs
+            )
+
+            current_optimization_index = 0
+            current_execution_index = 0
+
+            for opt_config in optimization_configs:
+                current_optimization_index += 1
                 self._logger.info(f"Executando otimização: {opt_config.nome}")
 
-                # Processar cada dataset na configuração
-                for dataset_id in opt_config.target_datasets:
-                    self._logger.info(f"Processando dataset: {dataset_id}")
+                # Resolver algoritmos e parâmetros base por ID
+                algorithm_names, all_algorithm_params = (
+                    self._resolve_algorithm_configuration(
+                        opt_config.target_algorithm, batch_config
+                    )
+                )
 
-                    try:
-                        # Resolver configuração do dataset e carregá-lo
-                        dataset_config = self._resolve_dataset_config(
-                            dataset_id, batch_config.get("datasets", [])
-                        )
+                # Processar cada algoritmo individualmente
+                for algorithm_name in algorithm_names:
+                    current_dataset_index = 0
 
-                        # Carregar dataset baseado na configuração
-                        if dataset_config["tipo"] == "file":
-                            filename = dataset_config["parametros"]["filename"]
-                            dataset = self._load_dataset(filename)
-                        else:
-                            # Para datasets sintéticos, criar usando o método existente
-                            dataset = self._create_dataset_from_config(dataset_config)
+                    # Obter parâmetros base específicos para este algoritmo
+                    base_params = all_algorithm_params.get(algorithm_name, {})
 
-                        self._logger.info(
-                            f"Dataset {dataset_id} carregado: {len(dataset.sequences)} sequências"
-                        )
+                    # Processar cada dataset na configuração
+                    for dataset_id in opt_config.target_datasets:
+                        current_dataset_index += 1
+                        current_execution_index += 1
+                        self._logger.info(f"Processando dataset: {dataset_id}")
 
-                        # Extrair configurações de recursos
-                        resources_config = ConfigurationParser.parse_resources_config(
-                            batch_config
-                        )
+                        try:
+                            # Resolver configuração do dataset e carregá-lo
+                            dataset_config = self._resolve_dataset_config(
+                                dataset_id, batch_config.get("datasets", [])
+                            )
 
-                        # Preparar configuração para o executor
-                        executor_config = {
-                            "study_name": opt_config.study_name,
-                            "direction": opt_config.direction,
-                            "n_trials": opt_config.n_trials,
-                            "timeout_per_trial": opt_config.timeout_per_trial,
-                            "parameters": opt_config.parameters,
-                            "optuna_config": opt_config.optuna_config or {},
-                            "resources": resources_config,  # Incluir configurações de recursos
-                            "internal_jobs": resources_config.get(
-                                "internal_jobs", 4
-                            ),  # Paralelismo interno
-                        }
+                            # Carregar dataset baseado na configuração
+                            if dataset_config["tipo"] == "file":
+                                filename = dataset_config["parametros"]["filename"]
+                                dataset = self._load_dataset(filename)
+                            else:
+                                # Para datasets sintéticos, criar usando o método existente
+                                dataset = self._create_dataset_from_config(
+                                    dataset_config
+                                )
 
-                        # Executar otimização
-                        optimization_results = self._executor.execute_optimization(
-                            opt_config.target_algorithm,
-                            dataset,
-                            executor_config,
-                            self._monitoring_service,
-                        )
+                            self._logger.info(
+                                f"Dataset {dataset_id} carregado: {len(dataset.sequences)} sequências"
+                            )
 
-                        all_results.append(optimization_results)
+                            # Extrair configurações de recursos
+                            resources_config = (
+                                ConfigurationParser.parse_resources_config(batch_config)
+                            )
 
-                        # Criar sumário para esta otimização
-                        optimization_summaries.append(
-                            {
-                                "optimization_name": opt_config.nome,
-                                "algorithm": opt_config.target_algorithm,
-                                "dataset": dataset_id,
-                                "best_value": optimization_results.get("best_value"),
-                                "best_params": optimization_results.get("best_params"),
-                                "n_trials": optimization_results.get("n_trials"),
-                                "total_time": optimization_results.get("total_time"),
+                            # Processar parâmetros de otimização - nova estrutura
+                            optimization_params = {}
+                            if algorithm_name in opt_config.parameters:
+                                optimization_params = opt_config.parameters[
+                                    algorithm_name
+                                ]
+                            else:
+                                # Fallback para estrutura antiga (compatibilidade)
+                                optimization_params = opt_config.parameters
+
+                            # Preparar configuração para o executor
+                            executor_config = {
+                                "study_name": f"{opt_config.study_name}_{algorithm_name}_{dataset_id}",
+                                "direction": opt_config.direction,
+                                "n_trials": opt_config.n_trials,
+                                "timeout_per_trial": opt_config.timeout_per_trial,
+                                "parameters": optimization_params,
+                                "base_params": base_params,  # Parâmetros base da configuração
+                                "optuna_config": opt_config.optuna_config or {},
+                                "resources": resources_config,  # Incluir configurações de recursos
+                                "internal_jobs": resources_config.get(
+                                    "internal_jobs", 4
+                                ),  # Paralelismo interno
                             }
-                        )
 
-                        self._logger.info(f"Otimização concluída para {dataset_id}")
+                            # Executar otimização
+                            optimization_results = self._executor.execute_optimization(
+                                algorithm_name,  # Usar nome do algoritmo resolvido
+                                dataset,
+                                executor_config,
+                                self._monitoring_service,
+                                config_index=current_execution_index,
+                                total_configs=total_executions,
+                                dataset_index=current_dataset_index,
+                                total_datasets=len(opt_config.target_datasets),
+                                dataset_name=dataset_id,  # Passar nome original do dataset
+                            )
 
-                    except Exception as e:
-                        self._logger.error(f"Erro na otimização de {dataset_id}: {e}")
-                        # Adicionar resultado de erro
-                        error_result = {
-                            "optimization_name": opt_config.nome,
-                            "algorithm": opt_config.target_algorithm,
-                            "dataset": dataset_id,
-                            "error": str(e),
-                            "status": "failed",
-                        }
-                        all_results.append(error_result)
-                        optimization_summaries.append(error_result)
+                            all_results.append(optimization_results)
+
+                            # Criar sumário para esta otimização
+                            optimization_summaries.append(
+                                {
+                                    "optimization_name": opt_config.nome,
+                                    "algorithm": algorithm_name,  # Usar nome do algoritmo resolvido
+                                    "dataset": dataset_id,
+                                    "best_value": optimization_results.get(
+                                        "best_value"
+                                    ),
+                                    "best_params": optimization_results.get(
+                                        "best_params"
+                                    ),
+                                    "n_trials": optimization_results.get("n_trials"),
+                                    "total_time": optimization_results.get(
+                                        "total_time"
+                                    ),
+                                }
+                            )
+
+                            self._logger.info(f"Otimização concluída para {dataset_id}")
+
+                        except Exception as e:
+                            self._logger.error(
+                                f"Erro na otimização de {dataset_id}: {e}"
+                            )
+                            # Adicionar resultado de erro
+                            error_result = {
+                                "optimization_name": opt_config.nome,
+                                "algorithm": algorithm_name,  # Usar nome do algoritmo atual
+                                "dataset": dataset_id,
+                                "error": str(e),
+                                "status": "failed",
+                            }
+                            all_results.append(error_result)
+                            optimization_summaries.append(error_result)
 
             return {
                 "results": all_results,
@@ -623,11 +687,27 @@ class ExperimentService:
                         )
 
                         # Preparar configuração para o executor
+                        # Resolver algoritmo e parâmetros base por ID
+                        algorithm_name, base_params = (
+                            self._resolve_algorithm_configuration(
+                                sens_config.target_algorithm, batch_config
+                            )
+                        )
+
+                        # Processar parâmetros de sensibilidade - nova estrutura
+                        sensitivity_params = {}
+                        if algorithm_name in sens_config.parameters:
+                            sensitivity_params = sens_config.parameters[algorithm_name]
+                        else:
+                            # Fallback para estrutura antiga (compatibilidade)
+                            sensitivity_params = sens_config.parameters
+
                         executor_config = {
                             "analysis_method": sens_config.analysis_method,
                             "n_samples": sens_config.n_samples,
                             "repetitions_per_sample": sens_config.repetitions_per_sample,
-                            "parameters": sens_config.parameters,
+                            "parameters": sensitivity_params,
+                            "base_params": base_params,  # Parâmetros base da configuração
                             "output_metrics": sens_config.output_metrics,
                             "method_config": sens_config.method_config or {},
                             "resources": resources_config,  # Incluir configurações de recursos
@@ -639,7 +719,7 @@ class ExperimentService:
                         # Executar análise de sensibilidade
                         sensitivity_results = (
                             self._executor.execute_sensitivity_analysis(
-                                sens_config.target_algorithm, dataset, executor_config
+                                algorithm_name, dataset, executor_config
                             )
                         )
 
@@ -649,12 +729,10 @@ class ExperimentService:
                         sensitivity_summaries.append(
                             {
                                 "analysis_name": sens_config.nome,
-                                "algorithm": sens_config.target_algorithm,
+                                "algorithm": algorithm_name,  # Usar nome do algoritmo resolvido
                                 "dataset": dataset_id,
                                 "n_samples": sensitivity_results.get("n_samples"),
-                                "parameters_analyzed": list(
-                                    sens_config.parameters.keys()
-                                ),
+                                "parameters_analyzed": list(sensitivity_params.keys()),
                                 "total_time": sensitivity_results.get("total_time"),
                             }
                         )
@@ -670,7 +748,7 @@ class ExperimentService:
                         # Adicionar resultado de erro
                         error_result = {
                             "analysis_name": sens_config.nome,
-                            "algorithm": sens_config.target_algorithm,
+                            "algorithm": sens_config.target_algorithm,  # Manter ID original no erro
                             "dataset": dataset_id,
                             "error": str(e),
                             "status": "failed",
@@ -976,6 +1054,46 @@ class ExperimentService:
         raise BatchConfigurationError(
             f"Algoritmo com ID '{algorithm_id}' não encontrado"
         )
+
+    def _resolve_algorithm_configuration(
+        self, algorithm_id: str, config: Dict[str, Any]
+    ) -> tuple[List[str], Dict[str, Dict[str, Any]]]:
+        """
+        Resolve configuração de algoritmo por ID.
+
+        Args:
+            algorithm_id: ID da configuração do algoritmo
+            config: Configuração completa do batch
+
+        Returns:
+            tuple: (list_of_algorithm_names, all_algorithm_params)
+        """
+        algorithms_config = config.get("algorithms", [])
+
+        # Encontrar configuração por ID
+        algorithm_config = next(
+            (a for a in algorithms_config if a["id"] == algorithm_id), None
+        )
+
+        if not algorithm_config:
+            raise ValueError(
+                f"Configuração de algoritmo com ID '{algorithm_id}' não encontrada"
+            )
+
+        # Extrair algoritmos da configuração
+        algorithms = algorithm_config.get("algorithms", [])
+        if not algorithms:
+            raise ValueError(
+                f"Nenhum algoritmo definido na configuração '{algorithm_id}'"
+            )
+
+        # Retornar todos os algoritmos
+        algorithm_names = algorithms
+
+        # Extrair parâmetros específicos de todos os algoritmos
+        algorithm_params = algorithm_config.get("algorithm_params", {})
+
+        return algorithm_names, algorithm_params
 
     def _create_dataset_from_config(self, dataset_config: Dict[str, Any]) -> Dataset:
         """Cria dataset a partir da configuração."""

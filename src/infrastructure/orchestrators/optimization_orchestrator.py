@@ -6,6 +6,7 @@ incluindo salvamento incremental, relatórios avançados e sistema de recovery.
 """
 
 import json
+import logging
 import os
 import time
 from pathlib import Path
@@ -32,6 +33,10 @@ class OptimizationOrchestrator:
         dataset_repository: DatasetRepository,
         config: Dict[str, Any],
         monitoring_service=None,
+        config_index: int = 1,
+        total_configs: int = 1,
+        dataset_index: int = 1,
+        total_datasets: int = 1,
     ):
         """
         Inicializa o orquestrador.
@@ -41,12 +46,25 @@ class OptimizationOrchestrator:
             dataset_repository: Repositório de datasets
             config: Configuração completa do batch
             monitoring_service: Serviço de monitoramento (opcional)
+            config_index: Índice da configuração atual
+            total_configs: Total de configurações
+            dataset_index: Índice do dataset atual
+            total_datasets: Total de datasets
         """
         self.algorithm_registry = algorithm_registry
         self.dataset_repository = dataset_repository
         self.config = config
         self.monitoring_service = monitoring_service
         self.logger = get_logger(__name__)
+
+        # Armazenar totais para monitoramento
+        self.config_index = config_index
+        self.total_configs = total_configs
+        self.dataset_index = dataset_index
+        self.total_datasets = total_datasets
+
+        # Configurar logging do Optuna para arquivo apenas
+        self._setup_optuna_logging_filter()
 
         # Configuração de otimização
         self.optimization_config = config.get("optimization", {})
@@ -148,7 +166,45 @@ class OptimizationOrchestrator:
             # Inicializar monitoramento se disponível
             if self.monitoring_service:
                 algorithm_name = self.config.get("algorithm", "algoritmo")
-                item_id = f"{algorithm_name}_{self.config.get('dataset', 'dataset')}"
+                dataset_name = self.config.get("dataset", "dataset")
+
+                # Configurar monitoramento hierárquico
+                from src.presentation.monitoring.interfaces import ExecutionLevel
+
+                # Atualizar informações de execução
+                self.monitoring_service.update_hierarchy(
+                    ExecutionLevel.EXECUTION,
+                    "optimization_execution",
+                    0.0,
+                    "Iniciando otimização",
+                    {
+                        "execution_name": f"Otimização - {algorithm_name}",
+                        "config_index": self.config_index,
+                        "total_configs": self.total_configs,
+                    },
+                )
+
+                # Atualizar informações de dataset
+                self.monitoring_service.update_hierarchy(
+                    ExecutionLevel.DATASET,
+                    dataset_name,
+                    0.0,
+                    "Processando dataset",
+                    {
+                        "dataset_name": dataset_name,
+                        "dataset_index": self.dataset_index,
+                        "total_datasets": self.total_datasets,
+                        "algorithm_config_name": f"Otimização {algorithm_name}",
+                        "algorithm_config_index": 1,
+                        "total_algorithm_configs": 1,
+                        "total_algorithms": 1,
+                        "execution_name": f"Otimização - {algorithm_name}",
+                        "config_index": self.config_index,
+                        "total_configs": self.total_configs,
+                    },
+                )
+
+                item_id = f"{algorithm_name}_{dataset_name}"
                 self.monitoring_service.start_item(item_id, "optimization")
 
             # Definir função objetivo
@@ -291,7 +347,11 @@ class OptimizationOrchestrator:
         """
         try:
             # Gerar parâmetros baseado na configuração
-            params = self._generate_trial_params(trial)
+            trial_params = self._generate_trial_params(trial)
+
+            # Combinar com parâmetros base da configuração
+            base_params = self.config.get("base_params", {})
+            params = {**base_params, **trial_params}
 
             # Executar algoritmo usando a interface correta
             # A interface CSPAlgorithm espera: __init__(strings, alphabet, **params) e run()
@@ -304,7 +364,8 @@ class OptimizationOrchestrator:
             # Salvar resultado parcial
             trial_result = {
                 "trial_number": trial.number,
-                "params": params,
+                "trial_params": trial_params,  # Apenas parâmetros do trial
+                "final_params": params,  # Parâmetros finais (base + trial)
                 "max_distance": max_distance,
                 "best_string": best_string,
                 "metadata": metadata,
@@ -323,7 +384,7 @@ class OptimizationOrchestrator:
                 or (self.direction == "maximize" and max_distance > self.best_value)
             ):
                 self.best_value = max_distance
-                self.best_params = params.copy()
+                self.best_params = params.copy()  # Salvar parâmetros finais
 
             # Salvar progresso incremental
             self.trial_count += 1
@@ -338,7 +399,7 @@ class OptimizationOrchestrator:
             # Registrar erro
             trial_result = {
                 "trial_number": trial.number,
-                "params": self._generate_trial_params(trial),
+                "trial_params": self._generate_trial_params(trial),
                 "error": str(e),
                 "timestamp": time.time(),
                 "trial_id": trial.number,
@@ -400,13 +461,26 @@ class OptimizationOrchestrator:
 
                 # Atualizar progresso no monitoramento
                 algorithm_name = self.config.get("algorithm", "algoritmo")
-                item_id = f"{algorithm_name}_{self.config.get('dataset', 'dataset')}"
+                dataset_name = self.config.get("dataset", "dataset")
+                item_id = f"{algorithm_name}_{dataset_name}"
 
-                message = f"Trial {trial.number + 1}/{self.n_trials}"
+                # Criar mensagem mais detalhada
+                message = f"Trial ({trial.number + 1}/{self.n_trials})"
                 if trial.value is not None:
                     message += f" - Valor: {trial.value:.2f}"
 
-                self.monitoring_service.update_item(item_id, progress, message)
+                # Criar contexto hierárquico para otimização
+                from src.presentation.monitoring.interfaces import (
+                    create_hierarchical_context,
+                )
+
+                context = create_hierarchical_context(
+                    algorithm_id=algorithm_name,
+                    dataset_id=dataset_name,
+                    trial_id=f"{trial.number + 1}/{self.n_trials}",
+                )
+
+                self.monitoring_service.update_item(item_id, progress, message, context)
 
         callbacks.append(progress_callback)
 
@@ -541,3 +615,65 @@ class OptimizationOrchestrator:
 
         except Exception as e:
             self.logger.error(f"Erro ao gerar relatórios: {e}")
+
+    def _setup_optuna_logging_filter(self) -> None:
+        """Configura logging do Optuna para enviar apenas para arquivo, não terminal."""
+        optuna_logger = logging.getLogger("optuna")
+
+        # Configurar para não propagar para o logger raiz (evita saída no console)
+        optuna_logger.propagate = False
+
+        # Remover handlers existentes do console
+        for handler in optuna_logger.handlers[:]:
+            if (
+                isinstance(handler, logging.StreamHandler)
+                and handler.stream.name == "<stderr>"
+            ):
+                optuna_logger.removeHandler(handler)
+
+        # Verificar se já tem handler de arquivo configurado
+        has_file_handler = any(
+            isinstance(handler, logging.FileHandler)
+            for handler in optuna_logger.handlers
+        )
+
+        if not has_file_handler:
+            # Obter caminho do arquivo de log atual
+            from pathlib import Path
+
+            import yaml
+
+            from src.infrastructure.session_manager import SessionManager
+
+            try:
+                # Carregar configuração principal para SessionManager
+                config_path = Path("config/settings.yaml")
+                if config_path.exists():
+                    with open(config_path, "r", encoding="utf-8") as f:
+                        settings = yaml.safe_load(f)
+                else:
+                    settings = {}
+
+                session_manager = SessionManager(settings)
+                log_file_path = session_manager.get_log_path()
+
+                # Criar handler de arquivo para o Optuna
+                file_handler = logging.FileHandler(log_file_path)
+                file_handler.setLevel(logging.WARNING)
+
+                # Configurar formatação
+                formatter = logging.Formatter(
+                    "[%(levelname)s %(asctime)s] %(name)s: %(message)s"
+                )
+                file_handler.setFormatter(formatter)
+
+                # Adicionar handler ao logger do Optuna
+                optuna_logger.addHandler(file_handler)
+                optuna_logger.setLevel(logging.WARNING)
+
+                self.logger.debug("Logger do Optuna configurado para arquivo apenas")
+
+            except Exception as e:
+                self.logger.warning(f"Erro ao configurar logger do Optuna: {e}")
+                # Fallback: pelo menos suprimir propagação
+                optuna_logger.propagate = False

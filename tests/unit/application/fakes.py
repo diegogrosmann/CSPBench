@@ -199,7 +199,15 @@ class FakeExecutorPort:
         return results
 
     def execute_optimization(
-        self, algorithm_name: str, dataset: Dataset, optimization_config: Dict[str, Any]
+        self,
+        algorithm_name: str,
+        dataset: Dataset,
+        optimization_config: Dict[str, Any],
+        monitoring_service=None,
+        config_index: int = 1,
+        total_configs: int = 1,
+        dataset_index: int = 1,
+        total_datasets: int = 1,
     ) -> Dict[str, Any]:
         """Executa otimização de hiperparâmetros."""
         return {

@@ -39,6 +39,10 @@ class ExecutorInterface(ABC):
         dataset: Dataset,
         optimization_config: Dict[str, Any],
         monitoring_service=None,
+        config_index: int = 1,
+        total_configs: int = 1,
+        dataset_index: int = 1,
+        total_datasets: int = 1,
     ) -> Dict[str, Any]:
         """
         Executa otimização de hiperparâmetros.
@@ -48,6 +52,10 @@ class ExecutorInterface(ABC):
             dataset: Dataset para otimização
             optimization_config: Configuração da otimização
             monitoring_service: Serviço de monitoramento opcional
+            config_index: Índice da configuração atual
+            total_configs: Total de configurações
+            dataset_index: Índice do dataset atual
+            total_datasets: Total de datasets
 
         Returns:
             Dict[str, Any]: Resultado da otimização contendo:
