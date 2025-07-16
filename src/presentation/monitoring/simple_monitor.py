@@ -46,6 +46,71 @@ class SimpleMonitor(MonitoringInterface):
         self.header_printed = False
         self._print_header()
 
+    def start_item(
+        self,
+        item_id: str,
+        item_type: str = "repetition",
+        context: Optional[HierarchicalContext] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """Inicia um item individual (repetição, trial, amostra)."""
+        # Usar sempre o algorithm_id do contexto como chave principal
+        algorithm_name = (
+            context.algorithm_id if context and context.algorithm_id else item_id
+        )
+
+        # Primeiro algoritmo - adiciona à lista de ordem
+        if algorithm_name not in self.current_algorithms:
+            self.algorithm_order.append(algorithm_name)
+            self.current_algorithms[algorithm_name] = {
+                "progress": 0.0,
+                "completed": False,
+                "current_rep": 0,
+                "total_rep": 1,
+                "name_printed": False,
+                "completed_reps": 0,
+            }
+            self.algorithm_repetitions[algorithm_name] = {}
+
+        # Inicializar estrutura para repetição específica
+        if item_id not in self.algorithm_repetitions[algorithm_name]:
+            # Extrair informações de repetições se disponível no context
+            current_rep = 1
+            total_rep = 1
+            if context and context.repetition_id:
+                # Tentar extrair números de repetição do ID se for formatado como "1/10"
+                rep_parts = context.repetition_id.split("/")
+                if len(rep_parts) == 2:
+                    try:
+                        current_rep = int(rep_parts[0])
+                        total_rep = int(rep_parts[1])
+                    except ValueError:
+                        pass  # Manter valores padrão se não conseguir parsear
+
+            self.algorithm_repetitions[algorithm_name][item_id] = {
+                "progress": 0.0,
+                "completed": False,
+                "rep_number": current_rep,
+                "started": True,
+                "start_time": datetime.now(),
+            }
+
+            # Atualizar total de repetições do algoritmo
+            self.current_algorithms[algorithm_name]["total_rep"] = total_rep
+
+            # Imprimir nome do algoritmo na primeira repetição
+            if not self.current_algorithms[algorithm_name]["name_printed"]:
+                print("")
+                print(f"• {algorithm_name}:")
+
+                # Mostrar barra de progresso inicial
+                progress_bar = self._create_progress_bar(0.0)
+                rep_info = f"(0/{total_rep}) " if total_rep > 1 else ""
+                status_line = f"  {progress_bar} {rep_info}0%"
+                print(f"{status_line}     ", end="", flush=True)
+
+                self.current_algorithms[algorithm_name]["name_printed"] = True
+
     def _print_header(self) -> None:
         """Imprime cabeçalho do monitor."""
         if self.task_type == TaskType.EXECUTION:
@@ -223,9 +288,7 @@ class SimpleMonitor(MonitoringInterface):
 
         # Decidir se deve imprimir/atualizar
         significant_change = (
-            not algo_status["name_printed"]
-            or abs(total_progress - old_total_progress)
-            >= 10.0  # Mudança de 10% ou mais
+            abs(total_progress - old_total_progress) >= 10.0  # Mudança de 10% ou mais
             or algo_status["completed"]
             or (
                 old_rep_progress < 100.0 and rep_data["completed"]
@@ -233,11 +296,6 @@ class SimpleMonitor(MonitoringInterface):
         )
 
         if significant_change:
-            if not algo_status["name_printed"]:
-                print("")
-                print(f"• {algorithm_name}:")
-                algo_status["name_printed"] = True
-
             # Criar linha de progresso
             progress_bar = self._create_progress_bar(total_progress)
 

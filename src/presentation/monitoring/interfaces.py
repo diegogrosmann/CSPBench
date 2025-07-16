@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional
 
 
 class TaskType(Enum):
-    """Tipos de tarefa suportados."""
+    """Tipos de tarefa suportadas."""
 
     EXECUTION = "execution"
     OPTIMIZATION = "optimization"
@@ -431,6 +431,25 @@ class MonitoringInterface(ABC):
             task_type: Tipo da tarefa (execution, optimization, sensitivity)
             task_name: Nome da tarefa
             config: Configuração da tarefa
+        """
+        ...
+
+    @abstractmethod
+    def start_item(
+        self,
+        item_id: str,
+        item_type: str = "repetition",
+        context: Optional[HierarchicalContext] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """
+        Inicia um item individual (repetição, trial, amostra).
+
+        Args:
+            item_id: ID único do item
+            item_type: Tipo do item (repetition, trial, sample, etc.)
+            context: Contexto hierárquico
+            metadata: Metadados opcionais
         """
         ...
 

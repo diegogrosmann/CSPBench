@@ -918,9 +918,8 @@ class ExecutionOrchestrator(BaseOrchestrator):
                             algorithm_id=algorithm_name,
                             repetition_id=f"{rep_number}/{repetitions}",
                         )
-                        monitoring_service.update_item(
-                            rep_id, 0.0, "Iniciando", context
-                        )
+                        # Iniciar item antes da execução
+                        monitoring_service.start_item(rep_id, "repetition", context)
 
                     # Obter resultado
                     result = future.result()
@@ -1021,6 +1020,8 @@ class ExecutionOrchestrator(BaseOrchestrator):
                         algorithm_id=algorithm_name,
                         repetition_id=f"{rep+1}/{repetitions}",
                     )
+                    # Iniciar item antes da execução
+                    monitoring_service.start_item(rep_id, "repetition", context)
                     monitoring_service.update_item(rep_id, 0.0, "Iniciando", context)
 
                 # Executar algoritmo

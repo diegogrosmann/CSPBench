@@ -40,6 +40,13 @@ datasets:
     parametros:
       filename: "teste.fasta"
 
+  - id: dataset_medio
+    nome: "Dataset Médio Existente"
+    tipo: "file"
+    parametros:
+      filename: "synthetic_n20_L50_noise0.1_ACTG.fasta
+
+
 # =====================================================================
 # SEÇÃO 4: ALGORITMOS
 # =====================================================================
@@ -95,12 +102,12 @@ optimization:
   # Lista de otimizações
   optimizations:
     # Otimização 1: BLF-GA em dataset pequeno
-    - nome: "Otimização BLF-GA - Dataset Pequeno"
+    - nome: "Otimizaçcão BLF-GA - Dataset Pequeno"
       study_name: "blfga_pequeno"
       direction: "minimize"
       n_trials: 10
       timeout_per_trial: 300
-      target_datasets: ["dataset_pequeno"]
+      target_datasets: ["dataset_pequeno", "dataset_medio"]
       target_algorithm: "BLF-GA"
       
       parameters:
@@ -182,6 +189,15 @@ export:
     - "detailed_results"
     - "plots"
     - "logs"
+
+monitoring:
+  # Monitoramento geral
+  enabled: true                      # bool: Habilitar monitoramento
+  interface: "simple"                # string: Tipo de interface
+                                    # "simple" = interface simples no terminal (padrão)
+                                    # "tui" = interface avançada com curses
+  update_interval: 3                 # int: Intervalo de atualização em segundos (1-10)
+
 
 # =====================================================================
 # SEÇÃO 8: CONFIGURAÇÕES DE VISUALIZAÇÃO

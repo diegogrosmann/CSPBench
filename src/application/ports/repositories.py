@@ -214,7 +214,11 @@ class ExecutorPort(Protocol):
         ...
 
     def execute_optimization(
-        self, algorithm_name: str, dataset: Dataset, optimization_config: Dict[str, Any]
+        self,
+        algorithm_name: str,
+        dataset: Dataset,
+        optimization_config: Dict[str, Any],
+        monitoring_service=None,
     ) -> Dict[str, Any]:
         """
         Executa otimização de hiperparâmetros.
@@ -223,6 +227,7 @@ class ExecutorPort(Protocol):
             algorithm_name: Nome do algoritmo
             dataset: Dataset para otimização
             optimization_config: Configuração da otimização
+            monitoring_service: Serviço de monitoramento (opcional)
 
         Returns:
             Dict[str, Any]: Resultados da otimização
@@ -371,7 +376,11 @@ class AbstractExecutorPort(ABC):
 
     @abstractmethod
     def execute_optimization(
-        self, algorithm_name: str, dataset: Dataset, optimization_config: Dict[str, Any]
+        self,
+        algorithm_name: str,
+        dataset: Dataset,
+        optimization_config: Dict[str, Any],
+        monitoring_service=None,
     ) -> Dict[str, Any]:
         """Executa otimização de hiperparâmetros."""
         pass

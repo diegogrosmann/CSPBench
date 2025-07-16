@@ -31,6 +31,7 @@ class OptimizationOrchestrator:
         algorithm_registry: AlgorithmRegistry,
         dataset_repository: DatasetRepository,
         config: Dict[str, Any],
+        monitoring_service=None,
     ):
         """
         Inicializa o orquestrador.
@@ -39,10 +40,12 @@ class OptimizationOrchestrator:
             algorithm_registry: Registry de algoritmos
             dataset_repository: Repositório de datasets
             config: Configuração completa do batch
+            monitoring_service: Serviço de monitoramento (opcional)
         """
         self.algorithm_registry = algorithm_registry
         self.dataset_repository = dataset_repository
         self.config = config
+        self.monitoring_service = monitoring_service
         self.logger = get_logger(__name__)
 
         # Configuração de otimização
@@ -130,6 +133,9 @@ class OptimizationOrchestrator:
             self.logger.info("Iniciando otimização com Optuna")
             self.start_time = time.time()
 
+            # Configurar logging do Optuna para ser menos verboso
+            optuna.logging.set_verbosity(optuna.logging.WARNING)
+
             # Configurar Optuna
             study = self._create_study()
 
@@ -138,6 +144,12 @@ class OptimizationOrchestrator:
 
             # Carregar algoritmo
             algorithm_class = self._load_algorithm()
+
+            # Inicializar monitoramento se disponível
+            if self.monitoring_service:
+                algorithm_name = self.config.get("algorithm", "algoritmo")
+                item_id = f"{algorithm_name}_{self.config.get('dataset', 'dataset')}"
+                self.monitoring_service.start_item(item_id, "optimization")
 
             # Definir função objetivo
             def objective(trial: optuna.trial.Trial) -> float:
@@ -153,13 +165,19 @@ class OptimizationOrchestrator:
                 timeout=self.timeout_per_trial * self.n_trials,
                 callbacks=callbacks,
                 n_jobs=self.resources_config.get("parallel", {}).get("n_jobs", 1),
-                show_progress_bar=self.monitoring_config.get("progress", {}).get(
-                    "show_progress_bar", True
-                ),
+                show_progress_bar=False,  # Desabilitar barra de progresso do Optuna
             )
 
             # Processar resultados finais
             results = self._process_final_results(study)
+
+            # Finalizar monitoramento se disponível
+            if self.monitoring_service:
+                algorithm_name = self.config.get("algorithm", "algoritmo")
+                item_id = f"{algorithm_name}_{self.config.get('dataset', 'dataset')}"
+                self.monitoring_service.finish_item(
+                    item_id, success=True, result=results
+                )
 
             # Gerar relatórios
             if self.export_config.get("enabled", True):
@@ -358,7 +376,7 @@ class OptimizationOrchestrator:
                     step=param_config.get("step", None),
                 )
             elif param_type == "uniform":
-                params[param_name] = trial.suggest_uniform(
+                params[param_name] = trial.suggest_float(
                     param_name, param_config["low"], param_config["high"]
                 )
             elif param_type == "loguniform":
@@ -374,15 +392,33 @@ class OptimizationOrchestrator:
         """Configura callbacks do Optuna."""
         callbacks = []
 
-        # Callback de progresso
+        # Callback de progresso customizado
+        def progress_callback(study, trial):
+            if self.monitoring_service:
+                # Calcular progresso baseado no número de trials
+                progress = (trial.number + 1) / self.n_trials * 100
+
+                # Atualizar progresso no monitoramento
+                algorithm_name = self.config.get("algorithm", "algoritmo")
+                item_id = f"{algorithm_name}_{self.config.get('dataset', 'dataset')}"
+
+                message = f"Trial {trial.number + 1}/{self.n_trials}"
+                if trial.value is not None:
+                    message += f" - Valor: {trial.value:.2f}"
+
+                self.monitoring_service.update_item(item_id, progress, message)
+
+        callbacks.append(progress_callback)
+
+        # Callback de progresso padrão (se não há monitoramento)
         progress_config = self.monitoring_config.get("progress", {})
         if progress_config.get("log_interval", 0) > 0:
 
-            def progress_callback(study, trial):
+            def log_progress_callback(study, trial):
                 if trial.number % progress_config["log_interval"] == 0:
                     self.logger.info(f"Trial {trial.number}: {trial.value}")
 
-            callbacks.append(progress_callback)
+            callbacks.append(log_progress_callback)
 
         # Callback de early stopping
         early_stopping_config = progress_config.get("early_stopping", {})
@@ -458,6 +494,7 @@ class OptimizationOrchestrator:
             "end_time": end_time,
             "algorithm": self.config.get("algorithm"),
             "dataset": self.config.get("dataset"),
+            "status": "success",
             "trials": [
                 {
                     "number": trial.number,

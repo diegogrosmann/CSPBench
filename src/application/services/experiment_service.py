@@ -242,7 +242,10 @@ class ExperimentService:
 
             # Executar otimização
             results = self._executor.execute_optimization(
-                algorithm_name, dataset, opt_config
+                algorithm_name,
+                dataset,
+                opt_config,
+                monitoring_service=self._monitoring_service,
             )
 
             # Exportar resultados se configurado
@@ -510,7 +513,10 @@ class ExperimentService:
 
                         # Executar otimização
                         optimization_results = self._executor.execute_optimization(
-                            opt_config.target_algorithm, dataset, executor_config
+                            opt_config.target_algorithm,
+                            dataset,
+                            executor_config,
+                            self._monitoring_service,
                         )
 
                         all_results.append(optimization_results)

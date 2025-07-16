@@ -23,14 +23,18 @@ class BasicMonitoringService:
         self.is_active = False
 
     def start_monitoring(
-        self, task_type: TaskType, batch_config: Dict[str, Any]
+        self,
+        task_type: TaskType,
+        batch_name: str,
+        batch_config: Optional[Dict[str, Any]] = None,
     ) -> None:
         """
         Inicia o monitoramento.
 
         Args:
             task_type: Tipo da tarefa (EXECUTION, OPTIMIZATION, SENSITIVITY)
-            batch_config: Configuração do batch
+            batch_name: Nome do batch
+            batch_config: Configuração do batch (opcional)
         """
         try:
             # Cria monitor baseado na configuração
@@ -41,10 +45,7 @@ class BasicMonitoringService:
                 return
 
             # Inicia o monitoramento na interface
-            batch_name = batch_config.get("metadados", {}).get(
-                "nome", "Batch Execution"
-            )
-            self.monitor.start_task(task_type, batch_name, batch_config)
+            self.monitor.start_task(task_type, batch_name, batch_config or {})
             self.is_active = True
 
             self.logger.info(f"Monitoramento iniciado para tarefa: {task_type.value}")
@@ -115,6 +116,52 @@ class BasicMonitoringService:
                 self.monitor.update_item(item_id, progress, message, context)
             except Exception as e:
                 self.logger.error(f"Erro ao atualizar item {item_id}: {e}")
+
+    def start_item(
+        self,
+        item_id: str,
+        item_type: str = "repetition",
+        context=None,
+        metadata=None,
+    ) -> None:
+        """
+        Inicia um item individual.
+
+        Args:
+            item_id: ID único do item
+            item_type: Tipo do item (repetition, trial, sample, etc.)
+            context: Contexto hierárquico (opcional)
+            metadata: Metadados opcionais
+        """
+        if self.monitor:
+            try:
+                self.monitor.start_item(item_id, item_type, context, metadata)
+            except Exception as e:
+                self.logger.error(f"Erro ao iniciar item {item_id}: {e}")
+
+    def update_hierarchy(
+        self,
+        level,
+        level_id: str,
+        progress: float,
+        message: str = "",
+        data=None,
+    ) -> None:
+        """
+        Atualiza progresso hierárquico.
+
+        Args:
+            level: Nível hierárquico (ExecutionLevel)
+            level_id: ID do nível
+            progress: Progresso (0.0 a 100.0)
+            message: Mensagem de status
+            data: Dados adicionais específicos do nível
+        """
+        if self.monitor:
+            try:
+                self.monitor.update_hierarchy(level, level_id, progress, message, data)
+            except Exception as e:
+                self.logger.error(f"Erro ao atualizar hierarquia {level}: {e}")
 
     def finish_item(
         self,
