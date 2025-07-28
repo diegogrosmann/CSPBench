@@ -1,90 +1,92 @@
 """
-Pacote de algoritmos CSP.
+CSP algorithms package.
 
-Este módulo inicializa o pacote algorithms e implementa o sistema de
-auto-descoberta de algoritmos. Todos os algoritmos implementados são
-automaticamente registrados no registry global.
+This module initializes the algorithms package and implements the
+auto-discovery system for algorithms. All implemented algorithms are
+automatically registered in the global registry.
 
-ALGORITMOS IMPLEMENTADOS:
+IMPLEMENTED ALGORITHMS:
 
-1. **Baseline (Algoritmos Simples)**:
-   - Greedy Consensus: Consenso por votação majoritária
-   - Baselines para comparação de performance
+1. **Baseline (Simple Algorithms)**:
+   - Greedy Consensus: Consensus by majority voting
+   - Baselines for performance comparison
 
 2. **BLF-GA (Blockwise Learning Fusion + Genetic Algorithm)**:
-   - Metaheurística híbrida avançada
-   - Combina aprendizado por blocos com evolução genética
-   - Mecanismos adaptativos para diversidade e convergência
-   - Paralelização eficiente e configurabilidade avançada
+   - Advanced hybrid metaheuristic
+   - Combines block learning with genetic evolution
+   - Adaptive mechanisms for diversity and convergence
+   - Efficient parallelization and advanced configurability
 
 3. **CSC (Consensus String Clustering)**:
-   - Estratégia de divisão e conquista
-   - Clustering hierárquico de strings
-   - Otimização local com recombinação global
+   - Divide and conquer strategy
+   - Hierarchical clustering of strings
+   - Local optimization with global recombination
 
 4. **DP-CSP (Dynamic Programming CSP)**:
-   - Programação dinâmica com poda
-   - Garantia de otimalidade dentro de limites de recurso
-   - Modelagem de estados eficiente
+   - Dynamic programming with pruning
+   - Optimality guarantee within resource limits
+   - Efficient state modeling
 
 5. **H³-CSP (Hybrid Hierarchical Hamming Search)**:
-   - Abordagem hierárquica em três camadas
-   - Seleção adaptativa de técnicas por bloco
-   - Balanceamento automático entre qualidade e eficiência
+   - Three-layer hierarchical approach
+   - Adaptive technique selection per block
+   - Automatic balancing between quality and efficiency
 
-AUTO-DESCOBERTA:
-O sistema automaticamente descobre e registra todos os algoritmos
-implementados nos subpacotes, permitindo uso dinâmico através do
-registry global.
+AUTO-DISCOVERY:
+The system automatically discovers and registers all algorithms
+implemented in subpackages, enabling dynamic usage through the
+global registry.
 
-EXEMPLO DE USO:
+USAGE EXAMPLE:
 ```python
 from cspbench.domain.algorithms import global_registry
 
-# Listar algoritmos disponíveis
-print("Algoritmos disponíveis:")
+# List available algorithms
+print("Available algorithms:")
 for name, cls in global_registry.items():
     print(f"  {name}: {cls.__doc__.split('.')[0]}")
 
-# Usar um algoritmo específico
+# Use a specific algorithm
 algorithm_class = global_registry["Baseline"]
 algorithm = algorithm_class(strings=["ATCG", "ATCC"], alphabet="ATCG")
 result_string, max_distance, metadata = algorithm.run()
 ```
 
-ESTRUTURA:
-Cada algoritmo deve estar em seu próprio subpacote com:
-- __init__.py: Exposição da classe principal
-- algorithm.py: Wrapper com decorador @register_algorithm
-- implementation.py: Lógica específica do algoritmo
-- config.py: Configurações e parâmetros padrão
-- README.md: Documentação detalhada
+STRUCTURE:
+Each algorithm must be in its own subpackage with:
+- __init__.py: Main class exposure
+- algorithm.py: Wrapper with @register_algorithm decorator
+- implementation.py: Algorithm-specific logic
+- config.py: Configurations and default parameters
+- README.md: Detailed documentation
 """
 
 import importlib
 import pkgutil
 from pathlib import Path
 
-# Importa o registry do domínio
+# Import registry from domain
 from src.domain.algorithms import global_registry, register_algorithm
 
 
-# Auto-descoberta e importação de algoritmos
+# Auto-discovery and algorithm import
 def _discover_algorithms():
-    """Descobre e importa automaticamente todos os algoritmos."""
+    """Discover and automatically import all algorithms."""
     algorithms_path = Path(__file__).parent
 
     for importer, modname, ispkg in pkgutil.iter_modules([str(algorithms_path)]):
         if ispkg and not modname.startswith("_"):
             try:
-                # Importa o subpacote para ativar o registro automático
+                # Import subpackage to activate automatic registration
                 importlib.import_module(f"algorithms.{modname}")
             except ImportError as e:
-                # Algoritmo pode ter dependências opcionais
-                print(f"Aviso: Algoritmo '{modname}' não pôde ser carregado: {e}")
+                # Algorithm may have optional dependencies
+                print(f"Warning: Algorithm '{modname}' could not be loaded: {e}")
 
 
-# Executa auto-descoberta na importação
+# Execute auto-discovery on import
 _discover_algorithms()
+
+__all__ = ["global_registry", "register_algorithm"]
 
 __all__ = ["global_registry", "register_algorithm"]

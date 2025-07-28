@@ -1,18 +1,18 @@
 """
-H³-CSP: Hybrid Hierarchical Hamming Search para CSP.
+H³-CSP: Hybrid Hierarchical Hamming Search for CSP.
 
-Este módulo implementa a classe wrapper que integra o algoritmo H³-CSP
-ao framework CSP-BLFGA. O H³-CSP é um algoritmo híbrido de três camadas
-que combina decomposição hierárquica, técnicas especializadas por bloco
-e refinamento global para resolver o Closest String Problem.
+This module implements the wrapper class that integrates the H³-CSP algorithm
+into the CSP-BLFGA framework. H³-CSP is a three-layer hybrid algorithm
+that combines hierarchical decomposition, specialized block techniques
+and global refinement to solve the Closest String Problem.
 
-Arquitetura do H³-CSP:
-1. B-Splitter: Divide as strings em blocos contíguos (~√L)
-2. Smart-Core: Seleciona técnica ótima por bloco baseada na dificuldade
-3. Global Refine: Combina blocos e aplica hill-climbing global
+H³-CSP Architecture:
+1. B-Splitter: Divides strings into contiguous blocks (~√L)
+2. Smart-Core: Selects optimal technique per block based on difficulty
+3. Global Refine: Combines blocks and applies global hill-climbing
 
 Classes:
-    H3CSPAlgorithm: Wrapper para integração do H³-CSP ao framework CSP.
+    H3CSPAlgorithm: Wrapper for H³-CSP integration into CSP framework.
 """
 
 from collections.abc import Callable
@@ -26,78 +26,113 @@ from .implementation import H3CSP
 @register_algorithm
 class H3CSPAlgorithm(CSPAlgorithm):
     """
-    H³-CSP: Hybrid Hierarchical Hamming Search para o Closest String Problem.
+    H³-CSP: Hybrid Hierarchical Hamming Search for the Closest String Problem.
 
-    O H³-CSP é um algoritmo híbrido que utiliza uma abordagem de três camadas
-    para resolver o CSP de forma eficiente. Ele divide o problema em blocos
-    menores, aplica técnicas especializadas em cada bloco e depois combina
-    os resultados com refinamento global.
+    H³-CSP is a hybrid algorithm that uses a three-layer approach
+    to solve CSP efficiently. It divides the problem into smaller
+    blocks, applies specialized techniques to each block, and then combines
+    the results with global refinement.
 
-    Características:
-    - Decomposição hierárquica baseada na regra √L
-    - Seleção adaptativa de técnicas por bloco
-    - Refinamento global por busca local (hill-climbing)
-    - Determinístico e sem suporte a paralelismo interno
+    Features:
+    - Hierarchical decomposition based on √L rule
+    - Adaptive technique selection per block
+    - Global refinement through local search (hill-climbing)
+    - Deterministic and no internal parallelism support
 
-    Parâmetros principais:
-    - beam_width: Largura do beam search (padrão: 32)
-    - k_candidates: Número de candidatos por bloco (padrão: 5)
-    - local_iters: Iterações de refinamento local (padrão: 3)
-    - max_time: Tempo máximo de execução em segundos (padrão: 300)
-    - seed: Semente para reprodutibilidade (padrão: None)
+    Main parameters:
+    - beam_width: Beam search width (default: 32)
+    - k_candidates: Number of candidates per block (default: 5)
+    - local_iters: Local refinement iterations (default: 3)
+    - max_time: Maximum execution time in seconds (default: 300)
+    - seed: Seed for reproducibility (default: None)
 
     Args:
-        strings (list[str]): Lista de strings de entrada para o CSP.
-        alphabet (str): Alfabeto utilizado nas strings.
-        **params: Parâmetros específicos do algoritmo (ver config.py).
+        strings (list[str]): List of input strings for CSP.
+        alphabet (str): Alphabet used in strings.
+        **params: Algorithm-specific parameters (see config.py).
 
     Attributes:
-        name (str): Nome do algoritmo ("H³-CSP").
-        default_params (dict): Parâmetros padrão do algoritmo.
-        supports_internal_parallel (bool): False - não suporta paralelismo interno.
-        is_deterministic (bool): True - algoritmo determinístico.
-        h3_csp_instance (H3CSP): Instância da implementação do algoritmo.
+        name (str): Algorithm name ("H³-CSP").
+        default_params (dict): Algorithm default parameters.
+        supports_internal_parallel (bool): False - does not support internal parallelism.
+        is_deterministic (bool): True - deterministic algorithm.
+        h3_csp_instance (H3CSP): Instance of algorithm implementation.
 
     Example:
         >>> strings = ["ACGT", "AGCT", "ATCT"]
         >>> alg = H3CSPAlgorithm(strings, "ACGT", beam_width=16)
         >>> center, distance, metadata = alg.run()
-        >>> print(f"Centro: {center}, Distância: {distance}")
+        >>> print(f"Center: {center}, Distance: {distance}")
     """
 
     name = "H³-CSP"
     default_params = H3_CSP_DEFAULTS
-    supports_internal_parallel = False  # H³-CSP não suporta paralelismo interno
-    is_deterministic = True  # H³-CSP é determinístico
+    supports_internal_parallel = False  # H³-CSP does not support internal parallelism
+    is_deterministic = True  # H³-CSP is deterministic
 
     def __init__(self, strings: list[str], alphabet: str, **params):
         """
-        Inicializa o wrapper H3CSPAlgorithm.
+        Initialize the H3CSPAlgorithm wrapper.
 
-        Configura os parâmetros e cria uma instância da implementação
-        H3CSP que será utilizada para executar o algoritmo.
+        Configure parameters and create an instance of the H3CSP implementation
+        that will be used to execute the algorithm.
 
         Args:
-            strings (list[str]): Lista de strings de entrada para o CSP.
-                                Todas as strings devem ter o mesmo comprimento.
-            alphabet (str): Alfabeto utilizado nas strings (ex: "ACGT" para DNA).
-            **params: Parâmetros específicos do algoritmo que sobrescreverão
-                     os valores padrão definidos em H3_CSP_DEFAULTS.
+            strings (list[str]): List of input strings for CSP.
+                                All strings must have the same length.
+            alphabet (str): Alphabet used in strings (e.g. "ACGT" for DNA).
+            **params: Algorithm-specific parameters that will override
+                     the default values defined in H3_CSP_DEFAULTS.
 
         Raises:
-            ValueError: Se as strings tiverem comprimentos diferentes.
-            ValueError: Se o alfabeto estiver vazio.
+            ValueError: If strings have different lengths.
+            ValueError: If alphabet is empty.
         """
         super().__init__(strings, alphabet, **params)
         self.h3_csp_instance = H3CSP(self.strings, self.alphabet, **self.params)
 
     def set_progress_callback(self, callback: Callable[[str], None]) -> None:
         """
-        Define um callback para monitorar o progresso da execução.
+        Define a callback to monitor execution progress.
 
-        O callback será chamado durante a execução do algoritmo com
-        mensagens descritivas sobre o progresso atual, permitindo
-        interfaces gráficas ou logs de progresso.
+        The callback will be called during algorithm execution with
+        descriptive messages about current progress, enabling
+        graphical interfaces or progress logs.
+    """
+
+    name = "H³-CSP"
+    default_params = H3_CSP_DEFAULTS
+    supports_internal_parallel = False  # H³-CSP does not support internal parallelism
+    is_deterministic = True  # H³-CSP is deterministic
+
+    def __init__(self, strings: list[str], alphabet: str, **params):
+        """
+        Initialize the H3CSPAlgorithm wrapper.
+
+        Configure parameters and create an instance of the H3CSP
+        implementation that will be used to execute the algorithm.
+
+        Args:
+            strings (list[str]): List of input strings for CSP.
+                                All strings must have the same length.
+            alphabet (str): Alphabet used in strings (e.g., "ACGT" for DNA).
+            **params: Algorithm-specific parameters that will override
+                     the default values defined in H3_CSP_DEFAULTS.
+
+        Raises:
+            ValueError: If strings have different lengths.
+            ValueError: If alphabet is empty.
+        """
+        super().__init__(strings, alphabet, **params)
+        self.h3_csp_instance = H3CSP(self.strings, self.alphabet, **self.params)
+
+    def set_progress_callback(self, callback: Callable[[str], None]) -> None:
+        """
+        Define a callback to monitor execution progress.
+
+        The callback will be called during algorithm execution with
+        descriptive messages about current progress, allowing
+        graphical interfaces or progress logs.
 
         Args:
             callback (Callable[[str], None]): Função que será chamada

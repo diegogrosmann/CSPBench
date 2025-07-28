@@ -1,8 +1,8 @@
 """
-Algoritmo de consenso ganancioso (Baseline) para o Closest String Problem.
+Greedy consensus algorithm (Baseline) for the Closest String Problem.
 
 Classes:
-    BaselineAlg: Implementação do algoritmo baseline.
+    BaselineAlg: Baseline algorithm implementation.
 """
 
 from src.domain.algorithms import CSPAlgorithm, register_algorithm
@@ -13,46 +13,46 @@ from .implementation import greedy_consensus, max_distance
 @register_algorithm
 class BaselineAlg(CSPAlgorithm):
     """
-    Algoritmo de consenso ganancioso (Baseline) para o Closest String Problem.
+    Greedy consensus algorithm (Baseline) for the Closest String Problem.
 
     Args:
-        strings (list[str]): Lista de strings de entrada.
-        alphabet (str): Alfabeto utilizado.
+        strings (list[str]): List of input strings.
+        alphabet (str): Used alphabet.
 
-    Métodos:
-        run(): Executa o algoritmo e retorna (centro, distância máxima, metadata).
+    Methods:
+        run(): Execute the algorithm and return (center, max_distance, metadata).
     """
 
     name = "Baseline"
     default_params: dict = {}
     is_deterministic = True
-    supports_internal_parallel = False  # Baseline não suporta paralelismo interno
+    supports_internal_parallel = False  # Baseline doesn't support internal parallelism
 
     def __init__(self, strings: list[str], alphabet: str, **params):
         """
-        Inicializa o algoritmo Baseline.
+        Initialize the Baseline algorithm.
 
         Args:
-            strings: Lista de strings do dataset
-            alphabet: Alfabeto utilizado
-            **params: Parâmetros específicos do algoritmo
+            strings: List of dataset strings
+            alphabet: Used alphabet
+            **params: Algorithm-specific parameters
         """
         super().__init__(strings, alphabet, **params)
 
     def run(self) -> tuple[str, int, dict]:
         """
-        Executa o consenso guloso e calcula a maior distância de Hamming.
+        Execute greedy consensus and calculate maximum Hamming distance.
 
         Returns:
-            tuple[str, int, dict]: (string centro, distância máxima, metadata)
+            tuple[str, int, dict]: (center string, max distance, metadata)
         """
         import time
 
         start_time = time.time()
 
-        self._report_progress("Iniciando consenso ganancioso...")
+        self._report_progress("Starting greedy consensus...")
 
-        # Salvar estado inicial no histórico
+        # Save initial state in history
         self._save_history_entry(
             0,
             phase="initialization",
@@ -62,13 +62,13 @@ class BaselineAlg(CSPAlgorithm):
 
         center = greedy_consensus(self.strings, self.alphabet)
 
-        self._report_progress("Calculando distância máxima...")
+        self._report_progress("Computing maximum distance...")
         dist = max_distance(center, self.strings)
 
         end_time = time.time()
         execution_time = end_time - start_time
 
-        # Salvar estado final no histórico
+        # Save final state to history
         self._save_history_entry(
             1,
             phase="completion",
@@ -78,8 +78,8 @@ class BaselineAlg(CSPAlgorithm):
         )
 
         metadata = {
-            "iteracoes": 1,  # Algoritmo determinístico executado uma vez
-            "centro_encontrado": center,
+            "iterations": 1,  # Deterministic algorithm executed once
+            "center_found": center,
             "total_strings": len(self.strings),
             "execution_time": execution_time,
             "history": self.get_history() if self.save_history else [],

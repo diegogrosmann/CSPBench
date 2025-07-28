@@ -1,9 +1,9 @@
 """
-Domínio: Algoritmos CSP
+Domain: CSP Algorithms
 
-Este módulo contém a lógica central de algoritmos para o Closest String Problem (CSP),
-incluindo interfaces abstratas, registry de algoritmos e operadores genéticos.
-Livre de dependências externas conforme arquitetura hexagonal.
+This module contains the core logic for Closest String Problem (CSP) algorithms,
+including abstract interfaces, algorithm registry, and genetic operators.
+Free from external dependencies following hexagonal architecture.
 """
 
 import random
@@ -11,7 +11,7 @@ from abc import ABC, abstractmethod
 from typing import Any, Callable, Optional
 
 # =============================================================================
-# REGISTRY DE ALGORITMOS
+# ALGORITHM REGISTRY
 # =============================================================================
 
 global_registry: dict[str, type] = {}
@@ -19,13 +19,13 @@ global_registry: dict[str, type] = {}
 
 def register_algorithm(cls: type) -> type:
     """
-    Decorador para registrar uma classe de algoritmo no registry global.
+    Decorator to register an algorithm class in the global registry.
 
     Args:
-        cls: Classe do algoritmo a ser registrada
+        cls: Algorithm class to be registered
 
     Returns:
-        type: A própria classe, permitindo uso como decorador
+        type: The class itself, allowing use as decorator
     """
     algorithm_name = getattr(cls, "name", cls.__name__)
     global_registry[algorithm_name] = cls
@@ -33,14 +33,14 @@ def register_algorithm(cls: type) -> type:
 
 
 # =============================================================================
-# INTERFACES DE ALGORITMOS
+# ALGORITHM INTERFACES
 # =============================================================================
 
 
 class CSPAlgorithm(ABC):
-    """Interface base abstrata para todos os algoritmos CSP."""
+    """Abstract base interface for all CSP algorithms."""
 
-    # Atributos de classe obrigatórios
+    # Required class attributes
     name: str
     default_params: dict
     is_deterministic: bool = False
@@ -49,12 +49,12 @@ class CSPAlgorithm(ABC):
     @abstractmethod
     def __init__(self, strings: list[str], alphabet: str, **params):
         """
-        Inicializa o algoritmo com as strings e alfabeto.
+        Initialize algorithm with strings and alphabet.
 
         Args:
-            strings: Lista de strings do dataset
-            alphabet: Alfabeto utilizado
-            **params: Parâmetros específicos do algoritmo
+            strings: List of dataset strings
+            alphabet: Used alphabet
+            **params: Algorithm-specific parameters
         """
         self.strings = strings
         self.alphabet = alphabet
@@ -62,77 +62,77 @@ class CSPAlgorithm(ABC):
         self.progress_callback: Optional[Callable[[str, float], None]] = None
         self.warning_callback: Optional[Callable[[str], None]] = None
 
-        # Configurações de histórico
+        # History settings
         self.save_history = params.get("save_history", False)
         self.history_frequency = params.get(
             "history_frequency", 1
-        )  # A cada N iterações
+        )  # Every N iterations
         self.history = []
 
     def set_progress_callback(self, callback: Callable[[str, float], None]) -> None:
-        """Define callback para relatar progresso do algoritmo."""
+        """Set callback to report algorithm progress."""
         self.progress_callback = callback
 
     def set_warning_callback(self, callback: Callable[[str], None]) -> None:
-        """Define callback para relatar warnings do algoritmo."""
+        """Set callback to report algorithm warnings."""
         self.warning_callback = callback
 
     def _report_progress(self, message: str, progress: float = 0.0) -> None:
-        """Relata progresso se callback estiver definido."""
+        """Report progress if callback is defined."""
         if self.progress_callback:
             self.progress_callback(message, progress)
 
     def _report_warning(self, message: str) -> None:
-        """Relata warning se callback estiver definido."""
+        """Report warning if callback is defined."""
         if self.warning_callback:
             self.warning_callback(message)
 
     def _save_history_entry(self, iteration: int, **data) -> None:
         """
-        Salva uma entrada no histórico se habilitado.
+        Save an entry in history if enabled.
 
         Args:
-            iteration: Número da iteração atual
-            **data: Dados do estado atual (fitness, melhor solução, etc.)
+            iteration: Current iteration number
+            **data: Current state data (fitness, best solution, etc.)
         """
         if self.save_history and (iteration % self.history_frequency == 0):
             entry = {"iteration": iteration, "timestamp": self._get_timestamp(), **data}
             self.history.append(entry)
 
     def _get_timestamp(self) -> float:
-        """Retorna timestamp atual para histórico."""
+        """Return current timestamp for history."""
         import time
 
         return time.time()
 
     def get_history(self) -> list[dict]:
-        """Retorna o histórico de execução."""
+        """Return execution history."""
         return self.history.copy()
 
     def clear_history(self) -> None:
-        """Limpa o histórico atual."""
+        """Clear current history."""
         self.history.clear()
 
     @abstractmethod
     def run(self) -> tuple[str, int, dict[str, Any]]:
         """
-        Executa o algoritmo e retorna resultado estruturado.
+        Execute algorithm and return structured result.
 
         Returns:
-            tuple: (string_central, distancia_maxima, metadata)
-                metadata deve conter:
-                - history: Lista de estados durante execução (se habilitado)
-                - iterations: Número total de iterações
-                - convergence_data: Dados de convergência (se aplicável)
-                - outras informações específicas do algoritmo
+            tuple: (center_string, max_distance, metadata)
+                metadata should contain:
+                - history: List of states during execution (if enabled)
+                - iterations: Total number of iterations
+                - convergence_data: Convergence data (if applicable)
+                - other algorithm-specific information
         """
 
     def set_params(self, **params) -> None:
-        """Define novos parâmetros para o algoritmo."""
+        """Set new parameters for the algorithm."""
         self.params.update(params)
 
     def get_metadata(self) -> dict[str, Any]:
-        """Retorna metadados do algoritmo."""
+        """Return algorithm metadata."""
         return {
             "name": self.name,
             "params": self.params.copy(),
@@ -145,21 +145,21 @@ class CSPAlgorithm(ABC):
 
 
 class Algorithm(ABC):
-    """Interface legacy para compatibilidade com código existente."""
+    """Legacy interface for compatibility with existing code."""
 
     @abstractmethod
     def __init__(self, strings: list[str], alphabet: str):
-        """Inicializa algoritmo legacy."""
+        """Initialize legacy algorithm."""
         self.strings = strings
         self.alphabet = alphabet
 
     @abstractmethod
     def solve(self) -> str:
-        """Resolve o problema CSP retornando string central."""
+        """Solve CSP problem returning center string."""
 
 
 # =============================================================================
-# OPERADORES GENÉTICOS
+# GENETIC OPERATORS
 # =============================================================================
 
 String = str
@@ -168,13 +168,13 @@ Population = list[String]
 
 def mean_hamming_distance(pop: Population) -> float:
     """
-    Calcula a distância de Hamming média entre todos os pares de indivíduos.
+    Calculate average Hamming distance between all pairs of individuals.
 
     Args:
-        pop: População de strings
+        pop: Population of strings
 
     Returns:
-        float: Distância média entre pares
+        float: Average distance between pairs
     """
     if len(pop) < 2:
         return 0.0
@@ -193,16 +193,16 @@ def mean_hamming_distance(pop: Population) -> float:
 
 def mutate_multi(ind: str, alphabet: str, rng: random.Random, n: int = 2) -> str:
     """
-    Realiza mutação multi-ponto alterando até n posições aleatórias.
+    Perform multi-point mutation by changing up to n random positions.
 
     Args:
-        ind: String original
-        alphabet: Conjunto de símbolos válidos
-        rng: Gerador de números aleatórios
-        n: Número de mutações a aplicar
+        ind: Original string
+        alphabet: Set of valid symbols
+        rng: Random number generator
+        n: Number of mutations to apply
 
     Returns:
-        str: String mutada
+        str: Mutated string
     """
     chars = list(ind)
     L = len(chars)
@@ -211,7 +211,7 @@ def mutate_multi(ind: str, alphabet: str, rng: random.Random, n: int = 2) -> str
         pos = rng.randint(0, L - 1)
         old = chars[pos]
 
-        # Escolhe símbolo diferente do atual
+        # Choose symbol different from current
         available = [c for c in alphabet if c != old]
         if available:
             chars[pos] = rng.choice(available)
@@ -221,14 +221,14 @@ def mutate_multi(ind: str, alphabet: str, rng: random.Random, n: int = 2) -> str
 
 def mutate_inversion(ind: str, rng: random.Random) -> str:
     """
-    Realiza mutação por inversão de um segmento aleatório.
+    Perform inversion mutation of a random segment.
 
     Args:
-        ind: String original
-        rng: Gerador de números aleatórios
+        ind: Original string
+        rng: Random number generator
 
     Returns:
-        str: String com segmento invertido
+        str: String with inverted segment
     """
     chars = list(ind)
     L = len(chars)
@@ -236,10 +236,10 @@ def mutate_inversion(ind: str, rng: random.Random) -> str:
     if L < 2:
         return ind
 
-    # Seleciona dois pontos aleatórios
+    # Select two random points
     i, j = sorted(rng.sample(range(L), 2))
 
-    # Inverte o segmento entre i e j
+    # Invert segment between i and j
     chars[i : j + 1] = chars[i : j + 1][::-1]
 
     return "".join(chars)
@@ -249,24 +249,24 @@ def crossover_one_point(
     parent1: str, parent2: str, rng: random.Random
 ) -> tuple[str, str]:
     """
-    Realiza crossover de um ponto entre dois pais.
+    Perform one-point crossover between two parents.
 
     Args:
-        parent1: Primeiro pai
-        parent2: Segundo pai
-        rng: Gerador de números aleatórios
+        parent1: First parent
+        parent2: Second parent
+        rng: Random number generator
 
     Returns:
-        tuple: Dois filhos resultantes
+        tuple: Two resulting children
     """
     L = len(parent1)
     if L <= 1:
         return parent1, parent2
 
-    # Seleciona ponto de corte
+    # Select cut point
     cut_point = rng.randint(1, L - 1)
 
-    # Cria filhos trocando sufixos
+    # Create children by swapping suffixes
     child1 = parent1[:cut_point] + parent2[cut_point:]
     child2 = parent2[:cut_point] + parent1[cut_point:]
 
@@ -277,16 +277,16 @@ def crossover_uniform(
     parent1: str, parent2: str, rng: random.Random, rate: float = 0.5
 ) -> tuple[str, str]:
     """
-    Realiza crossover uniforme entre dois pais.
+    Perform uniform crossover between two parents.
 
     Args:
-        parent1: Primeiro pai
-        parent2: Segundo pai
-        rng: Gerador de números aleatórios
-        rate: Taxa de troca por posição
+        parent1: First parent
+        parent2: Second parent
+        rng: Random number generator
+        rate: Exchange rate per position
 
     Returns:
-        tuple: Dois filhos resultantes
+        tuple: Two resulting children
     """
     chars1 = list(parent1)
     chars2 = list(parent2)
@@ -300,14 +300,14 @@ def crossover_uniform(
 
 def refine_greedy(individual: str, strings: list[str]) -> str:
     """
-    Refinamento local guloso posição por posição.
+    Greedy local refinement position by position.
 
     Args:
-        individual: String a ser refinada
-        strings: Strings de referência
+        individual: String to be refined
+        strings: Reference strings
 
     Returns:
-        str: String refinada
+        str: Refined string
     """
     chars = list(individual)
     alphabet = set("".join(strings))
@@ -317,7 +317,7 @@ def refine_greedy(individual: str, strings: list[str]) -> str:
         best_char = current_char
         best_distance = _max_distance_to_strings(chars, strings)
 
-        # Testa cada símbolo do alfabeto
+        # Test each symbol in alphabet
         for symbol in alphabet:
             if symbol != current_char:
                 chars[pos] = symbol
@@ -334,14 +334,14 @@ def refine_greedy(individual: str, strings: list[str]) -> str:
 
 def _max_distance_to_strings(chars: list[str], strings: list[str]) -> int:
     """
-    Calcula distância máxima de um candidato para conjunto de strings.
+    Calculate maximum distance from a candidate to set of strings.
 
     Args:
-        chars: Lista de caracteres formando string candidata
-        strings: Strings de referência
+        chars: List of characters forming candidate string
+        strings: Reference strings
 
     Returns:
-        int: Distância máxima
+        int: Maximum distance
     """
     candidate = "".join(chars)
     max_dist = 0
@@ -354,8 +354,8 @@ def _max_distance_to_strings(chars: list[str], strings: list[str]) -> int:
 
 
 # =============================================================================
-# ALGORITMOS ESPECÍFICOS
+# SPECIFIC ALGORITHMS
 # =============================================================================
 
-# Algoritmos específicos foram movidos para a pasta algorithms/
-# para serem carregados dinamicamente como plug-ins
+# Specific algorithms have been moved to the algorithms/ folder
+# to be dynamically loaded as plug-ins

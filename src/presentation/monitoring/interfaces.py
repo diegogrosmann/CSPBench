@@ -1,4 +1,4 @@
-"""Interfaces e tipos para sistema de monitoramento."""
+"""Interfaces and types for monitoring system."""
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional
 
 
 class TaskType(Enum):
-    """Tipos de tarefa suportadas."""
+    """Supported task types."""
 
     EXECUTION = "execution"
     OPTIMIZATION = "optimization"
@@ -17,7 +17,7 @@ class TaskType(Enum):
 
 
 class TaskStatus(Enum):
-    """Status de uma tarefa."""
+    """Task status."""
 
     PENDING = "pending"
     RUNNING = "running"
@@ -27,7 +27,7 @@ class TaskStatus(Enum):
 
 
 class ItemStatus(Enum):
-    """Status de um item individual (repetição, trial, amostra)."""
+    """Individual item status (repetition, trial, sample)."""
 
     PENDING = "pending"
     RUNNING = "running"
@@ -37,7 +37,7 @@ class ItemStatus(Enum):
 
 
 class ExecutionLevel(Enum):
-    """Níveis hierárquicos de execução."""
+    """Hierarchical execution levels."""
 
     EXECUTION = "execution"
     DATASET = "dataset"

@@ -1,10 +1,10 @@
 """
-Configurações padrão para o algoritmo baseline.
+Default configurations for the baseline algorithm.
 
-Atributos:
-    BASELINE_DEFAULTS (dict): Parâmetros padrão do baseline.
+Attributes:
+    BASELINE_DEFAULTS (dict): Default baseline parameters.
 """
 
 BASELINE_DEFAULTS = {
-    "tie_break": "lex",  # critério de desempate: 'lex', 'random', 'first'
+    "tie_break": "lex",  # tie-breaking criterion: 'lex', 'random', 'first'
 }

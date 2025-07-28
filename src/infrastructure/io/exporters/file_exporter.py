@@ -1,7 +1,7 @@
 """
-Exportador base para arquivos.
+Base file exporter.
 
-Implementa a interface ExportPort e fornece funcionalidade comum para todos os exportadores.
+Implements the ExportPort interface and provides common functionality for all exporters.
 """
 
 import csv
@@ -13,20 +13,20 @@ from src.application.ports import ExportPort
 
 
 class FileExporter(ExportPort):
-    """Exportador base para arquivos."""
+    """Base file exporter."""
 
     def __init__(self, output_path: str):
-        """Inicializa exportador com caminho de saída."""
+        """Initialize exporter with output path."""
         self.output_path = Path(output_path)
         self.output_path.mkdir(parents=True, exist_ok=True)
 
     def export_results(
         self, results: Dict[str, Any], format_type: str, destination: str
     ) -> str:
-        """Exporta resultados em formato específico."""
+        """Export results in specific format."""
         dest_path = self.output_path / destination
 
-        # Se destination é um diretório, gerar nome de arquivo
+        # If destination is a directory, generate filename
         if dest_path.is_dir() or not dest_path.suffix:
             from datetime import datetime
 
@@ -43,7 +43,7 @@ class FileExporter(ExportPort):
         elif format_type.lower() == "txt":
             self._write_txt(results, dest_path)
         else:
-            # Default para JSON
+            # Default to JSON
             self._write_json(results, dest_path)
 
         return str(dest_path)
@@ -51,12 +51,12 @@ class FileExporter(ExportPort):
     def export_batch_results(
         self, batch_results: List[Dict[str, Any]], format_type: str, destination: str
     ) -> str:
-        """Exporta resultados de batch."""
+        """Export batch results."""
         dest_path = self.output_path / destination
 
-        # Se destination é um diretório, usar nome de arquivo fixo
+        # If destination is a directory, use fixed filename
         if dest_path.is_dir() or not dest_path.suffix:
-            # Usar nome fixo para resultado principal
+            # Use fixed name for main result
             filename = f"results.{format_type.lower()}"
             dest_path = dest_path / filename
 
@@ -76,7 +76,7 @@ class FileExporter(ExportPort):
         if format_type.lower() == "json":
             self._write_json(batch_data, dest_path)
         elif format_type.lower() == "csv":
-            self._write_csv(batch_results, dest_path)  # Para CSV, só os resultados
+            self._write_csv(batch_results, dest_path)  # For CSV, only results
         elif format_type.lower() == "txt":
             self._write_txt(batch_data, dest_path)
         else:
@@ -85,17 +85,17 @@ class FileExporter(ExportPort):
         return str(dest_path)
 
     def get_supported_formats(self) -> List[str]:
-        """Lista formatos suportados."""
+        """List supported formats."""
         return ["json", "csv", "txt"]
 
     def export_optimization_results(
         self, optimization_data: Dict[str, Any], destination: str
     ) -> str:
-        """Exporta resultados de otimização."""
+        """Export optimization results."""
         return self.export_results(optimization_data, "json", destination)
 
     def export(self, data: Any, filename: Optional[str] = None) -> None:
-        """Exporta dados para arquivo (método legacy)."""
+        """Export data to file (legacy method)."""
         if filename:
             file_path = self.output_path / filename
         else:
@@ -108,14 +108,14 @@ class FileExporter(ExportPort):
         self._write_json(data, file_path)
 
     def _write_json(self, data: Any, dest_path: Path) -> None:
-        """Escreve dados em formato JSON."""
+        """Write data in JSON format."""
         with open(dest_path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2, ensure_ascii=False, default=str)
 
     def _write_csv(self, data: Any, dest_path: Path) -> None:
-        """Escreve dados em formato CSV."""
+        """Write data in CSV format."""
         if isinstance(data, list) and data:
-            # Assumir lista de dicionários
+            # Assume list of dictionaries
             fieldnames = set()
             for item in data:
                 if isinstance(item, dict):
@@ -130,18 +130,18 @@ class FileExporter(ExportPort):
                     if isinstance(item, dict):
                         writer.writerow(item)
         elif isinstance(data, dict):
-            # Tentar flatten para CSV
+            # Try flatten for CSV
             with open(dest_path, "w", newline="", encoding="utf-8") as f:
                 writer = csv.writer(f)
                 for key, value in data.items():
                     writer.writerow([key, value])
         else:
-            # Fallback: converter para string
+            # Fallback: convert to string
             with open(dest_path, "w", encoding="utf-8") as f:
                 f.write(str(data))
 
     def _write_txt(self, data: Any, dest_path: Path) -> None:
-        """Escreve dados em formato texto."""
+        """Write data in text format."""
         with open(dest_path, "w", encoding="utf-8") as f:
             if isinstance(data, (list, tuple)):
                 for item in data:

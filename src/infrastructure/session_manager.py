@@ -1,7 +1,7 @@
 """
-Gerenciador de Sessões CSPBench
+CSPBench Session Manager
 
-Gerencia criação de pastas e caminhos para logs e resultados organizados por sessão.
+Manages creation of folders and paths for logs and results organized by session.
 """
 
 import os
@@ -13,14 +13,14 @@ from src.infrastructure.logging_config import get_logger
 
 
 class SessionManager:
-    """Gerencia sessões de execução com pastas organizadas por datetime."""
+    """Manages execution sessions with folders organized by datetime."""
 
     def __init__(self, config: Dict[str, Any]):
         """
-        Inicializa o gerenciador de sessões.
+        Initialize the session manager.
 
         Args:
-            config: Configuração do sistema
+            config: System configuration
         """
         self._config = config
         self._logger = get_logger(__name__)
@@ -45,38 +45,54 @@ class SessionManager:
 
     def create_session(self, session_name: Optional[str] = None) -> str:
         """
-        Cria uma nova sessão com pasta específica.
+        Create a new session with specific folder.
 
         Args:
-            session_name: Nome personalizado da sessão (opcional)
+            session_name: Custom session name (optional)
 
         Returns:
-            str: Nome da pasta da sessão criada
+            str: Created session folder name
         """
         if not self._create_session_folders:
-            # Se não deve criar pastas de sessão, usar pastas base
+            # If should not create session folders, use base folders
             self._session_folder = ""
             return ""
 
         if session_name:
             self._session_folder = session_name
         else:
-            # Gerar nome baseado em datetime
-            now = datetime.now()
-            self._session_folder = now.strftime(self._session_folder_format)
+            # Generate automatic name with timestamp
+            timestamp = datetime.now().strftime(self._session_folder_format)
+            self._session_folder = timestamp
 
-        # Criar diretórios se não existirem
+        # Create directories if they don't exist
         log_dir = self.get_log_dir()
         result_dir = self.get_result_dir()
 
         Path(log_dir).mkdir(parents=True, exist_ok=True)
         Path(result_dir).mkdir(parents=True, exist_ok=True)
 
-        self._logger.info(f"Sessão criada: {self._session_folder}")
-        self._logger.info(f"Diretório de logs: {log_dir}")
-        self._logger.info(f"Diretório de resultados: {result_dir}")
+        self._logger.info(f"Session created: {self._session_folder}")
+        self._logger.info(f"Log directory: {log_dir}")
+        self._logger.info(f"Results directory: {result_dir}")
 
         return self._session_folder
+
+    def get_session_folder(self) -> str:
+        """Return the current session folder name."""
+        return self._session_folder or ""
+
+    def get_log_dir(self) -> str:
+        """Return the complete directory for current session logs."""
+        if not self._session_folder:
+            return self._base_log_dir
+        return os.path.join(self._base_log_dir, self._session_folder)
+
+    def get_result_dir(self) -> str:
+        """Return the complete directory for current session results."""
+        if not self._session_folder:
+            return self._base_result_dir
+        return os.path.join(self._base_result_dir, self._session_folder)
 
     def get_session_folder(self) -> str:
         """Retorna o nome da pasta da sessão atual."""
@@ -96,26 +112,26 @@ class SessionManager:
 
     def get_log_path(self, filename: Optional[str] = None) -> str:
         """
-        Retorna o caminho completo para arquivo de log.
+        Return the complete path for log file.
 
         Args:
-            filename: Nome do arquivo (usa padrão se não especificado)
+            filename: File name (uses default if not specified)
 
         Returns:
-            str: Caminho completo do arquivo de log
+            str: Complete path to log file
         """
         log_filename = filename or self._log_filename
         return os.path.join(self.get_log_dir(), log_filename)
 
     def get_result_path(self, filename: Optional[str] = None) -> str:
         """
-        Retorna o caminho completo para arquivo de resultado.
+        Return the complete path for result file.
 
         Args:
-            filename: Nome do arquivo (usa padrão se não especificado)
+            filename: File name (uses default if not specified)
 
         Returns:
-            str: Caminho completo do arquivo de resultado
+            str: Complete path to result file
         """
         result_filename = filename or self._result_filename
         return os.path.join(self.get_result_dir(), result_filename)

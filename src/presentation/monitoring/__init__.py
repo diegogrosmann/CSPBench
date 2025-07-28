@@ -1,4 +1,4 @@
-"""Sistema de monitoramento para CSPBench."""
+"""Monitoring system for CSPBench."""
 
 from .interfaces import (
     ExecutionLevel,
@@ -18,7 +18,7 @@ from .interfaces import (
 from .monitor_factory import MonitorFactory
 from .simple_monitor import SimpleMonitor
 
-# from .tui_monitor import TUIMonitor  # Temporariamente desabilitado
+# from .tui_monitor import TUIMonitor  # Temporarily disabled
 
 __all__ = [
     "MonitoringInterface",
@@ -35,6 +35,6 @@ __all__ = [
     "create_task_item",
     "create_hierarchical_context",
     "SimpleMonitor",
-    # "TUIMonitor",  # Temporariamente desabilitado
+    # "TUIMonitor",  # Temporarily disabled
     "MonitorFactory",
 ]

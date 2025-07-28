@@ -5,7 +5,7 @@ __pycache__
 .ruff_cache
 .env
 
-# Ignorar todos os arquivos em datasets, exceto os exemplos
+# Ignore all files in datasets, except examples
 datasets/*
 !datasets/teste.fasta
 !datasets/entrez_nucleotide_COIGene AND 600650SLEN_n20.fasta
@@ -16,7 +16,7 @@ datasets/*
 
 outputs/*
 
-# Ignorar todos os arquivos em batches, exceto os exemplos
+# Ignore all files in batches, except examples
 batches/*
 !batches/TEMPLATE_PADRONIZADO.yaml
 !batches/otimizacao_padrao.yaml

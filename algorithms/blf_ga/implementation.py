@@ -1,85 +1,85 @@
 """
-Implementação da heurística BLF-GA (Blockwise Learning Fusion + Genetic Algorithm) para CSP.
+Implementation of the BLF-GA heuristic (Blockwise Learning Fusion + Genetic Algorithm) for CSP.
 
-O BLF-GA é uma metaheurística híbrida avançada que combina três estratégias principais:
-1. **Blockwise Learning**: Divide as strings em blocos e aprende padrões locais
-2. **Genetic Algorithm**: Usa operações genéticas para evolução global
-3. **Fusion**: Combina conhecimento local e global para melhor convergência
+BLF-GA is an advanced hybrid metaheuristic that combines three main strategies:
+1. **Blockwise Learning**: Divides strings into blocks and learns local patterns
+2. **Genetic Algorithm**: Uses genetic operations for global evolution
+3. **Fusion**: Combines local and global knowledge for better convergence
 
-ARQUITETURA ALGORÍTMICA:
+ALGORITHMIC ARCHITECTURE:
 
 ┌─────────────────────────────────────────────────────────────────────────────────┐
-│                           ALGORITMO BLF-GA DETALHADO                            │
+│                           DETAILED BLF-GA ALGORITHM                             │
 ├─────────────────────────────────────────────────────────────────────────────────┤
-│ 1. INICIALIZAÇÃO                                                               │
-│   ├── Criar população inicial híbrida:                                         │
-│   │   ├── Consenso das strings originais (qualidade inicial)                  │
-│   │   ├── Variações do consenso por blocos (diversidade inteligente)          │
-│   │   └── Strings aleatórias (exploração ampla)                               │
-│   └── Dividir strings em blocos adaptativos baseado em initial_blocks         │
+│ 1. INITIALIZATION                                                              │
+│   ├── Create hybrid initial population:                                        │
+│   │   ├── Consensus of original strings (initial quality)                     │
+│   │   ├── Block-wise consensus variations (intelligent diversity)             │
+│   │   └── Random strings (broad exploration)                                  │
+│   └── Divide strings into adaptive blocks based on initial_blocks             │
 ├─────────────────────────────────────────────────────────────────────────────────┤
-│ 2. LOOP PRINCIPAL (até critério de parada)                                     │
-│   ├── A) APRENDIZADO POR BLOCOS (Blockwise Learning)                          │
-│   │   ├── Para cada bloco, encontrar padrão consenso da população atual       │
-│   │   ├── Criar repositório de conhecimento local                             │
-│   │   └── Usar padrões para guiar operações genéticas                         │
-│   ├── B) EVOLUÇÃO GENÉTICA                                                     │
-│   │   ├── Seleção por torneio (pressão seletiva balanceada)                   │
-│   │   ├── Crossover adaptativo:                                               │
-│   │   │   ├── one-point: preserva segmentos grandes                           │
-│   │   │   ├── uniform: máxima recombinação                                     │
-│   │   │   └── blend-blocks: preserva padrões locais                           │
-│   │   ├── Mutação adaptativa:                                                 │
-│   │   │   ├── multi: alterações pontuais                                      │
-│   │   │   ├── inversion: reorganização estrutural                             │
-│   │   │   └── transposition: relocação de segmentos                           │
-│   │   └── Elitismo adaptativo (pode ser desabilitado para diversidade)       │
-│   ├── C) MECANISMOS ADAPTATIVOS                                               │
-│   │   ├── Redivisão de blocos baseada em entropia posicional                  │
-│   │   ├── Imigrantes aleatórios para manter diversidade                       │
-│   │   ├── Mutação adaptativa baseada em convergência e diversidade            │
-│   │   ├── Refinamento local intensivo dos melhores indivíduos                 │
-│   │   ├── Niching para preservar múltiplas soluções                           │
-│   │   └── Restart populacional em caso de estagnação                          │
-│   └── D) CRITÉRIOS DE PARADA                                                  │
-│       ├── Solução ótima encontrada (distância = 0)                            │
-│       ├── Limite de tempo/gerações alcançado                                  │
-│       └── Early stopping por estagnação (no_improve_patience)                 │
+│ 2. MAIN LOOP (until stopping criterion)                                        │
+│   ├── A) BLOCKWISE LEARNING                                                   │
+│   │   ├── For each block, find consensus pattern of current population        │
+│   │   ├── Create local knowledge repository                                   │
+│   │   └── Use patterns to guide genetic operations                            │
+│   ├── B) GENETIC EVOLUTION                                                    │
+│   │   ├── Tournament selection (balanced selective pressure)                  │
+│   │   ├── Adaptive crossover:                                                 │
+│   │   │   ├── one-point: preserves large segments                             │
+│   │   │   ├── uniform: maximum recombination                                  │
+│   │   │   └── blend-blocks: preserves local patterns                          │
+│   │   ├── Adaptive mutation:                                                  │
+│   │   │   ├── multi: point alterations                                        │
+│   │   │   ├── inversion: structural reorganization                            │
+│   │   │   └── transposition: segment relocation                               │
+│   │   └── Adaptive elitism (can be disabled for diversity)                   │
+│   ├── C) ADAPTIVE MECHANISMS                                                  │
+│   │   ├── Block redivision based on positional entropy                       │
+│   │   ├── Random immigrants to maintain diversity                             │
+│   │   ├── Adaptive mutation based on convergence and diversity               │
+│   │   ├── Intensive local refinement of best individuals                     │
+│   │   ├── Niching to preserve multiple solutions                             │
+│   │   └── Population restart in case of stagnation                           │
+│   └── D) STOPPING CRITERIA                                                    │
+│       ├── Optimal solution found (distance = 0)                               │
+│       ├── Time/generation limit reached                                       │
+│       └── Early stopping due to stagnation (no_improve_patience)             │
 └─────────────────────────────────────────────────────────────────────────────────┘
 
-CARACTERÍSTICAS DISTINTIVAS:
+DISTINCTIVE CHARACTERISTICS:
 
-• **HIBRIDIZAÇÃO INTELIGENTE**: Combina busca global (AG) com aprendizado local (blocos)
-• **ADAPTATIVIDADE DINÂMICA**: Parâmetros se ajustam automaticamente durante evolução
-• **DIVERSIDADE CONTROLADA**: Múltiplos mecanismos para evitar convergência prematura
-• **PARALELIZAÇÃO EFICIENTE**: Aproveita múltiplos cores para avaliação e refinamento
-• **CONFIGURABILIDADE AVANÇADA**: Parâmetros dinâmicos e estratégias intercambiáveis
+• **INTELLIGENT HYBRIDIZATION**: Combines global search (GA) with local learning (blocks)
+• **DYNAMIC ADAPTIVITY**: Parameters automatically adjust during evolution
+• **CONTROLLED DIVERSITY**: Multiple mechanisms to avoid premature convergence
+• **EFFICIENT PARALLELIZATION**: Leverages multiple cores for evaluation and refinement
+• **ADVANCED CONFIGURABILITY**: Dynamic parameters and interchangeable strategies
 
-APLICAÇÃO AO CSP:
-O BLF-GA é especialmente adequado para o Closest String Problem pois:
-- Blocos capturam padrões locais comuns entre strings
-- Aprendizado adapta-se à estrutura específica do problema
-- Hibridização balanceia exploração global com intensificação local
-- Mecanismos adaptativos evitam armadilhas de convergência prematura
+CSP APPLICATION:
+BLF-GA is especially suitable for the Closest String Problem because:
+- Blocks capture common local patterns between strings
+- Learning adapts to the specific problem structure
+- Hybridization balances global exploration with local intensification
+- Adaptive mechanisms avoid premature convergence traps
 
-EXEMPLO DE FLUXO:
+EXAMPLE FLOW:
 Strings: ["ACGT", "AGCT", "ATCT"]
-1. Consenso inicial: "ACCT"
-2. Blocos: [(0,2), (2,4)] baseado em entropia
-3. Aprendizado: bloco1="AC", bloco2="CT"
-4. Evolução: crossover_blend_blocks usa padrões aprendidos
-5. Adaptação: redivide blocos se entropia mudar
-6. Convergência: refina soluções até ótimo ou critério de parada
+1. Initial consensus: "ACCT"
+2. Blocks: [(0,2), (2,4)] based on entropy
+3. Learning: block1="AC", block2="CT"
+4. Evolution: crossover_blend_blocks uses learned patterns
+5. Adaptation: redivides blocks if entropy changes
+6. Convergence: refines solutions until optimal or stopping criterion
 
 Classes:
-    BLFGA: Implementa o algoritmo BLF-GA com todos os mecanismos adaptativos.
+    BLFGA: Implements the BLF-GA algorithm with all adaptive mechanisms.
 
-Funções auxiliares:
-    hamming_dist(a, b): Wrapper para distância de Hamming.
-    max_distance(center, strings): Wrapper para distância máxima.
+Auxiliary functions:
+    hamming_dist(a, b): Wrapper for Hamming distance.
+    max_distance(center, strings): Wrapper for maximum distance.
 
-Author: Implementação baseada em pesquisa de metaheurísticas híbridas
-Version: Otimizada para CSP com mecanismos adaptativos avançados
+Author: Implementation based on hybrid metaheuristics research
+Version: Optimized for CSP with advanced adaptive mechanisms
 """
 
 import logging
@@ -131,55 +131,55 @@ def hamming_dist(a: String, b: String) -> int:
 
 class BLFGA:
     """
-    Implementação do algoritmo BLF-GA (Blockwise Learning Fusion + Genetic Algorithm).
+    Implementation of the BLF-GA algorithm (Blockwise Learning Fusion + Genetic Algorithm).
 
-    O BLF-GA é uma metaheurística híbrida que resolve o Closest String Problem através
-    da combinação de três componentes principais:
+    BLF-GA is a hybrid metaheuristic that solves the Closest String Problem through
+    the combination of three main components:
 
-    1. **BLOCKWISE LEARNING (Aprendizado por Blocos)**:
-       - Divide as strings de entrada em blocos menores
-       - Aprende padrões locais em cada bloco através de consenso
-       - Permite exploração mais eficiente do espaço de busca
+    1. **BLOCKWISE LEARNING**:
+       - Divides input strings into smaller blocks
+       - Learns local patterns in each block through consensus
+       - Enables more efficient exploration of search space
 
-    2. **GENETIC ALGORITHM (Algoritmo Genético)**:
-       - Mantém uma população de soluções candidatas
-       - Usa operações genéticas (seleção, crossover, mutação) para evolução
-       - Implementa elitismo para preservar melhores soluções
+    2. **GENETIC ALGORITHM**:
+       - Maintains a population of candidate solutions
+       - Uses genetic operations (selection, crossover, mutation) for evolution
+       - Implements elitism to preserve best solutions
 
-    3. **FUSION (Fusão)**:
-       - Combina conhecimento local (blocos) com busca global (GA)
-       - Usa refinamento local intensivo nos melhores indivíduos
-       - Aplica mecanismos adaptativos para balancear exploração/exploração
+    3. **FUSION**:
+       - Combines local knowledge (blocks) with global search (GA)
+       - Uses intensive local refinement on best individuals
+       - Applies adaptive mechanisms to balance exploration/exploitation
 
-    CARACTERÍSTICAS PRINCIPAIS:
-    - Blocking adaptativo baseado em entropia das posições
-    - Múltiplos operadores de crossover e mutação
-    - Controle de diversidade com imigrantes aleatórios
-    - Mutação adaptativa baseada em convergência
-    - Refinamento local dos elites
-    - Múltiplos critérios de parada
+    MAIN CHARACTERISTICS:
+    - Adaptive blocking based on positional entropy
+    - Multiple crossover and mutation operators
+    - Diversity control with random immigrants
+    - Adaptive mutation based on convergence
+    - Local refinement of elites
+    - Multiple stopping criteria
 
     Args:
-        strings: Lista de strings de entrada para encontrar o centro
-        alphabet: Alfabeto das strings (ex: 'ATCG' para DNA)
-        pop_size: Tamanho da população (int fixo ou float para multiplicador de n)
-        min_pop_size: Tamanho mínimo da população quando usar proporção
-        initial_blocks: Número inicial de blocos (int fixo ou float para proporção)
-        min_block_len: Tamanho mínimo de cada bloco
-        cross_prob: Probabilidade de crossover [0.6-0.95]
-        mut_prob: Probabilidade de mutação [0.01-0.2]
-        elite_rate: Taxa de elitismo [0.01-0.1]
-        rediv_freq: Frequência de redivisão de blocos (gerações)
-        max_gens: Número máximo de gerações
-        max_time: Tempo máximo de execução (segundos)
-        seed: Semente para reprodutibilidade
+        strings: List of input strings to find center
+        alphabet: String alphabet (e.g., 'ATCG' for DNA)
+        pop_size: Population size (fixed int or float for n multiplier)
+        min_pop_size: Minimum population size when using proportion
+        initial_blocks: Initial number of blocks (fixed int or proportion float)
+        min_block_len: Minimum size of each block
+        cross_prob: Crossover probability [0.6-0.95]
+        mut_prob: Mutation probability [0.01-0.2]
+        elite_rate: Elitism rate [0.01-0.1]
+        rediv_freq: Block redivision frequency (generations)
+        max_gens: Maximum number of generations
+        max_time: Maximum execution time (seconds)
+        seed: Seed for reproducibility
 
-    Demais parâmetros controlam aspectos específicos como:
-    - Diversidade e imigrantes
-    - Mutação adaptativa
-    - Tipos de operadores genéticos
-    - Refinamento local
-    - Critérios de parada e reinício
+    Other parameters control specific aspects such as:
+    - Diversity and immigrants
+    - Adaptive mutation
+    - Types of genetic operators
+    - Local refinement
+    - Stopping and restart criteria
     """
 
     def __init__(

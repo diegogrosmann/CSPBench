@@ -1,8 +1,8 @@
 """
-Dataset Generation Service - Camada de Aplicação
+Dataset Generation Service - Application Layer
 
-Orquestra a geração de datasets sintéticos e reais, coordenando
-entre diferentes geradores e repositórios.
+Orchestrates generation of synthetic and real datasets, coordinating
+between different generators and repositories.
 """
 
 from pathlib import Path
@@ -13,27 +13,27 @@ from src.infrastructure.persistence.dataset_repository import FileDatasetReposit
 
 
 class DatasetGenerationService:
-    """Serviço de geração de datasets."""
+    """Dataset generation service."""
 
     def __init__(self, dataset_repository: FileDatasetRepository):
         """
-        Inicializa o serviço.
+        Initialize the service.
 
         Args:
-            dataset_repository: Repositório para persistência de datasets
+            dataset_repository: Repository for dataset persistence
         """
         self.dataset_repository = dataset_repository
         self.synthetic_generator = SyntheticDatasetGenerator()
 
     def generate_synthetic_dataset(self, params: Dict[str, Any]) -> Dataset:
         """
-        Gera dataset sintético baseado nos parâmetros.
+        Generate synthetic dataset based on parameters.
 
         Args:
-            params: Parâmetros de geração (n, length, alphabet, noise, seed)
+            params: Generation parameters (n, length, alphabet, noise, seed)
 
         Returns:
-            Dataset gerado
+            Generated dataset
         """
         return self.synthetic_generator.generate_random(
             n=params["n"],
@@ -44,16 +44,16 @@ class DatasetGenerationService:
 
     def download_real_dataset(self, params: Dict[str, Any]) -> Dataset:
         """
-        Baixa dataset real baseado nos parâmetros.
+        Download real dataset based on parameters.
 
         Args:
-            params: Parâmetros de download (source, query, etc.)
+            params: Download parameters (source, query, etc.)
 
         Returns:
-            Dataset baixado
+            Downloaded dataset
 
         Raises:
-            NotImplementedError: Para fontes não implementadas
+            NotImplementedError: For unimplemented sources
         """
         source = params.get("source")
 
@@ -62,28 +62,28 @@ class DatasetGenerationService:
         elif source == "file":
             return self._import_from_file(params)
         else:
-            raise NotImplementedError(f"Fonte '{source}' não implementada")
+            raise NotImplementedError(f"Source '{source}' not implemented")
 
     def save_dataset(
         self, dataset: Dataset, filename: str, base_path: str = "datasets"
     ) -> str:
         """
-        Salva dataset em arquivo.
+        Save dataset to file.
 
         Args:
-            dataset: Dataset para salvar
-            filename: Nome do arquivo
-            base_path: Diretório base
+            dataset: Dataset to save
+            filename: File name
+            base_path: Base directory
 
         Returns:
-            Caminho completo do arquivo salvo
+            Complete path of saved file
         """
         output_path = Path(base_path) / filename
 
-        # Criar diretório se não existir
+        # Create directory if it doesn't exist
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
-        # Salvar em formato FASTA
+        # Save in FASTA format
         with open(output_path, "w", encoding="utf-8") as f:
             for i, seq in enumerate(dataset.sequences):
                 f.write(f">seq_{i+1}\n{seq}\n")
@@ -92,48 +92,48 @@ class DatasetGenerationService:
 
     def _download_from_ncbi(self, params: Dict[str, Any]) -> Dataset:
         """
-        Baixa dataset do NCBI.
+        Download dataset from NCBI.
 
         Args:
-            params: Parâmetros NCBI (query, max_sequences, min_length, max_length)
+            params: NCBI parameters (query, max_sequences, min_length, max_length)
 
         Returns:
-            Dataset baixado
+            Downloaded dataset
         """
-        # Por enquanto, simulamos o download com dados sintéticos
-        # Na implementação real, usaria Bio.Entrez ou similar
+        # For now, simulate download with synthetic data
+        # Real implementation would use Bio.Entrez or similar
 
-        print(f"🌐 Simulando download do NCBI...")
+        print(f"🌐 Simulating NCBI download...")
         print(f"   Query: {params['query']}")
         print(f"   Max sequences: {params['max_sequences']}")
         print(f"   Length range: {params['min_length']}-{params['max_length']}")
 
-        # Simular com dataset sintético baseado nos parâmetros
+        # Simulate with synthetic dataset based on parameters
         synthetic_params = {
             "n": params["max_sequences"],
             "length": (params["min_length"] + params["max_length"]) // 2,
-            "alphabet": "ACTG",  # DNA padrão
-            "noise": 0.05,  # Baixo ruído para dados "reais"
-            "seed": 42,  # Determinístico para simulação
+            "alphabet": "ACTG",  # Standard DNA
+            "noise": 0.05,  # Low noise for "real" data
+            "seed": 42,  # Deterministic for simulation
         }
 
         return self.generate_synthetic_dataset(synthetic_params)
 
     def _import_from_file(self, params: Dict[str, Any]) -> Dataset:
         """
-        Importa dataset de arquivo.
+        Import dataset from file.
 
         Args:
-            params: Parâmetros do arquivo (file_path)
+            params: File parameters (file_path)
 
         Returns:
-            Dataset importado
+            Imported dataset
         """
         file_path = params["file_path"]
 
-        print(f"📁 Importando arquivo: {file_path}")
+        print(f"📁 Importing file: {file_path}")
 
-        # Usar o repositório para carregar o arquivo
+        # Use repository to load file
         dataset_name = Path(file_path).stem
         return self.dataset_repository.load(dataset_name)
 
@@ -141,14 +141,14 @@ class DatasetGenerationService:
         self, dataset: Dataset, params: Dict[str, Any]
     ) -> Dict[str, Any]:
         """
-        Gera resumo da geração do dataset.
+        Generate dataset generation summary.
 
         Args:
-            dataset: Dataset gerado
-            params: Parâmetros usados
+            dataset: Generated dataset
+            params: Parameters used
 
         Returns:
-            Resumo da geração
+            Generation summary
         """
         return {
             "total_sequences": len(dataset.sequences),

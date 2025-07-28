@@ -1,8 +1,8 @@
 """
-Dataset Generation Wizard - Interface Interativa para Geração de Datasets
+Dataset Generation Wizard - Interactive Interface for Dataset Generation
 
-Implementa wizards interativos para coleta de parâmetros e geração de datasets
-sintéticos e reais, seguindo a arquitetura hexagonal.
+Implements interactive wizards for parameter collection and generation of
+synthetic and real datasets, following hexagonal architecture.
 """
 
 import re
@@ -11,92 +11,86 @@ from typing import Any, Dict, Optional, Tuple
 
 
 class DatasetWizard:
-    """Wizard interativo para geração de datasets."""
+    """Interactive wizard for dataset generation."""
 
     def __init__(self):
-        """Inicializa o wizard de datasets."""
+        """Initialize the dataset wizard."""
         pass
 
     def show_main_menu(self) -> str:
         """
-        Mostra o menu principal e retorna a opção selecionada.
+        Show main menu and return selected option.
 
         Returns:
-            str: 'synthetic', 'real' ou 'exit'
+            str: 'synthetic', 'real' or 'exit'
         """
         print("\n" + "=" * 60)
         print("🧬 Dataset Generation Wizard")
         print("=" * 60)
-        print("\nEscolha o tipo de dataset:")
-        print("  1. Dataset Sintético  - Gera sequências aleatórias")
-        print("  2. Dataset Real       - Download de bancos de dados")
-        print("  0. Sair")
+        print("\nChoose dataset type:")
+        print("  1. Synthetic Dataset  - Generate random sequences")
+        print("  2. Real Dataset       - Download from databases")
+        print("  0. Exit")
         print()
 
         while True:
-            try:
-                choice = input("💡 Selecione uma opção (1/2/0): ").strip()
-
-                if choice == "1":
-                    return "synthetic"
-                elif choice == "2":
-                    return "real"
-                elif choice == "0":
-                    return "exit"
-                else:
-                    print("❌ Opção inválida! Tente novamente.")
-
-            except (KeyboardInterrupt, EOFError):
-                print("\n👋 Operação cancelada!")
+            choice = input("Select option (1/2/0): ").strip()
+            if choice == "1":
+                return "synthetic"
+            elif choice == "2":
+                return "real"
+            elif choice == "0":
                 return "exit"
+            else:
+                print("❌ Invalid option. Please choose 1, 2 or 0.")
 
     def collect_synthetic_params(self) -> Dict[str, Any]:
         """
-        Coleta parâmetros para geração de dataset sintético.
+        Collect parameters for synthetic dataset generation.
 
         Returns:
-            Dict com parâmetros: n, length, alphabet, noise, seed
+            Dict with parameters: n, length, alphabet, noise, seed
         """
         print("\n" + "-" * 40)
-        print("🧪 Configuração de Dataset Sintético")
+        print("🧪 Synthetic Dataset Configuration")
         print("-" * 40)
 
         params = {}
 
-        # Número de sequências
+        # Number of sequences
         params["n"] = self._get_int_input(
-            "Número de sequências", default=20, min_val=2, max_val=1000
+            "Number of sequences", default=20, min_val=2, max_val=1000
         )
 
-        # Comprimento das sequências
+        # Sequence length
         params["length"] = self._get_int_input(
-            "Comprimento das sequências", default=50, min_val=4, max_val=10000
+            "Sequence length", default=50, min_val=4, max_val=10000
         )
 
-        # Alfabeto
+        # Alphabet
         params["alphabet"] = self._get_alphabet_input()
 
-        # Nível de ruído
+        # Noise level
         params["noise"] = self._get_float_input(
-            "Nível de ruído (0.0-1.0)", default=0.1, min_val=0.0, max_val=1.0
+            "Noise level (0.0-1.0)", default=0.1, min_val=0.0, max_val=1.0
         )
 
-        # Seed para reprodutibilidade
+        # Seed for reproducibility
         params["seed"] = self._get_optional_int_input(
-            "Seed para reprodutibilidade (Enter para aleatório)", default=None
+            "Seed for reproducibility (Enter for random)", default=None
         )
 
         return params
 
     def collect_real_params(self) -> Dict[str, Any]:
         """
-        Coleta parâmetros para download de dataset real.
+        Collect parameters for real dataset download.
 
         Returns:
-            Dict com parâmetros: source, query, max_sequences, min_length, max_length
+            Dict with parameters: source, query, max_sequences, min_length, max_length
         """
         print("\n" + "-" * 40)
-        print("🌐 Configuração de Dataset Real")
+        print("🌐 Real Dataset Configuration")
         print("-" * 40)
 
         params = {}

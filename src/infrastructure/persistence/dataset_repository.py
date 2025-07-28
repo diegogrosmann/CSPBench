@@ -1,7 +1,7 @@
 """
-Repositório de Datasets baseado em arquivos
+File-based Dataset Repository
 
-Implementa DatasetRepository usando sistema de arquivos.
+Implements DatasetRepository using file system.
 """
 
 from pathlib import Path
@@ -12,14 +12,14 @@ from src.domain.errors import DatasetNotFoundError, DatasetValidationError
 
 
 class FileDatasetRepository:
-    """Repositório de datasets baseado em arquivos FASTA."""
+    """FASTA file-based dataset repository."""
 
     def __init__(self, base_path: str = "saved_datasets"):
         self.base_path = Path(base_path)
         self.base_path.mkdir(exist_ok=True)
 
     def save(self, dataset: Dataset, name: str) -> str:
-        """Salva dataset em arquivo FASTA."""
+        """Save dataset to FASTA file."""
         file_path = self.base_path / f"{name}.fasta"
 
         with open(file_path, "w") as f:
@@ -29,11 +29,11 @@ class FileDatasetRepository:
         return str(file_path)
 
     def load(self, identifier: str) -> Dataset:
-        """Carrega dataset de arquivo."""
+        """Load dataset from file."""
         file_path = self._resolve_path(identifier)
 
         if not file_path.exists():
-            raise DatasetNotFoundError(f"Dataset não encontrado: {identifier}")
+            raise DatasetNotFoundError(f"Dataset not found: {identifier}")
 
         sequences = self._parse_fasta(file_path)
         metadata = {"source": str(file_path), "format": "fasta"}
@@ -41,12 +41,12 @@ class FileDatasetRepository:
         return Dataset(sequences, metadata)
 
     def list_available(self) -> List[str]:
-        """Lista datasets disponíveis."""
+        """List available datasets."""
         files = list(self.base_path.glob("*.fasta"))
         return [f.stem for f in files]
 
     def exists(self, identifier: str) -> bool:
-        """Verifica se dataset existe."""
+        """Check if dataset exists."""
         file_path = self._resolve_path(identifier)
         return file_path.exists()
 
@@ -59,13 +59,13 @@ class FileDatasetRepository:
         return False
 
     def _resolve_path(self, identifier: str) -> Path:
-        """Resolve identificador para caminho do arquivo."""
+        """Resolve identifier to file path."""
         if identifier.endswith(".fasta"):
             return self.base_path / identifier
         return self.base_path / f"{identifier}.fasta"
 
     def _parse_fasta(self, file_path: Path) -> List[str]:
-        """Parse de arquivo FASTA."""
+        """Parse FASTA file."""
         sequences = []
         current_sequence = ""
 
@@ -83,12 +83,12 @@ class FileDatasetRepository:
                 sequences.append(current_sequence)
 
         if not sequences:
-            raise DatasetValidationError(f"Nenhuma sequência encontrada em {file_path}")
+            raise DatasetValidationError(f"No sequences found in {file_path}")
 
         return sequences
 
 
 class FastaDatasetRepository(FileDatasetRepository):
-    """Alias para compatibilidade."""
+    """Alias for compatibility."""
 
     pass

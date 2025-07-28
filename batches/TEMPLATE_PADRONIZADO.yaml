@@ -1,204 +1,204 @@
 # ===================================================================
-# TEMPLATE PADRONIZADO CSPBench - ESTRUTURA UNIFICADA v0.2
+# STANDARDIZED TEMPLATE CSPBench - UNIFIED STRUCTURE v0.2
 # ===================================================================
-# Este template define a estrutura padrão para todos os tipos de batch.
-# Tipos suportados: execution, optimization, sensitivity
-# Uso: Copie este template e adapte para sua necessidade específica
+# This template defines the standard structure for all batch types.
+# Supported types: execution, optimization, sensitivity
+# Usage: Copy this template and adapt for your specific needs
 
 # =====================================================================
-# SEÇÃO 1: METADADOS (OBRIGATÓRIO PARA TODOS)
+# SECTION 1: METADATA (REQUIRED FOR ALL)
 # =====================================================================
-# Esta seção contém informações básicas sobre o batch.
-# Todos os campos são obrigatórios para rastreabilidade e documentação.
+# This section contains basic information about the batch.
+# All fields are required for traceability and documentation.
 metadados:
-  nome: "Nome do Batch"                    # Nome descritivo do batch (string)
-  descricao: "Descrição detalhada do que o batch faz"  # Descrição completa (string)
-  autor: "Nome do Autor"                   # Autor responsável (string)
-  versao: "1.0"                           # Versão do batch (string)
-  data_criacao: "2025-07-13"              # Data de criação no formato YYYY-MM-DD
-  tags: ["tag1", "tag2"]                  # Tags para categorização (list)
-  timeout_global: 3600                    # Timeout global em segundos (int)
-                                          # Valores comuns: 3600 (1h), 7200 (2h), 14400 (4h)
+  nome: "Batch Name"                      # Descriptive batch name (string)
+  descricao: "Detailed description of what the batch does"  # Complete description (string)
+  autor: "Author Name"                    # Responsible author (string)
+  versao: "1.0"                          # Batch version (string)
+  data_criacao: "2025-07-13"             # Creation date in YYYY-MM-DD format
+  tags: ["tag1", "tag2"]                 # Tags for categorization (list)
+  timeout_global: 3600                   # Global timeout in seconds (int)
+                                         # Common values: 3600 (1h), 7200 (2h), 14400 (4h)
 
 # =====================================================================
-# SEÇÃO 2: CONFIGURAÇÕES DE INFRAESTRUTURA (OPCIONAL)
+# SECTION 2: INFRASTRUCTURE SETTINGS (OPTIONAL)
 # =====================================================================
-# Esta seção permite sobrepor configurações do arquivo settings.yaml.
-# Use apenas se precisar de configurações específicas para este batch.
+# This section allows overriding settings from the settings.yaml file.
+# Use only if you need specific settings for this batch.
 infrastructure:
-  # Sistema de histórico - controla como o histórico de execução é salvo
+  # History system - controls how execution history is saved
   history:
-    save_history: true                   # bool: Salvar histórico detalhado
-                                        # true = salva cada iteração, false = apenas resultado final
-    plot_history: true                  # bool: Gerar gráficos do histórico
-                                       # true = cria plots de convergência, false = sem plots
-    history_frequency: 1               # int: Frequência de salvamento (a cada N iterações)
-                                      # 1 = cada iteração, 10 = a cada 10 iterações
+    save_history: true                  # bool: Save detailed history
+                                       # true = saves each iteration, false = final result only
+    plot_history: true                 # bool: Generate history plots
+                                      # true = creates convergence plots, false = no plots
+    history_frequency: 1              # int: Save frequency (every N iterations)
+                                     # 1 = each iteration, 10 = every 10 iterations
     history_plots:
-      plot_convergence: true           # bool: Gráfico de convergência do algoritmo
-      plot_fitness_evolution: true     # bool: Evolução do fitness ao longo do tempo
-      plot_best_solutions: true        # bool: Timeline das melhores soluções encontradas
-      plot_parameters: true            # bool: Evolução de parâmetros adaptativos
-      plot_format: "png"               # string: Formato dos plots ("png"|"pdf"|"svg")
+      plot_convergence: true          # bool: Algorithm convergence plot
+      plot_fitness_evolution: true    # bool: Fitness evolution over time
+      plot_best_solutions: true       # bool: Timeline of best solutions found
+      plot_parameters: true           # bool: Adaptive parameter evolution
+      plot_format: "png"              # string: Plot format ("png"|"pdf"|"svg")
   
-  # Sistema de resultados - controla como os resultados são persistidos
+  # Results system - controls how results are persisted
   result:
-    save_partial_results: true         # bool: Salvar resultados parciais durante execução
-                                      # true = salva incrementalmente, false = apenas no final
-    partial_file: "partial_results.json" # string: Nome do arquivo de resultados parciais 
+    save_partial_results: true        # bool: Save partial results during execution
+                                     # true = saves incrementally, false = only at the end
+    partial_file: "partial_results.json" # string: Partial results filename 
 
 # =====================================================================
-# SEÇÃO 3: DATASETS (PADRONIZADO PARA TODOS)
+# SECTION 3: DATASETS (STANDARDIZED FOR ALL)
 # =====================================================================
-# Define os datasets disponíveis para uso no batch.
-# Cada dataset tem um ID único que pode ser referenciado nas execuções.
-# Tipos suportados: synthetic, file, entrez
+# Defines the datasets available for use in the batch.
+# Each dataset has a unique ID that can be referenced in executions.
+# Supported types: synthetic, file, entrez
 datasets:
-  # === DATASETS SINTÉTICOS ===
-  # Geram dados artificiais para testes e desenvolvimento
-  - id: dataset_teste                    # string: ID único do dataset
-    nome: "Dataset de Teste"             # string: Nome descritivo
-    tipo: "synthetic"                    # string: Tipo do dataset
-    parametros:                          # Parâmetros específicos para datasets sintéticos:
-      n: 10                             # int: Número de sequências (3-100 recomendado)
-      L: 20                             # int: Comprimento das sequências (5-1000)
-      alphabet: "ACGT"                  # string: Alfabeto das sequências
-                                       # "ACGT" = DNA, "01" = binário, "ACDEFGH..." = personalizado
-      noise: 0.1                       # float: Nível de ruído (0.0-1.0)
-                                       # 0.0 = sem ruído, 0.5 = muito ruído
-      fully_random: false              # bool: Sequências completamente aleatórias
-                                       # false = baseadas em padrões, true = aleatórias
-      seed: 42                         # int|null: Semente para reprodutibilidade
-                                      # int = determinístico, null = aleatório
+  # === SYNTHETIC DATASETS ===
+  # Generate artificial data for testing and development
+  - id: dataset_teste                   # string: Unique dataset ID
+    nome: "Test Dataset"                # string: Descriptive name
+    tipo: "synthetic"                   # string: Dataset type
+    parametros:                         # Parameters specific to synthetic datasets:
+      n: 10                            # int: Number of sequences (3-100 recommended)
+      L: 20                            # int: Sequence length (5-1000)
+      alphabet: "ACGT"                 # string: Sequence alphabet
+                                      # "ACGT" = DNA, "01" = binary, "ACDEFGH..." = custom
+      noise: 0.1                      # float: Noise level (0.0-1.0)
+                                      # 0.0 = no noise, 0.5 = very noisy
+      fully_random: false             # bool: Completely random sequences
+                                      # false = pattern-based, true = random
+      seed: 42                        # int|null: Seed for reproducibility
+                                     # int = deterministic, null = random
 
-  # === DATASETS DE ARQUIVO ===
-  # Carregam dados de arquivos FASTA existentes
-  - id: dataset_arquivo                 # string: ID único do dataset
-    nome: "Dataset de Arquivo"          # string: Nome descritivo
-    tipo: "file"                        # string: Tipo do dataset
-    parametros:                         # Parâmetros específicos para datasets de arquivo:
-      filename: "exemplo.fasta"         # string: Nome do arquivo (deve estar em datasets/)
-                                       # Formatos suportados: .fasta, .fa, .txt
+  # === FILE DATASETS ===
+  # Load data from existing FASTA files
+  - id: dataset_arquivo                # string: Unique dataset ID
+    nome: "File Dataset"               # string: Descriptive name
+    tipo: "file"                       # string: Dataset type
+    parametros:                        # Parameters specific to file datasets:
+      filename: "exemplo.fasta"        # string: Filename (must be in datasets/)
+                                      # Supported formats: .fasta, .fa, .txt
 
-  # === DATASETS ENTREZ (NCBI) ===
-  # Baixam dados diretamente do NCBI usando a API Entrez
-  - id: dataset_ncbi                    # string: ID único do dataset
-    nome: "Dataset NCBI"                # string: Nome descritivo
-    tipo: "entrez"                      # string: Tipo do dataset
-    parametros:                         # Parâmetros específicos para datasets Entrez:
-      query: "COIGene AND 600:650[SLEN]" # string: Query de busca no NCBI
-                                         # Sintaxe: https://www.ncbi.nlm.nih.gov/books/NBK25499/
-      db: "nucleotide"                   # string: Banco de dados NCBI
-                                        # "nucleotide", "protein", "pubmed", etc.
-      retmax: 10                        # int: Número máximo de sequências a baixar (1-10000)
-                                       # ATENÇÃO: Valores altos podem ser lentos
+  # === ENTREZ DATASETS (NCBI) ===
+  # Download data directly from NCBI using Entrez API
+  - id: dataset_ncbi                   # string: Unique dataset ID
+    nome: "NCBI Dataset"               # string: Descriptive name
+    tipo: "entrez"                     # string: Dataset type
+    parametros:                        # Parameters specific to Entrez datasets:
+      query: "COIGene AND 600:650[SLEN]" # string: NCBI search query
+                                         # Syntax: https://www.ncbi.nlm.nih.gov/books/NBK25499/
+      db: "nucleotide"                  # string: NCBI database
+                                       # "nucleotide", "protein", "pubmed", etc.
+      retmax: 10                       # int: Maximum number of sequences to download (1-10000)
+                                      # WARNING: High values may be slow
 
 # =====================================================================
-# SEÇÃO 4: ALGORITMOS (PADRONIZADO PARA TODOS)
+# SECTION 4: ALGORITHMS (STANDARDIZED FOR ALL)
 # =====================================================================
-# Define configurações de algoritmos que podem ser reutilizadas.
-# Permite criar "presets" de parâmetros para diferentes cenários.
+# Defines algorithm configurations that can be reused.
+# Allows creating parameter "presets" for different scenarios.
 algorithms:
-  - id: "config_padrao"                 # string: ID único da configuração
-    nome: "Configuração Padrão"         # string: Nome descritivo
-    descricao: "Algoritmos com parâmetros padrão"  # string: Descrição detalhada
-    algorithms:                         # list: Lista de algoritmos incluídos nesta configuração
-      - "Baseline"                      # Algoritmo de linha de base (mais simples)
-      - "BLF-GA"                        # Block-based Genetic Algorithm (principal)
-      - "CSC"                           # Closest String with Constraints
-      - "H³-CSP"                        # Heuristic Closest String Problem
-      - "DP-CSP"                        # Dynamic Programming CSP
+  - id: "config_padrao"                # string: Unique configuration ID
+    nome: "Default Configuration"       # string: Descriptive name
+    descricao: "Algorithms with default parameters"  # string: Detailed description
+    algorithms:                        # list: List of algorithms included in this configuration
+      - "Baseline"                     # Baseline algorithm (simplest)
+      - "BLF-GA"                       # Block-based Genetic Algorithm (main)
+      - "CSC"                          # Closest String with Constraints
+      - "H³-CSP"                       # Heuristic Closest String Problem
+      - "DP-CSP"                       # Dynamic Programming CSP
     
-    # Parâmetros específicos por algoritmo
-    # Para execution: valores fixos usados diretamente
-    # Para optimization/sensitivity: valores base que podem ser sobrescritos
+    # Algorithm-specific parameters
+    # For execution: fixed values used directly
+    # For optimization/sensitivity: base values that can be overridden
     algorithm_params:
-      # === BASELINE - Algoritmo Guloso Simples ===
+      # === BASELINE - Simple Greedy Algorithm ===
       "Baseline":
-        tie_break: "lex"                # string: Critério de desempate
-                                       # "lex" = lexicográfico, "random" = aleatório, "first" = primeiro
+        tie_break: "lex"               # string: Tie-breaking criterion
+                                      # "lex" = lexicographic, "random" = random, "first" = first
       
       # === BLF-GA - Block-based Genetic Algorithm ===
       "BLF-GA":
-        # Parâmetros de População
-        pop_size: 100                   # int: Tamanho da população (50-500 recomendado)
-        max_gens: 200                   # int: Número máximo de gerações (100-1000)
+        # Population Parameters
+        pop_size: 100                  # int: Population size (50-500 recommended)
+        max_gens: 200                  # int: Maximum number of generations (100-1000)
         
-        # Operadores Genéticos
-        cross_prob: 0.8                 # float: Probabilidade de crossover (0.6-0.95)
-        mut_prob: 0.1                   # float: Probabilidade de mutação (0.01-0.3)
-        elite_rate: 0.05                # float: Taxa de elitismo (0.01-0.15)
+        # Genetic Operators
+        cross_prob: 0.8                # float: Crossover probability (0.6-0.95)
+        mut_prob: 0.1                  # float: Mutation probability (0.01-0.3)
+        elite_rate: 0.05               # float: Elitism rate (0.01-0.15)
         
-        # Parâmetros de Blocos (específicos do BLF-GA)
-        initial_blocks: 0.2             # float: Proporção inicial de blocos (0.1-0.5)
-        rediv_freq: 10                  # int: Frequência de redivisão (5-25)
+        # Block Parameters (BLF-GA specific)
+        initial_blocks: 0.2            # float: Initial block proportion (0.1-0.5)
+        rediv_freq: 10                 # int: Redivision frequency (5-25)
         
-        # Diversidade e Imigração
-        immigrant_freq: 15              # int: Frequência de imigração (10-30)
-        immigrant_ratio: 0.2            # float: Taxa de imigração (0.1-0.3)
+        # Diversity and Immigration
+        immigrant_freq: 15             # int: Immigration frequency (10-30)
+        immigrant_ratio: 0.2           # float: Immigration rate (0.1-0.3)
         
-        # Tipos de Operadores
-        crossover_type: "one_point"     # string: Tipo de crossover
-                                       # "one_point", "uniform", "blend_blocks"
-        mutation_type: "multi"          # string: Tipo de mutação
-                                       # "multi", "inversion", "transposition"
-        selection_type: "tournament"    # string: Tipo de seleção
-                                       # "tournament", "roulette", "ranking"
-        refinement_type: "greedy"       # string: Tipo de refinamento local
-                                       # "greedy", "swap", "insertion", "2opt"
+        # Operator Types
+        crossover_type: "one_point"    # string: Crossover type
+                                      # "one_point", "uniform", "blend_blocks"
+        mutation_type: "multi"         # string: Mutation type
+                                      # "multi", "inversion", "transposition"
+        selection_type: "tournament"   # string: Selection type
+                                      # "tournament", "roulette", "ranking"
+        refinement_type: "greedy"      # string: Local refinement type
+                                      # "greedy", "swap", "insertion", "2opt"
         
-        # Critérios de Parada
-        no_improve_patience: 0.3        # float: Paciência sem melhoria (0.1-0.5)
-                                       # Proporção de gerações sem melhoria antes de parar
+        # Stopping Criteria
+        no_improve_patience: 0.3       # float: Patience without improvement (0.1-0.5)
+                                      # Proportion of generations without improvement before stopping
       
       # === CSC - Closest String with Constraints ===
       "CSC":
-        min_d: 2                        # int: Distância mínima inicial (1-5)
-        d_factor: 0.75                  # float: Fator de incremento da distância (0.5-1.0)
-        min_blocks: 4                   # int: Número mínimo de blocos (2-8)
-        max_blocks: 8                   # int: Número máximo de blocos (4-16)
-        l_div: 25                       # int: Divisor para comprimento de blocos (10-50)
+        min_d: 2                       # int: Initial minimum distance (1-5)
+        d_factor: 0.75                 # float: Distance increment factor (0.5-1.0)
+        min_blocks: 4                  # int: Minimum number of blocks (2-8)
+        max_blocks: 8                  # int: Maximum number of blocks (4-16)
+        l_div: 25                      # int: Divisor for block length (10-50)
       
       # === H³-CSP - Heuristic Closest String Problem ===
       "H³-CSP":
-        auto_blocks: true               # bool: Divisão automática de blocos
-                                       # true = automática, false = manual
-        min_block_size: 2               # int: Tamanho mínimo de bloco (1-5)
-        block_size: 4                   # int: Tamanho padrão de bloco (2-8)
-        k_candidates: 5                 # int: Número de candidatos considerados (3-10)
-        local_iters: 3                  # int: Iterações de busca local (1-5)
-        fallback_enabled: true          # bool: Habilitar fallback para blocos grandes
+        auto_blocks: true              # bool: Automatic block division
+                                      # true = automatic, false = manual
+        min_block_size: 2              # int: Minimum block size (1-5)
+        block_size: 4                  # int: Default block size (2-8)
+        k_candidates: 5                # int: Number of candidates considered (3-10)
+        local_iters: 3                 # int: Local search iterations (1-5)
+        fallback_enabled: true         # bool: Enable fallback for large blocks
       
       # === DP-CSP - Dynamic Programming CSP ===
       "DP-CSP":
-        max_d: 5                        # int: Distância máxima considerada (3-10)
-                                       # Valores altos aumentam muito o tempo de execução
-        warn_threshold: 50              # int: Limite de sequências para aviso (20-100)
-                                       # Acima deste valor, o algoritmo pode ser muito lento
-        seed: null                      # int|null: Semente para reprodutibilidade
+        max_d: 5                       # int: Maximum distance considered (3-10)
+                                      # High values greatly increase execution time
+        warn_threshold: 50             # int: Sequence limit for warning (20-100)
+                                      # Above this value, the algorithm may be very slow
+        seed: null                     # int|null: Seed for reproducibility
 
 # =====================================================================
-# SEÇÃO 5: TIPO DE TAREFA (OBRIGATÓRIO)
+# SECTION 5: TASK TYPE (REQUIRED)
 # =====================================================================
-# Define o tipo de operação que será realizada.
-# Cada tipo tem configurações específicas na seção correspondente.
+# Defines the type of operation to be performed.
+# Each type has specific configurations in the corresponding section.
 task:
-  type: "execution"                     # string: Tipo da tarefa
-                                       # "execution" = executar algoritmos com parâmetros fixos
-                                       # "optimization" = otimizar hiperparâmetros com Optuna
-                                       # "sensitivity" = analisar sensibilidade com SALib
+  type: "execution"                    # string: Task type
+                                      # "execution" = run algorithms with fixed parameters
+                                      # "optimization" = optimize hyperparameters with Optuna
+                                      # "sensitivity" = analyze sensitivity with SALib
 
 # =====================================================================
-# SEÇÃO 6A: CONFIGURAÇÃO ESPECÍFICA - EXECUTION
+# SECTION 6A: SPECIFIC CONFIGURATION - EXECUTION
 # =====================================================================
-# Use esta seção quando task.type = "execution"
-# Executa algoritmos em datasets com parâmetros pré-definidos
+# Use this section when task.type = "execution"
+# Runs algorithms on datasets with pre-defined parameters
 execution:
-  # Lista de execuções a realizar
+  # List of executions to perform
   executions:
-    - nome: "Execução Teste"            # string: Nome descritivo da execução
-      datasets: ["dataset_teste"]       # list: IDs dos datasets a usar (referência à seção 3)
-      algorithms: ["config_padrao"]     # list: IDs das configurações de algoritmos (referência à seção 4)
+    - nome: "Test Execution"           # string: Descriptive execution name
+      datasets: ["dataset_teste"]     # list: Dataset IDs to use (reference to section 3)
+      algorithms: ["config_padrao"]     # list: Algorithm configuration IDs (reference to section 4)
       repetitions: 1                   # int: Número de repetições por combinação (1-10 recomendado)
                                        # Cada combinação dataset+algoritmo será executada N vezes
     # Você pode adicionar múltiplas execuções:
@@ -208,13 +208,13 @@ execution:
     #   repetitions: 5
 
 # =====================================================================
-# SEÇÃO 6B: CONFIGURAÇÃO ESPECÍFICA - OPTIMIZATION
+# SECTION 6B: SPECIFIC CONFIGURATION - OPTIMIZATION
 # =====================================================================
 # Use esta seção quando task.type = "optimization"
-# Otimiza hiperparâmetros de algoritmos usando Optuna
+# Optimize algorithm hyperparameters using Optuna
 optimization:
-  # Framework de otimização (configuração global)
-  method: "optuna"                      # string: Framework de otimização (apenas "optuna" suportado)
+  # Optimization framework (global configuration)
+  method: "optuna"                      # string: Optimization framework (only "optuna" supported)
   
   # Configurações globais do Optuna (aplicadas a todas as otimizações)
   global_optuna_config:
@@ -234,9 +234,9 @@ optimization:
   
   # Lista de otimizações a realizar
   optimizations:
-    - nome: "Otimização BLF-GA"        # string: Nome descritivo da otimização
+    - nome: "BLF-GA Optimization"      # string: Descriptive optimization name
       study_name: "estudo_blfga"       # string: Nome do estudo para identificação
-      direction: "minimize"             # string: Direção da otimização
+      direction: "minimize"             # string: Optimization direction
                                        # "minimize" = minimizar objetivo (para distância)
                                        # "maximize" = maximizar objetivo (para qualidade)
       n_trials: 100                    # int: Número de trials/tentativas (50-1000 recomendado)
@@ -244,12 +244,12 @@ optimization:
       
       # Datasets e algoritmo específicos para otimizar
       target_datasets: ["dataset_teste"] # list: IDs dos datasets a usar (referência à seção 3)
-      target_algorithm: "config_padrao" # string: ID da configuração de algoritmo (referência à seção 4)
+      target_algorithm: "config_padrao" # string: Algorithm configuration ID (reference to section 4)
       
       # Parâmetros a otimizar (sobrepõem algorithm_params da seção 4)
       # Tipos suportados: int, uniform (float), categorical
       parameters:
-        "BLF-GA":                      # string: Nome do algoritmo (deve existir na configuração)
+        "BLF-GA":                      # string: Algorithm name (must exist in configuration)
           pop_size:                    # Nome do parâmetro (deve existir no algoritmo)
             type: "int"                # string: Tipo do parâmetro
             low: 50                    # int: Valor mínimo (para int/uniform)
@@ -302,7 +302,7 @@ optimization:
     #         high: 1.0
 
 # =====================================================================
-# SEÇÃO 6C: CONFIGURAÇÃO ESPECÍFICA - SENSITIVITY
+# SECTION 6C: SPECIFIC CONFIGURATION - SENSITIVITY
 # =====================================================================
 # Use esta seção quando task.type = "sensitivity"
 # Realiza análises de sensibilidade dos parâmetros usando SALib
@@ -414,7 +414,7 @@ sensitivity:
     #     - "convergence_rate"
 
 # =====================================================================
-# SEÇÃO 7: CONFIGURAÇÕES DE EXPORTAÇÃO (OBRIGATÓRIO)
+# SECTION 7: EXPORT SETTINGS (REQUIRED)
 # =====================================================================
 # Define onde e como os resultados serão salvos
 export:
@@ -460,7 +460,7 @@ export:
     # Outras opções: "raw_data", "parameters", "metadata"
 
 # =====================================================================
-# SEÇÃO 8: CONFIGURAÇÕES DE VISUALIZAÇÃO (OPCIONAL)
+# SECTION 8: VISUALIZATION SETTINGS (OPTIONAL)
 # =====================================================================
 # Define quais gráficos gerar e suas configurações visuais
 plots:
@@ -509,7 +509,7 @@ plots:
   tight_layout: true                 # bool: Usar layout apertado automaticamente
 
 # =====================================================================
-# SEÇÃO 9: CONFIGURAÇÕES DE MONITORAMENTO (OPCIONAL)
+# SECTION 9: MONITORING SETTINGS (OPTIONAL)
 # =====================================================================
 # Configurações para monitoramento em tempo real da execução
 monitoring:
@@ -522,7 +522,7 @@ monitoring:
   
  
 # =====================================================================
-# SEÇÃO 10: CONFIGURAÇÕES DE RECURSOS (OPCIONAL)
+# SECTION 10: RESOURCE SETTINGS (OPTIONAL)
 # =====================================================================
 # Controle de uso de recursos computacionais
 resources:
@@ -559,7 +559,7 @@ resources:
     device_id: 0                     # int: ID do dispositivo GPU a usar
 
 # =====================================================================
-# SEÇÃO 11: CONFIGURAÇÕES DE LOGGING (OPCIONAL)
+# SECTION 11: LOGGING SETTINGS (OPTIONAL)
 # =====================================================================
 # Controle detalhado dos logs de execução
 logging:
@@ -605,7 +605,7 @@ logging:
     include_context: true            # bool: Incluir contexto extra (parâmetros, etc.)
 
 # =====================================================================
-# SEÇÃO 12: CONFIGURAÇÕES DE SISTEMA (OPCIONAL)
+# SECTION 12: SYSTEM SETTINGS (OPTIONAL)
 # =====================================================================
 # Configurações gerais do sistema e comportamento
 system:

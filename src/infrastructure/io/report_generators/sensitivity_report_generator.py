@@ -1,8 +1,8 @@
 """
-Gerador de Relatórios de Análise de Sensibilidade
+Sensitivity Analysis Report Generator
 
-Responsável por gerar relatórios específicos para análises de sensibilidade,
-incluindo visualizações dos índices de Morris, Sobol, etc.
+Responsible for generating specific reports for sensitivity analyses,
+including visualizations of Morris, Sobol indices, etc.
 """
 
 import json
@@ -17,34 +17,34 @@ import seaborn as sns
 
 class SensitivityReportGenerator:
     """
-    Gerador de relatórios específicos para análises de sensibilidade.
+    Specific report generator for sensitivity analyses.
     """
 
     def __init__(self, session_path: Path):
         """
-        Inicializa o gerador de relatórios de sensibilidade.
+        Initialize the sensitivity report generator.
 
         Args:
-            session_path: Caminho da sessão onde salvar o relatório
+            session_path: Session path where to save the report
         """
         self.session_path = session_path
 
-        # Configurar matplotlib
+        # Configure matplotlib
         plt.style.use("seaborn-v0_8")
         sns.set_palette("husl")
 
     def generate_sensitivity_report(self, sensitivity_data: Dict[str, Any]) -> None:
         """
-        Gera relatório específico para análise de sensibilidade.
+        Generate specific report for sensitivity analysis.
 
         Args:
-            sensitivity_data: Dados da análise de sensibilidade
+            sensitivity_data: Sensitivity analysis data
         """
-        # Criar diretório de relatório
+        # Create report directory
         report_dir = self.session_path / "sensitivity_report"
         report_dir.mkdir(exist_ok=True)
 
-        # Processar dados de sensibilidade
+        # Process sensitivity data
         analysis_results = self._extract_sensitivity_results(sensitivity_data)
 
         if not analysis_results:

@@ -1,8 +1,8 @@
 """
-Orquestrador de Execução
+Execution Orchestrator
 
-Concentra toda a lógica de execução de algoritmos CSP,
-tanto para execuções únicas quanto batches.
+Centralizes all CSP algorithm execution logic,
+for both single executions and batches.
 """
 
 import json
@@ -21,16 +21,16 @@ from src.infrastructure.orchestrators.base_orchestrator import BaseOrchestrator
 
 
 class ExecutionOrchestrator(BaseOrchestrator):
-    """Orquestrador responsável pela execução de algoritmos CSP."""
+    """Orchestrator responsible for CSP algorithm execution."""
 
     def __init__(self, algorithm_registry, dataset_repository, monitoring_service=None):
         """
-        Inicializa orquestrador de execução.
+        Initialize execution orchestrator.
 
         Args:
-            algorithm_registry: Registry de algoritmos
-            dataset_repository: Repositório de datasets
-            monitoring_service: Serviço de monitoramento opcional
+            algorithm_registry: Algorithm registry
+            dataset_repository: Dataset repository
+            monitoring_service: Optional monitoring service
         """
         super().__init__(monitoring_service)
         self._algorithm_registry = algorithm_registry
@@ -42,10 +42,10 @@ class ExecutionOrchestrator(BaseOrchestrator):
 
     def execute(self, config: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Implementa método abstrato do BaseOrchestrator.
+        Implements abstract method from BaseOrchestrator.
 
         Args:
-            config: Configuração da execução
+            config: Execution configuration
 
         Returns:
             Dict[str, Any]: Resultado da execução
@@ -55,11 +55,11 @@ class ExecutionOrchestrator(BaseOrchestrator):
         return {"results": results}
 
     def set_batch_config(self, batch_config: Dict[str, Any]) -> None:
-        """Define configuração do batch atual."""
+        """Define current batch configuration."""
         self._current_batch_config = batch_config
-        self._logger.debug(f"Configuração de batch definida: {type(batch_config)}")
+        self._logger.debug(f"Batch configuration defined: {type(batch_config)}")
 
-        # Configurar salvamento parcial se habilitado
+        # Configure partial saving if enabled
         if self._should_save_partial_results():
             self._setup_partial_results_file()
 
@@ -72,30 +72,30 @@ class ExecutionOrchestrator(BaseOrchestrator):
         monitoring_service=None,
     ) -> Dict[str, Any]:
         """
-        Executa um algoritmo único.
+        Execute a single algorithm.
 
         Args:
-            algorithm_name: Nome do algoritmo a executar
-            dataset: Dataset para processamento
-            params: Parâmetros específicos do algoritmo
-            timeout: Timeout em segundos
-            monitoring_service: Serviço de monitoramento opcional
+            algorithm_name: Name of algorithm to execute
+            dataset: Dataset for processing
+            params: Algorithm-specific parameters
+            timeout: Timeout in seconds
+            monitoring_service: Optional monitoring service
 
         Returns:
-            Dict[str, Any]: Resultado da execução
+            Dict[str, Any]: Execution result
         """
         from algorithms import global_registry
 
-        # Verifica se algoritmo existe
+        # Check if algorithm exists
         if algorithm_name not in global_registry:
             raise AlgorithmExecutionError(
-                f"Algoritmo '{algorithm_name}' não encontrado"
+                f"Algorithm '{algorithm_name}' not found"
             )
 
         algorithm_class = global_registry[algorithm_name]
         params = params or {}
 
-        # Aplicar configurações de infraestrutura se batch_config disponível
+        # Apply infrastructure configurations if batch_config available
         if self._current_batch_config:
             infrastructure_config = self._current_batch_config.get("infrastructure", {})
             history_config = infrastructure_config.get("history", {})
@@ -246,7 +246,7 @@ class ExecutionOrchestrator(BaseOrchestrator):
     def _execute_structured_batch(
         self, batch_config: Dict[str, Any], monitoring_service=None
     ) -> List[Dict[str, Any]]:
-        """Executa batch com estrutura nova (datasets + algorithms + executions)."""
+        """Execute batch with new structure (datasets + algorithms + executions)."""
         self._logger.debug("Processando batch de execução estruturado")
 
         # Nova estrutura com datasets e algoritmos por ID
@@ -363,7 +363,7 @@ class ExecutionOrchestrator(BaseOrchestrator):
     def _execute_legacy_batch(
         self, batch_config: Dict[str, Any], monitoring_service=None
     ) -> List[Dict[str, Any]]:
-        """Executa batch com estrutura legada (experiments)."""
+        """Execute batch with legacy structure (experiments)."""
         from src.infrastructure import FileDatasetRepository
 
         dataset_repo = FileDatasetRepository("./datasets")
@@ -374,7 +374,7 @@ class ExecutionOrchestrator(BaseOrchestrator):
                 print(f"[DEBUG] Processando experimento: {exp}")
                 # Carrega dataset
                 dataset = dataset_repo.load(exp["dataset"])
-                print(f"[DEBUG] Dataset carregado: {len(dataset.sequences)} sequências")
+                print(f"[DEBUG] Dataset loaded: {len(dataset.sequences)} sequences")
 
                 result = self.execute_single(
                     algorithm_name=exp["algorithm"],
@@ -406,7 +406,7 @@ class ExecutionOrchestrator(BaseOrchestrator):
         return results
 
     def _should_save_partial_results(self) -> bool:
-        """Verifica se deve salvar resultados parciais."""
+        """Check if partial results should be saved."""
         if not self._current_batch_config:
             return False
 
@@ -415,7 +415,7 @@ class ExecutionOrchestrator(BaseOrchestrator):
         return result_config.get("save_partial_results", False)
 
     def _setup_partial_results_file(self) -> None:
-        """Configura arquivo para salvamento de resultados parciais."""
+        """Configure file for partial results saving."""
         from src.infrastructure import SessionManager
 
         try:
@@ -443,7 +443,7 @@ class ExecutionOrchestrator(BaseOrchestrator):
         print(f"✅ Sistema de salvamento parcial inicializado")
 
     def _save_partial_result(self, result: Dict[str, Any]) -> None:
-        """Salva um resultado parcial no arquivo."""
+        """Save a partial result to file."""
         if not self._partial_results_file:
             return
 
@@ -555,14 +555,14 @@ class ExecutionOrchestrator(BaseOrchestrator):
                 filename = dataset_config["parametros"]["filename"]
                 dataset = dataset_repo.load(filename)
             else:
-                # Para datasets sintéticos, criar usando gerador
+                # For synthetic datasets, create using generator
                 dataset = self._create_dataset_from_config(dataset_config)
 
             self._logger.info(
-                f"Dataset {dataset_id} carregado: {len(dataset.sequences)} sequências"
+                f"Dataset {dataset_id} loaded: {len(dataset.sequences)} sequences"
             )
 
-            # Executar algoritmos desta configuração
+            # Execute algorithms for this configuration
             algorithm_names = algorithm_config["algorithms"]
             algorithm_params = algorithm_config.get("algorithm_params", {})
             repetitions = execution.get("repetitions", 1)
@@ -698,19 +698,19 @@ class ExecutionOrchestrator(BaseOrchestrator):
         results = []
 
         try:
-            # Carregar dataset
+            # Load dataset
             if dataset_config["tipo"] == "file":
                 filename = dataset_config["parametros"]["filename"]
                 dataset = dataset_repo.load(filename)
             else:
-                # Para datasets sintéticos, criar usando gerador
+                # For synthetic datasets, create using generator
                 dataset = self._create_dataset_from_config(dataset_config)
 
             self._logger.info(
-                f"Dataset {dataset_id} carregado: {len(dataset.sequences)} sequências"
+                f"Dataset {dataset_id} loaded: {len(dataset.sequences)} sequences"
             )
 
-            # Obter configurações de algoritmos da execução
+            # Get algorithm configurations from execution
             algorithm_ids = execution["algorithms"]
             repetitions = execution.get("repetitions", 1)
 

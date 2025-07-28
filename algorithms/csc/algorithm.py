@@ -1,8 +1,8 @@
 """
-CSC: Consensus String Clustering para CSP.
+CSC: Consensus String Clustering for CSP.
 
 Classes:
-    CSCAlgorithm: Implementação do algoritmo CSC.
+    CSCAlgorithm: CSC algorithm implementation.
 """
 
 from src.domain.algorithms import CSPAlgorithm, register_algorithm
@@ -15,51 +15,51 @@ from .implementation import heuristic_closest_string
 @register_algorithm
 class CSCAlgorithm(CSPAlgorithm):
     """
-    CSC: Consensus String Clustering para o Closest String Problem.
+    CSC: Consensus String Clustering for the Closest String Problem.
 
     Args:
-        strings (list[str]): Lista de strings de entrada.
-        alphabet (str): Alfabeto utilizado.
-        **params: Parâmetros do algoritmo.
+        strings (list[str]): List of input strings.
+        alphabet (str): Alphabet used.
+        **params: Algorithm parameters.
 
-    Métodos:
-        run(): Executa o CSC e retorna (centro, distância máxima, metadata).
+    Methods:
+        run(): Executes CSC and returns (center, maximum distance, metadata).
     """
 
     name = "CSC"
     default_params = CSC_DEFAULTS
-    supports_internal_parallel = False  # CSC não suporta paralelismo interno
-    is_deterministic = True  # CSC é determinístico
+    supports_internal_parallel = False  # CSC doesn't support internal parallelism
+    is_deterministic = True  # CSC is deterministic
 
     def __init__(self, strings: list[str], alphabet: str, **params):
         """
-        Inicializa o algoritmo CSC.
+        Initialize CSC algorithm.
 
         Args:
-            strings: Lista de strings do dataset
-            alphabet: Alfabeto utilizado
-            **params: Parâmetros específicos do algoritmo
+            strings: List of dataset strings
+            alphabet: Alphabet used
+            **params: Algorithm-specific parameters
         """
         super().__init__(strings, alphabet, **params)
 
     def run(self) -> tuple[str, int, dict]:
         """
-        Executa o algoritmo CSC e retorna a string central, distância máxima e metadata.
+        Execute CSC algorithm and return center string, maximum distance and metadata.
 
         Returns:
-            tuple[str, int, dict]: (string_central, distancia_maxima, metadata)
+            tuple[str, int, dict]: (center_string, maximum_distance, metadata)
         """
-        # Salvar estado inicial no histórico se habilitado
+        # Save initial state to history if enabled
         if self.save_history:
             self._save_history_entry(
                 0,
                 phase="initialization",
                 parameters=self.params,
-                message="Iniciando algoritmo CSC",
+                message="Starting CSC algorithm",
             )
 
         self._report_progress(
-            f"Iniciando CSC (d={self.params.get('d')}, n_blocks={self.params.get('n_blocks')})"
+            f"Starting CSC (d={self.params.get('d')}, n_blocks={self.params.get('n_blocks')})"
         )
 
         center = heuristic_closest_string(
@@ -74,21 +74,21 @@ class CSCAlgorithm(CSPAlgorithm):
                     "d": self.params.get("d"),
                     "n_blocks": self.params.get("n_blocks"),
                 },
-                "centro_encontrado": center,
-                "sucesso": True,
+                "center_found": center,
+                "success": True,
             }
 
-            # Salvar estado final no histórico se habilitado
+            # Save final state to history if enabled
             if self.save_history:
                 self._save_history_entry(
                     1,
                     phase="completion",
                     best_fitness=dist,
                     best_solution=center,
-                    message="Algoritmo CSC finalizado com sucesso",
+                    message="CSC algorithm completed successfully",
                 )
 
-                # Adicionar histórico aos metadados
+                # Add history to metadata
                 metadata["history"] = self.get_history()
 
             return center, dist, metadata
@@ -104,22 +104,22 @@ class CSCAlgorithm(CSPAlgorithm):
                     "d": self.params.get("d"),
                     "n_blocks": self.params.get("n_blocks"),
                 },
-                "centro_encontrado": fallback_center,
-                "sucesso": False,
-                "fallback_usado": True,
+                "center_found": fallback_center,
+                "success": False,
+                "fallback_used": True,
             }
 
-            # Salvar estado final no histórico se habilitado (com fallback)
+            # Save final state to history if enabled (with fallback)
             if self.save_history:
                 self._save_history_entry(
                     1,
                     phase="completion",
                     best_fitness=fallback_dist,
                     best_solution=fallback_center,
-                    message="Algoritmo CSC falhou, usando fallback",
+                    message="CSC algorithm failed, using fallback",
                 )
 
-                # Adicionar histórico aos metadados
+                # Add history to metadata
                 metadata["history"] = self.get_history()
 
             return fallback_center, fallback_dist, metadata

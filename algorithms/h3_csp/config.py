@@ -1,44 +1,44 @@
 """
-Configurações padrão para o algoritmo H³-CSP.
+Default configurations for the H³-CSP algorithm.
 
-Este módulo define todos os parâmetros padrão do algoritmo H³-CSP,
-incluindo parâmetros de divisão de blocos, técnicas de busca,
-refinamento e controle de execução.
+This module defines all default parameters for the H³-CSP algorithm,
+including block division parameters, search techniques,
+refinement and execution control.
 
-Constantes:
-    H3_CSP_DEFAULTS (dict): Dicionário com todos os parâmetros padrão
-                           do algoritmo H³-CSP.
+Constants:
+    H3_CSP_DEFAULTS (dict): Dictionary with all default parameters
+                           for the H³-CSP algorithm.
 """
 
 # H³-CSP Configuration
 H3_CSP_DEFAULTS = {
-    # === Parâmetros de Divisão de Blocos ===
-    "auto_blocks": True,  # Usa divisão automática por √L
-    "min_block_size": 2,  # Tamanho mínimo de bloco
-    "max_blocks": None,  # Máximo de blocos (None = automático)
-    "block_size": 2,  # Tamanho base de bloco (se não automático)
-    "block_strategy": None,  # Estratégia de divisão (None = padrão)
-    # === Limiares de Dificuldade por Bloco ===
-    "block_small": 2,  # Limite para blocos "pequenos" (busca exaustiva)
-    "block_medium": 4,  # Limite para blocos "médios" (beam search reduzido)
-    "block_large": 8,  # Limite para blocos "grandes" (beam search completo)
-    # === Parâmetros de Busca ===
-    "exhaustive_limit": 10000,  # Limite para busca exaustiva (|Σ|^m)
-    "beam_width": 32,  # Largura do beam search
-    "k_candidates": 5,  # Número de candidatos por bloco
-    # === Refinamento Global ===
-    "local_search_iters": 3,  # Iterações de busca local (deprecated)
-    "local_iters": 3,  # Iterações de busca local (atual)
-    # === Controle de Execução ===
-    "max_time": 300,  # Tempo máximo em segundos
-    "seed": None,  # Semente para reprodutibilidade
-    # === Parâmetros Experimentais ===
-    "diversity_threshold": 1,  # Limiar de diversidade (não usado atualmente)
-    "fallback_enabled": True,  # Habilita fallback para blocos grandes
+    # === Block Division Parameters ===
+    "auto_blocks": True,  # Use automatic division by √L
+    "min_block_size": 2,  # Minimum block size
+    "max_blocks": None,  # Maximum blocks (None = automatic)
+    "block_size": 2,  # Base block size (if not automatic)
+    "block_strategy": None,  # Division strategy (None = default)
+    # === Difficulty Thresholds per Block ===
+    "block_small": 2,  # Limit for "small" blocks (exhaustive search)
+    "block_medium": 4,  # Limit for "medium" blocks (reduced beam search)
+    "block_large": 8,  # Limit for "large" blocks (full beam search)
+    # === Search Parameters ===
+    "exhaustive_limit": 10000,  # Limit for exhaustive search (|Σ|^m)
+    "beam_width": 32,  # Beam search width
+    "k_candidates": 5,  # Number of candidates per block
+    # === Global Refinement ===
+    "local_search_iters": 3,  # Local search iterations (deprecated)
+    "local_iters": 3,  # Local search iterations (current)
+    # === Execution Control ===
+    "max_time": 300,  # Maximum time in seconds
+    "seed": None,  # Seed for reproducibility
+    # === Experimental Parameters ===
+    "diversity_threshold": 1,  # Diversity threshold (not currently used)
+    "fallback_enabled": True,  # Enable fallback for large blocks
 }
 
-# Mapeamento de parâmetros para compatibilidade
-# Alguns parâmetros têm nomes alternativos para compatibilidade com versões anteriores
+# Parameter mapping for compatibility
+# Some parameters have alternative names for compatibility with previous versions
 _PARAMETER_ALIASES = {
-    "local_search_iters": "local_iters",  # Alias para compatibilidade
+    "local_search_iters": "local_iters",  # Alias for compatibility
 }

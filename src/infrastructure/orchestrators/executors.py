@@ -1,7 +1,7 @@
 """
-Executor Principal - Roteador de Tarefas
+Main Executor - Task Router
 
-Implementa interface padronizada delegando execução para orquestradores especializados.
+Implements standardized interface delegating execution to specialized orchestrators.
 """
 
 import time
@@ -14,30 +14,30 @@ from src.infrastructure.logging_config import get_logger
 
 
 class Executor(ExecutorInterface):
-    """Executor principal que delega tarefas para orquestradores especializados."""
+    """Main executor that delegates tasks to specialized orchestrators."""
 
     def __init__(self):
-        """Inicializa executor como roteador puro."""
+        """Initialize executor as pure router."""
         self._logger = get_logger(__name__)
         self._current_batch_config = None
 
     def set_batch_config(self, batch_config: Dict[str, Any]) -> None:
-        """Define configuração do batch atual (delegado para orquestradores)."""
+        """Set current batch configuration (delegated to orchestrators)."""
         self._current_batch_config = batch_config
-        self._logger.debug(f"Configuração de batch definida: {type(batch_config)}")
+        self._logger.debug(f"Batch configuration set: {type(batch_config)}")
 
     def execute_batch(
         self, batch_config: Dict[str, Any], monitoring_service=None
     ) -> List[Dict[str, Any]]:
         """
-        Executa batch de algoritmos delegando para ExecutionOrchestrator.
+        Execute algorithm batch delegating to ExecutionOrchestrator.
 
         Args:
-            batch_config: Configuração do batch
-            monitoring_service: Serviço de monitoramento opcional
+            batch_config: Batch configuration
+            monitoring_service: Optional monitoring service
 
         Returns:
-            List[Dict[str, Any]]: Lista de resultados da execução
+            List[Dict[str, Any]]: List of execution results
         """
         try:
             from src.infrastructure import (
@@ -48,23 +48,23 @@ class Executor(ExecutorInterface):
                 ExecutionOrchestrator,
             )
 
-            # Configurar dependências
+            # Configure dependencies
             algorithm_registry = DomainAlgorithmRegistry()
             dataset_repository = FileDatasetRepository("./datasets")
 
-            # Criar orquestrador de execução
+            # Create execution orchestrator
             orchestrator = ExecutionOrchestrator(
                 algorithm_registry=algorithm_registry,
                 dataset_repository=dataset_repository,
                 monitoring_service=monitoring_service,
             )
 
-            # Delegar execução
+            # Delegate execution
             return orchestrator.execute_batch(batch_config, monitoring_service)
 
         except Exception as e:
-            self._logger.error(f"Erro na execução do batch: {e}")
-            raise AlgorithmExecutionError(f"Erro na execução do batch: {e}") from e
+            self._logger.error(f"Error in batch execution: {e}")
+            raise AlgorithmExecutionError(f"Error in batch execution: {e}") from e
 
     def execute_optimization(
         self,
@@ -79,21 +79,21 @@ class Executor(ExecutorInterface):
         dataset_name: str | None = None,
     ) -> Dict[str, Any]:
         """
-        Executa otimização de hiperparâmetros delegando para OptimizationOrchestrator.
+        Execute hyperparameter optimization delegating to OptimizationOrchestrator.
 
         Args:
-            algorithm_name: Nome do algoritmo
-            dataset: Dataset para otimização
-            optimization_config: Configuração da otimização
-            monitoring_service: Serviço de monitoramento opcional
-            config_index: Índice da configuração atual
-            total_configs: Total de configurações
-            dataset_index: Índice do dataset atual
-            total_datasets: Total de datasets
-            dataset_name: Nome original do dataset (opcional)
+            algorithm_name: Algorithm name
+            dataset: Dataset for optimization
+            optimization_config: Optimization configuration
+            monitoring_service: Optional monitoring service
+            config_index: Current configuration index
+            total_configs: Total configurations
+            dataset_index: Current dataset index
+            total_datasets: Total datasets
+            dataset_name: Original dataset name (optional)
 
         Returns:
-            Dict[str, Any]: Resultado da otimização
+            Dict[str, Any]: Optimization result
         """
         try:
             from src.infrastructure import (
@@ -104,20 +104,20 @@ class Executor(ExecutorInterface):
                 OptimizationOrchestrator,
             )
 
-            # Configurar dependências
+            # Configure dependencies
             algorithm_registry = DomainAlgorithmRegistry()
             dataset_repository = FileDatasetRepository("./datasets")
 
-            # Usar nome original do dataset se fornecido, senão usar temporário
+            # Use original dataset name if provided, otherwise use temporary
             if dataset_name:
                 dataset_id = dataset_name
             else:
                 dataset_id = f"temp_optimization_{int(time.time())}"
 
-            # Salvar o dataset temporariamente no repositório para o orquestrador
+            # Save dataset temporarily in repository for orchestrator
             dataset_repository.save(dataset, dataset_id)
 
-            # Criar configuração completa para o orquestrador
+            # Create complete configuration for orchestrator
             full_config = {
                 "algorithm": algorithm_name,
                 "dataset": dataset_id,
@@ -128,7 +128,7 @@ class Executor(ExecutorInterface):
                 "plots": optimization_config.get("plots", {}),
             }
 
-            # Criar orquestrador
+            # Create orchestrator
             orchestrator = OptimizationOrchestrator(
                 algorithm_registry=algorithm_registry,
                 dataset_repository=dataset_repository,
@@ -140,10 +140,10 @@ class Executor(ExecutorInterface):
                 total_datasets=total_datasets,
             )
 
-            # Executar otimização
+            # Execute optimization
             results = orchestrator.run_optimization()
 
-            # Limpar dataset temporário apenas se era temporário
+            # Clean up temporary dataset only if it was temporary
             if not dataset_name:
                 try:
                     dataset_repository.delete(dataset_id)
@@ -153,8 +153,8 @@ class Executor(ExecutorInterface):
             return results
 
         except Exception as e:
-            self._logger.error(f"Erro na otimização: {e}")
-            raise AlgorithmExecutionError(f"Erro na otimização: {e}") from e
+            self._logger.error(f"Error in optimization: {e}")
+            raise AlgorithmExecutionError(f"Error in optimization: {e}") from e
 
     def execute_sensitivity_analysis(
         self,
@@ -164,16 +164,16 @@ class Executor(ExecutorInterface):
         monitoring_service=None,
     ) -> Dict[str, Any]:
         """
-        Executa análise de sensibilidade delegando para SensitivityOrchestrator.
+        Execute sensitivity analysis delegating to SensitivityOrchestrator.
 
         Args:
-            algorithm_name: Nome do algoritmo
-            dataset: Dataset para análise
-            sensitivity_config: Configuração da análise
-            monitoring_service: Serviço de monitoramento opcional
+            algorithm_name: Algorithm name
+            dataset: Dataset for analysis
+            sensitivity_config: Analysis configuration
+            monitoring_service: Optional monitoring service
 
         Returns:
-            Dict[str, Any]: Resultado da análise de sensibilidade
+            Dict[str, Any]: Sensitivity analysis result
         """
         try:
             from src.infrastructure import DomainAlgorithmRegistry
@@ -181,15 +181,15 @@ class Executor(ExecutorInterface):
                 SensitivityOrchestrator,
             )
 
-            # Configurar registry
+            # Configure registry
             algorithm_registry = DomainAlgorithmRegistry()
 
-            # Criar orquestrador de sensibilidade
+            # Create sensitivity orchestrator
             orchestrator = SensitivityOrchestrator(
                 algorithm_registry, self, monitoring_service=monitoring_service
             )
 
-            # Executar análise
+            # Execute analysis
             results = orchestrator.execute_sensitivity_analysis(
                 algorithm_name, dataset, sensitivity_config
             )
@@ -197,35 +197,35 @@ class Executor(ExecutorInterface):
             return results
 
         except Exception as e:
-            self._logger.error(f"Erro na análise de sensibilidade: {e}")
+            self._logger.error(f"Error in sensitivity analysis: {e}")
             raise AlgorithmExecutionError(
-                f"Erro na análise de sensibilidade: {e}"
+                f"Error in sensitivity analysis: {e}"
             ) from e
 
     def get_execution_status(self, execution_id: str) -> str:
         """
-        Obtém status de uma execução específica.
+        Get status of a specific execution.
 
         Args:
-            execution_id: ID da execução
+            execution_id: Execution ID
 
         Returns:
-            str: Status da execução (running, completed, failed, cancelled)
+            str: Execution status (running, completed, failed, cancelled)
         """
-        # Por enquanto, retornamos um status genérico
-        # TODO: Implementar sistema de tracking de execuções
+        # For now, return a generic status
+        # TODO: Implement execution tracking system
         return "completed"
 
     def cancel_execution(self, execution_id: str) -> bool:
         """
-        Cancela uma execução em andamento.
+        Cancel a running execution.
 
         Args:
-            execution_id: ID da execução a cancelar
+            execution_id: ID of execution to cancel
 
         Returns:
-            bool: True se cancelamento foi bem-sucedido
+            bool: True if cancellation was successful
         """
-        # Por enquanto, retornamos False
-        # TODO: Implementar sistema de cancelamento
+        # For now, return False
+        # TODO: Implement cancellation system
         return False

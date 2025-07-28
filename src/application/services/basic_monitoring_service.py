@@ -1,4 +1,4 @@
-"""Serviço básico de monitoramento compatível com a nova interface."""
+"""Basic monitoring service compatible with the new interface."""
 
 from typing import Any, Dict, Optional
 
@@ -8,14 +8,14 @@ from src.presentation.monitoring.monitor_factory import MonitorFactory
 
 
 class BasicMonitoringService:
-    """Serviço básico de monitoramento para integração com o sistema de execução."""
+    """Basic monitoring service for integration with execution system."""
 
     def __init__(self, config: Dict[str, Any]):
         """
-        Inicializa o serviço de monitoramento.
+        Initialize monitoring service.
 
         Args:
-            config: Configuração do batch/sistema
+            config: Batch/system configuration
         """
         self.config = config
         self.logger = get_logger(__name__)
@@ -29,50 +29,50 @@ class BasicMonitoringService:
         batch_config: Optional[Dict[str, Any]] = None,
     ) -> None:
         """
-        Inicia o monitoramento.
+        Start monitoring.
 
         Args:
-            task_type: Tipo da tarefa (EXECUTION, OPTIMIZATION, SENSITIVITY)
-            batch_name: Nome do batch
-            batch_config: Configuração do batch (opcional)
+            task_type: Task type (EXECUTION, OPTIMIZATION, SENSITIVITY)
+            batch_name: Batch name
+            batch_config: Batch configuration (optional)
         """
         try:
-            # Cria monitor baseado na configuração
+            # Create monitor based on configuration
             self.monitor = MonitorFactory.create_monitor(self.config)
 
             if not self.monitor:
-                self.logger.info("Monitoramento desabilitado na configuração")
+                self.logger.info("Monitoring disabled in configuration")
                 return
 
-            # Inicia o monitoramento na interface
+            # Start monitoring in interface
             self.monitor.start_task(task_type, batch_name, batch_config or {})
             self.is_active = True
 
-            self.logger.info(f"Monitoramento iniciado para tarefa: {task_type.value}")
+            self.logger.info(f"Monitoring started for task: {task_type.value}")
 
         except Exception as e:
-            self.logger.error(f"Erro ao iniciar monitoramento: {e}")
+            self.logger.error(f"Error starting monitoring: {e}")
             self.monitor = None
 
     def show_error(self, error: str) -> None:
         """
-        Exibe erro no monitor.
+        Display error in monitor.
 
         Args:
-            error: Mensagem de erro
+            error: Error message
         """
         if self.monitor:
             try:
                 self.monitor.show_error(error)
             except Exception as e:
-                self.logger.error(f"Erro ao exibir erro no monitor: {e}")
+                self.logger.error(f"Error displaying error in monitor: {e}")
 
     def finish_monitoring(self, results: Optional[Dict[str, Any]] = None) -> None:
         """
-        Finaliza o monitoramento.
+        Finish monitoring.
 
         Args:
-            results: Resultados finais (opcional)
+            results: Final results (optional)
         """
         if not self.is_active:
             return
@@ -83,18 +83,18 @@ class BasicMonitoringService:
                 self.monitor.finish_task(success=success, final_results=results)
 
             self.is_active = False
-            self.logger.info("Monitoramento finalizado")
+            self.logger.info("Monitoring finished")
 
         except Exception as e:
-            self.logger.error(f"Erro ao finalizar monitoramento: {e}")
+            self.logger.error(f"Error finishing monitoring: {e}")
 
     def close(self) -> None:
-        """Fecha o serviço de monitoramento."""
+        """Close monitoring service."""
         if self.monitor:
             try:
                 self.monitor.close()
             except Exception as e:
-                self.logger.error(f"Erro ao fechar monitor: {e}")
+                self.logger.error(f"Error closing monitor: {e}")
 
         self.is_active = False
         self.monitor = None
@@ -103,19 +103,19 @@ class BasicMonitoringService:
         self, item_id: str, progress: float, message: str = "", context=None
     ) -> None:
         """
-        Atualiza um item individual.
+        Update an individual item.
 
         Args:
-            item_id: ID único do item
-            progress: Progresso (0.0 a 100.0)
-            message: Mensagem de status
-            context: Contexto hierárquico (opcional)
+            item_id: Unique item ID
+            progress: Progress (0.0 to 100.0)
+            message: Status message
+            context: Hierarchical context (optional)
         """
         if self.monitor:
             try:
                 self.monitor.update_item(item_id, progress, message, context)
             except Exception as e:
-                self.logger.error(f"Erro ao atualizar item {item_id}: {e}")
+                self.logger.error(f"Error updating item {item_id}: {e}")
 
     def start_item(
         self,
@@ -125,19 +125,19 @@ class BasicMonitoringService:
         metadata=None,
     ) -> None:
         """
-        Inicia um item individual.
+        Start an individual item.
 
         Args:
-            item_id: ID único do item
-            item_type: Tipo do item (repetition, trial, sample, etc.)
-            context: Contexto hierárquico (opcional)
-            metadata: Metadados opcionais
+            item_id: Unique item ID
+            item_type: Item type (repetition, trial, sample, etc.)
+            context: Hierarchical context (optional)
+            metadata: Optional metadata
         """
         if self.monitor:
             try:
                 self.monitor.start_item(item_id, item_type, context, metadata)
             except Exception as e:
-                self.logger.error(f"Erro ao iniciar item {item_id}: {e}")
+                self.logger.error(f"Error starting item {item_id}: {e}")
 
     def update_hierarchy(
         self,
@@ -148,14 +148,14 @@ class BasicMonitoringService:
         data=None,
     ) -> None:
         """
-        Atualiza progresso hierárquico.
+        Update hierarchical progress.
 
         Args:
-            level: Nível hierárquico (ExecutionLevel)
-            level_id: ID do nível
-            progress: Progresso (0.0 a 100.0)
-            message: Mensagem de status
-            data: Dados adicionais específicos do nível
+            level: Hierarchical level (ExecutionLevel)
+            level_id: Level ID
+            progress: Progress (0.0 to 100.0)
+            message: Status message
+            data: Additional level-specific data
         """
         if self.monitor:
             try:

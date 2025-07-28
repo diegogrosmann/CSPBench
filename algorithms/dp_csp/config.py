@@ -1,13 +1,13 @@
 """
-Configurações padrão para o algoritmo DP-CSP.
+Default configurations for the DP-CSP algorithm.
 
-Atributos:
-    DP_CSP_DEFAULTS (dict): Parâmetros padrão do DP-CSP.
+Attributes:
+    DP_CSP_DEFAULTS (dict): Default parameters for DP-CSP.
 """
 
 # DP-CSP Configuration
 DP_CSP_DEFAULTS = {
-    "max_d": None,  # padrão: distância baseline
-    "warn_threshold": 9,  # alerta se (d+1)^n > 10^9
-    "max_time": 300,  # timeout em segundos
+    "max_d": None,  # default: baseline distance
+    "warn_threshold": 9,  # warn if (d+1)^n > 10^9
+    "max_time": 300,  # timeout in seconds
 }

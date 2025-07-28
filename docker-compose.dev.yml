@@ -1,0 +1,30 @@
+# docker-compose.dev.yml - Development Environment
+version: '3.9'
+
+services:
+  cspbench-dev:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    container_name: cspbench-dev
+    env_file:
+      - .env
+    environment:
+      - APP_ENV=development
+      - DEBUG=True
+    volumes:
+      # Development: mount code for live reload
+      - .:/app
+      - /app/__pycache__  # Exclude cache from container
+    working_dir: /app
+    command: python main.py
+    ports:
+      - "8080:8080"  # If web server needed in the future
+    
+    # Keep container running for debug
+    stdin_open: true
+    tty: true
+    
+networks:
+  default:
+    name: cspbench-dev-network

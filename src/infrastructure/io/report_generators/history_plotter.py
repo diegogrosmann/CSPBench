@@ -1,8 +1,8 @@
 """
-Gerador de Gráficos e Exportação de Histórico de Algoritmos
+History Algorithm Graphics Generator and Export
 
-Responsável por gerar gráficos específicos do histórico de execução dos algoritmos
-e exportar dados brutos, trabalhando com dados genéricos independentes do tipo de algoritmo.
+Responsible for generating specific graphics from algorithm execution history
+and exporting raw data, working with generic data independent of algorithm type.
 """
 
 import csv
@@ -17,17 +17,17 @@ import seaborn as sns
 
 class HistoryPlotter:
     """
-    Gerador de gráficos e exportação de dados para histórico de algoritmos.
-    Trabalha com dados genéricos independentes do tipo de algoritmo.
+    Graphics generator and data export for algorithm history.
+    Works with generic data independent of algorithm type.
     """
 
     def __init__(self, config: Dict[str, Any], output_dir: Path):
         """
-        Inicializa o gerador de gráficos de histórico.
+        Initialize the history graphics generator.
 
         Args:
-            config: Configuração do sistema
-            output_dir: Diretório onde salvar os gráficos
+            config: System configuration
+            output_dir: Directory where to save graphics
         """
         self.config = config
         self.output_dir = output_dir
@@ -35,42 +35,42 @@ class HistoryPlotter:
         self.plot_config = self.history_config.get("history_plots", {})
         self.plot_format = self.plot_config.get("plot_format", "png")
 
-        # Configurar matplotlib
+        # Configure matplotlib
         plt.style.use("seaborn-v0_8")
         sns.set_palette("husl")
 
     def generate_history_plots(self, experiment_results: List[Dict[str, Any]]) -> None:
         """
-        Gera todos os gráficos de histórico configurados e exporta dados brutos.
+        Generate all configured history plots and export raw data.
 
         Args:
-            experiment_results: Lista de resultados de experimentos
+            experiment_results: List of experiment results
         """
         if not self.history_config.get("plot_history", False):
             return
 
-        print("📈 Gerando gráficos e exportação de histórico...")
+        print("📈 Generating history plots and export...")
 
-        # Criar diretório de histórico
+        # Create history directory
         history_dir = self.output_dir / "history"
         history_dir.mkdir(exist_ok=True)
 
-        # Processar dados de histórico
+        # Process history data
         history_data = self._extract_history_data(experiment_results)
 
         if not history_data:
-            print("⚠️ Nenhum dado de histórico encontrado")
+            print("⚠️ No history data found")
             return
 
-        # Exportar dados brutos primeiro
+        # Export raw data first
         self._export_raw_history_data(history_data, history_dir)
 
-        print(f"📊 Histórico processado e salvo em: {history_dir}")
+        print(f"📊 History processed and saved in: {history_dir}")
 
     def _extract_history_data(
         self, experiment_results: List[Dict[str, Any]]
     ) -> Dict[str, Dict[str, Any]]:
-        """Extrai dados de histórico dos resultados dos experimentos."""
+        """Extract history data from experiment results."""
         history_data = {}
 
         for i, result in enumerate(experiment_results):
@@ -92,15 +92,15 @@ class HistoryPlotter:
     def _export_raw_history_data(
         self, history_data: Dict[str, Dict[str, Any]], history_dir: Path
     ) -> None:
-        """Exporta dados brutos de histórico em formatos CSV e JSON."""
-        print("💾 Exportando dados brutos de histórico...")
+        """Export raw history data in CSV and JSON formats."""
+        print("💾 Exporting raw history data...")
 
-        # Exportar JSON completo
+        # Export complete JSON
         json_file = history_dir / "history_raw_data.json"
         with open(json_file, "w", encoding="utf-8") as f:
             json.dump(history_data, f, indent=2, ensure_ascii=False, default=str)
 
-        # Preparar dados para CSV (formato tabular)
+        # Prepare data for CSV (tabular format)
         csv_rows = []
         for exp_key, exp_data in history_data.items():
             base_info = {
@@ -111,11 +111,11 @@ class HistoryPlotter:
                 "runtime": exp_data.get("runtime", 0),
             }
 
-            # Processar cada entrada do histórico
+            # Process each history entry
             for entry in exp_data.get("history", []):
                 row = base_info.copy()
 
-                # Adicionar dados genéricos da entrada
+                # Add generic entry data
                 for key, value in entry.items():
                     if isinstance(value, (dict, list)):
                         row[f"history_{key}"] = json.dumps(value)
@@ -124,7 +124,7 @@ class HistoryPlotter:
 
                 csv_rows.append(row)
 
-        # Exportar CSV detalhado
+        # Export detailed CSV
         if csv_rows:
             csv_file = history_dir / "history_data.csv"
             fieldnames = set()

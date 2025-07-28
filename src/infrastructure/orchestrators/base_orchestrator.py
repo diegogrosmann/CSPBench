@@ -1,8 +1,8 @@
 """
-Base para Orquestradores
+Base for Orchestrators
 
-Fornece funcionalidade comum para todos os orquestradores,
-incluindo integração padronizada com sistema de monitoramento.
+Provides common functionality for all orchestrators,
+including standardized integration with monitoring system.
 """
 
 from abc import ABC, abstractmethod
@@ -12,14 +12,14 @@ from src.infrastructure.logging_config import get_logger
 
 
 class BaseOrchestrator(ABC):
-    """Base abstrata para todos os orquestradores do sistema."""
+    """Abstract base for all system orchestrators."""
 
     def __init__(self, monitoring_service=None):
         """
-        Inicializa orquestrador base.
+        Initialize base orchestrator.
 
         Args:
-            monitoring_service: Serviço de monitoramento opcional
+            monitoring_service: Optional monitoring service
         """
         self.monitoring_service = monitoring_service
         self._logger = get_logger(__name__)
@@ -27,34 +27,34 @@ class BaseOrchestrator(ABC):
     @abstractmethod
     def execute(self, **kwargs) -> Dict[str, Any]:
         """
-        Executa a orquestração específica.
+        Execute specific orchestration.
 
         Returns:
-            Dict[str, Any]: Resultado da orquestração
+            Dict[str, Any]: Orchestration result
         """
         pass
 
     def _report_progress(self, progress: float, message: str) -> None:
         """
-        Reporta progresso ao sistema de monitoramento.
+        Report progress to monitoring system.
 
         Args:
-            progress: Progresso em percentual (0-100)
-            message: Mensagem descritiva do progresso
+            progress: Progress percentage (0-100)
+            message: Descriptive progress message
         """
         if self.monitoring_service:
             try:
                 self.monitoring_service.report_progress(progress, message)
             except Exception as e:
-                self._logger.warning(f"Erro ao reportar progresso: {e}")
+                self._logger.warning(f"Error reporting progress: {e}")
 
     def _update_task_data(self, task_type: str, **data) -> None:
         """
-        Atualiza dados específicos da tarefa no monitoramento.
+        Update task-specific data in monitoring.
 
         Args:
-            task_type: Tipo da tarefa (execution, optimization, sensitivity)
-            **data: Dados específicos da tarefa
+            task_type: Task type (execution, optimization, sensitivity)
+            **data: Task-specific data
         """
         if not self.monitoring_service:
             return
@@ -67,19 +67,19 @@ class BaseOrchestrator(ABC):
             elif task_type == "sensitivity":
                 self.monitoring_service.update_sensitivity_data(**data)
             else:
-                self._logger.warning(f"Tipo de tarefa desconhecido: {task_type}")
+                self._logger.warning(f"Unknown task type: {task_type}")
         except Exception as e:
-            self._logger.warning(f"Erro ao atualizar dados da tarefa: {e}")
+            self._logger.warning(f"Error updating task data: {e}")
 
     def _log_error(self, error: Exception, context: str = "") -> None:
         """
-        Registra erro com contexto apropriado.
+        Log error with appropriate context.
 
         Args:
-            error: Exceção ocorrida
-            context: Contexto adicional do erro
+            error: Exception that occurred
+            context: Additional error context
         """
-        error_msg = f"Erro na orquestração"
+        error_msg = f"Error in orchestration"
         if context:
             error_msg += f" ({context})"
         error_msg += f": {error}"
@@ -88,18 +88,18 @@ class BaseOrchestrator(ABC):
 
     def _log_info(self, message: str) -> None:
         """
-        Registra informação no log.
+        Log information message.
 
         Args:
-            message: Mensagem a registrar
+            message: Message to log
         """
         self._logger.info(message)
 
     def _log_debug(self, message: str) -> None:
         """
-        Registra informação de debug no log.
+        Log debug information message.
 
         Args:
-            message: Mensagem a registrar
+            message: Message to log
         """
         self._logger.debug(message)

@@ -1,7 +1,7 @@
 """
-Registry de Algoritmos baseado no domínio
+Domain-based Algorithm Registry
 
-Implementa AlgorithmRegistry usando o registry global do domínio.
+Implements AlgorithmRegistry using the global domain registry.
 """
 
 from typing import Any, Dict, List, Type
@@ -11,73 +11,73 @@ from src.domain.errors import AlgorithmNotFoundError, AlgorithmRegistrationError
 
 
 class DomainAlgorithmRegistry:
-    """Registry de algoritmos baseado no registry global do domínio."""
+    """Algorithm registry based on the global domain registry."""
 
     def register_algorithm(self, algorithm_class: Type[CSPAlgorithm]) -> None:
-        """Registra um algoritmo."""
+        """Register an algorithm."""
         if not issubclass(algorithm_class, CSPAlgorithm):
             raise AlgorithmRegistrationError(
-                f"Algoritmo deve herdar de CSPAlgorithm: {algorithm_class}"
+                f"Algorithm must inherit from CSPAlgorithm: {algorithm_class}"
             )
 
-        # Usa o nome da classe como chave
+        # Use class name as key
         name = algorithm_class.__name__
         global_registry[name] = algorithm_class
 
     def get_algorithm(self, name: str) -> Type[CSPAlgorithm]:
-        """Obtém classe de algoritmo por nome."""
+        """Get algorithm class by name."""
         if name not in global_registry:
-            raise AlgorithmNotFoundError(f"Algoritmo não encontrado: {name}")
+            raise AlgorithmNotFoundError(f"Algorithm not found: {name}")
 
         return global_registry[name]
 
     def list_algorithms(self) -> List[str]:
-        """Lista algoritmos disponíveis."""
+        """List available algorithms."""
         return list(global_registry.keys())
 
     def algorithm_exists(self, name: str) -> bool:
-        """Verifica se algoritmo existe."""
+        """Check if algorithm exists."""
         return name in global_registry
 
     def get_algorithm_metadata(self, name: str) -> Dict[str, Any]:
-        """Obtém metadados de algoritmo."""
+        """Get algorithm metadata."""
         if name not in global_registry:
-            raise AlgorithmNotFoundError(f"Algoritmo não encontrado: {name}")
+            raise AlgorithmNotFoundError(f"Algorithm not found: {name}")
 
         algo_class = global_registry[name]
         return {
             "name": name,
             "class": algo_class.__name__,
             "module": algo_class.__module__,
-            "description": algo_class.__doc__ or "Sem descrição",
+            "description": algo_class.__doc__ or "No description",
         }
 
-    # Métodos de compatibilidade para código existente
+    # Compatibility methods for existing code
     def register(self, name: str, algorithm_class: Type[CSPAlgorithm]) -> None:
-        """Registra um algoritmo (método legacy)."""
+        """Register an algorithm (legacy method)."""
         if not issubclass(algorithm_class, CSPAlgorithm):
             raise AlgorithmRegistrationError(
-                f"Algoritmo deve herdar de CSPAlgorithm: {algorithm_class}"
+                f"Algorithm must inherit from CSPAlgorithm: {algorithm_class}"
             )
 
         global_registry[name] = algorithm_class
 
     def get(self, name: str) -> Type[CSPAlgorithm]:
-        """Obtém classe de algoritmo por nome (método legacy)."""
+        """Get algorithm class by name (legacy method)."""
         return self.get_algorithm(name)
 
     def list_available(self) -> List[str]:
-        """Lista algoritmos disponíveis."""
+        """List available algorithms."""
         return list(global_registry.keys())
 
     def exists(self, name: str) -> bool:
-        """Verifica se algoritmo existe."""
+        """Check if algorithm exists."""
         return name in global_registry
 
     def get_info(self, name: str) -> Dict[str, Any]:
-        """Obtém informações sobre algoritmo."""
+        """Get information about algorithm."""
         if name not in global_registry:
-            raise AlgorithmNotFoundError(f"Algoritmo não encontrado: {name}")
+            raise AlgorithmNotFoundError(f"Algorithm not found: {name}")
 
         algorithm_class = global_registry[name]
 
@@ -88,12 +88,12 @@ class DomainAlgorithmRegistry:
             "supports_internal_parallel": getattr(
                 algorithm_class, "supports_internal_parallel", False
             ),
-            "description": algorithm_class.__doc__ or "Sem descrição disponível",
+            "description": algorithm_class.__doc__ or "No description available",
         }
 
     def create_instance(
         self, name: str, strings: List[str], alphabet: str, **params
     ) -> CSPAlgorithm:
-        """Cria instância de algoritmo."""
+        """Create algorithm instance."""
         algorithm_class = self.get(name)
         return algorithm_class(strings, alphabet, **params)

@@ -1,51 +1,51 @@
 # CSC (Consensus String Clustering)
 
-O algoritmo **Consensus String Clustering (CSC)** é uma abordagem híbrida para o Closest String Problem que combina **clusterização de strings** com **recombinação de blocos** para encontrar uma string central de alta qualidade. O algoritmo agrupa strings similares, calcula consensos locais e então recombina segmentos desses consensos para gerar candidatos otimizados.
+The **Consensus String Clustering (CSC)** algorithm is a hybrid approach to the Closest String Problem that combines **string clustering** with **block recombination** to find a high-quality center string. The algorithm groups similar strings, calculates local consensus, and then recombines segments of these consensus to generate optimized candidates.
 
-## 📋 Índice
+## 📋 Table of Contents
 
-- [Estratégia Algorítmica](#estratégia-algorítmica)
-- [Funcionamento Detalhado](#funcionamento-detalhado)
-- [Parâmetros e Configuração](#parâmetros-e-configuração)
-- [Casos de Uso](#casos-de-uso)
-- [Análise Algorítmica](#análise-algorítmica)
-- [Exemplos de Uso](#exemplos-de-uso)
-- [Limitações](#limitações)
-- [Integração com CSPBench](#integração-com-cspbench)
+- [Algorithmic Strategy](#algorithmic-strategy)
+- [Detailed Operation](#detailed-operation)
+- [Parameters and Configuration](#parameters-and-configuration)
+- [Use Cases](#use-cases)
+- [Algorithmic Analysis](#algorithmic-analysis)
+- [Usage Examples](#usage-examples)
+- [Limitations](#limitations)
+- [Integration with CSPBench](#integration-with-cspbench)
 
-## 🎯 Estratégia Algorítmica
+## 🎯 Algorithmic Strategy
 
-### Abordagem Principal
-O CSC utiliza uma estratégia de **"dividir para conquistar"** combinada com **aprendizado de padrões locais**:
+### Main Approach
+CSC uses a **"divide and conquer"** strategy combined with **local pattern learning**:
 
-1. **Clusterização por Similaridade**: Agrupa strings com distâncias Hamming próximas usando DBSCAN
-2. **Consenso Local**: Calcula a string consenso para cada cluster independentemente
-3. **Recombinação de Blocos**: Divide consensos em segmentos e testa todas as combinações possíveis
-4. **Busca Local**: Refina o melhor candidato através de otimização posição-a-posição
+1. **Similarity Clustering**: Groups strings with close Hamming distances using DBSCAN
+2. **Local Consensus**: Calculates consensus string for each cluster independently
+3. **Block Recombination**: Divides consensus into segments and tests all possible combinations
+4. **Local Search**: Refines the best candidate through position-by-position optimization
 
-### Vantagens
-- **Explora Estrutura Local**: Aproveita padrões regionais no dataset
-- **Híbrido**: Combina clusterização não-supervisionada com busca determinística
-- **Escalável**: Performance razoável mesmo com datasets grandes
-- **Robusto**: Parâmetros são calculados automaticamente se não especificados
+### Advantages
+- **Explores Local Structure**: Leverages regional patterns in dataset
+- **Hybrid**: Combines unsupervised clustering with deterministic search
+- **Scalable**: Reasonable performance even with large datasets
+- **Robust**: Parameters are calculated automatically if not specified
 
-### Filosofia
-O CSC assume que strings similares podem compartilhar padrões locais que, quando combinados estrategicamente, podem levar a uma solução global melhor do que consensos únicos.
+### Philosophy
+CSC assumes that similar strings can share local patterns that, when strategically combined, can lead to a better global solution than single consensus.
 
-## ⚙️ Funcionamento Detalhado
+## ⚙️ Detailed Operation
 
-### Etapa 1: Preparação e Análise
+### Step 1: Preparation and Analysis
 ```
-Entrada: [ACGT, AGCT, ATGT, CCGT]
-└── Análise de distâncias Hamming
-└── Cálculo automático de parâmetros (d, n_blocks)
+Input: [ACGT, AGCT, ATGT, CCGT]
+└── Hamming distance analysis
+└── Automatic parameter calculation (d, n_blocks)
 ```
 
-### Etapa 2: Clusterização (DBSCAN)
+### Step 2: Clustering (DBSCAN)
 ```
-Parâmetro d = 2 (raio de distância)
-├── Cluster 1: [ACGT, AGCT, ATGT] (strings similares)
-└── Cluster 2: [CCGT] (string isolada)
+Parameter d = 2 (distance radius)
+├── Cluster 1: [ACGT, AGCT, ATGT] (similar strings)
+└── Cluster 2: [CCGT] (isolated string)
 ```
 
 ### Etapa 3: Consenso Local
@@ -82,78 +82,78 @@ Melhor candidato: ACGT (menor distância máxima)
 └── Resultado final: ACGT
 ```
 
-## 🔧 Parâmetros e Configuração
+## 🔧 Parameters and Configuration
 
-### Parâmetros Principais
+### Main Parameters
 
-| Parâmetro | Tipo | Padrão | Descrição |
-|-----------|------|--------|-----------|
-| `d` | int | Auto | Raio de distância para clusterização DBSCAN |
-| `n_blocks` | int | Auto | Número de blocos para recombinação |
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `d` | int | Auto | Distance radius for DBSCAN clustering |
+| `n_blocks` | int | Auto | Number of blocks for recombination |
 
-### Parâmetros de Cálculo Automático
+### Automatic Calculation Parameters
 
-| Parâmetro | Tipo | Padrão | Descrição |
-|-----------|------|--------|-----------|
-| `min_d` | int | 2 | Distância mínima para DBSCAN |
-| `d_factor` | float | 0.8 | Fator da média das distâncias para calcular d |
-| `min_blocks` | int | 2 | Número mínimo de blocos |
-| `max_blocks` | int | 4 | Número máximo de blocos |
-| `n_div` | int | 6 | Divisor do número de strings para n_blocks |
-| `l_div` | int | 25 | Divisor do comprimento das strings para n_blocks |
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `min_d` | int | 2 | Minimum distance for DBSCAN |
+| `d_factor` | float | 0.8 | Distance average factor to calculate d |
+| `min_blocks` | int | 2 | Minimum number of blocks |
+| `max_blocks` | int | 4 | Maximum number of blocks |
+| `n_div` | int | 6 | String number divisor for n_blocks |
+| `l_div` | int | 25 | String length divisor for n_blocks |
 
-### Cálculo Automático de Parâmetros
+### Automatic Parameter Calculation
 ```python
-# d (raio DBSCAN)
-d = max(min_d, floor(média_distâncias_hamming * d_factor))
+# d (DBSCAN radius)
+d = max(min_d, floor(hamming_distance_average * d_factor))
 
-# n_blocks (número de blocos)
+# n_blocks (number of blocks)
 n_blocks = max(min_blocks, min(max_blocks, n_strings/n_div, L_strings/l_div))
 ```
 
-## 📊 Casos de Uso
+## 📊 Use Cases
 
-### 🟢 Ideal Para:
-- **Datasets com Estrutura Local**: Strings que formam grupos naturais
-- **Instâncias Médias**: 10-100 strings, comprimentos 50-500
-- **Ruído Moderado**: Datasets com padrões locais preservados
-- **Análise Exploratória**: Compreender agrupamentos no dataset
+### 🟢 Ideal For:
+- **Datasets with Local Structure**: Strings that form natural groups
+- **Medium Instances**: 10-100 strings, lengths 50-500
+- **Moderate Noise**: Datasets with preserved local patterns
+- **Exploratory Analysis**: Understanding dataset clusters
 
-### 🟡 Adequado Para:
-- **Datasets Balanceados**: Múltiplos grupos de tamanhos similares
-- **Problemas Estruturados**: Sequências com regiões conservadas
-- **Análise Comparativa**: Benchmark contra algoritmos mais simples
+### 🟡 Suitable For:
+- **Balanced Datasets**: Multiple groups of similar sizes
+- **Structured Problems**: Sequences with conserved regions
+- **Comparative Analysis**: Benchmark against simpler algorithms
 
-### 🔴 Limitado Para:
-- **Datasets Muito Grandes**: >1000 strings (clusterização custosa)
-- **Strings Muito Longas**: >1000 caracteres (muitos blocos)
-- **Alto Ruído**: Strings completamente aleatórias
-- **Tempo Real**: Execução pode ser lenta para instâncias grandes
+### 🔴 Limited For:
+- **Very Large Datasets**: >1000 strings (expensive clustering)
+- **Very Long Strings**: >1000 characters (too many blocks)
+- **High Noise**: Completely random strings
+- **Real Time**: Execution can be slow for large instances
 
-## 📈 Análise Algorítmica
+## 📈 Algorithmic Analysis
 
-### Complexidade Temporal
-- **Clusterização**: O(n² × L) onde n = número de strings, L = comprimento
-- **Consenso**: O(k × m × L) onde k = clusters, m = strings por cluster
-- **Recombinação**: O(k<sup>n_blocks</sup> × L) - exponencial no número de blocos
-- **Busca Local**: O(iterações × L × |alfabeto|)
+### Time Complexity
+- **Clustering**: O(n² × L) where n = number of strings, L = length
+- **Consensus**: O(k × m × L) where k = clusters, m = strings per cluster
+- **Recombination**: O(k<sup>n_blocks</sup> × L) - exponential in number of blocks
+- **Local Search**: O(iterations × L × |alphabet|)
 - **Total**: O(n² × L + k<sup>n_blocks</sup> × L)
 
-### Complexidade Espacial
-- **Armazenamento**: O(n × L + k × L + k<sup>n_blocks</sup> × L)
-- **Pico de Memória**: Durante geração de candidatos
+### Space Complexity
+- **Storage**: O(n × L + k × L + k<sup>n_blocks</sup> × L)
+- **Memory Peak**: During candidate generation
 
-### Performance Esperada
+### Expected Performance
 ```
-n=10,  L=50:   < 1 segundo
-n=50,  L=100:  1-5 segundos
-n=100, L=200:  5-30 segundos
-n=500, L=500:  1-10 minutos
+n=10,  L=50:   < 1 second
+n=50,  L=100:  1-5 seconds
+n=100, L=200:  5-30 seconds
+n=500, L=500:  1-10 minutes
 ```
 
-## 💡 Exemplos de Uso
+## 💡 Usage Examples
 
-### Exemplo 1: Configuração Básica
+### Example 1: Basic Configuration
 ```python
 from algorithms.csc import CSCAlgorithm
 
@@ -161,24 +161,24 @@ strings = ["ACGT", "AGCT", "ATGT", "CCGT"]
 algorithm = CSCAlgorithm(strings, alphabet="ACGT")
 center, distance, metadata = algorithm.run()
 
-print(f"Centro: {center}")
-print(f"Distância: {distance}")
-print(f"Clusters encontrados: {metadata['parametros_usados']}")
+print(f"Center: {center}")
+print(f"Distance: {distance}")
+print(f"Clusters found: {metadata['parameters_used']}")
 ```
 
-### Exemplo 2: Parâmetros Customizados
+### Example 2: Custom Parameters
 ```python
-# Forçar clusterização mais agressiva
+# Force more aggressive clustering
 algorithm = CSCAlgorithm(
     strings,
     alphabet="ACGT",
-    d=1,  # Raio menor = clusters menores
-    n_blocks=3  # Mais blocos = mais combinações
+    d=1,  # Smaller radius = smaller clusters
+    n_blocks=3  # More blocks = more combinations
 )
 center, distance, metadata = algorithm.run()
 ```
 
-### Exemplo 3: Via Interface do CSPBench
+### Example 3: Via CSPBench Interface
 ```python
 from src.core.interfaces.algorithm_interface import AlgorithmRunner
 
@@ -190,40 +190,40 @@ result = runner.run_algorithm(
 )
 ```
 
-### Exemplo 4: Análise de Metadados
+### Example 4: Metadata Analysis
 ```python
 center, distance, metadata = algorithm.run()
 
-print("=== Análise CSC ===")
-print(f"Centro encontrado: {center}")
-print(f"Distância máxima: {distance}")
-print(f"Parâmetros utilizados: {metadata['parametros_usados']}")
-print(f"Sucesso: {metadata['sucesso']}")
+print("=== CSC Analysis ===")
+print(f"Center found: {center}")
+print(f"Maximum distance: {distance}")
+print(f"Parameters used: {metadata['parameters_used']}")
+print(f"Success: {metadata['success']}")
 
-if not metadata['sucesso']:
-    print("⚠️ Algoritmo falhou, fallback utilizado")
+if not metadata['success']:
+    print("⚠️ Algorithm failed, fallback used")
 ```
 
-## ⚠️ Limitações
+## ⚠️ Limitations
 
-### Limitações Técnicas
-1. **Explosão Combinatorial**: k<sup>n_blocks</sup> candidatos podem ser muitos
-2. **Sensibilidade a Parâmetros**: d e n_blocks afetam drasticamente os resultados
-3. **Qualidade de Clusters**: DBSCAN pode falhar com dados esparsos
-4. **Overhead de Memória**: Armazena todos os candidatos simultaneamente
+### Technical Limitations
+1. **Combinatorial Explosion**: k<sup>n_blocks</sup> candidates can be too many
+2. **Parameter Sensitivity**: d and n_blocks drastically affect results
+3. **Cluster Quality**: DBSCAN may fail with sparse data
+4. **Memory Overhead**: Stores all candidates simultaneously
 
-### Limitações Práticas
-1. **Datasets Desequilibrados**: Clusters de tamanhos muito diferentes
-2. **Strings Aleatórias**: Sem estrutura local, clusterização é inútil
-3. **Tempo de Execução**: Pode ser lento comparado a heurísticas simples
-4. **Determinismo Limitado**: Dependente da implementação do DBSCAN
+### Practical Limitations
+1. **Unbalanced Datasets**: Clusters of very different sizes
+2. **Random Strings**: Without local structure, clustering is useless
+3. **Execution Time**: Can be slow compared to simple heuristics
+4. **Limited Determinism**: Dependent on DBSCAN implementation
 
 
 
-## 🔗 Integração com CSPBench
+## 🔗 CSPBench Integration
 
-### Registro Automático
-O algoritmo é registrado automaticamente no framework via decorador:
+### Automatic Registration
+The algorithm is automatically registered in the framework via decorator:
 
 ```python
 @register_algorithm
@@ -233,7 +233,7 @@ class CSCAlgorithm(CSPAlgorithm):
     is_deterministic = True
 ```
 
-### Configuração via YAML
+### YAML Configuration
 ```yaml
 algorithm:
   name: "CSC"
@@ -242,45 +242,45 @@ algorithm:
     n_blocks: 2
 ```
 
-### Execução via CLI
+### CLI Execution
 ```bash
 python main.py --algorithm CSC --dataset synthetic --d 2 --n_blocks 3
 ```
 
-### Suporte a Paralelização
-- **Paralelismo Interno**: ❌ Não suportado
-- **Paralelismo de Runs**: ✅ Múltiplas execuções podem rodar em paralelo
-- **Compatibilidade**: ✅ Funciona com batch processing e otimização
+### Parallelization Support
+- **Internal Parallelism**: ❌ Not supported
+- **Run Parallelism**: ✅ Multiple executions can run in parallel
+- **Compatibility**: ✅ Works with batch processing and optimization
 
-### Metadados Retornados
+### Returned Metadata
 ```python
 metadata = {
-    "iteracoes": 1,
-    "parametros_usados": {"d": 2, "n_blocks": 2},
-    "centro_encontrado": "ACGT",
-    "sucesso": True,
-    "fallback_usado": False  # Apenas se sucesso = False
+    "iterations": 1,
+    "parameters_used": {"d": 2, "n_blocks": 2},
+    "center_found": "ACGT",
+    "success": True,
+    "fallback_used": False  # Only if success = False
 }
 ```
 
 ### Troubleshooting
 
-**Problema**: Nenhum cluster encontrado
+**Problem**: No clusters found
 ```
-Solução: Reduzir o parâmetro 'd' ou verificar se strings são muito diferentes
-```
-
-**Problema**: Muitos candidatos, execução lenta
-```
-Solução: Reduzir 'n_blocks' ou aumentar 'd' para clusters maiores
+Solution: Reduce parameter 'd' or check if strings are too different
 ```
 
-**Problema**: Qualidade ruim dos resultados
+**Problem**: Too many candidates, slow execution
 ```
-Solução: Ajustar parâmetros manualmente ou usar algoritmo diferente
+Solution: Reduce 'n_blocks' or increase 'd' for larger clusters
+```
+
+**Problem**: Poor quality results
+```
+Solution: Manually adjust parameters or use different algorithm
 ```
 
 ---
 
-**Desenvolvido para CSPBench** - Framework de Experimentação para o Closest String Problem  
-📚 Para mais informações, consulte a [documentação principal](../../README.md) do framework.
+**Developed for CSPBench** - Experimentation Framework for the Closest String Problem  
+📚 For more information, see the [main documentation](../../README.md) of the framework.

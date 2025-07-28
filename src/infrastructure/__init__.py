@@ -1,7 +1,7 @@
 """
-Camada de Infraestrutura CSPBench
+CSPBench Infrastructure Layer
 
-Contém implementações de portas e adaptadores para sistemas externos.
+Contains implementations of ports and adapters for external systems.
 """
 
 from .io.exporters import CsvExporter, FileExporter, JsonExporter, TxtExporter

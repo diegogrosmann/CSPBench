@@ -1,8 +1,8 @@
 """
-Configurações padrão para o algoritmo CSC.
+Default configurations for CSC algorithm.
 
-Atributos:
-    CSC_DEFAULTS (dict): Parâmetros padrão do CSC.
+Attributes:
+    CSC_DEFAULTS (dict): Default CSC parameters.
 """
 
 # CSC Configuration

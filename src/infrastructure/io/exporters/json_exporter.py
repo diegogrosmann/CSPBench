@@ -1,8 +1,8 @@
 """
-Exportador para formato JSON com relatórios avançados.
+JSON Format Exporter with Advanced Reports.
 
-Especialização do FileExporter que adiciona geração automática de relatórios
-baseado no tipo de dados detectado.
+FileExporter specialization that adds automatic report generation
+based on detected data type.
 """
 
 from pathlib import Path
@@ -12,40 +12,68 @@ from .file_exporter import FileExporter
 
 
 class JsonExporter(FileExporter):
-    """Exportador para formato JSON com relatórios avançados."""
+    """JSON format exporter with advanced reports."""
 
     def __init__(self, output_path: str, config: Optional[Dict[str, Any]] = None):
-        """Inicializa exportador JSON com configuração opcional."""
+        """Initialize JSON exporter with optional configuration."""
         super().__init__(output_path)
         self.config = config or {}
 
     def export_batch_results(
         self, batch_results: List[Dict[str, Any]], format_type: str, destination: str
     ) -> str:
-        """Exporta resultados de batch com relatórios avançados."""
-        # Exportar dados JSON básicos
+        """Export batch results with advanced reports."""
+        # Export basic JSON data
         json_path = super().export_batch_results(
             batch_results, format_type, destination
         )
 
-        # Gerar relatório avançado se configurado
+        # Generate advanced report if configured
         if self.config and self._should_generate_report():
             try:
-                # Verificar tipos de dados específicos
-                is_sensitivity_analysis = self._is_sensitivity_data(batch_results)
-                is_optimization_data = self._is_optimization_data(batch_results)
-
-                if is_sensitivity_analysis:
+                if self._is_sensitivity_data(batch_results):
+                    print("📊 Sensitivity data detected - generating sensitivity report")
                     self._generate_sensitivity_report(batch_results)
-                elif is_optimization_data:
+                elif self._is_optimization_data(batch_results):
+                    print("📊 Optimization data detected - generating optimization report")
                     self._generate_optimization_report(batch_results)
                 else:
+                    print("📊 Standard execution data - generating execution report")
                     self._generate_execution_report(batch_results)
 
             except Exception as e:
-                print(f"⚠️ Erro ao gerar relatório avançado: {e}")
+                print(f"⚠️ Error generating advanced report: {e}")
 
         return json_path
+
+    def _generate_sensitivity_report(self, batch_results: List[Dict[str, Any]]) -> None:
+        """Generate specific report for sensitivity analysis."""
+        try:
+            from ..report_generators.sensitivity_report_generator import (
+                SensitivityReportGenerator,
+            )
+
+            # Build sensitivity data
+            sensitivity_data = {"batch_results": batch_results}
+
+            session_path = Path(self.output_path)
+            sensitivity_report_generator = SensitivityReportGenerator(session_path)
+            sensitivity_report_generator.generate_sensitivity_report(sensitivity_data)
+
+        except ImportError as e:
+            print(
+                f"⚠️ Could not import sensitivity report generator: {e}"
+            )
+        except Exception as e:
+            print(f"⚠️ Error generating sensitivity report: {e}")
+
+    def _generate_optimization_report(
+        self, batch_results: List[Dict[str, Any]]
+    ) -> None:
+        """Generate specific report for optimization."""
+        print(
+            "📊 Optimization data detected - using specific optimization report"
+        )
 
     def _generate_sensitivity_report(self, batch_results: List[Dict[str, Any]]) -> None:
         """Gera relatório específico para análise de sensibilidade."""

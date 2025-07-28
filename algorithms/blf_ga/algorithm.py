@@ -1,8 +1,8 @@
 """
-BLF-GA: Blockwise Learning Fusion + Genetic Algorithm para CSP.
+BLF-GA: Blockwise Learning Fusion + Genetic Algorithm for CSP.
 
 Classes:
-    BLFGAAlgorithm: Wrapper para integração do BLF-GA ao framework CSP.
+    BLFGAAlgorithm: Wrapper for BLF-GA integration into CSP framework.
 """
 
 from collections.abc import Callable
@@ -16,41 +16,41 @@ from .implementation import BLFGA
 @register_algorithm
 class BLFGAAlgorithm(CSPAlgorithm):
     """
-    BLF-GA: Blockwise Learning Fusion + Genetic Algorithm para o Closest String Problem.
+    BLF-GA: Blockwise Learning Fusion + Genetic Algorithm for the Closest String Problem.
 
-    Uma metaheurística híbrida que combina:
-    - Aprendizado por blocos (blockwise learning)
-    - Algoritmo genético global
-    - Mecanismos adaptativos avançados
+    A hybrid metaheuristic that combines:
+    - Blockwise learning
+    - Global genetic algorithm
+    - Advanced adaptive mechanisms
 
-    Características:
-    - Suporte a paralelismo interno
-    - Múltiplos operadores genéticos
-    - Controle adaptativos de parâmetros
-    - Refinamento local dos elites
-    - Critérios de parada flexíveis
+    Features:
+    - Internal parallelism support
+    - Multiple genetic operators
+    - Adaptive parameter control
+    - Local refinement of elites
+    - Flexible stopping criteria
 
     Args:
-        strings (list[str]): Lista de strings de entrada.
-        alphabet (str): Alfabeto utilizado.
-        **params: Parâmetros do algoritmo.
+        strings (list[str]): List of input strings.
+        alphabet (str): Alphabet used.
+        **params: Algorithm parameters.
 
-    Métodos:
-        run(): Executa o BLF-GA e retorna (centro, distância máxima, metadata).
-        run_with_history(): Executa e retorna histórico completo.
-        get_metadata(): Retorna metadados detalhados do algoritmo.
+    Methods:
+        run(): Executes BLF-GA and returns (center, maximum distance, metadata).
+        run_with_history(): Executes and returns complete history.
+        get_metadata(): Returns detailed algorithm metadata.
     """
 
     name = "BLF-GA"
     default_params = BLF_GA_DEFAULTS
-    supports_internal_parallel = True  # BLF-GA pode usar paralelismo interno
-    is_deterministic = False  # É estocástico (pode ter seed para reprodutibilidade)
+    supports_internal_parallel = True  # BLF-GA can use internal parallelism
+    is_deterministic = False  # Is stochastic (can have seed for reproducibility)
 
     def __init__(self, strings: list[str], alphabet: str, **params):
         super().__init__(strings, alphabet, **params)
 
-        # Filtrar parâmetros para passar apenas os que a implementação BLFGA conhece
-        # Remover parâmetros específicos do framework de histórico
+        # Filter parameters to pass only those that BLFGA implementation knows
+        # Remove framework-specific history parameters
         blfga_params = {
             k: v
             for k, v in self.params.items()
@@ -59,64 +59,64 @@ class BLFGAAlgorithm(CSPAlgorithm):
 
         self.blf_ga_instance = BLFGA(self.strings, self.alphabet, **blfga_params)
 
-        # Configurar callback de histórico se habilitado
+        # Configure history callback if enabled
         if self.save_history:
             self.blf_ga_instance.set_history_callback(self._save_dynamic_history_entry)
 
     def set_params(self, **params) -> None:
         """
-        Define novos parâmetros para o algoritmo.
+        Set new parameters for the algorithm.
 
         Args:
-            **params: Parâmetros a serem atualizados
+            **params: Parameters to be updated
         """
         super().set_params(**params)
-        # Atualizar instância do BLF-GA diretamente
+        # Update BLF-GA instance directly
         self.blf_ga_instance.update_params(**params)
 
     def set_progress_callback(self, callback: Callable[[str], None]) -> None:
         """
-        Passa o callback para a instância do BLFGA.
+        Pass callback to BLFGA instance.
 
         Args:
-            callback (Callable[[str], None]): Função de callback de progresso.
+            callback (Callable[[str], None]): Progress callback function.
         """
         super().set_progress_callback(callback)
         self.blf_ga_instance.set_progress_callback(callback)
 
     def set_warning_callback(self, callback: Callable[[str], None]) -> None:
         """
-        Define callback para warnings e passa para a instância do BLFGA.
+        Set callback for warnings and pass to BLFGA instance.
 
         Args:
-            callback (Callable[[str], None]): Função de callback de warning.
+            callback (Callable[[str], None]): Warning callback function.
         """
         super().set_warning_callback(callback)
-        # BLF-GA pode gerar warnings sobre convergência, parâmetros, etc.
-        # Por enquanto, apenas armazena o callback
+        # BLF-GA can generate warnings about convergence, parameters, etc.
+        # For now, just store the callback
         self._blfga_warning_callback = callback
 
     def run(self) -> tuple[str, int, dict]:
         """
-        Executa o BLF-GA e retorna a string central, a distância máxima e metadata detalhada.
+        Execute BLF-GA and return center string, maximum distance and detailed metadata.
 
         Returns:
             tuple: (best_string, best_fitness, metadata)
-                - best_string: Melhor string encontrada
-                - best_fitness: Distância máxima da melhor string
-                - metadata: Dicionário com informações detalhadas da execução
+                - best_string: Best string found
+                - best_fitness: Maximum distance of best string
+                - metadata: Dictionary with detailed execution information
         """
         import time
 
         start_time = time.time()
 
         try:
-            # Limpar histórico anterior
+            # Clear previous history
             self.clear_history()
 
-            self._report_progress("Iniciando BLF-GA...")
+            self._report_progress("Starting BLF-GA...")
 
-            # Salvar estado inicial
+            # Save initial state
             self._save_history_entry(
                 0,
                 phase="initialization",
@@ -128,7 +128,7 @@ class BLFGAAlgorithm(CSPAlgorithm):
             best, best_val, ga_history = self.blf_ga_instance.run()
             execution_time = time.time() - start_time
 
-            # Processar histórico do GA para nosso formato padrão
+            # Process GA history to our standard format
             if ga_history and self.save_history:
                 for i, fitness in enumerate(ga_history):
                     self._save_history_entry(
@@ -143,7 +143,7 @@ class BLFGAAlgorithm(CSPAlgorithm):
                         ),
                     )
 
-            # Salvar estado final
+            # Save final state
             self._save_history_entry(
                 len(ga_history) if ga_history else 1,
                 phase="completion",
@@ -153,7 +153,7 @@ class BLFGAAlgorithm(CSPAlgorithm):
                 execution_time=execution_time,
             )
 
-            # Metadata detalhada da execução
+            # Detailed execution metadata
             metadata = {
                 "algorithm": "BLF-GA",
                 "status": "completed",
@@ -179,13 +179,13 @@ class BLFGAAlgorithm(CSPAlgorithm):
                     "block_redivision": self.blf_ga_instance.rediv_freq > 0,
                     "elite_refinement": self.blf_ga_instance.refine_elites != "none",
                 },
-                # Histórico detalhado se habilitado
+                # Detailed history if enabled
                 "history": self.get_history() if self.save_history else [],
                 "ga_fitness_history": ga_history if ga_history else [],
-                # Compatibilidade com versão anterior
-                "iteracoes": len(ga_history) if ga_history else 0,
-                "melhor_distancia": best_val,
-                "historico_completo": len(ga_history) if ga_history else 0,
+                # Compatibility with previous version
+                "iterations": len(ga_history) if ga_history else 0,
+                "best_distance": best_val,
+                "complete_history": len(ga_history) if ga_history else 0,
             }
 
             return best, best_val, metadata
@@ -207,7 +207,7 @@ class BLFGAAlgorithm(CSPAlgorithm):
     def _save_blfga_history(
         self, generation: int, best_fitness: float, **kwargs
     ) -> None:
-        """Callback para salvar histórico durante execução do BLF-GA."""
+        """Callback to save history during BLF-GA execution."""
         self._save_history_entry(
             generation,
             phase="evolution",
@@ -218,20 +218,20 @@ class BLFGAAlgorithm(CSPAlgorithm):
 
     def run_with_history(self) -> tuple[str, int, list]:
         """
-        Executa o BLF-GA e retorna a string central, a distância máxima e o histórico de distâncias.
+        Execute BLF-GA and return the center string, maximum distance and distance history.
         """
         return self.blf_ga_instance.run()
 
     def get_metadata(self) -> dict:
         """
-        Retorna metadados detalhados do algoritmo BLF-GA.
+        Return detailed metadata of the BLF-GA algorithm.
 
         Returns:
-            dict: Metadados incluindo configuração e estado atual
+            dict: Metadata including configuration and current state
         """
         base_metadata = super().get_metadata()
 
-        # Adiciona metadados específicos do BLF-GA
+        # Add BLF-GA specific metadata
         blfga_metadata = {
             "algorithm_type": "hybrid_metaheuristic",
             "components": [
@@ -260,23 +260,23 @@ class BLFGAAlgorithm(CSPAlgorithm):
             },
         }
 
-        # Merge dos metadados
+        # Merge metadata
         base_metadata.update(blfga_metadata)
         return base_metadata
 
     def _save_dynamic_history_entry(self, generation: int, event_data: dict) -> None:
         """
-        Callback para registrar eventos dinâmicos durante execução do BLF-GA.
+        Callback to register dynamic events during BLF-GA execution.
 
         Args:
-            generation: Geração atual
-            event_data: Dicionário com dados do evento incluindo 'event' e demais informações
+            generation: Current generation
+            event_data: Dictionary with event data including 'event' and other information
         """
         if self.save_history:
-            # Extrair o tipo de evento e demais dados
+            # Extract event type and other data
             event_type = event_data.pop("event", "unknown_event")
             self._save_history_entry(
-                generation + 1,  # +1 porque iteration 0 é initialization
+                generation + 1,  # +1 because iteration 0 is initialization
                 phase="dynamic_event",
                 generation=generation,
                 event_type=event_type,

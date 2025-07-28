@@ -1,62 +1,62 @@
 """
-Operações Genéticas para BLF-GA (Block Letter Frequency Genetic Algorithm)
+Genetic Operations for BLF-GA (Block Letter Frequency Genetic Algorithm)
 
-Este módulo implementa uma suíte completa de operadores genéticos especializados para o problema
-de Consenso de Strings (CSP) usando algoritmos genéticos. O BLF-GA é um algoritmo evolutivo que
-evolui uma população de strings candidatas para encontrar a string de consenso que minimiza a
-distância máxima para um conjunto de strings de entrada.
+This module implements a complete suite of genetic operators specialized for the 
+Closest String Problem (CSP) using genetic algorithms. BLF-GA is an evolutionary algorithm that
+evolves a population of candidate strings to find the consensus string that minimizes the
+maximum distance to a set of input strings.
 
-ARQUITETURA DO MÓDULO:
-====================
-1. Medição de Diversidade:
-   - Cálculo da distância de Hamming média entre indivíduos
-   - Monitoramento da convergência populacional
+MODULE ARCHITECTURE:
+===================
+1. Diversity Measurement:
+   - Calculation of average Hamming distance between individuals
+   - Population convergence monitoring
 
-2. Operadores de Mutação:
-   - Mutação multi-ponto: Altera múltiplas posições aleatoriamente
-   - Mutação por inversão: Inverte segmentos da string
-   - Mutação por transposição: Move segmentos para outras posições
+2. Mutation Operators:
+   - Multi-point mutation: Randomly changes multiple positions
+   - Inversion mutation: Inverts string segments
+   - Transposition mutation: Moves segments to other positions
 
-3. Operadores de Crossover:
-   - Crossover de um ponto: Troca sufixos entre pais
-   - Crossover uniforme: Combina genes posição por posição
-   - Crossover por blocos: Troca segmentos estruturais
+3. Crossover Operators:
+   - One-point crossover: Exchanges suffixes between parents
+   - Uniform crossover: Combines genes position by position
+   - Block crossover: Exchanges structural segments
 
-4. Refinamento Local:
-   - Busca gulosa: Otimização posição por posição
-   - Refinamento por troca: Permuta posições para melhorar fitness
-   - Refinamento por inserção: Move segmentos pequenos
-   - Refinamento 2-opt: Inverte segmentos para otimização
+4. Local Refinement:
+   - Greedy search: Position-by-position optimization
+   - Swap refinement: Permutes positions to improve fitness
+   - Insertion refinement: Moves small segments
+   - 2-opt refinement: Inverts segments for optimization
 
-ESTRATÉGIAS ALGORÍTMICAS:
-========================
-- Cada indivíduo é representado como uma string de mesmo comprimento das strings de entrada
-- O fitness é calculado como a distância máxima do indivíduo para todas as strings de referência
-- Os operadores são projetados para preservar o comprimento das strings
-- O refinamento local é usado para escapar de ótimos locais e acelerar convergência
+ALGORITHMIC STRATEGIES:
+======================
+- Each individual is represented as a string of the same length as input strings
+- Fitness is calculated as the maximum distance from individual to all reference strings
+- Operators are designed to preserve string length
+- Local refinement is used to escape local optima and accelerate convergence
 
-CASOS DE USO:
-============
-- Busca de consenso em sequências biológicas
-- Otimização de strings em problemas de alinhamento
-- Análise de variabilidade genética
-- Problemas de clustering baseado em distância
+USE CASES:
+=========
+- Consensus search in biological sequences
+- String optimization in alignment problems
+- Genetic variability analysis
+- Distance-based clustering problems
 
-EXEMPLO DE USO:
-==============
+USAGE EXAMPLE:
+=============
 ```python
 from algorithms.blf_ga.ops.genetic_ops import (
     mutate_multi, crossover_one_point, refine_greedy, mean_hamming_distance
 )
 
-# População inicial
+# Initial population
 pop = ["ACGT", "ATGT", "ACCT"]
 strings = ["ACGT", "ATGT", "ACCT", "AGGT"]
 
-# Medição de diversidade
+# Diversity measurement
 diversity = mean_hamming_distance(pop)
 
-# Mutação
+# Mutation
 mutated = mutate_multi("ACGT", "ACGT", random.Random(42), n=1)
 
 # Crossover
@@ -94,63 +94,63 @@ Population = list[String]
 
 
 # =============================================================================
-# MEDIÇÃO DE DIVERSIDADE POPULACIONAL
+# POPULATION DIVERSITY MEASUREMENT
 # =============================================================================
 
 
 def mean_hamming_distance(pop: Population) -> float:
     """
-    Calcula a distância de Hamming média entre todos os pares de indivíduos na população.
+    Calculate the average Hamming distance between all pairs of individuals in the population.
 
-    A distância de Hamming é uma métrica fundamental para medir a diversidade genética
-    em populações de strings. Ela conta o número de posições onde dois indivíduos diferem.
-    Uma população com alta diversidade (distância média alta) indica maior exploração
-    do espaço de busca, enquanto baixa diversidade pode indicar convergência prematura.
+    Hamming distance is a fundamental metric for measuring genetic diversity
+    in string populations. It counts the number of positions where two individuals differ.
+    A population with high diversity (high average distance) indicates greater exploration
+    of the search space, while low diversity may indicate premature convergence.
 
-    ESTRATÉGIA ALGORÍTMICA:
-    - Usa broadcasting NumPy para calcular eficientemente todas as distâncias par a par
-    - Considera apenas o triângulo superior da matriz de distâncias (evita duplicação)
-    - Complexidade: O(n²·m) onde n é o tamanho da população e m o comprimento das strings
+    ALGORITHMIC STRATEGY:
+    - Uses NumPy broadcasting to efficiently calculate all pairwise distances
+    - Considers only the upper triangle of the distance matrix (avoids duplication)
+    - Complexity: O(n²·m) where n is population size and m is string length
 
     Args:
-        pop (Population): Lista de indivíduos (strings) da população
+        pop (Population): List of individuals (strings) in the population
 
     Returns:
-        float: Distância de Hamming média entre todos os pares.
-               Retorna 0.0 se a população tem menos de 2 indivíduos.
+        float: Average Hamming distance between all pairs.
+               Returns 0.0 if population has fewer than 2 individuals.
 
     Examples:
         >>> pop = ["ACGT", "ATGT", "GCGT"]
-        >>> mean_hamming_distance(pop)  # Há diferenças nas posições 1 e 0
+        >>> mean_hamming_distance(pop)  # Differences at positions 1 and 0
         1.3333333333333333
 
-        >>> pop = ["AAAA", "AAAA"]  # População homogênea
+        >>> pop = ["AAAA", "AAAA"]  # Homogeneous population
         >>> mean_hamming_distance(pop)
         0.0
 
     Note:
-        - Assume que todas as strings têm o mesmo comprimento
-        - Útil para monitorar a convergência do algoritmo genético
-        - Valores próximos de 0 indicam população convergida
+        - Assumes all strings have the same length
+        - Useful for monitoring genetic algorithm convergence
+        - Values close to 0 indicate converged population
     """
     if len(pop) < 2:
         return 0.0
 
-    # Converte strings para matriz NumPy para processamento eficiente
+    # Convert strings to NumPy matrix for efficient processing
     arr = np.array([list(ind) for ind in pop])
 
-    # Calcula distâncias par a par usando broadcasting
-    # arr[:, None, :] cria uma dimensão extra para comparação elemento a elemento
+    # Calculate pairwise distances using broadcasting
+    # arr[:, None, :] creates an extra dimension for element-wise comparison
     dists = np.sum(arr[:, None, :] != arr[None, :, :], axis=2)
 
-    # Pega apenas o triângulo superior (evita contar cada par duas vezes)
+    # Take only upper triangle (avoid counting each pair twice)
     iu = np.triu_indices(len(pop), 1)
 
     return np.mean(dists[iu])
 
 
 # =============================================================================
-# OPERADORES DE MUTAÇÃO
+# MUTATION OPERATORS
 # =============================================================================
 
 

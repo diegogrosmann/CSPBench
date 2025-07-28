@@ -1,7 +1,7 @@
 """
-Serviços da Aplicação
+Application Services
 
-Implementa casos de uso e lógica de aplicação.
+Implements use cases and application logic.
 """
 
 from .experiment_service import ExperimentService

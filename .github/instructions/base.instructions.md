@@ -19,7 +19,8 @@ applyTo: '**'
 7. [🔐 Segurança e Credenciais](#7-segurança-e-credenciais)
 8. [📄 Documentação](#8-documentação)
 9. [🔄 Processo de Desenvolvimento](#9-processo-de-desenvolvimento)
-10. [🤖 Diretrizes para IAs](#10-diretrizes-para-ias)
+10. [🌐 Internacionalização](#10-internacionalização)
+11. [🤖 Diretrizes para IAs](#11-diretrizes-para-ias)
 
 ---
 
@@ -191,21 +192,7 @@ sensitivity:   # Análise de sensibilidade
 
 ## 5. 📝 Convenções de Código
 
-### 5.1 Idioma e Nomenclatura
-
-- ✅ **Código**: Inglês (variáveis, funções, classes, métodos)
-- ✅ **Comentários**: Português (para facilitar compreensão)
-- ✅ **Documentação**: Português
-- ✅ **Logs/Output**: Português
-
-```python
-def calculate_distance(sequence_a: str, sequence_b: str) -> int:
-    """Calcula a distância entre duas sequências."""
-    # Implementação usando programação dinâmica
-    return hamming_distance(sequence_a, sequence_b)
-```
-
-### 5.2 Ferramentas de Qualidade
+### 5.1 Ferramentas de Qualidade
 
 | Ferramenta | Propósito | Configuração | Obrigatório |
 |------------|-----------|--------------|-------------|
@@ -214,7 +201,7 @@ def calculate_distance(sequence_a: str, sequence_b: str) -> int:
 | `mypy` | Type checking | `--strict` | ✅ |
 | `isort` | Ordenação imports | `pyproject.toml` | ✅ |
 
-### 5.3 Contratos de Interface
+### 5.2 Contratos de Interface
 
 ```python
 # Interface CSPAlgorithm
@@ -225,7 +212,7 @@ def run(self, dataset, **kwargs) -> tuple[str, int, dict]:
     """
 ```
 
-### 5.4 Tratamento de Erros
+### 5.3 Tratamento de Erros
 
 - ✅ **Exceções Customizadas**: Use `src.domain.errors`
 - ✅ **Propagação**: Deixe erros subirem com contexto
@@ -385,104 +372,91 @@ refactor/<descricao>    # Refatorações
 
 ---
 
-## 10. 🤖 Diretrizes para IAs
+## 10. 🌐 Internacionalização
 
-### 10.1 Comunicação e Idioma
+### 10.1 Política Obrigatória
 
+**REGRA FUNDAMENTAL**: Todo código deve estar em inglês - sem exceções.
+
+| Elemento | Idioma | Exemplo |
+|----------|--------|---------|
+| **Variáveis/Funções** | Inglês | `calculate_distance()` |
+| **Classes/Métodos** | Inglês | `class Algorithm:` |
+| **Docstrings** | Inglês | `"""Execute algorithm and return..."""` |
+| **Comentários** | Inglês | `# Save final state to history` |
+| **Mensagens** | Inglês | `"Starting CSP algorithm..."` |
+| **Metadados** | Inglês | `"center_found": center` |
+
+### 10.2 Mapeamento de Termos
+
+| Português | Inglês | Contexto |
+|-----------|--------|----------|
+| `algoritmo` | `algorithm` | Geral |
+| `execução` | `execution` | Logs/código |
+| `configuração` | `configuration` | Config |
+| `parâmetros` | `parameters` | Documentação |
+| `centro_encontrado` | `center_found` | Metadados |
+| `melhor_distancia` | `best_distance` | Metadados |
+| `iteracoes` | `iterations` | Metadados |
+| `Iniciando` | `Starting` | Mensagens |
+| `finalizado com sucesso` | `completed successfully` | Mensagens |
+
+### 10.3 Auditoria
+
+```bash
+# Verificar termos em português
+grep -r "algoritmo\|execução\|configuração" src/
+grep -r "Iniciando\|Executando\|Finalizando" src/
+grep -r "[àáâãäçéêëíîïóôõöúûüÀÁÂÃÄÇÉÊËÍÎÏÓÔÕÖÚÛÜ]" src/
+```
+
+---
+
+## 11. 🤖 Diretrizes para IAs
+
+### 11.1 Comunicação
 - ✅ **Resposta**: Sempre em português brasileiro
 - ✅ **Clareza**: Manter precisão técnica
 - ✅ **Contexto**: Considerar arquitetura existente
-- ✅ **Consistência**: Seguir padrões estabelecidos
 
-### 10.2 Processo de Trabalho
-
-1. **📊 Análise Prévia**
-   ```markdown
-   ## Análise do Pedido
-   **O que fazer:** [Descrição clara]
-   **Análise do código:** [Contexto relevante]
-   **Plano de ação:** [Passos a seguir]
-   **Mudanças planejadas:** [Lista detalhada]
-   ```
-
-2. **🔍 Investigação**
-   - Usar ferramentas para entender código existente
-   - Ler arquivos relevantes antes de modificar
-   - Buscar padrões e convenções existentes
-
-3. **💬 Comunicação Clara**
-   - Explicar o que será feito antes de fazer
-   - Mostrar plano de implementação
-   - Aguardar aprovação para mudanças significativas
-
-
-### 10.3 Implementação
-
-- ✅ **Ferramentas**: Usar métodos internos sempre que possível (APIs, funções Python, tasks VS Code) para executar comandos como run, test, read, format, etc.
-- ✅ **Prioridade Interna**: Sempre priorizar métodos internos para execução de tarefas, evitando comandos externos (shell, terminal) ou que exijam aprovação manual.
-- ✅ **Automação**: Não solicitar aprovação para ações que podem ser realizadas internamente.
-- ❌ **Comandos Externos**: Só utilizar comandos externos se não houver alternativa interna viável.
-- ✅ **Incrementalidade**: Fazer mudanças pequenas e testáveis
-- ✅ **Validação**: Testar após cada mudança significativa
+### 11.2 Implementação
+- ✅ **Ferramentas Internas**: Priorizar APIs/funções internas vs comandos externos
+- ✅ **Incrementalidade**: Mudanças pequenas e testáveis
+- ✅ **Validação**: Testar após mudanças significativas
 - ✅ **Cleanup**: Remover código obsoleto
 
-### 10.4 Restrições Críticas
-
+### 11.3 Restrições Críticas
 - ❌ **Dependências Cruzadas**: Plugins NÃO podem depender uns dos outros
 - ❌ **Imports Diretos**: Aplicação NÃO pode importar plugins diretamente
 - ❌ **Domain Purity**: Domain layer NÃO pode ter I/O ou dependências externas
 - ❌ **Credenciais**: NUNCA hardcodar ou versionar credenciais
-- ❌ **Adaptadores**: NUNCA use adaptadores para codigos legados, remova codigo legado.
 
-### 10.5 Qualidade e Padrões
+### 11.4 Internacionalização Obrigatória
 
-- ✅ **Code Style**: Seguir black, ruff, mypy
-- ✅ **Testes**: Criar/atualizar testes para mudanças
-- ✅ **Documentação**: Atualizar docs conforme necessário
-- ✅ **Type Hints**: Usar tipagem estática apropriada
+**AÇÃO AUTOMÁTICA**: Sempre traduzir português → inglês ao modificar código.
 
-### 10.6 Templates de Comunicação
+#### Checklist Obrigatório:
+- [ ] **Variáveis/Funções**: snake_case em inglês
+- [ ] **Classes**: PascalCase em inglês  
+- [ ] **Docstrings**: Google Style em inglês
+- [ ] **Comentários**: Inglês explicativo
+- [ ] **Mensagens**: Logs/erros em inglês
+- [ ] **Metadados**: Chaves em inglês
 
-#### Proposta de Mudança
-```markdown
-## 📋 Proposta de Mudança
-
-### 🎯 Objetivo
-[Descrição clara do que precisa ser feito]
-
-### 📊 Análise
-- **Arquivos impactados**: [Lista]
-- **Dependências**: [Lista]
-- **Riscos**: [Lista]
-
-### 🛠️ Plano de Implementação
-1. [Passo 1]
-2. [Passo 2]
-3. [Passo 3]
-
-### ✅ Checklist
-- [ ] Testes atualizados
-- [ ] Documentação atualizada
-- [ ] Código formatado
-- [ ] Sem quebra de compatibilidade
+#### Traduções Automáticas:
+```python
+TRANSLATIONS = {
+    "algoritmo": "algorithm", "execução": "execution",
+    "configuração": "configuration", "parâmetros": "parameters",
+    "centro_encontrado": "center_found", "iteracoes": "iterations",
+    "Iniciando": "Starting", "finalizado com sucesso": "completed successfully"
+}
 ```
 
-#### Relatório de Implementação
-```markdown
-## ✅ Implementação Concluída
-
-### 🔧 Mudanças Realizadas
-- [Mudança 1]
-- [Mudança 2]
-
-### 🧪 Testes
-- [x] Testes unitários passando
-- [x] Testes de integração passando
-- [x] Cobertura mantida
-
-### 📝 Próximos Passos
-- [Se houver]
-```
+### 11.5 Qualidade
+- ✅ **Code Style**: black, ruff, mypy
+- ✅ **Testes**: Criar/atualizar para mudanças
+- ✅ **Type Hints**: Tipagem estática apropriada
 
 ---
 

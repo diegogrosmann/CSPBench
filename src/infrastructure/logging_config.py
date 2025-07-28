@@ -1,7 +1,7 @@
 """
-Configuração de Logging para CSPBench
+Logging Configuration for CSPBench
 
-Configurações centralizadas de logging sem dependências de console externas.
+Centralized logging configurations without external console dependencies.
 """
 
 import logging
@@ -16,36 +16,36 @@ def setup_basic_logging(
     base_name: str = "cspbench",
     max_bytes: int = 10 * 1024 * 1024,  # 10MB
     backup_count: int = 5,
-    log_file_path: Optional[str] = None,  # Caminho completo do arquivo se especificado
+    log_file_path: Optional[str] = None,  # Full file path if specified
 ) -> None:
     """
-    Configura logging básico do sistema.
+    Configure basic system logging.
 
     Args:
-        level: Nível de log (DEBUG, INFO, WARNING, ERROR)
-        log_dir: Diretório para arquivos de log
-        base_name: Nome base para arquivos de log
-        max_bytes: Tamanho máximo do arquivo antes da rotação
-        backup_count: Número de backups a manter
-        log_file_path: Caminho completo do arquivo (sobrepõe log_dir + base_name)
+        level: Log level (DEBUG, INFO, WARNING, ERROR)
+        log_dir: Directory for log files
+        base_name: Base name for log files
+        max_bytes: Maximum file size before rotation
+        backup_count: Number of backups to maintain
+        log_file_path: Full file path (overrides log_dir + base_name)
     """
-    # Determinar caminho do arquivo
+    # Determine file path
     if log_file_path:
         log_file = Path(log_file_path)
         log_file.parent.mkdir(parents=True, exist_ok=True)
     else:
-        # Criar diretório se não existir
+        # Create directory if it doesn't exist
         log_path = Path(log_dir)
         log_path.mkdir(parents=True, exist_ok=True)
         log_file = log_path / f"{base_name}.log"
 
-    # Configurar formatação
+    # Configure formatting
     formatter = logging.Formatter(
         "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
     )
 
-    # Configurar handler para arquivo com rotação
+    # Configure file handler with rotation
     file_handler = logging.handlers.RotatingFileHandler(
         log_file, maxBytes=max_bytes, backupCount=backup_count, encoding="utf-8"
     )
@@ -55,40 +55,40 @@ def setup_basic_logging(
     )
     file_handler.setFormatter(formatter)
 
-    # Configurar logger raiz
+    # Configure root logger
     root_logger = logging.getLogger()
     root_logger.setLevel(getattr(logging, level.upper(), logging.INFO))
 
-    # Limpar handlers existentes
+    # Clear existing handlers
     for handler in root_logger.handlers[:]:
         root_logger.removeHandler(handler)
 
-    # Adicionar novo handler
+    # Add new handler
     root_logger.addHandler(file_handler)
 
 
 def get_logger(name: str) -> logging.Logger:
     """
-    Retorna logger configurado para módulo específico.
+    Returns configured logger for specific module.
 
     Args:
-        name: Nome do módulo/logger
+        name: Module/logger name
 
     Returns:
-        logging.Logger: Logger configurado
+        logging.Logger: Configured logger
     """
     return logging.getLogger(name)
 
 
 class LoggerConfig:
-    """Configuração centralizada de loggers."""
+    """Centralized logger configuration."""
 
     _initialized = False
     _log_level = "INFO"
 
     @classmethod
     def initialize(cls, level: str = "INFO", **kwargs) -> None:
-        """Inicializa configuração de logging."""
+        """Initialize logging configuration."""
         if not cls._initialized:
             setup_basic_logging(level=level, **kwargs)
             cls._log_level = level
@@ -96,16 +96,16 @@ class LoggerConfig:
 
     @classmethod
     def get_level(cls) -> str:
-        """Retorna nível atual de logging."""
+        """Return current logging level."""
         return cls._log_level
 
     @classmethod
     def set_level(cls, level: str) -> None:
-        """Altera nível de logging."""
+        """Change logging level."""
         cls._log_level = level
         logging.getLogger().setLevel(getattr(logging, level.upper(), logging.INFO))
 
     @classmethod
     def is_initialized(cls) -> bool:
-        """Verifica se logging foi inicializado."""
+        """Check if logging was initialized."""
         return cls._initialized

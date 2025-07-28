@@ -1,35 +1,35 @@
 # ===================================================================
-# CONFIGURAÇÃO PRINCIPAL CSPBench
+# CSPBENCH MAIN CONFIGURATION
 # ===================================================================
 
-# Configurações da aplicação
+# Application settings
 application:
   name: "CSPBench"
   version: "0.1.0"
-  description: "Framework para Closest String Problem"
+  description: "Framework for Closest String Problem"
 
-# Configurações de infraestrutura
+# Infrastructure settings
 infrastructure:
-  # Repositório de datasets
+  # Dataset repository
   dataset_repository:
     type: "FileDatasetRepository"
     config:
       base_path: "./datasets"
       supported_formats: ["fasta", "txt"]
   
-  # Registry de algoritmos
+  # Algorithm registry
   algorithm_registry:
     type: "DomainAlgorithmRegistry"
     config:
       auto_register: true
   
-  # Executor de algoritmos
+  # Algorithm executor
   executor:
     type: "Executor"
     config:
       timeout_default: 300
   
-  # Sistema de logging
+  # Logging system
   logging:
     base_log_dir: "./outputs/logs"
     session_folder_format: "%Y%m%d_%H%M%S"
@@ -37,14 +37,14 @@ infrastructure:
     log_filename: "cspbench.log"
     create_session_folders: true
     
-  # Sistema de resultados
+  # Results system
   result:
     base_result_dir: "./outputs/results"
-    save_partial_results: false       # Salvar resultados parciais durante execução
-    session_folder_format: "%Y%m%d_%H%M%S"  # Mesmo formato dos logs
-    create_session_folders: true      # Criar pastas por sessão
+    save_partial_results: false       # Save partial results during execution
+    session_folder_format: "%Y%m%d_%H%M%S"  # Same format as logs
+    create_session_folders: true      # Create folders per session
     
-    # Configurações de relatório
+    # Report settings
     report:
       save_plots: true
       plot_format: "png"
@@ -52,12 +52,12 @@ infrastructure:
       include_summary: true
       save_detailed_results: true
       
-    # Configurações de exportação
+    # Export settings
     export:
       export_csv: true
       export_json: true
 
-  # Sistema de histórico
+  # History system
   history:
-    save_history: false               # Salvar histórico detalhado
-    history_frequency: 1              # Frequência de salvamento (a cada N iterações)
+    save_history: false               # Save detailed history
+    history_frequency: 1              # Save frequency (every N iterations)

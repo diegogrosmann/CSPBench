@@ -1,8 +1,8 @@
 """
-DP-CSP: Dynamic Programming exata para o Closest String Problem.
+DP-CSP: Exact Dynamic Programming for the Closest String Problem.
 
 Classes:
-    DPCSPAlgorithm: Implementação do algoritmo exato por programação dinâmica.
+    DPCSPAlgorithm: Exact dynamic programming algorithm implementation.
 """
 
 from src.domain.algorithms import CSPAlgorithm, register_algorithm
@@ -15,55 +15,55 @@ from .implementation import exact_dp_closest_string
 @register_algorithm
 class DPCSPAlgorithm(CSPAlgorithm):
     """
-    DP-CSP: Solução exata por programação dinâmica para o Closest String Problem.
+    DP-CSP: Exact dynamic programming solution for the Closest String Problem.
 
     Args:
-        strings (list[str]): Lista de strings de entrada.
-        alphabet (str): Alfabeto utilizado.
-        **params: Parâmetros do algoritmo.
+        strings (list[str]): List of input strings.
+        alphabet (str): Alphabet used.
+        **params: Algorithm parameters.
 
-    Métodos:
-        run(): Executa o DP-CSP e retorna (centro, distância máxima, metadata).
+    Methods:
+        run(): Executes DP-CSP and returns (center, maximum distance, metadata).
     """
 
     name = "DP-CSP"
     default_params = DP_CSP_DEFAULTS
-    supports_internal_parallel = False  # DP-CSP não suporta paralelismo interno
+    supports_internal_parallel = False  # DP-CSP doesn't support internal parallelism
     is_deterministic = True
 
     def __init__(self, strings: list[str], alphabet: str, **params):
         """
-        Inicializa o algoritmo DP-CSP.
+        Initialize DP-CSP algorithm.
 
         Args:
-            strings: Lista de strings do dataset
-            alphabet: Alfabeto utilizado
-            **params: Parâmetros específicos do algoritmo
+            strings: List of dataset strings
+            alphabet: Alphabet used
+            **params: Algorithm-specific parameters
         """
         super().__init__(strings, alphabet, **params)
 
     def run(self) -> tuple[str, int, dict]:
         """
-        Executa o algoritmo DP-CSP e retorna a string central, distância máxima e metadata.
+        Execute DP-CSP algorithm and return center string, maximum distance and metadata.
 
         Returns:
-            tuple[str, int, dict]: (string_central, distancia_maxima, metadata)
+            tuple[str, int, dict]: (center_string, maximum_distance, metadata)
         """
-        # Salvar estado inicial no histórico se habilitado
+        # Save initial state to history if enabled
         if self.save_history:
             self._save_history_entry(
                 0,
                 phase="initialization",
                 parameters=self.params,
-                message="Iniciando algoritmo DP-CSP",
+                message="Starting DP-CSP algorithm",
             )
 
         max_d = self.params.get("max_d")
         if max_d is None:
-            # Usa baseline como upper bound
+            # Use baseline as upper bound
             max_d = max_distance(self.strings[0], self.strings)
 
-        self._report_progress(f"Iniciando DP-CSP com max_d={max_d}")
+        self._report_progress(f"Starting DP-CSP with max_d={max_d}")
 
         try:
             center, dist = exact_dp_closest_string(
@@ -77,32 +77,32 @@ class DPCSPAlgorithm(CSPAlgorithm):
                 "iteracoes": 1,
                 "max_d_usado": max_d,
                 "solucao_exata": True,
-                "centro_encontrado": center,
+                "center_found": center,
             }
 
-            # Salvar estado final no histórico se habilitado
+            # Save final state to history if enabled
             if self.save_history:
                 self._save_history_entry(
                     1,
                     phase="completion",
                     best_fitness=dist,
                     best_solution=center,
-                    message="Algoritmo DP-CSP finalizado com sucesso",
+                    message="DP-CSP algorithm completed successfully",
                 )
 
-                # Adicionar histórico aos metadados
+                # Add history to metadata
                 metadata["history"] = self.get_history()
 
             return center, dist, metadata
         except RuntimeError as e:
-            # DP-CSP falhou devido a limitações de memória/tempo
-            self._report_warning(f"DP-CSP falhou: {e}")
+            # DP-CSP failed due to memory/time limitations
+            self._report_warning(f"DP-CSP failed: {e}")
 
-            # Salvar estado de falha no histórico se habilitado
+            # Save failure state to history if enabled
             if self.save_history:
                 self._save_history_entry(
-                    1, phase="error", message=f"Algoritmo DP-CSP falhou: {e}"
+                    1, phase="error", message=f"DP-CSP algorithm failed: {e}"
                 )
 
-            # Re-raise a exceção para indicar falha real
-            raise RuntimeError(f"DP-CSP falhou: {e}") from e
+            # Re-raise the exception to indicate real failure
+            raise RuntimeError(f"DP-CSP failed: {e}") from e

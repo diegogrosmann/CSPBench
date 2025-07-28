@@ -1,7 +1,7 @@
 """
-Módulo de Orquestradores da Infraestrutura
+Infrastructure Orchestrators Module
 
-Implementações para execução e coordenação de algoritmos.
+Implementations for algorithm execution and coordination.
 """
 
 from .executors import Executor

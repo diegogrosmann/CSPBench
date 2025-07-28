@@ -1,8 +1,8 @@
 """
-Domínio CSPBench
+CSPBench Domain
 
-Módulo de domínio contendo a lógica central do negócio para o CSPBench.
-Implementa algoritmos, métricas e entidades de dados sem dependências externas.
+Domain module containing the core business logic for CSPBench.
+Implements algorithms, metrics, and data entities without external dependencies.
 """
 
 from .algorithms import Algorithm, CSPAlgorithm, global_registry, register_algorithm

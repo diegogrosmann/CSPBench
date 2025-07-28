@@ -1,7 +1,7 @@
 """
-Módulo de Persistência da Infraestrutura
+Infrastructure Persistence Module
 
-Implementações para armazenamento e recuperação de dados.
+Implementations for data storage and retrieval.
 """
 
 from .algorithm_registry import DomainAlgorithmRegistry

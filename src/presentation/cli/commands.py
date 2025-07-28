@@ -1,7 +1,7 @@
 """
-Módulo de Registro de Comandos CLI
+CLI Commands Registration Module
 
-Centraliza o registro de todos os comandos da CLI para modularidade.
+Centralizes the registration of all CLI commands for modularity.
 """
 
 import json
@@ -17,38 +17,38 @@ from src.infrastructure.orchestrators.session_manager import SessionManager
 
 
 def load_config():
-    """Carrega configuração do arquivo settings.yaml."""
+    """Load configuration from settings.yaml file."""
     import yaml
 
     config_path = Path("config/settings.yaml")
 
     if not config_path.exists():
-        typer.echo(f"❌ Arquivo de configuração não encontrado: {config_path}")
+        typer.echo(f"❌ Configuration file not found: {config_path}")
         raise typer.Exit(1)
 
     try:
         with open(config_path, "r", encoding="utf-8") as f:
             return yaml.safe_load(f)
     except Exception as e:
-        typer.echo(f"❌ Erro ao carregar configuração: {e}")
+        typer.echo(f"❌ Error loading configuration: {e}")
         raise typer.Exit(1)
 
 
 def list_sessions() -> None:
-    """Lista todas as sessões disponíveis."""
+    """List all available sessions."""
     try:
         config = load_config()
         session_mgr = SessionManager(config)
         sessions = session_mgr.list_sessions()
 
         if not sessions:
-            typer.echo("📂 Nenhuma sessão encontrada.")
+            typer.echo("📂 No sessions found.")
             return
 
-        typer.echo("📂 Sessões disponíveis:")
+        typer.echo("📂 Available sessions:")
         typer.echo("-" * 60)
 
-        # Ordenar por data de criação (mais recentes primeiro)
+        # Sort by creation date (most recent first)
         sorted_sessions = sorted(
             sessions.items(),
             key=lambda x: x[1]["created"],
@@ -56,66 +56,66 @@ def list_sessions() -> None:
         )
 
         for session_name, info in sorted_sessions:
-            created = info["created"].strftime("%Y-%m-%d %H:%M:%S")
+            created_str = info["created"].strftime("%Y-%m-%d %H:%M:%S")
             logs_status = "✅" if info["logs"] else "❌"
             results_status = "✅" if info["results"] else "❌"
 
-            typer.echo(f"🗂️  {session_name}")
-            typer.echo(f"   📅 Criado: {created}")
-            typer.echo(f"   📄 Logs: {logs_status}  🗃️  Resultados: {results_status}")
+            typer.echo(f"  {session_name}")
+            typer.echo(f"    Created: {created_str}")
+            typer.echo(f"    Logs: {logs_status}  Results: {results_status}")
             typer.echo()
 
     except Exception as e:
-        typer.echo(f"❌ Erro ao listar sessões: {e}")
+        typer.echo(f"❌ Error listing sessions: {e}")
 
 
 def cleanup_old_sessions(keep_last: int = 10) -> None:
-    """Remove sessões antigas, mantendo apenas as mais recentes."""
+    """Remove old sessions, keeping only the most recent ones."""
     try:
         config = load_config()
         session_mgr = SessionManager(config)
         session_mgr.cleanup_old_sessions(keep_last)
         typer.echo(
-            f"🧹 Limpeza concluída. Mantidas as {keep_last} sessões mais recentes."
+            f"🧹 Cleanup completed. Kept the {keep_last} most recent sessions."
         )
     except Exception as e:
-        typer.echo(f"❌ Erro na limpeza: {e}")
+        typer.echo(f"❌ Cleanup error: {e}")
 
 
 def register_commands(app: typer.Typer, experiment_service_getter) -> None:
     """
-    Registra todos os comandos da CLI na aplicação Typer.
+    Register all CLI commands in the Typer application.
 
     Args:
-        app: Instância do Typer onde registrar comandos
-        experiment_service_getter: Função que retorna o ExperimentService inicializado
+        app: Typer instance where to register commands
+        experiment_service_getter: Function that returns initialized ExperimentService
     """
 
     @app.command()
     def test():
-        """Teste básico do sistema."""
+        """Basic system test."""
         try:
             service = experiment_service_getter()
             assert service is not None
 
-            # Cria dataset sintético para teste
+            # Create synthetic dataset for testing
             generator = SyntheticDatasetGenerator()
             dataset = generator.generate_random(n=10, length=20, alphabet="ACTG")
 
             typer.echo(
-                f"📊 Dataset gerado: {len(dataset.sequences)} strings de tamanho {len(dataset.sequences[0])}"
+                f"📊 Dataset generated: {len(dataset.sequences)} strings of size {len(dataset.sequences[0])}"
             )
 
-            # Testa algoritmo disponível
+            # Test available algorithm
             import algorithms
             from algorithms import global_registry
 
             available_algorithms = list(global_registry.keys())
             if not available_algorithms:
-                typer.echo("⚠️ Nenhum algoritmo disponível", color=True)
+                typer.echo("⚠️ No algorithms available", color=True)
                 return
 
-            # Usa o primeiro algoritmo disponível
+            # Use the first available algorithm
             algorithm_name = available_algorithms[0]
             algorithm_class = global_registry[algorithm_name]
 
@@ -125,112 +125,112 @@ def register_commands(app: typer.Typer, experiment_service_getter) -> None:
 
             result_string, max_distance, metadata = algorithm.run()
 
-            typer.echo(f"🎯 Resultado: {result_string}")
-            typer.echo(f"📏 Distância máxima: {max_distance}")
-            typer.echo(f"📋 Metadados: {metadata}")
-            typer.echo("✅ Teste concluído com sucesso!")
+            typer.echo(f"🎯 Result: {result_string}")
+            typer.echo(f"📏 Maximum distance: {max_distance}")
+            typer.echo(f"📋 Metadata: {metadata}")
+            typer.echo("✅ Test completed successfully!")
 
         except Exception as e:
-            typer.echo(f"❌ Erro no teste: {e}")
+            typer.echo(f"❌ Test error: {e}")
             raise typer.Exit(1)
 
     @app.command()
     def run(
-        algorithm: str = typer.Argument(..., help="Nome do algoritmo"),
-        dataset: str = typer.Argument(..., help="Caminho do dataset"),
+        algorithm: str = typer.Argument(..., help="Algorithm name"),
+        dataset: str = typer.Argument(..., help="Dataset path"),
         params: Optional[str] = typer.Option(
-            None, "--params", "-p", help="JSON com parâmetros"
+            None, "--params", "-p", help="JSON with parameters"
         ),
         timeout: Optional[int] = typer.Option(
-            None, "--timeout", "-t", help="Timeout em segundos"
+            None, "--timeout", "-t", help="Timeout in seconds"
         ),
         output: Optional[str] = typer.Option(
-            None, "--output", "-o", help="Arquivo de saída"
+            None, "--output", "-o", help="Output file"
         ),
     ):
-        """Executa um algoritmo em um dataset."""
+        """Execute an algorithm on a dataset."""
         try:
             service = experiment_service_getter()
             assert service is not None
 
-            # Parse dos parâmetros JSON se fornecidos
+            # Parse JSON parameters if provided
             params_dict = json.loads(params) if params else {}
 
-            typer.echo(f"🚀 Executando {algorithm} em {dataset}...")
+            typer.echo(f"🚀 Executing {algorithm} on {dataset}...")
 
             result = service.run_single_experiment(
                 algorithm, dataset, params=params_dict, timeout=timeout
             )
 
-            typer.echo(f"🎯 Resultado: {result}")
+            typer.echo(f"🎯 Result: {result}")
 
         except Exception as e:
-            typer.echo(f"❌ Erro: {e}")
+            typer.echo(f"❌ Error: {e}")
             raise typer.Exit(1)
 
     @app.command()
     def batch(
         cfg: Path = typer.Argument(
-            ..., exists=True, readable=True, help="YAML do batch"
+            ..., exists=True, readable=True, help="Batch YAML file"
         ),
         verbose: bool = typer.Option(
-            False, "--verbose", "-v", help="Mostrar detalhes dos resultados"
+            False, "--verbose", "-v", help="Show result details"
         ),
     ):
-        """Executa um arquivo de batch (runs, otimizações ou sensibilidade)."""
+        """Execute a batch file (runs, optimizations or sensitivity analysis)."""
         try:
             service = experiment_service_getter()
             assert service is not None
 
-            typer.echo(f"📋 Executando batch: {cfg}...")
+            typer.echo(f"📋 Executing batch: {cfg}...")
 
             result = service.run_batch(str(cfg))
 
             if verbose:
-                typer.echo(f"📊 Resultados detalhados:")
+                typer.echo(f"📊 Detailed results:")
                 for i, res in enumerate(
                     result["results"][:5]
-                ):  # Primeiros 5 resultados
-                    typer.echo(f"  Resultado {i+1}: {res}")
+                ):  # First 5 results
+                    typer.echo(f"  Result {i+1}: {res}")
                 if len(result["results"]) > 5:
-                    typer.echo(f"  ... e mais {len(result['results']) - 5} resultados")
+                    typer.echo(f"  ... and {len(result['results']) - 5} more results")
 
-            typer.echo(f"✅ Batch concluído: {result['summary']}")
+            typer.echo(f"✅ Batch completed: {result['summary']}")
 
         except Exception as e:
-            typer.echo(f"❌ Erro no batch: {e}")
+            typer.echo(f"❌ Batch error: {e}")
             raise typer.Exit(1)
 
     @app.command()
     def algorithms():
-        """Lista algoritmos disponíveis."""
+        """List available algorithms."""
         try:
-            service = experiment_service_getter()  # Para garantir inicialização
+            service = experiment_service_getter()  # To ensure initialization
 
-            # Importa do módulo algorithms para ativar auto-descoberta
+            # Import from algorithms module to activate auto-discovery
             import algorithms
             from algorithms import global_registry
 
-            typer.echo("🧠 Algoritmos disponíveis:")
+            typer.echo("🧠 Available algorithms:")
             for name, cls in global_registry.items():
-                typer.echo(f"  • {name}: {cls.__doc__ or 'Sem descrição'}")
+                typer.echo(f"  • {name}: {cls.__doc__ or 'No description'}")
 
             if not global_registry:
-                typer.echo("  (Nenhum algoritmo registrado)")
+                typer.echo("  (No algorithms registered)")
 
         except Exception as e:
-            typer.echo(f"❌ Erro: {e}")
+            typer.echo(f"❌ Error: {e}")
             raise typer.Exit(1)
 
     @app.command()
     def config_info():
-        """Mostra informações de configuração."""
+        """Show configuration information."""
         try:
             import yaml
 
             config_path = Path("config/settings.yaml")
             if not config_path.exists():
-                typer.echo(f"❌ Arquivo de configuração não encontrado: {config_path}")
+                typer.echo(f"❌ Configuration file not found: {config_path}")
                 raise typer.Exit(1)
 
             with open(config_path, "r", encoding="utf-8") as f:
@@ -240,53 +240,53 @@ def register_commands(app: typer.Typer, experiment_service_getter) -> None:
             typer.echo(f"📋 {app_info['name']} v{app_info['version']}")
             typer.echo(f"📝 {app_info['description']}")
 
-            typer.echo("\\n🔧 Configuração de infraestrutura:")
+            typer.echo("\\n🔧 Infrastructure configuration:")
             for component, info in config["infrastructure"].items():
                 typer.echo(f"  • {component}: {info['type']}")
 
-            typer.echo("\\n🌍 Variáveis de ambiente:")
+            typer.echo("\\n🌍 Environment variables:")
             typer.echo(
-                f"  • NCBI_EMAIL: {'definido' if os.getenv('NCBI_EMAIL') else 'não definido'}"
+                f"  • NCBI_EMAIL: {'defined' if os.getenv('NCBI_EMAIL') else 'not defined'}"
             )
             typer.echo(
-                f"  • NCBI_API_KEY: {'definido' if os.getenv('NCBI_API_KEY') else 'não definido'}"
+                f"  • NCBI_API_KEY: {'defined' if os.getenv('NCBI_API_KEY') else 'not defined'}"
             )
             typer.echo(
-                f"  • EXECUTOR_IMPL: {os.getenv('EXECUTOR_IMPL', 'não definida')}"
+                f"  • EXECUTOR_IMPL: {os.getenv('EXECUTOR_IMPL', 'not defined')}"
             )
-            typer.echo(f"  • EXPORT_FMT: {os.getenv('EXPORT_FMT', 'não definida')}")
-            typer.echo(f"  • DATASET_PATH: {os.getenv('DATASET_PATH', 'não definida')}")
+            typer.echo(f"  • EXPORT_FMT: {os.getenv('EXPORT_FMT', 'not defined')}")
+            typer.echo(f"  • DATASET_PATH: {os.getenv('DATASET_PATH', 'not defined')}")
 
         except Exception as e:
-            typer.echo(f"❌ Erro: {e}")
+            typer.echo(f"❌ Error: {e}")
             raise typer.Exit(1)
 
     @app.command()
     def sessions() -> None:
         """
-        Lista todas as sessões disponíveis com suas informações.
+        List all available sessions with their information.
         """
         list_sessions()
 
     @app.command()
     def cleanup(
         keep: int = typer.Option(
-            10, "--keep", "-k", help="Número de sessões mais recentes para manter"
+            10, "--keep", "-k", help="Number of most recent sessions to keep"
         )
     ) -> None:
         """
-        Remove sessões antigas, mantendo apenas as mais recentes.
+        Remove old sessions, keeping only the most recent ones.
         """
         cleanup_old_sessions(keep)
 
     @app.command()
     def show_session(
         session_name: str = typer.Argument(
-            ..., help="Nome da sessão (formato: YYYYMMDD_HHMMSS)"
+            ..., help="Session name (format: YYYYMMDD_HHMMSS)"
         )
     ) -> None:
         """
-        Mostra detalhes de uma sessão específica.
+        Show details of a specific session.
         """
         try:
             config = load_config()
@@ -294,8 +294,8 @@ def register_commands(app: typer.Typer, experiment_service_getter) -> None:
             sessions = session_mgr.list_sessions()
 
             if session_name not in sessions:
-                typer.echo(f"❌ Sessão '{session_name}' não encontrada.")
-                typer.echo("\n📂 Sessões disponíveis:")
+                typer.echo(f"❌ Session '{session_name}' not found.")
+                typer.echo("\n📂 Available sessions:")
                 for name in sorted(sessions.keys(), reverse=True):
                     typer.echo(f"  • {name}")
                 return
@@ -303,29 +303,29 @@ def register_commands(app: typer.Typer, experiment_service_getter) -> None:
             info = sessions[session_name]
             created = info["created"].strftime("%Y-%m-%d %H:%M:%S")
 
-            typer.echo(f"🗂️  Sessão: {session_name}")
-            typer.echo(f"📅 Criado: {created}")
+            typer.echo(f"🗂️  Session: {session_name}")
+            typer.echo(f"📅 Created: {created}")
             typer.echo()
 
-            # Mostrar logs se existirem
+            # Show logs if they exist
             if info["logs"]:
                 log_path = session_mgr.get_log_path(session_name)
                 typer.echo(f"📄 Log: {log_path}")
                 if log_path.exists():
                     stat = log_path.stat()
                     size_kb = stat.st_size / 1024
-                    typer.echo(f"   📊 Tamanho: {size_kb:.1f} KB")
+                    typer.echo(f"   📊 Size: {size_kb:.1f} KB")
 
-            # Mostrar resultados se existirem
+            # Show results if they exist
             if info["results"]:
                 result_path = session_mgr.get_result_path(session_name)
-                typer.echo(f"🗃️  Resultado: {result_path}")
+                typer.echo(f"🗃️  Result: {result_path}")
                 if result_path.exists():
                     stat = result_path.stat()
                     size_kb = stat.st_size / 1024
-                    typer.echo(f"   📊 Tamanho: {size_kb:.1f} KB")
+                    typer.echo(f"   📊 Size: {size_kb:.1f} KB")
 
-                    # Tentar mostrar resumo do resultado
+                    # Try to show result summary
                     try:
                         import json
 
@@ -334,22 +334,22 @@ def register_commands(app: typer.Typer, experiment_service_getter) -> None:
 
                         if "summary" in result_data:
                             summary = result_data["summary"]
-                            typer.echo(f"   📈 Resumo: {summary}")
+                            typer.echo(f"   📈 Summary: {summary}")
 
                     except Exception:
-                        pass  # Ignora erros ao ler resultado
+                        pass  # Ignore errors when reading result
 
         except Exception as e:
-            typer.echo(f"❌ Erro ao mostrar sessão: {e}")
+            typer.echo(f"❌ Error showing session: {e}")
 
     @app.command()
     def view_report(
         session_name: str = typer.Argument(
-            ..., help="Nome da sessão (formato: YYYYMMDD_HHMMSS)"
+            ..., help="Session name (format: YYYYMMDD_HHMMSS)"
         )
     ) -> None:
         """
-        Abre o relatório HTML de uma sessão no navegador.
+        Open the HTML report of a session in the browser.
         """
         try:
             config = load_config()
@@ -357,25 +357,25 @@ def register_commands(app: typer.Typer, experiment_service_getter) -> None:
             sessions = session_mgr.list_sessions()
 
             if session_name not in sessions:
-                typer.echo(f"❌ Sessão '{session_name}' não encontrada.")
+                typer.echo(f"❌ Session '{session_name}' not found.")
                 return
 
-            # Construir caminho do relatório
+            # Build report path
             result_base_dir = Path(
                 config["infrastructure"]["result"]["base_result_dir"]
             )
             report_path = result_base_dir / session_name / "report" / "report.html"
 
             if not report_path.exists():
-                typer.echo(f"❌ Relatório não encontrado para sessão '{session_name}'.")
-                typer.echo(f"   Esperado em: {report_path}")
+                typer.echo(f"❌ Report not found for session '{session_name}'.")
+                typer.echo(f"   Expected at: {report_path}")
                 return
 
-            # Abrir no navegador
+            # Open in browser
             import webbrowser
 
             webbrowser.open(f"file://{report_path.absolute()}")
-            typer.echo(f"🌐 Abrindo relatório no navegador: {report_path}")
+            typer.echo(f"🌐 Opening report in browser: {report_path}")
 
         except Exception as e:
-            typer.echo(f"❌ Erro ao abrir relatório: {e}")
+            typer.echo(f"❌ Error opening report: {e}")

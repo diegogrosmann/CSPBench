@@ -1,7 +1,7 @@
 """
-Pacote CSC do CSP.
+CSP CSC package.
 
-Expõe a classe CSCAlgorithm para registro automático.
+Exposes the CSCAlgorithm class for automatic registration.
 """
 
 from .algorithm import CSCAlgorithm

@@ -1,7 +1,7 @@
 """
-TUI da Camada de Apresentação
+Presentation Layer TUI
 
-Interface de usuário textual (Text User Interface).
+Text User Interface.
 """
 
-# TODO: Implementar após migração
+# TODO: Implement after migration

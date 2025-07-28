@@ -1,7 +1,7 @@
 """
-Geradores de relatórios especializados.
+Specialized report generators.
 
-Cada gerador é responsável por um tipo específico de relatório.
+Each generator is responsible for a specific type of report.
 """
 
 from .execution_report_generator import ExecutionReportGenerator

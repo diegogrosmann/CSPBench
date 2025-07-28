@@ -1,9 +1,9 @@
 """
-Domínio: Dataset
+Domain: Dataset
 
-Este módulo contém a entidade principal Dataset e suas operações,
-representando sequências de strings e metadados associados.
-Implementação pura sem dependências externas.
+This module contains the main Dataset entity and its operations,
+representing string sequences and associated metadata.
+Pure implementation without external dependencies.
 """
 
 import random
@@ -12,33 +12,33 @@ from typing import Any, Dict, List, Optional
 
 class Dataset:
     """
-    Entidade Dataset representando um conjunto de strings para CSP.
+    Dataset entity representing a set of strings for CSP.
 
     Attributes:
-        sequences: Lista de strings do dataset
-        metadata: Metadados do dataset (tamanho, origem, etc.)
+        sequences: List of dataset strings
+        metadata: Dataset metadata (size, origin, etc.)
     """
 
     def __init__(self, sequences: List[str], metadata: Optional[Dict[str, Any]] = None):
         """
-        Inicializa um dataset com sequências e metadados.
+        Initialize a dataset with sequences and metadata.
 
         Args:
-            sequences: Lista de strings
-            metadata: Dicionário com metadados opcionais
+            sequences: List of strings
+            metadata: Dictionary with optional metadata
         """
         if not sequences:
-            raise ValueError("Dataset não pode estar vazio")
+            raise ValueError("Dataset cannot be empty")
 
-        # Validar que todas as strings têm mesmo comprimento
+        # Validate that all strings have the same length
         length = len(sequences[0])
         if not all(len(seq) == length for seq in sequences):
-            raise ValueError("Todas as strings devem ter mesmo comprimento")
+            raise ValueError("All strings must have the same length")
 
         self.sequences = sequences
         self.metadata = metadata or {}
 
-        # Inferir metadados básicos
+        # Infer basic metadata
         self.metadata.update(
             {
                 "n": len(sequences),
@@ -49,14 +49,14 @@ class Dataset:
         )
 
     def _infer_alphabet(self) -> str:
-        """Infere alfabeto a partir das sequências."""
+        """Infer alphabet from sequences."""
         alphabet_set = set()
         for seq in self.sequences:
             alphabet_set.update(seq)
         return "".join(sorted(alphabet_set))
 
     def _calculate_diversity(self) -> float:
-        """Calcula diversidade média do dataset."""
+        """Calculate average dataset diversity."""
         if len(self.sequences) < 2:
             return 0.0
 
@@ -77,35 +77,35 @@ class Dataset:
 
     @property
     def size(self) -> int:
-        """Retorna número de sequências."""
+        """Return number of sequences."""
         return len(self.sequences)
 
     @property
     def length(self) -> int:
-        """Retorna comprimento das sequências."""
+        """Return length of sequences."""
         return len(self.sequences[0]) if self.sequences else 0
 
     @property
     def alphabet(self) -> str:
-        """Retorna alfabeto do dataset."""
+        """Return dataset alphabet."""
         return self.metadata.get("alphabet", "")
 
     def validate(self) -> bool:
         """
-        Valida consistência do dataset.
+        Validate dataset consistency.
 
         Returns:
-            bool: True se dataset está válido
+            bool: True if dataset is valid
         """
         if not self.sequences:
             return False
 
-        # Verificar comprimentos uniformes
+        # Check uniform lengths
         length = len(self.sequences[0])
         if not all(len(seq) == length for seq in self.sequences):
             return False
 
-        # Verificar caracteres válidos
+        # Check valid characters
         alphabet_set = set(self.alphabet)
         for seq in self.sequences:
             if not all(c in alphabet_set for c in seq):
@@ -115,10 +115,10 @@ class Dataset:
 
     def get_statistics(self) -> Dict[str, Any]:
         """
-        Retorna estatísticas detalhadas do dataset.
+        Return detailed dataset statistics.
 
         Returns:
-            dict: Estatísticas do dataset
+            dict: Dataset statistics
         """
         return {
             "size": self.size,
@@ -132,65 +132,65 @@ class Dataset:
 
     def to_dict(self) -> Dict[str, Any]:
         """
-        Converte dataset para dicionário.
+        Convert dataset to dictionary.
 
         Returns:
-            dict: Representação em dicionário
+            dict: Dictionary representation
         """
         return {"sequences": self.sequences.copy(), "metadata": self.metadata.copy()}
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Dataset":
         """
-        Cria dataset a partir de dicionário.
+        Create dataset from dictionary.
 
         Args:
-            data: Dicionário com sequences e metadata
+            data: Dictionary with sequences and metadata
 
         Returns:
-            Dataset: Instância criada
+            Dataset: Created instance
         """
         return cls(data["sequences"], data.get("metadata"))
 
     def add_sequence(self, sequence: str) -> None:
         """
-        Adiciona nova sequência ao dataset.
+        Add new sequence to dataset.
 
         Args:
-            sequence: String a ser adicionada
+            sequence: String to be added
 
         Raises:
-            ValueError: Se sequência tem comprimento diferente
+            ValueError: If sequence has different length
         """
         if len(sequence) != self.length:
-            raise ValueError(f"Sequência deve ter comprimento {self.length}")
+            raise ValueError(f"Sequence must have length {self.length}")
 
         self.sequences.append(sequence)
 
-        # Atualizar metadados
+        # Update metadata
         self.metadata["n"] = len(self.sequences)
         self.metadata["alphabet"] = self._infer_alphabet()
         self.metadata["diversity"] = self._calculate_diversity()
 
     def remove_sequence(self, index: int) -> str:
         """
-        Remove sequência por índice.
+        Remove sequence by index.
 
         Args:
-            index: Índice da sequência a ser removida
+            index: Index of sequence to be removed
 
         Returns:
-            str: Sequência removida
+            str: Removed sequence
 
         Raises:
-            IndexError: Se índice inválido
+            IndexError: If invalid index
         """
         if not 0 <= index < len(self.sequences):
-            raise IndexError("Índice fora do intervalo")
+            raise IndexError("Index out of range")
 
         removed = self.sequences.pop(index)
 
-        # Atualizar metadados
+        # Update metadata
         self.metadata["n"] = len(self.sequences)
         if self.sequences:
             self.metadata["diversity"] = self._calculate_diversity()
@@ -199,14 +199,14 @@ class Dataset:
 
     def filter_by_pattern(self, pattern: str, position: int) -> "Dataset":
         """
-        Filtra sequências que têm padrão específico em posição.
+        Filter sequences that have specific pattern at position.
 
         Args:
-            pattern: Caractere ou padrão a buscar
-            position: Posição para verificar
+            pattern: Character or pattern to search
+            position: Position to check
 
         Returns:
-            Dataset: Novo dataset com sequências filtradas
+            Dataset: New dataset with filtered sequences
         """
         filtered_sequences = [seq for seq in self.sequences if seq[position] == pattern]
 
@@ -217,17 +217,17 @@ class Dataset:
 
     def sample(self, n: int, seed: Optional[int] = None) -> "Dataset":
         """
-        Retorna amostra aleatória do dataset.
+        Return random sample from dataset.
 
         Args:
-            n: Número de sequências na amostra
-            seed: Semente para reprodutibilidade
+            n: Number of sequences in sample
+            seed: Seed for reproducibility
 
         Returns:
-            Dataset: Novo dataset com amostra
+            Dataset: New dataset with sample
         """
         if n > len(self.sequences):
-            raise ValueError("Tamanho da amostra maior que dataset")
+            raise ValueError("Sample size larger than dataset")
 
         rng = random.Random(seed)
         sampled_sequences = rng.sample(self.sequences, n)
@@ -240,7 +240,7 @@ class Dataset:
 
 
 class SyntheticDatasetGenerator:
-    """Gerador de datasets sintéticos para teste de algoritmos CSP."""
+    """Synthetic dataset generator for CSP algorithm testing."""
 
     @staticmethod
     def generate_from_center(
@@ -251,17 +251,17 @@ class SyntheticDatasetGenerator:
         seed: Optional[int] = None,
     ) -> Dataset:
         """
-        Gera dataset baseado em string central com ruído.
+        Generate dataset based on center string with noise.
 
         Args:
-            center: String central
-            n: Número de sequências a gerar
-            noise_rate: Taxa de ruído (0-1)
-            alphabet: Alfabeto válido
-            seed: Semente para reprodutibilidade
+            center: Center string
+            n: Number of sequences to generate
+            noise_rate: Noise rate (0-1)
+            alphabet: Valid alphabet
+            seed: Seed for reproducibility
 
         Returns:
-            Dataset: Dataset sintético gerado
+            Dataset: Generated synthetic dataset
         """
         rng = random.Random(seed)
         sequences = []
@@ -294,16 +294,16 @@ class SyntheticDatasetGenerator:
         n: int, length: int, alphabet: str, seed: Optional[int] = None
     ) -> Dataset:
         """
-        Gera dataset completamente aleatório.
+        Generate completely random dataset.
 
         Args:
-            n: Número de sequências
-            length: Comprimento das sequências
-            alphabet: Alfabeto válido
-            seed: Semente para reprodutibilidade
+            n: Number of sequences
+            length: Length of sequences
+            alphabet: Valid alphabet
+            seed: Seed for reproducibility
 
         Returns:
-            Dataset: Dataset aleatório gerado
+            Dataset: Generated random dataset
         """
         rng = random.Random(seed)
         sequences = []
@@ -330,29 +330,29 @@ class SyntheticDatasetGenerator:
         seed: Optional[int] = None,
     ) -> Dataset:
         """
-        Gera dataset com clusters de sequências similares.
+        Generate dataset with clusters of similar sequences.
 
         Args:
-            n_clusters: Número de clusters
-            sequences_per_cluster: Sequências por cluster
-            length: Comprimento das sequências
-            alphabet: Alfabeto válido
-            noise_rate: Taxa de ruído dentro dos clusters
-            seed: Semente para reprodutibilidade
+            n_clusters: Number of clusters
+            sequences_per_cluster: Sequences per cluster
+            length: Length of sequences
+            alphabet: Valid alphabet
+            noise_rate: Noise rate within clusters
+            seed: Seed for reproducibility
 
         Returns:
-            Dataset: Dataset com clusters
+            Dataset: Dataset with clusters
         """
         rng = random.Random(seed)
         all_sequences = []
         cluster_centers = []
 
-        # Gerar centros dos clusters
+        # Generate cluster centers
         for _ in range(n_clusters):
             center = "".join(rng.choice(alphabet) for _ in range(length))
             cluster_centers.append(center)
 
-            # Gerar sequências para este cluster
+            # Generate sequences for this cluster
             cluster_dataset = SyntheticDatasetGenerator.generate_from_center(
                 center,
                 sequences_per_cluster,

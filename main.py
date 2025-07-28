@@ -1,63 +1,63 @@
 #!/usr/bin/env python3
 """
-Ponto de Entrada Principal do CSPBench - Arquitetura Hexagonal
+CSPBench Main Entry Point - Hexagonal Architecture
 
-Este é o ponto de entrada principal do CSPBench refatorado com arquitetura hexagonal.
-Implementa injeção de dependências e configuração centralizada.
+This is the main entry point for the refactored CSPBench with hexagonal architecture.
+Implements dependency injection and centralized configuration.
 
-Funcionalidade:
-    - Carregamento de configurações do config/settings.yaml
-    - Injeção de dependências baseada em configuração
-    - Suporte a override via variáveis de ambiente
-    - CLI moderna usando Typer
+Functionality:
+    - Loading configurations from config/settings.yaml
+    - Configuration-based dependency injection
+    - Support for override via environment variables
+    - Modern CLI using Typer
 
-Uso Principal (conforme diretrizes):
+Main Usage (according to guidelines):
     ```bash
-    # Menu interativo (sem argumentos)
+    # Interactive menu (no arguments)
     python main.py
 
-    # Ajuda geral
+    # General help
     python main.py --help
 
-    # Lista algoritmos disponíveis
+    # List available algorithms
     python main.py --algorithms
 
-    # Gera/salva datasets sintéticos
+    # Generate/save synthetic datasets
     python main.py --datasetsave
 
-    # Executa batch diretamente (arquivo .yaml/.yml)
-    python main.py batches/exemplo.yaml
-    python main.py configuracao.yml
+    # Execute batch directly (.yaml/.yml file)
+    python main.py batches/example.yaml
+    python main.py configuration.yml
     ```
 
-Comandos Específicos:
+Specific Commands:
     ```bash
-    # Teste básico do sistema
+    # Basic system test
     python main.py test
 
-    # Executa algoritmo em dataset
-    python main.py run <algoritmo> <dataset>
+    # Execute algorithm on dataset
+    python main.py run <algorithm> <dataset>
 
-    # Executa batch via comando
-    python main.py batch <arquivo.yaml>
+    # Execute batch via command
+    python main.py batch <file.yaml>
 
-    # Gerenciamento de sessões
+    # Session management
     python main.py sessions
-    python main.py show-session <nome>
-    python main.py view-report <nome>
+    python main.py show-session <name>
+    python main.py view-report <name>
     python main.py cleanup
 
-    # Informações do sistema
+    # System information
     python main.py config-info
     python main.py algorithms
     ```
 
-Variáveis de Ambiente:
-    - EXECUTOR_IMPL: Override do executor (Executor)
-    - EXPORT_FORMAT: Override do formato de exportação (json, csv, txt)
-    - DATASET_PATH: Override do caminho base de datasets
-    - NCBI_EMAIL: Email para API do NCBI
-    - NCBI_API_KEY: Chave da API do NCBI
+Environment Variables:
+    - EXECUTOR_IMPL: Override executor (Executor)
+    - EXPORT_FORMAT: Override export format (json, csv, txt)
+    - DATASET_PATH: Override dataset base path
+    - NCBI_EMAIL: Email for NCBI API
+    - NCBI_API_KEY: NCBI API key
 """
 
 import os
@@ -68,10 +68,10 @@ from typing import Any, Dict, Optional
 import typer
 import yaml
 
-# Adiciona o diretório raiz ao path para imports
+# Add the root directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent))
 
-# IMPORTANTE: Importar algorithms primeiro para carregar o global_registry
+# IMPORTANT: Import algorithms first to load the global_registry
 import algorithms
 from src.application.services.experiment_service import ExperimentService
 from src.domain import SyntheticDatasetGenerator
@@ -89,36 +89,36 @@ from src.presentation.cli.commands import register_commands
 
 app = typer.Typer(
     name="cspbench",
-    help="CSPBench - Framework para Closest String Problem",
+    help="CSPBench - Framework for Closest String Problem",
     add_completion=False,
-    no_args_is_help=False,  # Não mostrar help quando sem argumentos
-    rich_markup_mode=None,  # Desabilita rich para evitar erros
+    no_args_is_help=False,  # Don't show help when no arguments
+    rich_markup_mode=None,  # Disable rich to avoid errors
 )
 
-# Variáveis globais para DI
+# Global variables for DI
 experiment_service: Optional[ExperimentService] = None
 config: Optional[Dict[str, Any]] = None
 session_manager: Optional[SessionManager] = None
 
 
 def load_config() -> Dict[str, Any]:
-    """Carrega configuração do arquivo settings.yaml."""
+    """Load configuration from settings.yaml file."""
     config_path = Path("config/settings.yaml")
 
     if not config_path.exists():
-        typer.echo(f"❌ Arquivo de configuração não encontrado: {config_path}")
+        typer.echo(f"❌ Configuration file not found: {config_path}")
         raise typer.Exit(1)
 
     try:
         with open(config_path, "r", encoding="utf-8") as f:
             return yaml.safe_load(f)
     except Exception as e:
-        typer.echo(f"❌ Erro ao carregar configuração: {e}")
+        typer.echo(f"❌ Error loading configuration: {e}")
         raise typer.Exit(1)
 
 
 def create_dataset_repository(config: Dict[str, Any]) -> FileDatasetRepository:
-    """Cria repositório de datasets baseado na configuração."""
+    """Create dataset repository based on configuration."""
     repo_config = config["infrastructure"]["dataset_repository"]["config"]
     base_path = os.getenv("DATASET_PATH", repo_config["base_path"])
 
@@ -126,23 +126,23 @@ def create_dataset_repository(config: Dict[str, Any]) -> FileDatasetRepository:
 
 
 def create_algorithm_registry(config: Dict[str, Any]) -> DomainAlgorithmRegistry:
-    """Cria registry de algoritmos baseado na configuração."""
+    """Create algorithm registry based on configuration."""
     return DomainAlgorithmRegistry()
 
 
 def create_executor(config: Dict[str, Any]) -> Executor:
-    """Cria executor baseado na configuração."""
+    """Create executor based on configuration."""
     executor_impl = os.getenv("EXECUTOR_IMPL", "Executor")
 
     if executor_impl == "Executor":
         return Executor()
     else:
-        typer.echo(f"⚠️  Executor '{executor_impl}' não implementado, usando Executor")
+        typer.echo(f"⚠️  Executor '{executor_impl}' not implemented, using Executor")
         return Executor()
 
 
 def create_exporter(config: Dict[str, Any]):
-    """Cria exportador baseado na configuração."""
+    """Create exporter based on configuration."""
     global session_manager
 
     # Configuração do exportador (se existir na configuração legada)
@@ -151,129 +151,129 @@ def create_exporter(config: Dict[str, Any]):
     )
     export_fmt = os.getenv("EXPORT_FORMAT", exporter_config.get("format", "json"))
 
-    # Usar diretório da sessão se SessionManager existe
+    # Use session directory if SessionManager exists
     if session_manager:
         output_path = session_manager.get_result_dir()
     else:
-        # Usar configuração da nova estrutura
+        # Use configuration from new structure
         result_config = config.get("infrastructure", {}).get("result", {})
         output_path = os.getenv(
             "OUTPUT_PATH", result_config.get("base_result_dir", "./outputs/results")
         )
 
     if export_fmt.lower() == "json":
-        return JsonExporter(output_path, config)  # Passar configuração completa
+        return JsonExporter(output_path, config)  # Pass complete configuration
     elif export_fmt.lower() == "csv":
         return CsvExporter(output_path)
     elif export_fmt.lower() == "txt":
         return TxtExporter(output_path)
     else:
-        typer.echo(f"⚠️  Formato '{export_fmt}' não suportado, usando JSON")
-        return JsonExporter(output_path, config)  # Passar configuração completa
+        typer.echo(f"⚠️  Format '{export_fmt}' not supported, using JSON")
+        return JsonExporter(output_path, config)  # Pass complete configuration
 
 
 def create_monitoring_service(config: Dict[str, Any]):
-    """Cria serviço de monitoramento baseado na configuração."""
+    """Create monitoring service based on configuration."""
     from src.application.services.basic_monitoring_service import BasicMonitoringService
 
     return BasicMonitoringService(config)
 
 
 def _initialize_logging(config: Dict[str, Any]) -> None:
-    """Inicializa sistema de logging baseado na configuração."""
+    """Initialize logging system based on configuration."""
     global session_manager
 
-    # Configurações padrão
+    # Default configurations
     default_level = "INFO"
     default_log_dir = "outputs/logs"
 
     try:
-        # Criar SessionManager se não existir
+        # Create SessionManager if it doesn't exist
         if session_manager is None:
             session_manager = SessionManager(config)
 
-        # Criar nova sessão
+        # Create new session
         session_folder = session_manager.create_session()
 
-        # Tentar extrair configurações do batch (se existir)
+        # Try to extract batch configurations (if exists)
         log_config = {}
         if "advanced" in config and "logs" in config["advanced"]:
             log_config = config["advanced"]["logs"]
 
-        # Verificar se logs estão habilitados
+        # Check if logs are enabled
         if not log_config.get("enable", True):
             return
 
-        # Extrair configurações
+        # Extract configurations
         log_level = log_config.get("log_level", default_level)
 
-        # Usar caminho da sessão para logs
+        # Use session path for logs
         log_file_path = session_manager.get_log_path()
 
-        # Inicializar LoggerConfig com caminho específico da sessão
+        # Initialize LoggerConfig with specific session path
         LoggerConfig.initialize(
             level=log_level,
             log_file_path=log_file_path,
             base_name="cspbench",
         )
 
-        # Criar logger e registrar inicialização
+        # Create logger and register initialization
         logger = get_logger(__name__)
         logger.info("=" * 60)
-        logger.info("CSPBench - Sistema de logging inicializado")
-        logger.info(f"Nível de log: {log_level}")
-        logger.info(f"Sessão: {session_folder}")
-        logger.info(f"Arquivo de log: {log_file_path}")
+        logger.info("CSPBench - Logging system initialized")
+        logger.info(f"Log level: {log_level}")
+        logger.info(f"Session: {session_folder}")
+        logger.info(f"Log file: {log_file_path}")
         logger.info(f"Timestamp: {__import__('datetime').datetime.now()}")
         logger.info("=" * 60)
 
     except Exception as e:
-        # Fallback para configuração básica em caso de erro
+        # Fallback to basic configuration in case of error
         LoggerConfig.initialize(level=default_level, log_dir=default_log_dir)
         logger = get_logger(__name__)
-        logger.warning(f"Erro ao configurar logging, usando padrões: {e}")
+        logger.warning(f"Error configuring logging, using defaults: {e}")
 
 
 def _update_logging_from_batch_config(batch_config: Dict[str, Any]) -> None:
-    """Atualiza configuração de logging baseado no arquivo de batch específico."""
+    """Update logging configuration based on specific batch file."""
     try:
         if "advanced" in batch_config and "logs" in batch_config["advanced"]:
             log_config = batch_config["advanced"]["logs"]
 
-            # Verificar se logs estão habilitados
+            # Check if logs are enabled
             if not log_config.get("enable", True):
                 return
 
-            # Atualizar nível se especificado
+            # Update level if specified
             if "log_level" in log_config:
                 new_level = log_config["log_level"]
                 LoggerConfig.set_level(new_level)
                 logger = get_logger(__name__)
-                logger.info(f"Nível de log atualizado para: {new_level}")
+                logger.info(f"Log level updated to: {new_level}")
     except Exception as e:
         logger = get_logger(__name__)
-        logger.warning(f"Erro ao atualizar configuração de logging do batch: {e}")
+        logger.warning(f"Error updating logging configuration from batch: {e}")
 
 
 def initialize_service() -> ExperimentService:
-    """Inicializa o serviço de experimentos com injeção de dependências."""
+    """Initialize experiment service with dependency injection."""
     global config, experiment_service
 
     if experiment_service is None:
         if config is None:
             config = load_config()
 
-        # Inicializar sistema de logging
+        # Initialize logging system
         _initialize_logging(config)
 
-        # Cria componentes da infraestrutura
+        # Create infrastructure components
         dataset_repo = create_dataset_repository(config)
         algo_registry = create_algorithm_registry(config)
         executor = create_executor(config)
         exporter = create_exporter(config)
         monitoring_service = create_monitoring_service(config)
 
-        # Cria serviço com DI
+        # Create service with DI
         experiment_service = ExperimentService(
             dataset_repo=dataset_repo,
             exporter=exporter,
@@ -282,27 +282,27 @@ def initialize_service() -> ExperimentService:
             monitoring_service=monitoring_service,
         )
 
-        typer.echo("✅ CSPBench inicializado com sucesso!")
+        typer.echo("✅ CSPBench initialized successfully!")
 
     return experiment_service
 
 
 def show_interactive_menu() -> None:
-    """Mostra interface interativa para seleção de arquivos de batch."""
-    print("CSPBench v0.1.0 - Framework para Closest String Problem")
+    """Show interactive interface for batch file selection."""
+    print("CSPBench v0.1.0 - Framework for Closest String Problem")
     print("=" * 60)
     print()
 
-    # Listar arquivos de batch disponíveis
+    # List available batch files
     batches_dir = Path("batches")
     if not batches_dir.exists():
-        _show_commands_help("📁 Diretório 'batches/' não encontrado")
+        _show_commands_help("📁 Directory 'batches/' not found")
         return
 
     batch_files = list(batches_dir.glob("*.yaml")) + list(batches_dir.glob("*.yml"))
 
     if not batch_files:
-        _show_commands_help("📋 Nenhum arquivo de batch encontrado em 'batches/'")
+        _show_commands_help("📋 No batch files found in 'batches/'")
         return
 
     _display_batch_files(batch_files)
@@ -314,22 +314,22 @@ def show_interactive_menu() -> None:
 
 
 def _show_commands_help(message: str) -> None:
-    """Mostra ajuda com comandos disponíveis."""
+    """Show help with available commands."""
     print(message)
     print()
-    print("Comandos disponíveis:")
-    print("  test         - Teste básico do sistema")
-    print("  algorithms   - Lista algoritmos disponíveis")
-    print("  config-info  - Mostra configuração")
-    print("  run          - Executa algoritmo único")
+    print("Available commands:")
+    print("  test         - Basic system test")
+    print("  algorithms   - List available algorithms")
+    print("  config-info  - Show configuration")
+    print("  run          - Execute single algorithm")
     print()
-    print("Uso: python main.py <comando> [argumentos]")
-    print("Exemplo: python main.py test")
+    print("Usage: python main.py <command> [arguments]")
+    print("Example: python main.py test")
 
 
 def _display_batch_files(batch_files: list) -> None:
-    """Exibe lista de arquivos de batch com descrições."""
-    print("📋 Arquivos de batch disponíveis:")
+    """Display list of batch files with descriptions."""
+    print("📋 Available batch files:")
     print()
 
     for i, batch_file in enumerate(batch_files, 1):
@@ -340,10 +340,10 @@ def _display_batch_files(batch_files: list) -> None:
 
 
 def _extract_file_description(batch_file: Path) -> str:
-    """Extrai descrição do arquivo de batch a partir de comentários."""
+    """Extract description from batch file from comments."""
     try:
         with open(batch_file, "r", encoding="utf-8") as f:
-            first_lines = f.read(300)  # Primeiros 300 chars
+            first_lines = f.read(300)  # First 300 chars
 
         for line in first_lines.split("\n"):
             line = line.strip()
@@ -352,30 +352,30 @@ def _extract_file_description(batch_file: Path) -> str:
                 if desc_text and not desc_text.startswith("="):
                     return desc_text
 
-        return "Arquivo de configuração de batch"
+        return "Batch configuration file"
     except:
-        return "Arquivo de configuração de batch"
+        return "Batch configuration file"
 
 
 def _display_manual_commands() -> None:
-    """Exibe lista de comandos manuais disponíveis."""
-    print("📋 Comandos manuais disponíveis:")
-    print("  test         - Teste básico do sistema")
-    print("  algorithms   - Lista algoritmos disponíveis")
-    print("  config-info  - Mostra configuração")
-    print("  run          - Executa algoritmo único")
+    """Display list of available manual commands."""
+    print("📋 Available manual commands:")
+    print("  test         - Basic system test")
+    print("  algorithms   - List available algorithms")
+    print("  config-info  - Show configuration")
+    print("  run          - Execute single algorithm")
     print()
 
 
 def _get_user_selection(batch_files: list) -> Optional[Path]:
-    """Obtém seleção do usuário e valida."""
+    """Get user selection and validate."""
     try:
         choice = input(
-            "💡 Selecione um arquivo (número) ou pressione Enter para sair: "
+            "💡 Select a file (number) or press Enter to exit: "
         ).strip()
 
         if choice == "":
-            print("👋 Até logo!")
+            print("👋 Goodbye!")
             return None
 
         if choice.isdigit():
@@ -383,26 +383,26 @@ def _get_user_selection(batch_files: list) -> Optional[Path]:
             if 1 <= choice_num <= len(batch_files):
                 return batch_files[choice_num - 1]
             else:
-                print("❌ Número inválido!")
+                print("❌ Invalid number!")
                 return None
         else:
-            print("❌ Entrada inválida!")
+            print("❌ Invalid input!")
             return None
 
     except KeyboardInterrupt:
-        print("\n👋 Até logo!")
+        print("\n👋 Goodbye!")
         return None
     except EOFError:
-        print("\n👋 Até logo!")
+        print("\n👋 Goodbye!")
         return None
 
 
 def _execute_selected_batch(selected_file: Path) -> None:
-    """Executa o arquivo de batch selecionado."""
-    print(f"\n🚀 Executando: {selected_file.name}")
+    """Execute the selected batch file."""
+    print(f"\n🚀 Executing: {selected_file.name}")
     print("-" * 40)
 
-    # Executa o batch selecionado
+    # Execute selected batch
     import sys
 
     sys.argv = ["main.py", "batch", str(selected_file)]
@@ -410,96 +410,189 @@ def _execute_selected_batch(selected_file: Path) -> None:
 
 
 def show_algorithms_and_exit():
-    """Mostra algoritmos disponíveis e sai."""
+    """Show available algorithms and exit."""
     try:
-        # Importa do módulo algorithms para ativar auto-descoberta
+        # Import from algorithms module to activate auto-discovery
         import algorithms
         from algorithms import global_registry
 
-        print("🧠 Algoritmos disponíveis:")
+        print("🧠 Available algorithms:")
         for name, cls in global_registry.items():
-            print(f"  • {name}: {cls.__doc__ or 'Sem descrição'}")
+            print(f"  • {name}: {cls.__doc__ or 'No description'}")
 
         if not global_registry:
-            print("  (Nenhum algoritmo registrado)")
+            print("  (No algorithms registered)")
 
     except Exception as e:
-        print(f"❌ Erro: {e}")
+        print(f"❌ Error: {e}")
         sys.exit(1)
 
     sys.exit(0)
 
 
 def show_datasetsave_and_exit():
-    """Executa wizard interativo de geração de datasets e sai."""
+    """Execute interactive dataset generation wizard and exit."""
     try:
         from src.infrastructure.orchestrators.dataset_generation_orchestrator import (
             DatasetGenerationOrchestrator,
         )
 
-        # Criar e executar orquestrador
+        # Create and execute orchestrator
         orchestrator = DatasetGenerationOrchestrator()
         result_path = orchestrator.run_interactive_generation()
 
         if result_path:
-            print(f"\n🎉 Dataset salvo com sucesso!")
+            print(f"\n🎉 Dataset saved successfully!")
         else:
-            print("\n� Operação cancelada.")
+            print("\n❌ Operation cancelled.")
 
     except Exception as e:
-        print(f"❌ Erro: {e}")
+        print(f"❌ Error: {e}")
+
+
+def _display_manual_commands() -> None:
+    """Display list of available manual commands."""
+    print("📋 Available manual commands:")
+    print("  test         - Basic system test")
+    print("  algorithms   - List available algorithms")
+    print("  config-info  - Show configuration")
+    print("  run          - Execute single algorithm")
+    print()
+
+
+def _get_user_selection(batch_files: list) -> Optional[Path]:
+    """Get user selection and validate."""
+    try:
+        choice = input(
+            "💡 Select a file (number) or press Enter to exit: "
+        ).strip()
+
+        if choice == "":
+            print("👋 Goodbye!")
+            return None
+
+        if choice.isdigit():
+            choice_num = int(choice)
+            if 1 <= choice_num <= len(batch_files):
+                return batch_files[choice_num - 1]
+            else:
+                print("❌ Invalid number!")
+                return None
+        else:
+            print("❌ Invalid input!")
+            return None
+
+    except KeyboardInterrupt:
+        print("\n👋 Goodbye!")
+        return None
+    except EOFError:
+        print("\n👋 Goodbye!")
+        return None
+
+
+def _execute_selected_batch(selected_file: Path) -> None:
+    """Execute the selected batch file."""
+    print(f"\n🚀 Executing: {selected_file.name}")
+    print("-" * 40)
+
+    # Execute the selected batch
+    import sys
+
+    sys.argv = ["main.py", "batch", str(selected_file)]
+    app()
+
+
+def show_algorithms_and_exit():
+    """Show available algorithms and exit."""
+    try:
+        # Import from algorithms module to activate auto-discovery
+        import algorithms
+        from algorithms import global_registry
+
+        print("🧠 Available algorithms:")
+        for name, cls in global_registry.items():
+            print(f"  • {name}: {cls.__doc__ or 'No description'}")
+
+        if not global_registry:
+            print("  (No algorithms registered)")
+
+    except Exception as e:
+        print(f"❌ Error: {e}")
+        sys.exit(1)
+
+    sys.exit(0)
+
+
+def show_datasetsave_and_exit():
+    """Execute interactive dataset generation wizard and exit."""
+    try:
+        from src.infrastructure.orchestrators.dataset_generation_orchestrator import (
+            DatasetGenerationOrchestrator,
+        )
+
+        # Create and execute orchestrator
+        orchestrator = DatasetGenerationOrchestrator()
+        result_path = orchestrator.run_interactive_generation()
+
+        if result_path:
+            print(f"\n🎉 Dataset saved successfully!")
+        else:
+            print("\n❌ Operation cancelled.")
+
+    except Exception as e:
+        print(f"❌ Error: {e}")
         sys.exit(1)
 
     sys.exit(0)
 
 
 def execute_batch_file(batch_file: str):
-    """Executa arquivo de batch diretamente."""
+    """Execute batch file directly."""
     try:
         batch_path = Path(batch_file)
 
         if not batch_path.exists():
-            print(f"❌ Arquivo não encontrado: {batch_file}")
+            print(f"❌ File not found: {batch_file}")
             sys.exit(1)
 
         if not batch_path.suffix.lower() in [".yaml", ".yml"]:
-            print(f"❌ Arquivo deve ser .yaml ou .yml: {batch_file}")
+            print(f"❌ File must be .yaml or .yml: {batch_file}")
             sys.exit(1)
 
-        # Executar batch
+        # Execute batch
         service = initialize_service()
-        print(f"📋 Executando batch: {batch_file}...")
+        print(f"📋 Executing batch: {batch_file}...")
 
         result = service.run_batch(str(batch_path))
-        print(f"✅ Batch concluído: {result.get('summary', 'Concluído')}")
+        print(f"✅ Batch completed: {result.get('summary', 'Completed')}")
 
     except KeyboardInterrupt:
-        print("\n🚫 Operação cancelada pelo usuário (Ctrl+C)")
-        print("📋 Batch interrompido durante a execução")
-        sys.exit(0)  # Exit com código 0 para indicar cancelamento intencional
+        print("\n🚫 Operation cancelled by user (Ctrl+C)")
+        print("📋 Batch interrupted during execution")
+        sys.exit(0)  # Exit with code 0 to indicate intentional cancellation
     except Exception as e:
-        print(f"❌ Erro no batch: {e}")
+        print(f"❌ Batch error: {e}")
         sys.exit(1)
 
 
-# Registrar todos os comandos da CLI
+# Register all CLI commands
 register_commands(app, initialize_service)
 
 
 def main(args: Optional[list] = None):
-    """Função main para execução programática."""
+    """Main function for programmatic execution."""
     import sys
 
     if args is None:
         args = sys.argv[1:]
 
     try:
-        # Se for um arquivo de batch, executar diretamente
+        # If it's a batch file, execute directly
         if len(args) == 1 and args[0].endswith((".yaml", ".yml")):
             execute_batch_file(args[0])
             return
 
-        # Caso contrário, usar o sistema de comandos do Typer
+        # Otherwise, use Typer command system
         original_argv = sys.argv[:]
         try:
             sys.argv = ["main.py"] + args
@@ -508,13 +601,13 @@ def main(args: Optional[list] = None):
             sys.argv = original_argv
 
     except KeyboardInterrupt:
-        print("\n🚫 Operação cancelada pelo usuário (Ctrl+C)")
+        print("\n🚫 Operation cancelled by user (Ctrl+C)")
         sys.exit(0)
     except SystemExit:
-        # Permitir SystemExit (incluindo sys.exit) passar sem tratamento
+        # Allow SystemExit (including sys.exit) to pass without handling
         raise
     except Exception as e:
-        print(f"❌ Erro inesperado: {e}")
+        print(f"❌ Unexpected error: {e}")
         sys.exit(1)
 
 
@@ -522,13 +615,13 @@ if __name__ == "__main__":
     import sys
 
     try:
-        # Se executado sem argumentos, mostra interface interativa
+        # If executed without arguments, show interactive interface
         if len(sys.argv) == 1:
             show_interactive_menu()
         elif len(sys.argv) == 2:
             arg = sys.argv[1]
 
-            # Implementar flags especiais
+            # Implement special flags
             if arg == "--algorithms":
                 show_algorithms_and_exit()
             elif arg == "--datasetsave":
@@ -536,53 +629,53 @@ if __name__ == "__main__":
             elif arg == "--help":
                 print(
                     """
-CSPBench v0.1.0 - Framework para Closest String Problem
+CSPBench v0.1.0 - Framework for Closest String Problem
 
-Uso:
-    python main.py                    Menu interativo
-    python main.py --help            Esta ajuda
-    python main.py --algorithms      Lista algoritmos disponíveis
-    python main.py --datasetsave     Gera/salva datasets
-    python main.py <arquivo.yaml>    Executa batch
-    python main.py <comando>         Executa comando específico
+Usage:
+    python main.py                    Interactive menu
+    python main.py --help            This help
+    python main.py --algorithms      List available algorithms
+    python main.py --datasetsave     Generate/save datasets
+    python main.py <file.yaml>       Execute batch
+    python main.py <command>         Execute specific command
 
-Comandos disponíveis:
-    test                             Teste básico do sistema
-    run <algoritmo> <dataset>        Executa algoritmo em dataset
-    batch <arquivo.yaml>             Executa batch
-    algorithms                       Lista algoritmos
-    config-info                      Mostra configuração
-    sessions                         Lista sessões
-    cleanup                          Remove sessões antigas
-    show-session <nome>              Mostra detalhes da sessão
-    view-report <nome>               Abre relatório no navegador
+Available commands:
+    test                             Basic system test
+    run <algorithm> <dataset>        Execute algorithm on dataset
+    batch <file.yaml>                Execute batch
+    algorithms                       List algorithms
+    config-info                      Show configuration
+    sessions                         List sessions
+    cleanup                          Remove old sessions
+    show-session <name>              Show session details
+    view-report <name>               Open report in browser
 
-Exemplos:
+Examples:
     python main.py test
-    python main.py run Baseline teste.fasta
-    python main.py batch batches/exemplo.yaml
-    python main.py batches/exemplo.yaml
+    python main.py run Baseline test.fasta
+    python main.py batch batches/example.yaml
+    python main.py batches/example.yaml
 """
                 )
                 sys.exit(0)
             elif not arg.startswith("-") and (
                 arg.endswith(".yaml") or arg.endswith(".yml")
             ):
-                # É um arquivo de batch - executar diretamente
+                # It's a batch file - execute directly
                 execute_batch_file(arg)
                 sys.exit(0)
             else:
-                # Usar CLI normal do Typer
+                # Use normal Typer CLI
                 app()
         else:
-            # Usar CLI normal do Typer
+            # Use normal Typer CLI
             app()
     except KeyboardInterrupt:
-        print("\n🚫 Operação cancelada pelo usuário (Ctrl+C)")
+        print("\n🚫 Operation cancelled by user (Ctrl+C)")
         sys.exit(0)
     except SystemExit:
-        # Permitir SystemExit (incluindo sys.exit) passar sem tratamento
+        # Allow SystemExit (including sys.exit) to pass without handling
         raise
     except Exception as e:
-        print(f"❌ Erro inesperado: {e}")
+        print(f"❌ Unexpected error: {e}")
         sys.exit(1)

@@ -1,8 +1,8 @@
 """
-Serviço de Experimentos CSPBench
+CSPBench Experiment Service
 
-Orquestra a execução de experimentos, otimizações e análises de sensibilidade.
-Implementa casos de uso da aplicação sem dependência de infraestrutura.
+Orchestrates the execution of experiments, optimizations, and sensitivity analyses.
+Implements application use cases without infrastructure dependency.
 """
 
 from typing import Any, Dict, List, Optional
@@ -16,6 +16,12 @@ from src.application.ports import (
 from src.application.services.config_parser import (
     ConfigurationParser,
     ConfigurationValidator,
+    InfrastructureConfig,
+    ExportConfig,
+    PlotsConfig,
+    MonitoringConfig,
+    LoggingConfig,
+    SystemConfig,
 )
 from src.domain import (
     AlgorithmExecutionError,
@@ -36,10 +42,10 @@ from src.presentation.monitoring.interfaces import TaskType
 
 class ExperimentService:
     """
-    Serviço principal para execução de experimentos CSP.
+    Main service for CSP experiment execution.
 
-    Coordena a execução de diferentes tipos de experimentos através das portas
-    definidas, mantendo a lógica de aplicação separada da infraestrutura.
+    Coordinates execution of different types of experiments through defined ports,
+    keeping application logic separate from infrastructure.
     """
 
     def __init__(
@@ -51,14 +57,14 @@ class ExperimentService:
         monitoring_service: Optional[Any] = None,
     ):
         """
-        Inicializa o serviço de experimentos.
+        Initialize the experiments service.
 
         Args:
-            dataset_repo: Repositório de datasets
-            exporter: Port para exportação de resultados
-            executor: Port para execução de algoritmos
-            algo_registry: Registry de algoritmos
-            monitoring_service: Serviço de monitoramento (opcional)
+            dataset_repo: Dataset repository
+            exporter: Port for results exportation
+            executor: Port for algorithm execution
+            algo_registry: Algorithm registry
+            monitoring_service: Monitoring service (optional)
         """
         self._dataset_repo = dataset_repo
         self._exporter = exporter
@@ -67,131 +73,141 @@ class ExperimentService:
         self._monitoring_service = monitoring_service
         self._logger = get_logger(__name__)
 
-    def _update_batch_logging(self, batch_config: Dict[str, Any]) -> None:
-        """Atualiza configuração de logging baseado no batch específico."""
+    def _update_batch_logging_with_config(self, logging_config) -> None:
+        """Update logging configuration based on parsed logging config."""
         try:
-            # Verificar configuração de logging no formato atual
+            if logging_config.level:
+                LoggerConfig.set_level(logging_config.level)
+                self._logger.info(f"Log level updated to: {logging_config.level}")
+                
+            # TODO: Implement additional logging configurations like file output, formatters, etc.
+            # This can be extended as needed when more detailed logging control is required
+            
+        except Exception as e:
+            self._logger.warning(
+                f"Error updating batch logging configuration: {e}"
+            )
+
+    def _update_batch_logging(self, batch_config: Dict[str, Any]) -> None:
+        """Update logging configuration based on specific batch."""
+        try:
+            # Check logging configuration in current format
             if "logging" in batch_config:
                 log_config = batch_config["logging"]
 
-                # Atualizar nível se especificado
+                # Update level if specified
                 if "level" in log_config:
                     new_level = log_config["level"]
                     LoggerConfig.set_level(new_level)
-                    self._logger.info(f"Nível de log atualizado para: {new_level}")
+                    self._logger.info(f"Log level updated to: {new_level}")
 
-            # Suportar formato legado também
+            # Support legacy format as well
             elif "advanced" in batch_config and "logs" in batch_config["advanced"]:
                 log_config = batch_config["advanced"]["logs"]
 
-                # Verificar se logs estão habilitados
+                # Check if logs are enabled
                 if not log_config.get("enable", True):
                     return
 
-                # Atualizar nível se especificado
+                # Update level if specified
                 if "log_level" in log_config:
                     new_level = log_config["log_level"]
                     LoggerConfig.set_level(new_level)
-                    self._logger.info(f"Nível de log atualizado para: {new_level}")
+                    self._logger.info(f"Log level updated to: {new_level}")
         except Exception as e:
             self._logger.warning(
-                f"Erro ao atualizar configuração de logging do batch: {e}"
+                f"Error updating batch logging configuration: {e}"
             )
 
     def run_batch(self, batch_cfg: str) -> Dict[str, Any]:
         """
-        Executa experimentos em lote a partir de configuração.
+        Execute batch experiments from configuration.
 
         Args:
-            batch_cfg: Caminho ou conteúdo da configuração de batch
+            batch_cfg: Path or content of batch configuration
 
         Returns:
-            Dict[str, Any]: Resultados consolidados do batch
+            Dict[str, Any]: Consolidated batch results
 
         Raises:
-            BatchConfigurationError: Se configuração inválida
-            BatchExecutionError: Se erro na execução
-            DatasetNotFoundError: Se dataset não encontrado
-            AlgorithmNotFoundError: Se algoritmo não encontrado
+            BatchConfigurationError: If invalid configuration
+            BatchExecutionError: If execution error
+            DatasetNotFoundError: If dataset not found
+            AlgorithmNotFoundError: If algorithm not found
         """
         try:
             self._logger.info(f"Iniciando execução de batch: {batch_cfg}")
 
-            # Parsear configuração de batch usando novo parser modular
+            # Parse batch configuration using new modular parser
             batch_config = self._parse_batch_config(batch_cfg)
 
-            # Extrair metadados usando novo parser
+            # Extract metadata using new parser
             metadata = ConfigurationParser.parse_metadata(batch_config)
-            self._logger.info(f"Batch carregado: {metadata.nome}")
+            self._logger.info(f"Batch loaded: {metadata.nome}")
 
-            # Atualizar configuração de logging se especificada no batch
-            self._update_batch_logging(batch_config)
+            # Parse all configuration sections
+            infrastructure_config = ConfigurationParser.parse_infrastructure_config(batch_config)
+            export_config = ConfigurationParser.parse_export_config(batch_config)
+            plots_config = ConfigurationParser.parse_plots_config(batch_config)
+            monitoring_config = ConfigurationParser.parse_monitoring_config(batch_config)
+            logging_config = ConfigurationParser.parse_logging_config(batch_config)
+            system_config = ConfigurationParser.parse_system_config(batch_config)
+            resources_config = ConfigurationParser.parse_resources_config(batch_config)
+
+            # Update logging configuration if specified in batch
+            self._update_batch_logging_with_config(logging_config)
 
             # Validar estrutura e determinar tipo
             task_type = ConfigurationValidator.validate_batch_structure(batch_config)
             self._logger.info(f"Tipo de task detectado: {task_type}")
 
+            # Configure monitoring if enabled
+            if monitoring_config.enabled and self._monitoring_service:
+                self._configure_monitoring(monitoring_config)
+
             # Processar de acordo com o tipo de task
             if task_type == "execution":
-                results = self._process_execution_batch(batch_config)
+                results = self._process_execution_batch(batch_config, resources_config)
             elif task_type == "optimization":
-                results = self._process_optimization_batch(batch_config)
+                results = self._process_optimization_batch(batch_config, resources_config)
             elif task_type == "sensitivity":
-                results = self._process_sensitivity_batch(batch_config)
+                results = self._process_sensitivity_batch(batch_config, resources_config)
             else:
                 raise BatchConfigurationError(
                     f"Tipo de task não suportado: {task_type}"
                 )
 
-            # Consolidar resultados
+            # Consolidate results
             consolidated_results = self._consolidate_batch_results(results["results"])
 
             total_experiments = len(results["results"])
             successful = consolidated_results.get("summary", {}).get("successful", 0)
             failed = consolidated_results.get("summary", {}).get("failed", 0)
             self._logger.info(
-                f"Batch concluído: {total_experiments} experimentos, {successful} sucessos, {failed} falhas"
+                f"Batch completed: {total_experiments} experiments, {successful} successful, {failed} failed"
             )
 
-            # Exportar se configurado
-            output_config = batch_config.get("output", {})
-            export_config = batch_config.get("export", {})
-
-            # Suportar ambas as configurações: output.save_results e export.enabled
-            should_export = output_config.get(
-                "save_results", False
-            ) or export_config.get("enabled", False)
-
-            if should_export:
-                # Determinar nome do arquivo baseado no tipo de task
-                default_filename = f"{task_type}_results.json"
-
-                # Usar configurações de export se disponível, senão usar padrões
-                format_type = (
-                    export_config.get("formats", {}).get("json", True)
-                    and "json"
-                    or "txt"
-                )
-                destination = export_config.get("destination", default_filename)
-
-                # Estruturar dados de export baseado no tipo de task
+            # Export results using new export configuration
+            if export_config.enabled:
                 export_data = {
                     "batch_summary": consolidated_results,
                     "detailed_results": results.get("results", []),
                 }
 
-                # Adicionar campos específicos por tipo
+                # Add task-specific data
                 if task_type == "sensitivity":
                     export_data["sensitivity_summaries"] = results.get(
                         "sensitivity_summaries", []
                     )
 
-                export_path = self._export_batch_results(
-                    export_data,
-                    format_type,
-                    destination,
+                export_path = self._export_batch_results_with_config(
+                    export_data, export_config, task_type
                 )
-                self._logger.info(f"Resultados exportados para: {export_path}")
+                self._logger.info(f"Results exported to: {export_path}")
+
+            # Generate plots if enabled
+            if plots_config.enabled:
+                self._generate_plots_with_config(results, plots_config, task_type)
 
             return consolidated_results
 
@@ -209,38 +225,38 @@ class ExperimentService:
 
     def optimize(self, opt_cfg: str) -> Dict[str, Any]:
         """
-        Executa otimização de hiperparâmetros.
+        Execute hyperparameter optimization.
 
         Args:
-            opt_cfg: Caminho ou conteúdo da configuração de otimização
+            opt_cfg: Path or content of optimization configuration
 
         Returns:
-            Dict[str, Any]: Resultados da otimização
+            Dict[str, Any]: Optimization results
 
         Raises:
-            OptimizationConfigurationError: Se configuração inválida
-            OptimizationExecutionError: Se erro na execução
-            DatasetNotFoundError: Se dataset não encontrado
-            AlgorithmNotFoundError: Se algoritmo não encontrado
+            OptimizationConfigurationError: If configuration is invalid
+            OptimizationExecutionError: If execution error
+            DatasetNotFoundError: If dataset not found
+            AlgorithmNotFoundError: If algorithm not found
         """
         try:
-            # Parsear configuração de otimização
+            # Parse optimization configuration
             opt_config = self._parse_optimization_config(opt_cfg)
 
-            # Validar configuração
+            # Validate configuration
             self._validate_optimization_config(opt_config)
 
-            # Carregar dataset
+            # Load dataset
             dataset = self._load_dataset(opt_config["dataset"])
 
-            # Verificar se algoritmo existe
+            # Check if algorithm exists
             algorithm_name = opt_config["algorithm"]
             if not self._algo_registry.algorithm_exists(algorithm_name):
                 raise AlgorithmNotFoundError(
-                    f"Algoritmo não encontrado: {algorithm_name}"
+                    f"Algorithm not found: {algorithm_name}"
                 )
 
-            # Executar otimização
+            # Execute optimization
             results = self._executor.execute_optimization(
                 algorithm_name,
                 dataset,
@@ -274,38 +290,38 @@ class ExperimentService:
 
     def sensitivity(self, sens_cfg: str) -> Dict[str, Any]:
         """
-        Executa análise de sensibilidade de parâmetros.
+        Execute parameter sensitivity analysis.
 
         Args:
-            sens_cfg: Caminho ou conteúdo da configuração de análise
+            sens_cfg: Path or content of analysis configuration
 
         Returns:
-            Dict[str, Any]: Resultados da análise de sensibilidade
+            Dict[str, Any]: Sensitivity analysis results
 
         Raises:
-            SensitivityConfigurationError: Se configuração inválida
-            SensitivityExecutionError: Se erro na execução
-            DatasetNotFoundError: Se dataset não encontrado
-            AlgorithmNotFoundError: Se algoritmo não encontrado
+            SensitivityConfigurationError: If configuration is invalid
+            SensitivityExecutionError: If execution error
+            DatasetNotFoundError: If dataset not found
+            AlgorithmNotFoundError: If algorithm not found
         """
         try:
-            # Parsear configuração de sensibilidade
+            # Parse sensitivity configuration
             sens_config = self._parse_sensitivity_config(sens_cfg)
 
-            # Validar configuração
+            # Validate configuration
             self._validate_sensitivity_config(sens_config)
 
-            # Carregar dataset
+            # Load dataset
             dataset = self._load_dataset(sens_config["dataset"])
 
-            # Verificar se algoritmo existe
+            # Check if algorithm exists
             algorithm_name = sens_config["algorithm"]
             if not self._algo_registry.algorithm_exists(algorithm_name):
                 raise AlgorithmNotFoundError(
-                    f"Algoritmo não encontrado: {algorithm_name}"
+                    f"Algorithm not found: {algorithm_name}"
                 )
 
-            # Executar análise de sensibilidade
+            # Execute sensitivity analysis
             results = self._executor.execute_sensitivity_analysis(
                 algorithm_name, dataset, sens_config
             )
@@ -343,25 +359,25 @@ class ExperimentService:
         timeout: Optional[int] = None,
     ) -> Dict[str, Any]:
         """
-        Executa experimento único.
+        Execute single experiment.
 
         Args:
-            algorithm_name: Nome do algoritmo
-            dataset_id: Identificador do dataset
-            params: Parâmetros do algoritmo
-            timeout: Timeout em segundos
+            algorithm_name: Algorithm name
+            dataset_id: Dataset identifier
+            params: Algorithm parameters
+            timeout: Timeout in seconds
 
         Returns:
-            Dict[str, Any]: Resultados do experimento
+            Dict[str, Any]: Experiment results
         """
-        # Verificar se algoritmo existe
+        # Check if algorithm exists
         if not self._algo_registry.algorithm_exists(algorithm_name):
-            raise AlgorithmNotFoundError(f"Algoritmo não encontrado: {algorithm_name}")
+            raise AlgorithmNotFoundError(f"Algorithm not found: {algorithm_name}")
 
-        # Carregar dataset
+        # Load dataset
         dataset = self._load_dataset(dataset_id)
 
-        # Criar configuração de batch para execução única
+        # Create batch configuration for single execution
         batch_config = {
             "task": {"type": "execution"},
             "experiments": [
@@ -373,11 +389,11 @@ class ExperimentService:
             ],
         }
 
-        # Adicionar timeout se fornecido
+        # Add timeout if provided
         if timeout is not None:
             batch_config["experiments"][0]["timeout"] = timeout
 
-        # Executar como batch e retornar primeiro resultado
+        # Execute as batch and return first result
         results = self._executor.execute_batch(batch_config)
         if results:
             result = results[0]
@@ -389,31 +405,32 @@ class ExperimentService:
             raise AlgorithmExecutionError(f"Erro na execução de {algorithm_name}")
 
     def list_available_algorithms(self) -> List[str]:
-        """Lista algoritmos disponíveis."""
+        """List available algorithms."""
         return self._algo_registry.list_algorithms()
 
     def list_available_datasets(self) -> List[str]:
-        """Lista datasets disponíveis."""
+        """List available datasets."""
         return self._dataset_repo.list_available()
 
     def get_algorithm_info(self, algorithm_name: str) -> Dict[str, Any]:
-        """Obtém informações de algoritmo."""
+        """Get algorithm information."""
         if not self._algo_registry.algorithm_exists(algorithm_name):
-            raise AlgorithmNotFoundError(f"Algoritmo não encontrado: {algorithm_name}")
+            raise AlgorithmNotFoundError(f"Algorithm not found: {algorithm_name}")
 
         return self._algo_registry.get_algorithm_metadata(algorithm_name)
 
     # Métodos privados auxiliares
 
-    def _process_execution_batch(self, batch_config: Dict[str, Any]) -> Dict[str, Any]:
+    def _process_execution_batch(self, batch_config: Dict[str, Any], resources_config: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Processa batch de execução usando o executor existente.
+        Process execution batch using existing executor.
 
         Args:
-            batch_config: Configuração do batch
+            batch_config: Batch configuration
+            resources_config: Resource configuration
 
         Returns:
-            Dict[str, Any]: Resultados da execução
+            Dict[str, Any]: Execution results
         """
         self._logger.info("Processando batch de execução")
 
@@ -423,8 +440,9 @@ class ExperimentService:
             self._monitoring_service.start_monitoring(TaskType.EXECUTION, batch_name)
 
         try:
+            # Pass resources configuration to executor
             results = self._executor.execute_batch(
-                batch_config, self._monitoring_service
+                batch_config, self._monitoring_service, resources_config
             )
 
             # Finalizar monitoramento
@@ -440,16 +458,16 @@ class ExperimentService:
             raise
 
     def _process_optimization_batch(
-        self, batch_config: Dict[str, Any]
+        self, batch_config: Dict[str, Any], resources_config: Dict[str, Any]
     ) -> Dict[str, Any]:
         """
-        Processa batch de otimização com suporte a múltiplas configurações.
+        Process optimization batch with support for multiple configurations.
 
         Args:
-            batch_config: Configuração do batch
+            batch_config: Batch configuration
 
         Returns:
-            Dict[str, Any]: Resultados consolidados da otimização
+            Dict[str, Any]: Consolidated optimization results
         """
         self._logger.info("Processando batch de otimização")
 
@@ -470,10 +488,10 @@ class ExperimentService:
             # Calcular totais para monitoramento
             total_optimizations = len(optimization_configs)
 
-            # Calcular total de execuções (datasets × algoritmos por configuração)
+            # Calculate total executions (datasets × algorithms per configuration)
             total_executions = 0
             for opt_config in optimization_configs:
-                # Resolver algoritmos para calcular total
+                # Resolve algorithms to calculate total
                 algorithm_names, _ = self._resolve_algorithm_configuration(
                     opt_config.target_algorithm, batch_config
                 )
@@ -490,46 +508,46 @@ class ExperimentService:
 
             for opt_config in optimization_configs:
                 current_optimization_index += 1
-                self._logger.info(f"Executando otimização: {opt_config.nome}")
+                self._logger.info(f"Executing optimization: {opt_config.nome}")
 
-                # Resolver algoritmos e parâmetros base por ID
+                # Resolve algorithms and base parameters by ID
                 algorithm_names, all_algorithm_params = (
                     self._resolve_algorithm_configuration(
                         opt_config.target_algorithm, batch_config
                     )
                 )
 
-                # Processar cada algoritmo individualmente
+                # Process each algorithm individually
                 for algorithm_name in algorithm_names:
                     current_dataset_index = 0
 
-                    # Obter parâmetros base específicos para este algoritmo
+                    # Get base parameters specific for this algorithm
                     base_params = all_algorithm_params.get(algorithm_name, {})
 
-                    # Processar cada dataset na configuração
+                    # Process each dataset in configuration
                     for dataset_id in opt_config.target_datasets:
                         current_dataset_index += 1
                         current_execution_index += 1
                         self._logger.info(f"Processando dataset: {dataset_id}")
 
                         try:
-                            # Resolver configuração do dataset e carregá-lo
+                            # Resolve dataset configuration and load it
                             dataset_config = self._resolve_dataset_config(
                                 dataset_id, batch_config.get("datasets", [])
                             )
 
-                            # Carregar dataset baseado na configuração
+                            # Load dataset based on configuration
                             if dataset_config["tipo"] == "file":
                                 filename = dataset_config["parametros"]["filename"]
                                 dataset = self._load_dataset(filename)
                             else:
-                                # Para datasets sintéticos, criar usando o método existente
+                                # For synthetic datasets, create using existing method
                                 dataset = self._create_dataset_from_config(
                                     dataset_config
                                 )
 
                             self._logger.info(
-                                f"Dataset {dataset_id} carregado: {len(dataset.sequences)} sequências"
+                                f"Dataset {dataset_id} loaded: {len(dataset.sequences)} sequences"
                             )
 
                             # Extrair configurações de recursos
@@ -547,22 +565,22 @@ class ExperimentService:
                                 # Fallback para estrutura antiga (compatibilidade)
                                 optimization_params = opt_config.parameters
 
-                            # Preparar configuração para o executor
+                            # Prepare configuration for executor
                             executor_config = {
                                 "study_name": f"{opt_config.study_name}_{algorithm_name}_{dataset_id}",
                                 "direction": opt_config.direction,
                                 "n_trials": opt_config.n_trials,
                                 "timeout_per_trial": opt_config.timeout_per_trial,
                                 "parameters": optimization_params,
-                                "base_params": base_params,  # Parâmetros base da configuração
+                                "base_params": base_params,  # Base parameters from configuration
                                 "optuna_config": opt_config.optuna_config or {},
-                                "resources": resources_config,  # Incluir configurações de recursos
+                                "resources": resources_config,  # Include resource configurations
                                 "internal_jobs": resources_config.get(
                                     "internal_jobs", 4
-                                ),  # Paralelismo interno
+                                ),  # Internal parallelism
                             }
 
-                            # Executar otimização
+                            # Execute optimization
                             optimization_results = self._executor.execute_optimization(
                                 algorithm_name,  # Usar nome do algoritmo resolvido
                                 dataset,
@@ -625,7 +643,7 @@ class ExperimentService:
             raise
 
     def _process_sensitivity_batch(
-        self, batch_config: Dict[str, Any]
+        self, batch_config: Dict[str, Any], resources_config: Dict[str, Any]
     ) -> Dict[str, Any]:
         """
         Processa batch de análise de sensibilidade com suporte a múltiplas configurações.
@@ -656,7 +674,7 @@ class ExperimentService:
 
             for sens_config in sensitivity_configs:
                 self._logger.info(
-                    f"Executando análise de sensibilidade: {sens_config.nome}"
+                    f"Executing sensitivity analysis: {sens_config.nome}"
                 )
 
                 # Processar cada dataset na configuração
@@ -669,16 +687,16 @@ class ExperimentService:
                             dataset_id, batch_config.get("datasets", [])
                         )
 
-                        # Carregar dataset baseado na configuração
+                        # Load dataset based on configuration
                         if dataset_config["tipo"] == "file":
                             filename = dataset_config["parametros"]["filename"]
                             dataset = self._load_dataset(filename)
                         else:
-                            # Para datasets sintéticos, criar usando o método existente
+                            # For synthetic datasets, create using existing method
                             dataset = self._create_dataset_from_config(dataset_config)
 
                         self._logger.info(
-                            f"Dataset {dataset_id} carregado: {len(dataset.sequences)} sequências"
+                            f"Dataset {dataset_id} loaded: {len(dataset.sequences)} sequences"
                         )
 
                         # Extrair configurações de recursos
@@ -1193,3 +1211,108 @@ class ExperimentService:
         return self._exporter.export_batch_results(
             results_list, format_type, destination
         )
+
+    def _configure_monitoring(self, monitoring_config) -> None:
+        """Configure monitoring service based on configuration."""
+        if self._monitoring_service:
+            # Configure monitoring interface and update interval
+            try:
+                # Update monitoring interface if supported
+                if hasattr(self._monitoring_service, 'set_interface'):
+                    self._monitoring_service.set_interface(monitoring_config.interface)
+                
+                # Update update interval if supported
+                if hasattr(self._monitoring_service, 'set_update_interval'):
+                    self._monitoring_service.set_update_interval(monitoring_config.update_interval)
+                    
+                self._logger.info(f"Monitoring configured: interface={monitoring_config.interface}, interval={monitoring_config.update_interval}")
+            except Exception as e:
+                self._logger.warning(f"Error configuring monitoring: {e}")
+
+    def _export_batch_results_with_config(
+        self, results: Dict[str, Any], export_config, task_type: str
+    ) -> str:
+        """Export batch results using new export configuration."""
+        try:
+            # Determine format based on configuration
+            format_type = "json"  # default
+            if export_config.formats:
+                if export_config.formats.get("json", False):
+                    format_type = "json"
+                elif export_config.formats.get("csv", False):
+                    format_type = "csv"
+                elif export_config.formats.get("parquet", False):
+                    format_type = "parquet"
+                elif export_config.formats.get("pickle", False):
+                    format_type = "pickle"
+
+            # Process destination template
+            destination = export_config.destination
+            destination = destination.replace("{task_type}", task_type)
+            # Additional template replacements can be added here
+
+            # Filter results based on include configuration
+            if export_config.include:
+                filtered_results = {}
+                for item in export_config.include:
+                    if item == "summary" and "batch_summary" in results:
+                        filtered_results["summary"] = results["batch_summary"]
+                    elif item == "detailed_results" and "detailed_results" in results:
+                        filtered_results["detailed_results"] = results["detailed_results"]
+                    elif item == "plots":
+                        # TODO: Add plot data when plots are implemented
+                        pass
+                    elif item == "logs":
+                        # TODO: Add log data when advanced logging is implemented
+                        pass
+                results = filtered_results
+
+            return self._exporter.export(results, format_type, destination)
+        except Exception as e:
+            self._logger.error(f"Error exporting results: {e}")
+            # Fallback to simple export
+            return self._export_batch_results(results, "json", f"{task_type}_results.json")
+
+    def _generate_plots_with_config(
+        self, results: Dict[str, Any], plots_config, task_type: str
+    ) -> None:
+        """Generate plots based on configuration."""
+        if not plots_config.enabled:
+            return
+
+        try:
+            self._logger.info("Generating plots...")
+            
+            # TODO: Implement plot generation based on plots_config
+            # This is a placeholder for future plot generation implementation
+            
+            # Basic plots that could be generated:
+            if plots_config.plot_convergence:
+                self._logger.debug("Generating convergence plots...")
+                
+            if plots_config.plot_comparison:
+                self._logger.debug("Generating comparison plots...")
+                
+            if plots_config.plot_boxplots:
+                self._logger.debug("Generating box plots...")
+                
+            if plots_config.plot_runtime:
+                self._logger.debug("Generating runtime plots...")
+                
+            # Task-specific plots
+            if task_type == "optimization":
+                if plots_config.plot_optimization_history:
+                    self._logger.debug("Generating optimization history plots...")
+                if plots_config.plot_parameter_importance:
+                    self._logger.debug("Generating parameter importance plots...")
+                    
+            elif task_type == "sensitivity":
+                if plots_config.plot_sensitivity_indices:
+                    self._logger.debug("Generating sensitivity indices plots...")
+                if plots_config.plot_morris_trajectories:
+                    self._logger.debug("Generating Morris trajectories plots...")
+                    
+            self._logger.info("Plot generation completed (placeholder implementation)")
+            
+        except Exception as e:
+            self._logger.error(f"Error generating plots: {e}")

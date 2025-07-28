@@ -1,7 +1,7 @@
 """
-CLI da Camada de Apresentação
+Presentation Layer CLI
 
-Interface de linha de comando.
+Command line interface.
 """
 
-# TODO: Implementar após migração
+# TODO: Implement after migration

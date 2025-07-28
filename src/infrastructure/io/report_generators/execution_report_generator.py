@@ -1,8 +1,8 @@
 """
-Gerador de Relatórios de Execução
+Execution Report Generator
 
-Responsável por gerar relatórios específicos para execuções normais de algoritmos,
-incluindo gráficos de comparação, estatísticas e análises.
+Responsible for generating specific reports for normal algorithm executions,
+including comparison charts, statistics and analyses.
 """
 
 import json
@@ -28,16 +28,16 @@ from src.infrastructure.logging_config import get_logger
 
 class ExecutionReportGenerator:
     """
-    Gerador de relatórios específicos para execuções de algoritmos.
+    Specific report generator for algorithm executions.
     """
 
     def __init__(self, config: Dict[str, Any], session_path: Path):
         """
-        Inicializa o gerador de relatórios de execução.
+        Initialize the execution report generator.
 
         Args:
-            config: Configuração do sistema
-            session_path: Caminho da sessão onde salvar o relatório
+            config: System configuration
+            session_path: Session path where to save the report
         """
         self.config = config
         self.session_path = session_path
@@ -49,19 +49,19 @@ class ExecutionReportGenerator:
         )
         self.logger = get_logger(__name__)
 
-        # Inicializar gerador de gráficos de histórico
+        # Initialize history plot generator
         self.history_plotter = HistoryPlotter(config, session_path)
 
-        # Configurar matplotlib
+        # Configure matplotlib
         plt.style.use("seaborn-v0_8")
         sns.set_palette("husl")
 
     def generate_report(self, results_data: Dict[str, Any]) -> None:
         """
-        Gera relatório completo para execução de algoritmos.
+        Generate complete report for algorithm execution.
 
         Args:
-            results_data: Dados dos resultados da execução
+            results_data: Execution results data
         """
         try:
             self.logger.info("Iniciando geração de relatório de execução")

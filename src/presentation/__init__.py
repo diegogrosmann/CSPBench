@@ -1,7 +1,7 @@
 """
-Camada de Apresentação CSPBench
+CSPBench Presentation Layer
 
-Contém interfaces de usuário (CLI, TUI) e controladores.
+Contains user interfaces (CLI, TUI) and controllers.
 """
 
-# TODO: Implementar após migração completa
+# TODO: Implement after complete migration

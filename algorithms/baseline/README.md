@@ -1,114 +1,114 @@
-# Baseline: Algoritmo de Consenso Ganancioso
+# Baseline: Greedy Consensus Algorithm
 
-O **Baseline** é um algoritmo determinístico simples e eficiente que implementa uma estratégia de consenso ganancioso para resolver o Closest String Problem. Serve como referência fundamental para comparação com métodos mais sofisticados.
+The **Baseline** is a simple and efficient deterministic algorithm that implements a greedy consensus strategy to solve the Closest String Problem. It serves as a fundamental reference for comparison with more sophisticated methods.
 
-## 📊 Visão Geral
+## 📊 Overview
 
-### **Estratégia Principal**
-- **Consenso por Posição**: Para cada posição, escolhe o símbolo mais frequente
-- **Decisão Gananciosa**: Toma decisões localmente ótimas sem considerar impacto global
-- **Determinístico**: Sempre produz o mesmo resultado para a mesma entrada
-- **Eficiência**: Execução linear em O(n × L × |Σ|)
+### **Main Strategy**
+- **Position-wise Consensus**: For each position, choose the most frequent symbol
+- **Greedy Decision**: Make locally optimal decisions without considering global impact
+- **Deterministic**: Always produces the same result for the same input
+- **Efficiency**: Linear execution in O(n × L × |Σ|)
 
-### **Funcionamento**
-1. Para cada posição i ∈ [0, L-1]:
-   - Conta a frequência de cada símbolo do alfabeto
-   - Seleciona o símbolo com maior frequência
-   - Em caso de empate, escolhe o primeiro símbolo alfabeticamente
-2. Constrói a string consenso concatenando os símbolos escolhidos
-3. Calcula a distância máxima de Hamming para todas as strings de entrada
+### **Operation**
+1. For each position i ∈ [0, L-1]:
+   - Count the frequency of each alphabet symbol
+   - Select the symbol with highest frequency
+   - In case of tie, choose the first symbol alphabetically
+2. Build consensus string by concatenating chosen symbols
+3. Calculate maximum Hamming distance to all input strings
 
-## 🔧 Características Técnicas
+## 🔧 Technical Characteristics
 
-### **Complexidade**
-- **Temporal**: O(n × L × |Σ|)
-  - n: número de strings
-  - L: comprimento das strings  
-  - |Σ|: tamanho do alfabeto
-- **Espacial**: O(|Σ|) para contadores + O(L) para resultado
+### **Complexity**
+- **Time**: O(n × L × |Σ|)
+  - n: number of strings
+  - L: string length  
+  - |Σ|: alphabet size
+- **Space**: O(|Σ|) for counters + O(L) for result
 
-### **Propriedades**
-- ✅ **Determinístico**: Sempre produz o mesmo resultado
-- ✅ **Rápido**: Execução quase instantânea
-- ✅ **Simples**: Implementação direta e compreensível
-- ✅ **Estável**: Não há parâmetros para ajustar
-- ❌ **Qualidade**: Pode não encontrar o ótimo global
-- ❌ **Independência**: Não considera dependências entre posições
+### **Properties**
+- ✅ **Deterministic**: Always produces the same result
+- ✅ **Fast**: Near-instantaneous execution
+- ✅ **Simple**: Direct and comprehensible implementation
+- ✅ **Stable**: No parameters to adjust
+- ❌ **Quality**: May not find global optimum
+- ❌ **Independence**: Does not consider dependencies between positions
 
 ## 🎯 Casos de Uso
 
-### **✅ Quando Usar**
-- **Baseline de Comparação**: Estabelecer linha de base para outros algoritmos
-- **Execução Rápida**: Quando tempo é extremamente limitado
-- **Dados com Consenso Forte**: Sequências com posições bem conservadas
-- **Pré-processamento**: Solução inicial para algoritmos iterativos
-- **Validação**: Verificar funcionamento básico do framework
+### **✅ When to Use**
+- **Comparison Baseline**: Establish baseline for other algorithms
+- **Fast Execution**: When time is extremely limited
+- **Strong Consensus Data**: Sequences with well-conserved positions
+- **Preprocessing**: Initial solution for iterative algorithms
+- **Validation**: Verify basic framework functionality
 
-### **❌ Limitações**
-- **Ótimos Locais**: Pode ficar preso em soluções subótimas
-- **Empates**: Resolução arbitrária pode impactar qualidade
-- **Dados Ruidosos**: Performance degradada com muito ruído
-- **Dependências**: Ignora correlações entre posições
+### **❌ Limitations**
+- **Local Optima**: May get stuck in suboptimal solutions
+- **Ties**: Arbitrary resolution may impact quality
+- **Noisy Data**: Degraded performance with high noise
+- **Dependencies**: Ignores correlations between positions
 
-## 🧮 Parâmetros
+## 🧮 Parameters
 
-O algoritmo Baseline **não possui parâmetros configuráveis**, garantindo:
-- Reprodutibilidade total
-- Simplicidade de uso
-- Ausência de tuning necessário
-- Comportamento consistente
+The Baseline algorithm **has no configurable parameters**, ensuring:
+- Total reproducibility
+- Ease of use
+- No tuning required
+- Consistent behavior
 
-## 💻 Exemplo de Uso
+## 💻 Usage Example
 
-### **Uso Básico**
+### **Basic Usage**
 ```python
 from algorithms.baseline.algorithm import BaselineAlg
 
-# Dataset de exemplo
+# Example dataset
 strings = ["ACGTACGT", "AGGTACGT", "ACGTAAGT"]
 alphabet = "ACGT"
 
-# Criar e executar algoritmo
+# Create and run algorithm
 algorithm = BaselineAlg(strings, alphabet)
 center, distance, metadata = algorithm.run()
 
-print(f"Centro encontrado: {center}")
-print(f"Distância máxima: {distance}")
-print(f"Metadados: {metadata}")
+print(f"Found center: {center}")
+print(f"Maximum distance: {distance}")
+print(f"Metadata: {metadata}")
 ```
 
 ### **Via Framework**
 ```bash
-# Execução via CLI
+# CLI execution
 python main.py --algorithms Baseline --dataset synthetic
 
-# Execução silenciosa
+# Silent execution
 python main.py --silent --algorithms Baseline --dataset synthetic --num-execs 1
 ```
 
-### **Em Lote (YAML)**
+### **Batch (YAML)**
 ```yaml
 algorithms: ["Baseline"]
 task:
   type: "execution"
   execution:
     executions:
-      - nome: "Teste Baseline"
+      - name: "Baseline Test"
         dataset: dataset_1
-        runs_per_algorithm_per_base: 1  # Determinístico
+        runs_per_algorithm_per_base: 1  # Deterministic
         timeout: 30
 ```
 
-## 🔬 Análise Algorítmica
+## 🔬 Algorithmic Analysis
 
-### **Pseudocódigo**
+### **Pseudocode**
 ```
 function baseline_consensus(strings, alphabet):
     L = length(strings[0])
     consensus = ""
     
     for position in range(L):
-        # Contar frequências
+        # Count frequencies
         counts = {}
         for symbol in alphabet:
             counts[symbol] = 0
@@ -117,7 +117,7 @@ function baseline_consensus(strings, alphabet):
             symbol = string[position]
             counts[symbol] += 1
         
-        # Encontrar símbolo mais frequente
+        # Find most frequent symbol
         max_count = 0
         best_symbol = alphabet[0]  # Tie-breaking
         
@@ -131,17 +131,17 @@ function baseline_consensus(strings, alphabet):
     return consensus
 ```
 
-### **Análise Matemática**
-Para uma posição i, seja f(s,i) a frequência do símbolo s na posição i:
-- Escolha: argmax_s f(s,i)
-- Distância esperada por posição: ≈ n × (1 - max_s(f(s,i)/n))
-- Distância total esperada: Σ_i n × (1 - max_s(f(s,i)/n))
+### **Mathematical Analysis**
+For a position i, let f(s,i) be the frequency of symbol s at position i:
+- Choice: argmax_s f(s,i)
+- Expected distance per position: ≈ n × (1 - max_s(f(s,i)/n))
+- Total expected distance: Σ_i n × (1 - max_s(f(s,i)/n))
 
-## 🎨 Visualizações
+## 🎨 Visualizations
 
-### **Análise de Consenso**
+### **Consensus Analysis**
 ```python
-# Gerar heatmap de consenso por posição
+# Generate consensus heatmap by position
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -149,7 +149,7 @@ def visualize_consensus(strings, alphabet):
     L = len(strings[0])
     n = len(strings)
     
-    # Matriz de frequências
+    # Frequency matrix
     freq_matrix = np.zeros((len(alphabet), L))
     
     for i, symbol in enumerate(alphabet):
@@ -157,25 +157,25 @@ def visualize_consensus(strings, alphabet):
             count = sum(1 for s in strings if s[pos] == symbol)
             freq_matrix[i, pos] = count / n
     
-    # Plotar heatmap
+    # Plot heatmap
     plt.imshow(freq_matrix, aspect='auto', cmap='viridis')
-    plt.xlabel('Posição')
-    plt.ylabel('Símbolo')
-    plt.colorbar(label='Frequência')
-    plt.title('Consenso por Posição')
+    plt.xlabel('Position')
+    plt.ylabel('Symbol')
+    plt.colorbar(label='Frequency')
+    plt.title('Consensus by Position')
     plt.show()
 ```
 
-## 🔗 Integração com CSPBench
+## 🔗 Integration with CSPBench
 
-O Baseline está totalmente integrado ao framework através de:
+Baseline is fully integrated with the framework through:
 
-- **Registro Automático**: Detectado via `@register_algorithm`
-- **Interface Padronizada**: Implementa `CSPAlgorithm`
-- **Execução Paralela**: Compatível com sistema de execução
-- **Relatórios**: Gera metadados estruturados
-- **Monitoramento**: Suporte a callbacks de progresso
+- **Automatic Registration**: Detected via `@register_algorithm`
+- **Standardized Interface**: Implements `CSPAlgorithm`
+- **Parallel Execution**: Compatible with execution system
+- **Reports**: Generates structured metadata
+- **Monitoring**: Supports progress callbacks
 
 ---
 
-*Baseline: A base sólida para comparação de algoritmos CSP - simples, rápido e confiável.*
+*Baseline: The solid foundation for CSP algorithm comparison - simple, fast and reliable.*

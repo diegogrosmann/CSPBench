@@ -1,7 +1,7 @@
 """
-Módulo External da Infraestrutura
+Infrastructure External Module
 
-Adaptadores para sistemas externos como NCBI, bases de dados, etc.
+Adapters for external systems like NCBI, databases, etc.
 """
 
 from .dataset_entrez import fetch_dataset

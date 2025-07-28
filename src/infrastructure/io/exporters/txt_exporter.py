@@ -1,15 +1,15 @@
 """
-Exportador para formato TXT.
+TXT Format Exporter.
 
-Especialização do FileExporter para formato texto simples.
+FileExporter specialization for simple text format.
 """
 
 from .file_exporter import FileExporter
 
 
 class TxtExporter(FileExporter):
-    """Exportador para formato TXT."""
+    """TXT format exporter."""
 
     def get_supported_formats(self) -> list[str]:
-        """Lista formatos suportados."""
+        """List supported formats."""
         return ["txt"]

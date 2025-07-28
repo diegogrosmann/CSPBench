@@ -1,86 +1,86 @@
 """
-Implementação exata do DP-CSP (Programação Dinâmica) para o Closest String Problem.
+Exact DP-CSP (Dynamic Programming) implementation for the Closest String Problem.
 
-O DP-CSP é um algoritmo de programação dinâmica que encontra a solução
-EXATA para o Closest String Problem. Diferentemente das heurísticas,
-garante que encontrará a string center com a menor distância máxima
-possível, provendo uma cota inferior ótima para comparação.
+DP-CSP is a dynamic programming algorithm that finds the EXACT solution
+for the Closest String Problem. Unlike heuristics, it guarantees finding
+the center string with the minimum possible maximum distance,
+providing an optimal lower bound for comparison.
 
-ARQUITETURA ALGORÍTMICA:
+ALGORITHMIC ARCHITECTURE:
 
-ALGORITMO DP-CSP DETALHADO:
+DETAILED DP-CSP ALGORITHM:
 
-1. MODELAGEM DO PROBLEMA
-   - Estado: (posição, vetor_distâncias)
-   - Decisão: qual símbolo escolher na posição atual
-   - Transição: estado[i] → estado[i+1] via escolha de símbolo
-   - Objetivo: minimizar distância máxima final
+1. PROBLEM MODELING
+   - State: (position, distance_vector)
+   - Decision: which symbol to choose at current position
+   - Transition: state[i] → state[i+1] via symbol choice
+   - Objective: minimize final maximum distance
 
-2. PROGRAMAÇÃO DINÂMICA
-   - Tabela DP: dp[posição][estado_distâncias] = custo_mínimo
-   - Recorrência: dp[i][d] = min(dp[i+1][d'] + custo_transição)
-   - Caso base: dp[L][d] = max(d) (distância máxima final)
-   - Solução: dp[0][estado_inicial] = distância ótima
+2. DYNAMIC PROGRAMMING
+   - DP Table: dp[position][distance_state] = minimum_cost
+   - Recurrence: dp[i][d] = min(dp[i+1][d'] + transition_cost)
+   - Base case: dp[L][d] = max(d) (final maximum distance)
+   - Solution: dp[0][initial_state] = optimal distance
 
-3. OTIMIZAÇÕES DE EFICIÊNCIA
-   - Poda por limite de memória (max_states)
-   - Encoding eficiente de estados como tuplas
-   - Memoização para evitar recálculos
-   - Reconstrução lazy da solução ótima
+3. EFFICIENCY OPTIMIZATIONS
+   - Memory limit pruning (max_states)
+   - Efficient state encoding as tuples
+   - Memoization to avoid recalculations
+   - Lazy optimal solution reconstruction
 
-4. CONTROLES DE RECURSO
-   - Limite de memória para evitar explosão exponencial
-   - Timeout para problemas intratáveis
-   - Fallback para heurística se recursos insuficientes
-   - Monitoramento de progresso via callbacks
+4. RESOURCE CONTROLS
+   - Memory limit to prevent exponential explosion
+   - Timeout for intractable problems
+   - Fallback to heuristics if insufficient resources
+   - Progress monitoring via callbacks
 
-FILOSOFIA ALGORÍTMICA:
+ALGORITHMIC PHILOSOPHY:
 
-- EXATIDÃO: Garante solução ótima dentro dos limites de recurso
-- COMPLETUDE: Explora todo o espaço de estados viável
-- EFICIÊNCIA: Usa programação dinâmica para evitar recálculos
-- ROBUSTEZ: Fallbacks e controles para casos intratáveis
+- EXACTNESS: Guarantees optimal solution within resource limits
+- COMPLETENESS: Explores all viable state space
+- EFFICIENCY: Uses dynamic programming to avoid recalculations
+- ROBUSTNESS: Fallbacks and controls for intractable cases
 
-CARACTERÍSTICAS DISTINTIVAS:
+DISTINCTIVE CHARACTERISTICS:
 
-- GARANTIA DE OTIMALIDADE: Diferente das heurísticas, garante solução ótima
-- COMPLEXIDADE CONTROLADA: Poda por limite de memória
-- VERSATILIDADE: Funciona para qualquer alfabeto e tamanho de string
-- TRANSPARÊNCIA: Reconstrução da solução ótima passo-a-passo
+- OPTIMALITY GUARANTEE: Unlike heuristics, guarantees optimal solution
+- CONTROLLED COMPLEXITY: Memory limit pruning
+- VERSATILITY: Works for any alphabet and string size
+- TRANSPARENCY: Step-by-step optimal solution reconstruction
 
-APLICAÇÃO AO CSP:
-O DP-CSP é ideal para:
-- Instâncias pequenas/médias onde exatidão é crítica
-- Benchmark de qualidade para heurísticas
-- Análise de estrutura do problema
-- Validação de soluções aproximadas
+CSP APPLICATION:
+DP-CSP is ideal for:
+- Small/medium instances where exactness is critical
+- Quality benchmarking for heuristics
+- Problem structure analysis
+- Approximate solution validation
 
-LIMITAÇÕES:
-- Complexidade exponencial no pior caso
-- Requer muita memória para problemas grandes
-- Pode ser lento para instâncias complexas
-- Não escalável para strings muito longas
+LIMITATIONS:
+- Exponential complexity in worst case
+- Requires high memory for large problems
+- Can be slow for complex instances
+- Not scalable for very long strings
 
-EXEMPLO DE FUNCIONAMENTO:
-Para strings ["AC", "AG", "AT"] e alfabeto "ACGT":
-1. Estados iniciais: (0, [0,0,0])
-2. Posição 0: escolher A → (1, [0,0,0])
-3. Posição 1: escolher C → (2, [0,1,1]), G → (2, [1,0,1]), T → (2, [1,1,0])
-4. Solução ótima: "AC" com distância máxima 1
+EXAMPLE OPERATION:
+For strings ["AC", "AG", "AT"] and alphabet "ACGT":
+1. Initial states: (0, [0,0,0])
+2. Position 0: choose A → (1, [0,0,0])
+3. Position 1: choose C → (2, [0,1,1]), G → (2, [1,0,1]), T → (2, [1,1,0])
+4. Optimal solution: "AC" with maximum distance 1
 
 Classes:
-    DPCSP: Implementação do algoritmo DP-CSP com controles de recurso.
+    DPCSP: DP-CSP algorithm implementation with resource controls.
 
-Funções auxiliares:
-    _dp_decision(): Função de decisão da programação dinâmica.
-    exact_dp_closest_string(): Wrapper principal com controles de recurso.
+Auxiliary functions:
+    _dp_decision(): Dynamic programming decision function.
+    exact_dp_closest_string(): Main wrapper with resource controls.
 
 Types:
-    String: Alias para str (representação de strings).
-    State: Tupla representando estado de distâncias.
+    String: Alias for str (string representation).
+    State: Tuple representing distance state.
 
-Author: Implementação baseada em programação dinâmica clássica para CSP
-Version: Otimizada com controles de recurso e fallbacks robustos
+Author: Implementation based on classical dynamic programming for CSP
+Version: Optimized with resource controls and robust fallbacks
 """
 
 from __future__ import annotations
@@ -104,155 +104,155 @@ String: TypeAlias = str
 
 def _dp_decision(strings: Sequence[String], alphabet: str, d: int) -> String | None:
     """
-    Algoritmo de decisão DP: verifica se existe string center com raio ≤ d.
+    DP decision algorithm: checks if center string exists with radius ≤ d.
 
-    Esta é a função central do DP-CSP que implementa o algoritmo de programação
-    dinâmica para o problema decisório: "Existe uma string center tal que
-    a distância máxima para todas as strings seja no máximo d?"
+    This is the core DP-CSP function that implements the dynamic programming
+    algorithm for the decision problem: "Does there exist a center string such that
+    the maximum distance to all strings is at most d?"
 
-    ALGORITMO DE PROGRAMAÇÃO DINÂMICA:
+    DYNAMIC PROGRAMMING ALGORITHM:
 
-    1. MODELAGEM DE ESTADOS:
-       - Estado: rem = (rem[0], rem[1], ..., rem[n-1])
-       - rem[i] = número de erros ainda permitidos para string i
-       - Estado inicial: rem = (d, d, ..., d)
-       - Estado final viável: rem[i] ≥ 0 para todo i
+    1. STATE MODELING:
+       - State: rem = (rem[0], rem[1], ..., rem[n-1])
+       - rem[i] = number of errors still allowed for string i
+       - Initial state: rem = (d, d, ..., d)
+       - Final viable state: rem[i] ≥ 0 for all i
 
-    2. PRÉ-COMPUTAÇÃO DE DIFERENÇAS:
-       - Para cada posição pos e símbolo σ:
-       - δσ[pos] = vetor indicando se σ difere de cada string em pos
-       - δσ[pos][i] = 1 se σ ≠ strings[i][pos], 0 caso contrário
+    2. DIFFERENCE PRE-COMPUTATION:
+       - For each position pos and symbol σ:
+       - δσ[pos] = vector indicating if σ differs from each string at pos
+       - δσ[pos][i] = 1 if σ ≠ strings[i][pos], 0 otherwise
 
-    3. TRANSIÇÕES DE ESTADO:
-       - Para cada posição pos = 0, 1, ..., L-1:
-       - Para cada estado rem na fronteira atual:
-       - Para cada símbolo σ do alfabeto:
-         a) Calcula novo_rem[i] = rem[i] - δσ[pos][i]
-         b) Se min(novo_rem) ≥ 0: estado viável, adiciona à próxima fronteira
-         c) Armazena ponteiro parent para reconstrução
+    3. STATE TRANSITIONS:
+       - For each position pos = 0, 1, ..., L-1:
+       - For each state rem in current frontier:
+       - For each symbol σ of alphabet:
+         a) Calculate new_rem[i] = rem[i] - δσ[pos][i]
+         b) If min(new_rem) ≥ 0: viable state, add to next frontier
+         c) Store parent pointer for reconstruction
 
-    4. PODA DE ESTADOS:
-       - Remove estados onde algum rem[i] < 0 (inviáveis)
-       - Evita duplicatas: um estado por configuração de rem
-       - Para se fronteira vazia (nenhuma solução possível)
+    4. STATE PRUNING:
+       - Remove states where some rem[i] < 0 (unfeasible)
+       - Avoid duplicates: one state per rem configuration
+       - Stop if frontier empty (no solution possible)
 
-    5. RECONSTRUÇÃO DE SOLUÇÃO:
-       - Se chegou ao final com estados viáveis: solução existe
-       - Usa ponteiros parent para backtrack do final ao início
-       - Reconstrói string center símbolo por símbolo
+    5. SOLUTION RECONSTRUCTION:
+       - If reached end with viable states: solution exists
+       - Use parent pointers to backtrack from end to start
+       - Reconstruct center string symbol by symbol
 
-    COMPLEXIDADE:
-    - Estados: O((d+1)^n) - cada rem[i] pode ser 0, 1, ..., d
-    - Transições: O(L × |Σ|) - para cada pos, testa cada símbolo
+    COMPLEXITY:
+    - States: O((d+1)^n) - each rem[i] can be 0, 1, ..., d
+    - Transitions: O(L × |Σ|) - for each pos, test each symbol
     - Total: O((d+1)^n × L × |Σ|)
 
-    OTIMIZAÇÕES IMPLEMENTADAS:
-    - Pré-computação de δσ evita recálculos
-    - Fronteira compacta reduz uso de memória
-    - Poda precoce elimina estados inviáveis rapidamente
-    - Parent pointers permitem reconstrução eficiente
+    OPTIMIZATIONS IMPLEMENTED:
+    - Pre-computation of δσ avoids recalculations
+    - Compact frontier reduces memory usage
+    - Early pruning eliminates unfeasible states quickly
+    - Parent pointers allow efficient reconstruction
 
     Args:
-        strings: Sequência de strings de entrada (mesmo comprimento)
-        alphabet: String com todos os símbolos válidos
-        d: Raio máximo permitido (threshold de decisão)
+        strings: Sequence of input strings (same length)
+        alphabet: String with all valid symbols
+        d: Maximum allowed radius (decision threshold)
 
     Returns:
-        String center com raio ≤ d se existir, None caso contrário
+        Center string with radius ≤ d if exists, None otherwise
 
     Example:
         >>> strings = ["AC", "AT", "GC"]
         >>> _dp_decision(strings, "ACGT", 1)
-        "AC"  # Uma solução com raio = 1
+        "AC"  # A solution with radius = 1
 
         >>> _dp_decision(strings, "ACGT", 0)
-        None  # Impossível raio = 0
+        None  # Impossible radius = 0
 
     Note:
-        A função é determinística mas pode retornar qualquer solução
-        válida (não necessariamente única). Validação final verifica
-        se solução retornada satisfaz realmente raio ≤ d.
+        Function is deterministic but may return any valid solution
+        (not necessarily unique). Final validation checks if returned
+        solution really satisfies radius ≤ d.
     """
     n, L = len(strings), len(strings[0])
 
-    # PRÉ-COMPUTAÇÃO: Matriz de diferenças δσ[pos][string]
-    # Para cada posição e símbolo, calcula vetor de discrepâncias
+    # PRE-COMPUTATION: Difference matrix δσ[pos][string]
+    # For each position and symbol, calculate discrepancy vector
     delta: list[dict[String, RemVec]] = []
     for pos in range(L):
-        # Símbolos na posição pos de todas as strings
+        # Symbols at position pos of all strings
         col = [s[pos] for s in strings]
-        # Para cada símbolo σ, calcula diferenças
+        # For each symbol σ, calculate differences
         delta.append({σ: tuple(int(σ != c) for c in col) for σ in alphabet})
 
-    # INICIALIZAÇÃO DA PROGRAMAÇÃO DINÂMICA
-    start: RemVec = (d,) * n  # Estado inicial: d erros para cada string
-    frontier: set[RemVec] = {start}  # Fronteira atual de estados viáveis
+    # DYNAMIC PROGRAMMING INITIALIZATION
+    start: RemVec = (d,) * n  # Initial state: d errors for each string
+    frontier: set[RemVec] = {start}  # Current frontier of viable states
 
-    # Ponteiros para reconstrução: (pos, estado) → (estado_anterior, símbolo)
+    # Pointers for reconstruction: (pos, state) → (previous_state, symbol)
     parent: dict[tuple[int, RemVec], tuple[RemVec | None, String]] = {
-        (0, start): (None, "")  # Estado inicial não tem predecessor
+        (0, start): (None, "")  # Initial state has no predecessor
     }
 
-    # PROGRAMAÇÃO DINÂMICA POSIÇÃO-A-POSIÇÃO
+    # POSITION-BY-POSITION DYNAMIC PROGRAMMING
     for pos in range(L):
-        nxt: set[RemVec] = set()  # Próxima fronteira
+        nxt: set[RemVec] = set()  # Next frontier
 
-        # Processa todos os estados da fronteira atual
+        # Process all states in current frontier
         for rem in frontier:
-            # Testa cada símbolo do alfabeto na posição atual
+            # Test each alphabet symbol at current position
             for σ, dv in delta[pos].items():
-                # TRANSIÇÃO DE ESTADO: consome erros baseado em diferenças
+                # STATE TRANSITION: consume errors based on differences
                 new_rem = tuple(r - v for r, v in zip(rem, dv))
 
-                # PODA: Remove estados inviáveis (algum rem[i] negativo)
+                # PRUNING: Remove unfeasible states (some rem[i] negative)
                 if min(new_rem) < 0:
-                    continue  # Estado inviável, poda
+                    continue  # Unfeasible state, prune
 
-                # Evita estados duplicados
+                # Avoid duplicate states
                 key = (pos + 1, new_rem)
                 if key in parent:
-                    continue  # Estado já visitado
+                    continue  # State already visited
 
-                # ARMAZENAMENTO: Registra transição e adiciona à próxima fronteira
+                # STORAGE: Record transition and add to next frontier
                 parent[key] = (rem, σ)
                 nxt.add(new_rem)
 
-        # Atualiza fronteira para próxima posição
+        # Update frontier for next position
         frontier = nxt
 
-        # PODA GLOBAL: Se nenhum estado viável, impossível continuar
+        # GLOBAL PRUNING: If no viable states, impossible to continue
         if not frontier:
-            return None  # Nenhuma solução existe para este d
+            return None  # No solution exists for this d
 
-    # RECONSTRUÇÃO DA SOLUÇÃO
-    # Se chegamos aqui, existe pelo menos um estado final viável
-    final_rem = next(iter(frontier))  # Qualquer estado final serve
+    # SOLUTION RECONSTRUCTION
+    # If we reach here, at least one final viable state exists
+    final_rem = next(iter(frontier))  # Any final state works
 
     center_chars: list[String] = []
     pos: int = L
     rem: RemVec = final_rem
 
-    # Backtrack usando ponteiros parent
+    # Backtrack using parent pointers
     while pos > 0:
         prev_rem, σ = parent[(pos, rem)]
-        center_chars.append(σ)  # Símbolo escolhido nesta posição
+        center_chars.append(σ)  # Symbol chosen at this position
         pos -= 1
 
-        if prev_rem is None:  # Chegamos ao estado inicial
+        if prev_rem is None:  # Reached initial state
             break
         rem = cast(RemVec, prev_rem)
 
-    # Reconstrói string na ordem correta
+    # Reconstruct string in correct order
     center_chars.reverse()
     result = "".join(center_chars)
 
-    # VALIDAÇÃO FINAL: Verifica se solução é realmente válida
+    # FINAL VALIDATION: Check if solution is really valid
     from src.domain.metrics import hamming_distance
 
     max_dist = max(hamming_distance(result, s) for s in strings)
     if max_dist > d:
         logger.error(
-            "[DP_DECISION] ERRO: Solução inválida! dist=%d > d=%d", max_dist, d
+            "[DP_DECISION] ERROR: Invalid solution! dist=%d > d=%d", max_dist, d
         )
 
     return result
@@ -266,116 +266,116 @@ def exact_dp_closest_string(
     warning_callback: Callable[[str], None] | None = None,
 ) -> tuple[String, int]:
     """
-    Encontra a solução EXATA do Closest String Problem usando programação dinâmica.
+    Finds the EXACT Closest String Problem solution using dynamic programming.
 
-    Esta é a interface principal do DP-CSP que coordena a busca pelo raio ótimo
-    mínimo. Diferentemente das heurísticas, garante encontrar a solução globalmente
-    ótima, fornecendo a cota inferior verdadeira para o problema.
+    This is the main DP-CSP interface that coordinates the search for the optimal
+    minimum radius. Unlike heuristics, it guarantees finding the globally
+    optimal solution, providing the true lower bound for the problem.
 
-    ESTRATÉGIA DE BUSCA DO RAIO ÓTIMO:
+    OPTIMAL RADIUS SEARCH STRATEGY:
 
-    1. BUSCA INCREMENTAL:
-       - Testa valores d = 0, 1, 2, ..., max_d sequencialmente
-       - Para cada d, usa algoritmo de decisão DP
-       - Para no primeiro d onde encontra solução (garantidamente ótimo)
+    1. INCREMENTAL SEARCH:
+       - Tests values d = 0, 1, 2, ..., max_d sequentially
+       - For each d, uses DP decision algorithm
+       - Stops at first d where solution is found (guaranteed optimal)
 
-    2. OTIMALIDADE GARANTIDA:
-       - Como testa em ordem crescente, primeira solução é ótima
-       - d* = min{d : existe center com raio ≤ d}
-       - Evita busca binária desnecessária para problema small
+    2. GUARANTEED OPTIMALITY:
+       - Since testing in increasing order, first solution is optimal
+       - d* = min{d : there exists center with radius ≤ d}
+       - Avoids unnecessary binary search for small problems
 
-    3. MONITORAMENTO DE RECURSOS:
-       - Estima complexidade (d+1)^n antes de executar
-       - Monitora uso de memória RSS durante execução
-       - Interrompe se exceder limites de tempo ou memória
-       - Reporta métricas detalhadas para auditoria
+    3. RESOURCE MONITORING:
+       - Estimates complexity (d+1)^n before executing
+       - Monitors RSS memory usage during execution
+       - Interrupts if exceeding time or memory limits
+       - Reports detailed metrics for auditing
 
-    LIMITAÇÕES E SALVAGUARDAS:
+    LIMITATIONS AND SAFEGUARDS:
 
-    - Complexidade Exponencial: O((d+1)^n × L × |Σ|) cresce rapidamente
-    - Limite de Estados: Aborta se (d+1)^n > 2e9 (evita crash por memória)
-    - Limite de Memória: Monitora RSS, aborta se > 95% do limite seguro
-    - Limite de Tempo: Timeout configurável (padrão 300s)
+    - Exponential Complexity: O((d+1)^n × L × |Σ|) grows rapidly
+    - State Limit: Aborts if (d+1)^n > 2e9 (prevents memory crash)
+    - Memory Limit: Monitors RSS, aborts if > 95% of safe limit
+    - Time Limit: Configurable timeout (default 300s)
 
-    CASOS DE USO RECOMENDADOS:
+    RECOMMENDED USE CASES:
 
-    - Validação: Verificar qualidade de algoritmos heurísticos
-    - Benchmark: Estabelecer ground truth para comparação
-    - Instâncias Pequenas: n ≤ 8, L ≤ 20, alphabet ≤ 4
-    - Pesquisa: Análise teórica de propriedades do CSP
+    - Validation: Check quality of heuristic algorithms
+    - Benchmark: Establish ground truth for comparison
+    - Small Instances: n ≤ 8, L ≤ 20, alphabet ≤ 4
+    - Research: Theoretical analysis of CSP properties
 
-    CONFIGURAÇÃO DE PARÂMETROS:
+    PARAMETER CONFIGURATION:
 
-    - max_d=None: Usa baseline (distância da primeira string) como limite
-    - progress_callback: Reporta progresso "Testando d=X"
-    - warning_callback: Reporta alertas de recursos antes de abortar
+    - max_d=None: Uses baseline (distance from first string) as limit
+    - progress_callback: Reports progress "Testing d=X"
+    - warning_callback: Reports resource warnings before aborting
 
-    MÉTRICAS E LOGS DETALHADOS:
+    DETAILED METRICS AND LOGS:
 
-    A função registra informações completas para auditoria:
-    - Parâmetros de entrada (n, L, alfabeto, strings)
-    - Limites de recursos configurados
-    - Progresso da busca (d testado, estados estimados)
-    - Resultado final (center encontrado, d* ótimo, validação)
-    - Métricas de performance (tempo, memória, iterações)
+    Function records complete information for auditing:
+    - Input parameters (n, L, alphabet, strings)
+    - Configured resource limits
+    - Search progress (d tested, estimated states)
+    - Final result (center found, optimal d*, validation)
+    - Performance metrics (time, memory, iterations)
 
     Args:
-        strings: Lista de strings de entrada (mesmo comprimento)
-        alphabet: String com símbolos válidos do alfabeto
-        max_d: Raio máximo a testar (None = baseline automático)
-        progress_callback: Função para reportar progresso (opcional)
-        warning_callback: Função para reportar alertas de recursos (opcional)
+        strings: List of input strings (same length)
+        alphabet: String with valid alphabet symbols
+        max_d: Maximum radius to test (None = automatic baseline)
+        progress_callback: Function to report progress (optional)
+        warning_callback: Function to report resource warnings (optional)
 
     Returns:
-        tuple: (center_ótimo, d*_ótimo)
-            - center_ótimo: String center com menor raio possível
-            - d*_ótimo: Menor raio possível para a instância
+        tuple: (optimal_center, optimal_d*)
+            - optimal_center: Center string with minimum possible radius
+            - optimal_d*: Minimum possible radius for the instance
 
     Raises:
-        RuntimeError: Se não encontrar solução dentro dos limites ou
-                     se exceder recursos (memória, tempo, complexidade)
+        RuntimeError: If no solution found within limits or
+                     if exceeding resources (memory, time, complexity)
 
     Example:
         >>> strings = ["ACGT", "AGCT", "ATCT"]
         >>> center, d_star = exact_dp_closest_string(strings, "ACGT")
-        >>> print(f"Solução ótima: {center} com raio {d_star}")
-        "Solução ótima: ACCT com raio 1"
+        >>> print(f"Optimal solution: {center} with radius {d_star}")
+        "Optimal solution: ACCT with radius 1"
 
     Note:
-        Para instâncias grandes, considere usar algoritmos heurísticos
-        como BLF-GA ou CSC que oferecem boa qualidade em tempo viável.
-        O DP-CSP deve ser usado quando exatidão é crítica e recursos
-        computacionais são adequados.
+        For large instances, consider using heuristic algorithms
+        like BLF-GA or CSC that offer good quality in viable time.
+        DP-CSP should be used when exactness is critical and
+        computational resources are adequate.
     """
-    # CONFIGURAÇÃO INICIAL E VALIDAÇÃO
-    baseline_val = max_distance(strings[0], strings)  # Cota superior simples
+    # INITIAL CONFIGURATION AND VALIDATION
+    baseline_val = max_distance(strings[0], strings)  # Simple upper bound
     if max_d is None:
         max_d = baseline_val
 
     n = len(strings)
     L = len(strings[0])
 
-    # LOGS DETALHADOS DE ENTRADA
+    # DETAILED INPUT LOGS
     logger.info(
-        "[DP_CSP] Iniciando busca exata com max_d=%d, baseline=%d", max_d, baseline_val
+        "[DP_CSP] Starting exact search with max_d=%d, baseline=%d", max_d, baseline_val
     )
-    logger.info("[DP_CSP] Dataset: n=%d, L=%d, alfabeto=%s", n, L, alphabet)
+    logger.info("[DP_CSP] Dataset: n=%d, L=%d, alphabet=%s", n, L, alphabet)
     for i, s in enumerate(strings):
         logger.info("[DP_CSP] String %d: %s", i, s)
 
-    # CONFIGURAÇÃO DE MONITORAMENTO DE RECURSOS
-    safe_mem_mb = 1000.0  # Limite padrão simplificado
+    # RESOURCE MONITORING CONFIGURATION
+    safe_mem_mb = 1000.0  # Simplified default limit
     max_time = DP_CSP_DEFAULTS.get("max_time", 300)
     t0 = time.time()
 
-    logger.info("[DP_CSP] Limites: mem=%.1fMB, tempo=%ds", safe_mem_mb, max_time)
+    logger.info("[DP_CSP] Limits: mem=%.1fMB, time=%ds", safe_mem_mb, max_time)
 
     def check_limits(d):
-        """Verifica limites de recursos antes de processar raio d."""
+        """Check resource limits before processing radius d."""
         import gc
         import os
 
-        # LIMPEZA E MEDIÇÃO DE MEMÓRIA
+        # MEMORY CLEANUP AND MEASUREMENT
         gc.collect()
         mem_mb = 0.0
         try:
@@ -387,19 +387,19 @@ def exact_dp_closest_string(
                             mem_mb = kb / 1024.0
                             break
         except (OSError, IOError, ValueError):
-            pass  # Continua mesmo se não conseguir medir memória
+            pass  # Continue even if cannot measure memory
 
         elapsed = time.time() - t0
 
-        # ESTIMATIVA DE COMPLEXIDADE
-        # Limite prático: ~2e9 estados (≈16GB RAM, 8 bytes/estado)
+        # COMPLEXITY ESTIMATION
+        # Practical limit: ~2e9 states (≈16GB RAM, 8 bytes/state)
         state_count_est = (d + 1) ** n
 
-        # VERIFICAÇÕES DE RECURSOS
+        # RESOURCE CHECKS
         if state_count_est > 2_000_000_000:
             msg = (
-                f"DP-CSP interrompido: (d+1)^n = {state_count_est:,} excede limite prático "
-                "(~2e9 estados, ~16GB RAM). Tente reduzir n ou d."
+                f"DP-CSP interrupted: (d+1)^n = {state_count_est:,} exceeds practical limit "
+                "(~2e9 states, ~16GB RAM). Try reducing n or d."
             )
             logger.error("[DP_CSP] %s", msg)
             if warning_callback:
@@ -407,94 +407,94 @@ def exact_dp_closest_string(
             raise RuntimeError(msg)
 
         if mem_mb > safe_mem_mb * 0.95:
-            msg = f"DP-CSP interrompido: uso de memória {mem_mb:.1f}MB excedeu limite seguro ({safe_mem_mb:.1f}MB)"
+            msg = f"DP-CSP interrupted: memory usage {mem_mb:.1f}MB exceeded safe limit ({safe_mem_mb:.1f}MB)"
             logger.error("[DP_CSP] %s", msg)
             if warning_callback:
                 warning_callback(msg)
             raise RuntimeError(msg)
 
         if elapsed > max_time:
-            msg = f"DP-CSP interrompido: tempo de execução excedeu {max_time}s"
+            msg = f"DP-CSP interrupted: execution time exceeded {max_time}s"
             logger.error("[DP_CSP] %s", msg)
             if warning_callback:
                 warning_callback(msg)
             raise RuntimeError(msg)
 
-    # BUSCA INCREMENTAL DO RAIO ÓTIMO
+    # INCREMENTAL SEARCH FOR OPTIMAL RADIUS
     for d in range(max_d + 1):
-        # Verificar recursos antes de cada iteração principal
+        # Check resources before each main iteration
         check_limits(d)
 
         if progress_callback:
-            progress_callback(f"Testando d={d}")
+            progress_callback(f"Testing d={d}")
 
-        logger.info("[DP_CSP] Testando d=%d (tentativa %d/%d)", d, d + 1, max_d + 1)
+        logger.info("[DP_CSP] Testing d=%d (attempt %d/%d)", d, d + 1, max_d + 1)
 
-        # ALGORITMO DE DECISÃO PARA RAIO d
+        # DECISION ALGORITHM FOR RADIUS d
         center = _dp_decision(strings, alphabet, d)
 
         if center is not None:
-            # SUCESSO: Encontrou solução com raio d
+            # SUCCESS: Found solution with radius d
 
-            # VALIDAÇÃO FINAL RIGOROSA
+            # RIGOROUS FINAL VALIDATION
             from src.domain.metrics import hamming_distance
 
             max_dist = max(hamming_distance(center, s) for s in strings)
 
-            logger.info("[DP_CSP] SUCESSO! Encontrou solução com d=%d", d)
-            logger.info("[DP_CSP] Centro encontrado: %s", center)
-            logger.info("[DP_CSP] Validação final: distância máxima = %d", max_dist)
+            logger.info("[DP_CSP] SUCCESS! Found solution with d=%d", d)
+            logger.info("[DP_CSP] Center found: %s", center)
+            logger.info("[DP_CSP] Final validation: maximum distance = %d", max_dist)
 
-            # Verificação de consistência
+            # Consistency check
             if max_dist != d:
                 logger.warning(
-                    "[DP_CSP] INCONSISTÊNCIA: d=%d mas distância real=%d", d, max_dist
+                    "[DP_CSP] INCONSISTENCY: d=%d but actual distance=%d", d, max_dist
                 )
 
             return center, d
 
-    # FALHA: Nenhuma solução encontrada dentro dos limites
-    logger.error("[DP_CSP] FALHA: Não foi possível encontrar centro com d ≤ %d", max_d)
+    # FAILURE: No solution found within limits
+    logger.error("[DP_CSP] FAILURE: Could not find center with d ≤ %d", max_d)
     raise RuntimeError(
-        f"Não foi possível encontrar centro com d ≤ {max_d}. "
-        "Tente aumentar o limite."
+        f"Could not find center with d ≤ {max_d}. "
+        "Try increasing the limit."
     )
 
 
 class DPCSP:
     """
-    Classe wrapper para o algoritmo DP-CSP (Dynamic Programming CSP).
+    Wrapper class for the DP-CSP (Dynamic Programming CSP) algorithm.
 
-    Esta classe fornece uma interface orientada a objetos para o algoritmo
-    DP-CSP, encapsulando configurações e oferecendo métodos convenientes
-    para execução e análise.
+    This class provides an object-oriented interface for the DP-CSP algorithm,
+    encapsulating configurations and offering convenient methods
+    for execution and analysis.
 
-    A classe é principalmente um wrapper em torno da função
-    exact_dp_closest_string(), fornecendo:
-    - Interface consistente com outros algoritmos do projeto
-    - Configuração de parâmetros via construtor
-    - Métodos de callback para monitoramento
-    - Metadados e estatísticas de execução
+    The class is primarily a wrapper around the exact_dp_closest_string()
+    function, providing:
+    - Consistent interface with other project algorithms
+    - Parameter configuration via constructor
+    - Callback methods for monitoring
+    - Execution metadata and statistics
 
     Attributes:
-        strings: Lista de strings de entrada
-        alphabet: Alfabeto utilizado
-        max_d: Raio máximo para busca
-        progress_callback: Callback para progresso
-        warning_callback: Callback para warnings
+        strings: List of input strings
+        alphabet: Alphabet used
+        max_d: Maximum radius for search
+        progress_callback: Progress callback
+        warning_callback: Warning callback
     """
 
     def __init__(
         self, strings: list[str], alphabet: str, max_d: int | None = None, **kwargs: Any
     ):
         """
-        Inicializa o algoritmo DP-CSP.
+        Initialize the DP-CSP algorithm.
 
         Args:
-            strings: Lista de strings de entrada (mesmo comprimento)
-            alphabet: Alfabeto utilizado
-            max_d: Raio máximo para busca (None = automático)
-            **kwargs: Parâmetros adicionais (para compatibilidade)
+            strings: List of input strings (same length)
+            alphabet: Alphabet used
+            max_d: Maximum radius for search (None = automatic)
+            **kwargs: Additional parameters (for compatibility)
         """
         self.strings = strings
         self.alphabet = alphabet
@@ -502,25 +502,25 @@ class DPCSP:
         self.progress_callback: Callable[[str], None] | None = None
         self.warning_callback: Callable[[str], None] | None = None
 
-        # Parâmetros para compatibilidade (não utilizados pelo DP-CSP)
+        # Parameters for compatibility (not used by DP-CSP)
         self.params = kwargs
 
     def set_progress_callback(self, callback: Callable[[str], None]) -> None:
-        """Define callback para reportar progresso."""
+        """Set callback to report progress."""
         self.progress_callback = callback
 
     def set_warning_callback(self, callback: Callable[[str], None]) -> None:
-        """Define callback para reportar warnings."""
+        """Set callback to report warnings."""
         self.warning_callback = callback
 
     def run(self) -> tuple[str, int]:
         """
-        Executa o algoritmo DP-CSP.
+        Execute the DP-CSP algorithm.
 
         Returns:
-            tuple: (center, distância_ótima)
-                - center: String center ótima
-                - distância_ótima: Menor raio possível
+            tuple: (center, optimal_distance)
+                - center: Optimal center string
+                - optimal_distance: Minimum possible radius
         """
         return exact_dp_closest_string(
             self.strings,

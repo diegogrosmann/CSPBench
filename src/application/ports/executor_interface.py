@@ -1,8 +1,8 @@
 """
-Interface Padronizada para Executores
+Standardized Interface for Executors
 
-Define o contrato comum que todos os executores devem implementar,
-garantindo consistência na execução de diferentes tipos de tarefas.
+Defines the common contract that all executors must implement,
+ensuring consistency in execution of different types of tasks.
 """
 
 from abc import ABC, abstractmethod
@@ -12,7 +12,7 @@ from src.domain import Dataset
 
 
 class ExecutorInterface(ABC):
-    """Interface padronizada para executores de algoritmos CSP."""
+    """Standardized interface for CSP algorithm executors."""
 
     @abstractmethod
     def execute_batch(
@@ -21,14 +21,14 @@ class ExecutorInterface(ABC):
         monitoring_service=None,
     ) -> List[Dict[str, Any]]:
         """
-        Executa batch de algoritmos (incluindo execuções únicas).
+        Execute batch of algorithms (including single executions).
 
         Args:
-            batch_config: Configuração do batch
-            monitoring_service: Serviço de monitoramento opcional
+            batch_config: Batch configuration
+            monitoring_service: Optional monitoring service
 
         Returns:
-            List[Dict[str, Any]]: Lista de resultados da execução
+            List[Dict[str, Any]]: List of execution results
         """
         pass
 
@@ -45,24 +45,24 @@ class ExecutorInterface(ABC):
         total_datasets: int = 1,
     ) -> Dict[str, Any]:
         """
-        Executa otimização de hiperparâmetros.
+        Execute hyperparameter optimization.
 
         Args:
-            algorithm_name: Nome do algoritmo
-            dataset: Dataset para otimização
-            optimization_config: Configuração da otimização
-            monitoring_service: Serviço de monitoramento opcional
-            config_index: Índice da configuração atual
-            total_configs: Total de configurações
-            dataset_index: Índice do dataset atual
-            total_datasets: Total de datasets
+            algorithm_name: Algorithm name
+            dataset: Dataset for optimization
+            optimization_config: Optimization configuration
+            monitoring_service: Optional monitoring service
+            config_index: Current configuration index
+            total_configs: Total configurations
+            dataset_index: Current dataset index
+            total_datasets: Total datasets
 
         Returns:
-            Dict[str, Any]: Resultado da otimização contendo:
-                - best_params: melhores parâmetros encontrados
-                - best_value: melhor valor alcançado
-                - n_trials: número de trials executados
-                - optimization_history: histórico da otimização
+            Dict[str, Any]: Optimization result containing:
+                - best_params: best parameters found
+                - best_value: best value achieved
+                - n_trials: number of trials executed
+                - optimization_history: optimization history
         """
         pass
 
@@ -75,54 +75,54 @@ class ExecutorInterface(ABC):
         monitoring_service=None,
     ) -> Dict[str, Any]:
         """
-        Executa análise de sensibilidade.
+        Execute sensitivity analysis.
 
         Args:
-            algorithm_name: Nome do algoritmo
-            dataset: Dataset para análise
-            sensitivity_config: Configuração da análise
-            monitoring_service: Serviço de monitoramento opcional
+            algorithm_name: Algorithm name
+            dataset: Dataset for analysis
+            sensitivity_config: Analysis configuration
+            monitoring_service: Optional monitoring service
 
         Returns:
-            Dict[str, Any]: Resultado da análise contendo:
-                - sensitivity_indices: índices de sensibilidade
-                - parameter_rankings: ranking dos parâmetros
-                - analysis_method: método utilizado
-                - samples_executed: número de amostras executadas
+            Dict[str, Any]: Analysis result containing:
+                - sensitivity_indices: sensitivity indices
+                - parameter_rankings: parameter rankings
+                - analysis_method: method used
+                - samples_executed: number of samples executed
         """
         pass
 
     @abstractmethod
     def get_execution_status(self, execution_id: str) -> str:
         """
-        Obtém status de uma execução específica.
+        Get status of a specific execution.
 
         Args:
-            execution_id: ID da execução
+            execution_id: Execution ID
 
         Returns:
-            str: Status da execução (running, completed, failed, cancelled)
+            str: Execution status (running, completed, failed, cancelled)
         """
         pass
 
     @abstractmethod
     def cancel_execution(self, execution_id: str) -> bool:
         """
-        Cancela uma execução em andamento.
+        Cancel a running execution.
 
         Args:
-            execution_id: ID da execução a cancelar
+            execution_id: Execution ID to cancel
 
         Returns:
-            bool: True se cancelamento foi bem-sucedido
+            bool: True if cancellation was successful
         """
         pass
 
     def set_batch_config(self, batch_config: Dict[str, Any]) -> None:
         """
-        Define configuração do batch atual (método opcional).
+        Set current batch configuration (optional method).
 
         Args:
-            batch_config: Configuração do batch
+            batch_config: Batch configuration
         """
         pass

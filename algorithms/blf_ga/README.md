@@ -1,32 +1,32 @@
 # BLF-GA: Blockwise Learning Fusion + Genetic Algorithm
 
-O **BLF-GA** é uma metaheurística híbrida avançada que combina aprendizado por blocos (Blockwise Learning) com algoritmo genético global, oferecendo uma abordagem sofisticada para resolver o Closest String Problem.
+The **BLF-GA** is an advanced hybrid metaheuristic that combines blockwise learning with global genetic algorithm, offering a sophisticated approach to solve the Closest String Problem.
 
-## 🧬 Visão Geral
+## 🧬 Overview
 
-### **Arquitetura Híbrida**
-O BLF-GA opera em múltiplas camadas, combinando:
-- **Aprendizado por Blocos**: Otimização local de segmentos das strings
-- **Evolução Genética**: Busca global através de população evolucionária
-- **Fusão Adaptativa**: Combinação inteligente de conhecimento local e global
-- **Refinamento Elite**: Busca local intensiva nos melhores indivíduos
+### **Hybrid Architecture**
+BLF-GA operates on multiple layers, combining:
+- **Blockwise Learning**: Local optimization of string segments
+- **Genetic Evolution**: Global search through evolutionary population
+- **Adaptive Fusion**: Intelligent combination of local and global knowledge
+- **Elite Refinement**: Intensive local search on best individuals
 
-### **Fases do Algoritmo**
-1. **Inicialização**: População inicial com diversidade controlada
-2. **Divisão em Blocos**: Segmentação adaptativa das strings
-3. **Aprendizado Local**: Otimização por bloco usando consenso e busca local
-4. **Evolução Global**: Operadores genéticos (seleção, crossover, mutação)
-5. **Fusão de Conhecimento**: Combinação de aprendizado local e global
-6. **Refinamento Elite**: Busca local nos melhores indivíduos
-7. **Redivisão Dinâmica**: Reconfiguração de blocos baseada na evolução
+### **Algorithm Phases**
+1. **Initialization**: Initial population with controlled diversity
+2. **Block Division**: Adaptive string segmentation
+3. **Local Learning**: Block-wise optimization using consensus and local search
+4. **Global Evolution**: Genetic operators (selection, crossover, mutation)
+5. **Knowledge Fusion**: Combination of local and global learning
+6. **Elite Refinement**: Local search on best individuals
+7. **Dynamic Redivision**: Block reconfiguration based on evolution
 
-## 🏗️ Componentes Técnicos
+## 🏗️ Technical Components
 
-### **Sistema de Blocos**
-- **B-Splitter**: Divisão inteligente em blocos contíguos
-- **Tamanho Adaptativo**: Blocos ajustados baseado no progresso
-- **Redivisão Dinâmica**: Reconfiguração periódica para escape de ótimos locais
-- **Aprendizado por Bloco**: Otimização local especializada
+### **Block System**
+- **B-Splitter**: Intelligent division into contiguous blocks
+- **Adaptive Size**: Blocks adjusted based on progress
+- **Dynamic Redivision**: Periodic reconfiguration to escape local optima
+- **Block Learning**: Specialized local optimization
 
 ### **Algoritmo Genético**
 - **População Diversa**: Inicialização garantindo diversidade genética
@@ -47,65 +47,65 @@ O BLF-GA opera em múltiplas camadas, combinando:
 ```python
 "population_size": 100,        # Tamanho da população
 "max_generations": 300,        # Máximo de gerações
-"elite_rate": 0.1,            # Taxa de elitismo (10%)
-"tournament_size": 3,          # Tamanho do torneio
+"elite_rate": 0.1,            # Elitism rate (10%)
+"tournament_size": 3,          # Tournament size
 ```
 
-### **Operadores Genéticos**
+### **Genetic Operators**
 ```python
-"crossover_prob": 0.8,         # Probabilidade de crossover
-"mutation_prob": 0.1,          # Probabilidade de mutação base
-"adaptive_mutation": True,      # Mutação adaptativa
-"local_search_prob": 0.3,      # Probabilidade de busca local
+"crossover_prob": 0.8,         # Crossover probability
+"mutation_prob": 0.1,          # Base mutation probability
+"adaptive_mutation": True,      # Adaptive mutation
+"local_search_prob": 0.3,      # Local search probability
 ```
 
-### **Sistema de Blocos**
+### **Block System**
 ```python
-"initial_blocks": 4,           # Número inicial de blocos
-"min_block_length": 3,         # Tamanho mínimo de bloco
-"redivision_frequency": 50,    # Frequência de redivisão
-"block_learning_rate": 0.1,    # Taxa de aprendizado por bloco
+"initial_blocks": 4,           # Initial number of blocks
+"min_block_length": 3,         # Minimum block size
+"redivision_frequency": 50,    # Redivision frequency
+"block_learning_rate": 0.1,    # Learning rate per block
 ```
 
-### **Controle e Convergência**
+### **Control and Convergence**
 ```python
-"max_time": 300,              # Tempo máximo (segundos)
-"convergence_generations": 50, # Gerações sem melhoria para parar
-"diversity_threshold": 0.1,    # Limiar de diversidade mínima
-"seed": None,                 # Semente para reprodutibilidade
+"max_time": 300,              # Maximum time (seconds)
+"convergence_generations": 50, # Generations without improvement to stop
+"diversity_threshold": 0.1,    # Minimum diversity threshold
+"seed": None,                 # Seed for reproducibility
 ```
 
-## 🎯 Estratégias e Heurísticas
+## 🎯 Strategies and Heuristics
 
 ### **Blockwise Learning**
-- **Consenso Local**: Geração de consenso ótimo por bloco
-- **Busca Exaustiva Local**: Exploração completa para blocos pequenos
-- **Hill Climbing**: Refinamento local por substituição de símbolos
-- **Cache de Blocos**: Reutilização de soluções de blocos similares
+- **Local Consensus**: Optimal consensus generation per block
+- **Local Exhaustive Search**: Complete exploration for small blocks
+- **Hill Climbing**: Local refinement by symbol substitution
+- **Block Cache**: Reuse of solutions for similar blocks
 
-### **Fusão de Conhecimento**
-- **Voting Scheme**: Combinação ponderada de soluções
-- **Block Replacement**: Substituição de blocos baseada em qualidade
-- **Hybrid Offspring**: Geração de descendentes híbridos
-- **Knowledge Transfer**: Transferência entre gerações
+### **Knowledge Fusion**
+- **Voting Scheme**: Weighted combination of solutions
+- **Block Replacement**: Quality-based block substitution
+- **Hybrid Offspring**: Generation of hybrid descendants
+- **Knowledge Transfer**: Transfer between generations
 
-### **Adaptação Dinâmica**
-- **Population Diversity Control**: Manutenção de diversidade genética
-- **Operator Rate Adaptation**: Ajuste automático de taxas
-- **Block Size Adaptation**: Redimensionamento baseado em performance
-- **Search Strategy Switching**: Alternância entre estratégias
+### **Dynamic Adaptation**
+- **Population Diversity Control**: Genetic diversity maintenance
+- **Operator Rate Adaptation**: Automatic rate adjustment
+- **Block Size Adaptation**: Performance-based resizing
+- **Search Strategy Switching**: Strategy alternation
 
-## 💻 Exemplo de Uso
+## 💻 Usage Example
 
-### **Uso Básico**
+### **Basic Usage**
 ```python
 from algorithms.blf_ga.algorithm import BLFGAAlgorithm
 
-# Dataset de exemplo
+# Example dataset
 strings = ["ACGTACGTACGT", "AGGTACGTAAGT", "ACGTAAGTTCGT"]
 alphabet = "ACGT"
 
-# Configurar algoritmo
+# Configure algorithm
 algorithm = BLFGAAlgorithm(
     strings, alphabet,
     population_size=100,
@@ -114,18 +114,18 @@ algorithm = BLFGAAlgorithm(
     mutation_prob=0.1
 )
 
-# Executar
+# Execute
 center, distance, metadata = algorithm.run()
 
-print(f"Centro encontrado: {center}")
-print(f"Distância: {distance}")
-print(f"Gerações: {metadata['generations_run']}")
-print(f"Tempo: {metadata['execution_time']:.2f}s")
+print(f"Center found: {center}")
+print(f"Distance: {distance}")
+print(f"Generations: {metadata['generations_run']}")
+print(f"Time: {metadata['execution_time']:.2f}s")
 ```
 
-### **Configuração Avançada**
+### **Advanced Configuration**
 ```python
-# Configuração para instâncias grandes
+# Configuration for large instances
 algorithm = BLFGAAlgorithm(
     strings, alphabet,
     population_size=200,
@@ -140,17 +140,17 @@ algorithm = BLFGAAlgorithm(
 
 ### **Via Framework**
 ```bash
-# Execução básica
+# Basic execution
 python main.py --algorithms BLF-GA --dataset synthetic
 
-# Com parâmetros customizados
+# With custom parameters
 python main.py --algorithms BLF-GA --dataset synthetic --workers 4
 
-# Execução otimizada para instâncias grandes
+# Optimized execution for large instances
 python main.py --algorithms BLF-GA --dataset file --timeout 600
 ```
 
-### **Configuração YAML**
+### **YAML Configuration**
 ```yaml
 algorithms: ["BLF-GA"]
 algorithm_params:
@@ -163,43 +163,43 @@ algorithm_params:
     max_time: 450
 ```
 
-## 📈 Performance e Características
+## 📈 Performance and Characteristics
 
-### **Complexidade Computacional**
-- **Temporal**: O(G × P × L × n) onde:
-  - G: número de gerações
-  - P: tamanho da população
-  - L: comprimento das strings
-  - n: número de strings
-- **Espacial**: O(P × L) para população + O(B × L) para blocos
+### **Computational Complexity**
+- **Time**: O(G × P × L × n) where:
+  - G: number of generations
+  - P: population size
+  - L: string length
+  - n: number of strings
+- **Space**: O(P × L) for population + O(B × L) for blocks
 
-### **Paralelização**
-- ✅ **Suporte Interno**: `supports_internal_parallel = True`
-- ✅ **Avaliação Paralela**: População avaliada em paralelo
-- ✅ **Blocos Paralelos**: Processamento simultâneo de blocos
-- ✅ **Auto-configuração**: Workers ajustados automaticamente
+### **Parallelization**
+- ✅ **Internal Support**: `supports_internal_parallel = True`
+- ✅ **Parallel Evaluation**: Population evaluated in parallel
+- ✅ **Parallel Blocks**: Simultaneous block processing
+- ✅ **Auto-configuration**: Workers adjusted automatically
 
-### **Escalabilidade**
-- **Instâncias Pequenas** (n≤20, L≤50): ~10-30s
-- **Instâncias Médias** (n≤100, L≤200): ~1-5 min
-- **Instâncias Grandes** (n≤500, L≤1000): ~10-30 min
+### **Scalability**
+- **Small Instances** (n≤20, L≤50): ~10-30s
+- **Medium Instances** (n≤100, L≤200): ~1-5 min
+- **Large Instances** (n≤500, L≤1000): ~10-30 min
 
-## 🎯 Casos de Uso
+## 🎯 Use Cases
 
-### **✅ Ideal Para**
-- **Instâncias Médias/Grandes**: n > 20, L > 100
-- **Dados com Padrões Locais**: Sequências biológicas estruturadas
-- **Qualidade Prioritária**: Quando solução próxima do ótimo é essencial
-- **Recursos Computacionais Disponíveis**: Sistemas multi-core
-- **Execução em Lote**: Múltiplas execuções com estatísticas
+### **✅ Ideal For**
+- **Medium/Large Instances**: n > 20, L > 100
+- **Data with Local Patterns**: Structured biological sequences
+- **Quality Priority**: When near-optimal solution is essential
+- **Available Computational Resources**: Multi-core systems
+- **Batch Execution**: Multiple runs with statistics
 
-### **❌ Limitações**
-- **Complexidade de Configuração**: Muitos parâmetros para ajustar
-- **Tempo de Execução**: Pode ser lento para instâncias pequenas
-- **Variabilidade**: Resultados podem variar entre execuções
-- **Recursos**: Consome mais CPU e memória que algoritmos simples
+### **❌ Limitations**
+- **Configuration Complexity**: Many parameters to tune
+- **Execution Time**: Can be slow for small instances
+- **Variability**: Results may vary between runs
+- **Resources**: Consumes more CPU and memory than simple algorithms
 
-## 🔬 Metadados Coletados
+## 🔬 Collected Metadata
 
 ```python
 {
@@ -220,9 +220,9 @@ algorithm_params:
 }
 ```
 
-## 🧪 Configurações Recomendadas
+## 🧪 Recommended Configurations
 
-### **Para Instâncias Pequenas**
+### **For Small Instances**
 ```python
 {
     "population_size": 50,
@@ -232,7 +232,7 @@ algorithm_params:
 }
 ```
 
-### **Para Instâncias Médias**
+### **For Medium Instances**
 ```python
 {
     "population_size": 100,
@@ -242,7 +242,7 @@ algorithm_params:
 }
 ```
 
-### **Para Instâncias Grandes**
+### **For Large Instances**
 ```python
 {
     "population_size": 200,
@@ -252,7 +252,7 @@ algorithm_params:
 }
 ```
 
-### **Para Execução Rápida**
+### **For Fast Execution**
 ```python
 {
     "population_size": 30,
@@ -262,9 +262,9 @@ algorithm_params:
 }
 ```
 
-## 🎨 Análise e Visualizações
+## 🎨 Analysis and Visualizations
 
-### **Curva de Convergência**
+### **Convergence Curve**
 ```python
 import matplotlib.pyplot as plt
 
@@ -274,14 +274,14 @@ def plot_convergence(metadata):
     
     plt.figure(figsize=(10, 6))
     plt.plot(generations, fitness, 'b-', linewidth=2)
-    plt.xlabel('Geração')
-    plt.ylabel('Melhor Fitness')
-    plt.title('Convergência do BLF-GA')
+    plt.xlabel('Generation')
+    plt.ylabel('Best Fitness')
+    plt.title('BLF-GA Convergence')
     plt.grid(True, alpha=0.3)
     plt.show()
 ```
 
-### **Diversidade Populacional**
+### **Population Diversity**
 ```python
 def plot_diversity(metadata):
     generations = range(len(metadata['diversity_curve']))
@@ -289,25 +289,25 @@ def plot_diversity(metadata):
     
     plt.figure(figsize=(10, 6))
     plt.plot(generations, diversity, 'r-', linewidth=2)
-    plt.xlabel('Geração')
-    plt.ylabel('Diversidade')
-    plt.title('Diversidade Populacional')
+    plt.xlabel('Generation')
+    plt.ylabel('Diversity')
+    plt.title('Population Diversity')
     plt.grid(True, alpha=0.3)
     plt.show()
 ```
 
-## 🔗 Integração com CSPBench
+## 🔗 CSPBench Integration
 
-### **Recursos do Framework**
-- **Registro Automático**: `@register_algorithm`
-- **Paralelismo Interno**: Configuração automática de workers
-- **Callbacks de Progresso**: Relatórios em tempo real
-- **Timeouts**: Controle de tempo máximo
-- **Monitoramento**: Interface curses compatível
+### **Framework Features**
+- **Automatic Registration**: `@register_algorithm`
+- **Internal Parallelism**: Automatic worker configuration
+- **Progress Callbacks**: Real-time reports
+- **Timeouts**: Maximum time control
+- **Monitoring**: Curses interface compatible
 
-### **Otimização de Hiperparâmetros**
+### **Hyperparameter Optimization**
 ```yaml
-# Configuração para Optuna
+# Configuration for Optuna
 optimization_config:
   param_space:
     "BLF-GA":
@@ -318,9 +318,9 @@ optimization_config:
       initial_blocks: ["int", 2, 10]
 ```
 
-### **Análise de Sensibilidade**
+### **Sensitivity Analysis**
 ```yaml
-# Configuração para SALib
+# Configuration for SALib
 sensitivity_config:
   param_space:
     "BLF-GA": [
@@ -332,25 +332,25 @@ sensitivity_config:
     ]
 ```
 
-## 🚀 Extensões e Melhorias
+## 🚀 Extensions and Improvements
 
-### **Versões Futuras**
-1. **BLF-GA Multi-Objetivo**: Otimização simultânea de múltiplos critérios
-2. **BLF-GA Distribuído**: Execução em cluster/grid
-3. **BLF-GA Adaptativo**: Algoritmo que se auto-ajusta
-4. **BLF-GA Quântico**: Inspiração em computação quântica
+### **Future Versions**
+1. **Multi-Objective BLF-GA**: Simultaneous optimization of multiple criteria
+2. **Distributed BLF-GA**: Cluster/grid execution
+3. **Adaptive BLF-GA**: Self-adjusting algorithm
+4. **Quantum BLF-GA**: Quantum computing inspiration
 
-### **Melhorias Implementáveis**
-- **Cache Inteligente**: Reutilização de avaliações
-- **Operadores Especializados**: Crossover e mutação específicos para CSP
-- **Aprendizado Online**: Adaptação baseada em histórico
-- **Paralelização Avançada**: GPU computing
+### **Implementable Improvements**
+- **Smart Cache**: Evaluation reuse
+- **Specialized Operators**: CSP-specific crossover and mutation
+- **Online Learning**: History-based adaptation
+- **Advanced Parallelization**: GPU computing
 
 ---
 
-*BLF-GA: Quando excelência em qualidade e sofisticação algorítmica são prioridades para resolver o CSP.*
+*BLF-GA: When excellence in quality and algorithmic sophistication are priorities for solving CSP.*
 
-## Documentação
+## Documentation
 
-- Consulte o código para docstrings detalhadas (Google style).
-- Integração automática com o framework CSP via decorador `@register_algorithm`.
+- See code for detailed docstrings (Google style).
+- Automatic integration with CSP framework via `@register_algorithm` decorator.

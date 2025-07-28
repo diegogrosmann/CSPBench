@@ -1,4 +1,4 @@
-"""Monitor simples para terminal."""
+"""Simple monitor for terminal."""
 
 from datetime import datetime
 from typing import Any, Dict, Optional
@@ -12,16 +12,16 @@ from .interfaces import (
 
 
 class SimpleMonitor(MonitoringInterface):
-    """Monitor simples que exibe progresso no terminal."""
+    """Simple monitor that displays progress in terminal."""
 
     def __init__(self):
         self.task_type: Optional[TaskType] = None
         self.task_name: str = ""
         self.start_time: Optional[datetime] = None
         self.header_printed: bool = False
-        self.last_execution_name: str = ""  # Controlar duplicação
+        self.last_execution_name: str = ""  # Control duplication
 
-        # Controle hierárquico
+        # Hierarchical control
         self.current_config_id: Optional[str] = None
         self.current_config_index: int = 0
         self.total_configs: int = 0
@@ -30,11 +30,11 @@ class SimpleMonitor(MonitoringInterface):
         self.current_dataset_index: int = 0
         self.total_datasets: int = 0
 
-        # Estado dos algoritmos do dataset atual
+        # Current dataset algorithm state
         self.current_algorithms: Dict[str, Dict[str, Any]] = {}
         self.algorithm_order: list[str] = []
 
-        # Mapeamento de repetições para algoritmos
+        # Repetition mapping for algorithms
         self.algorithm_repetitions: Dict[str, Dict[str, Any]] = {}
 
     def start_task(

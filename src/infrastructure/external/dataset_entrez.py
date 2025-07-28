@@ -1,15 +1,15 @@
 """
-Módulo de Download de Datasets do NCBI - CSPBench
+NCBI Dataset Download Module - CSPBench
 
-Fornece funcionalidades para download automático de sequências biológicas
-do NCBI via API Entrez para problemas de Closest String Problem (CSP).
+Provides functionality for automatic download of biological sequences
+from NCBI via Entrez API for Closest String Problem (CSP) applications.
 
-Configuração:
-    Crie um arquivo .env na raiz do projeto com:
-    NCBI_EMAIL=seu_email@exemplo.com
-    NCBI_API_KEY=sua_chave_api  # Opcional
+Configuration:
+    Create a .env file in the project root with:
+    NCBI_EMAIL=your_email@example.com
+    NCBI_API_KEY=your_api_key  # Optional
 
-Autor: CSPBench Development Team
+Author: CSPBench Development Team
 """
 
 import logging
@@ -29,12 +29,12 @@ try:
     from Bio import Entrez, SeqIO
 except ImportError as exc:
     raise ImportError(
-        "Biopython não encontrado. Instale com: pip install biopython"
+        "Biopython not found. Install with: pip install biopython"
     ) from exc
 
 logger = logging.getLogger(__name__)
 
-# Configurações padrão carregadas do .env
+# Default settings loaded from .env
 ENTREZ_DEFAULTS = {
     "email": os.getenv("NCBI_EMAIL", "change_me@example.com"),
     "api_key": os.getenv("NCBI_API_KEY"),
@@ -47,27 +47,27 @@ ENTREZ_DEFAULTS = {
 
 def fetch_dataset() -> Tuple[List[str], Dict[str, Any]]:
     """
-    Baixa um dataset do NCBI usando configuração padrão.
+    Download a dataset from NCBI using default configuration.
 
-    Para uso programático, prefira fetch_dataset_silent().
+    For programmatic use, prefer fetch_dataset_silent().
     """
-    # TODO: Reimplementar interface interativa
+    # TODO: Reimplement interactive interface
     return fetch_dataset_silent(ENTREZ_DEFAULTS)
 
 
 def fetch_dataset_silent(params: Dict[str, Any]) -> Tuple[List[str], Dict[str, Any]]:
     """
-    Baixa um dataset do NCBI usando parâmetros fornecidos.
+    Download a dataset from NCBI using provided parameters.
 
     Args:
-        params: Parâmetros de configuração (email, db, term, n, api_key)
+        params: Configuration parameters (email, db, term, n, api_key)
 
     Returns:
-        Tuple com lista de sequências e parâmetros utilizados
+        Tuple with list of sequences and used parameters
 
     Raises:
-        ValueError: Se erro na busca, download ou validação
-        HTTPError: Se problema de comunicação com NCBI
+        ValueError: If error in search, download or validation
+        HTTPError: If communication problem with NCBI
     """
     # Mesclar parâmetros com configurações padrão
     merged_params = {**ENTREZ_DEFAULTS}

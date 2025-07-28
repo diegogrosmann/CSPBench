@@ -1,8 +1,8 @@
 """
-Dataset Generation Orchestrator - Orquestração de Alto Nível
+Dataset Generation Orchestrator - High-Level Orchestration
 
-Coordena o wizard interativo com os serviços de geração,
-mantendo a separação de responsabilidades da arquitetura hexagonal.
+Coordinates the interactive wizard with generation services,
+maintaining the responsibility separation of hexagonal architecture.
 """
 
 from pathlib import Path
@@ -14,120 +14,120 @@ from src.presentation.tui.dataset_wizard import DatasetWizard
 
 
 class DatasetGenerationOrchestrator:
-    """Orquestrador para geração interativa de datasets."""
+    """Orchestrator for interactive dataset generation."""
 
     def __init__(self, base_path: str = "datasets"):
         """
-        Inicializa o orquestrador.
+        Initialize orchestrator.
 
         Args:
-            base_path: Diretório base para salvar datasets
+            base_path: Base directory to save datasets
         """
         self.base_path = base_path
         self.wizard = DatasetWizard()
 
-        # Criar repositório e serviço
+        # Create repository and service
         self.repository = FileDatasetRepository(base_path)
         self.service = DatasetGenerationService(self.repository)
 
     def run_interactive_generation(self) -> Optional[str]:
         """
-        Executa o processo interativo completo de geração de dataset.
+        Execute complete interactive dataset generation process.
 
         Returns:
-            Caminho do arquivo gerado ou None se cancelado
+            Generated file path or None if cancelled
         """
         try:
-            # Mostrar menu principal
+            # Show main menu
             choice = self.wizard.show_main_menu()
 
             if choice == "exit":
                 return None
 
-            # Coletar parâmetros baseado na escolha
+            # Collect parameters based on choice
             if choice == "synthetic":
                 return self._handle_synthetic_generation()
             elif choice == "real":
                 return self._handle_real_generation()
 
         except (KeyboardInterrupt, EOFError):
-            print("\n👋 Operação cancelada pelo usuário!")
+            print("\n👋 Operation cancelled by user!")
             return None
         except (FileNotFoundError, PermissionError, OSError) as e:
-            print(f"\n❌ Erro de arquivo: {e}")
+            print(f"\n❌ File error: {e}")
             return None
 
     def _handle_synthetic_generation(self) -> Optional[str]:
-        """Manipula geração de dataset sintético."""
-        # Coletar parâmetros
+        """Handle synthetic dataset generation."""
+        # Collect parameters
         params = self.wizard.collect_synthetic_params()
 
-        # Gerar nome padrão
+        # Generate default name
         default_filename = self.wizard.generate_default_filename("synthetic", params)
 
-        # Solicitar nome final
+        # Request final name
         filename = self.wizard.get_output_filename(default_filename)
 
-        # Verificar se arquivo já existe
+        # Check if file already exists
         output_path = Path(self.base_path) / filename
         if output_path.exists():
             overwrite = (
-                input(f"\n⚠️  Arquivo '{filename}' já existe. Sobrescrever? (s/N): ")
+                input(f"\n⚠️  File '{filename}' already exists. Overwrite? (y/N): ")
                 .strip()
                 .lower()
             )
             if overwrite not in ["s", "sim", "y", "yes"]:
-                print("📄 Operação cancelada.")
+                print("📄 Operation cancelled.")
                 return None
 
-        # Gerar dataset
-        print("\n🧪 Gerando dataset sintético...")
-        print(f"   Parâmetros: {params}")
+        # Generate dataset
+        print("\n🧪 Generating synthetic dataset...")
+        print(f"   Parameters: {params}")
 
         dataset = self.service.generate_synthetic_dataset(params)
 
-        # Salvar dataset
+        # Save dataset
         saved_path = self.service.save_dataset(dataset, filename, self.base_path)
 
-        # Mostrar resumo
+        # Show summary
         summary = self.service.get_generation_summary(dataset, params)
-        self._show_generation_summary("Sintético", saved_path, summary)
+        self._show_generation_summary("Synthetic", saved_path, summary)
 
         return saved_path
 
     def _handle_real_generation(self) -> Optional[str]:
-        """Manipula geração de dataset real."""
-        # Coletar parâmetros
+        """Handle real dataset generation."""
+        # Collect parameters
         params = self.wizard.collect_real_params()
 
-        # Gerar nome padrão
+        # Generate default name
         default_filename = self.wizard.generate_default_filename("real", params)
 
-        # Solicitar nome final
+        # Request final name
         filename = self.wizard.get_output_filename(default_filename)
 
-        # Verificar se arquivo já existe
+        # Check if file already exists
         output_path = Path(self.base_path) / filename
         if output_path.exists():
             overwrite = (
-                input(f"\n⚠️  Arquivo '{filename}' já existe. Sobrescrever? (s/N): ")
+                input(f"\n⚠️  File '{filename}' already exists. Overwrite? (y/N): ")
                 .strip()
                 .lower()
             )
             if overwrite not in ["s", "sim", "y", "yes"]:
-                print("📄 Operação cancelada.")
+                print("📄 Operation cancelled.")
                 return None
 
-        # Baixar/importar dataset
-        print("\n🌐 Processando dataset real...")
-        print(f"   Parâmetros: {params}")
+        # Download/import dataset
+        print("\n🌐 Processing real dataset...")
+        print(f"   Parameters: {params}")
 
         dataset = self.service.download_real_dataset(params)
 
-        # Salvar dataset
+        # Save dataset
         saved_path = self.service.save_dataset(dataset, filename, self.base_path)
 
-        # Mostrar resumo
+        # Show summary
         summary = self.service.get_generation_summary(dataset, params)
         self._show_generation_summary("Real", saved_path, summary)
 
@@ -136,12 +136,12 @@ class DatasetGenerationOrchestrator:
     def _show_generation_summary(
         self, dataset_type: str, saved_path: str, summary: Dict[str, Any]
     ) -> None:
-        """Mostra resumo da geração."""
-        print(f"\n✅ Dataset {dataset_type} gerado com sucesso!")
+        """Show generation summary."""
+        print(f"\n✅ {dataset_type} dataset generated successfully!")
         print("=" * 50)
-        print(f"📁 Arquivo salvo: {saved_path}")
-        print(f"📊 Sequências: {summary['total_sequences']}")
-        print(f"📏 Comprimento: {summary['sequence_length']}")
-        print(f"🔤 Alfabeto: {summary['alphabet']}")
-        print(f"💾 Tamanho estimado: {summary['estimated_size_kb']:.1f} KB")
+        print(f"📁 File saved: {saved_path}")
+        print(f"📊 Sequences: {summary['total_sequences']}")
+        print(f"📏 Length: {summary['sequence_length']}")
+        print(f"🔤 Alphabet: {summary['alphabet']}")
+        print(f"💾 Estimated size: {summary['estimated_size_kb']:.1f} KB")
         print("=" * 50)

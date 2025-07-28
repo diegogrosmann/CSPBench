@@ -324,7 +324,7 @@ class OptimizationOrchestrator:
             raise ValueError("Algoritmo não especificado")
 
         if not self.algorithm_registry.algorithm_exists(algorithm_name):
-            raise ValueError(f"Algoritmo não encontrado: {algorithm_name}")
+            raise ValueError(f"Algorithm not found: {algorithm_name}")
 
         return self.algorithm_registry.get_algorithm(algorithm_name)
 

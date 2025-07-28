@@ -1,8 +1,8 @@
 """
-Módulo de Parsing de Configuração CSPBench
+CSPBench Configuration Parsing Module
 
-Fornece classes e funções modulares para parsing e validação de configurações
-de batch, otimização e análise de sensibilidade.
+Provides modular classes and functions for parsing and validating
+batch, optimization, and sensitivity analysis configurations.
 """
 
 import json
@@ -21,9 +21,9 @@ from src.domain.errors import (
 
 @dataclass
 class BatchMetadata:
-    """Metadados do batch."""
+    """Batch metadata."""
 
-    nome: str
+    nome: str  # keeping original field names for YAML compatibility
     descricao: str
     autor: str
     versao: str
@@ -34,7 +34,7 @@ class BatchMetadata:
 
 @dataclass
 class OptimizationConfig:
-    """Configuração de uma otimização específica."""
+    """Configuration for a specific optimization."""
 
     nome: str
     study_name: str
@@ -49,7 +49,7 @@ class OptimizationConfig:
 
 @dataclass
 class SensitivityConfig:
-    """Configuração de uma análise de sensibilidade específica."""
+    """Configuration for a specific sensitivity analysis."""
 
     nome: str
     analysis_method: str
@@ -62,16 +62,101 @@ class SensitivityConfig:
     method_config: Optional[Dict[str, Any]] = None
 
 
+@dataclass
+class InfrastructureConfig:
+    """Infrastructure configuration."""
+    
+    history: Optional[Dict[str, Any]] = None
+    result: Optional[Dict[str, Any]] = None
+
+
+@dataclass
+class ExportConfig:
+    """Export configuration."""
+    
+    enabled: bool = True
+    destination: str = "outputs/{session_folder}"
+    formats: Optional[Dict[str, Any]] = None
+    csv_config: Optional[Dict[str, Any]] = None
+    json_config: Optional[Dict[str, Any]] = None
+    directory_structure: Optional[Dict[str, Any]] = None
+    include: Optional[List[str]] = None
+
+
+@dataclass
+class PlotsConfig:
+    """Visualization/plots configuration."""
+    
+    enabled: bool = True
+    plot_convergence: bool = True
+    plot_comparison: bool = True
+    plot_boxplots: bool = True
+    plot_scatter: bool = True
+    plot_heatmap: bool = True
+    plot_runtime: bool = True
+    plot_success_rate: bool = True
+    plot_optimization_history: bool = True
+    plot_parameter_importance: bool = True
+    plot_parallel_coordinate: bool = True
+    plot_sensitivity_indices: bool = True
+    plot_morris_trajectories: bool = True
+    plot_interaction_effects: bool = True
+    style: str = "seaborn-v0_8"
+    figure_size: List[int] = None
+    dpi: int = 300
+    color_palette: str = "Set2"
+    formats: List[str] = None
+    font_size: int = 12
+    title_size: int = 16
+    label_size: int = 14
+    legend_size: int = 10
+    tight_layout: bool = True
+
+
+@dataclass
+class MonitoringConfig:
+    """Monitoring configuration."""
+    
+    enabled: bool = True
+    interface: str = "simple"
+    update_interval: int = 3
+
+
+@dataclass
+class LoggingConfig:
+    """Logging configuration."""
+    
+    level: str = "INFO"
+    output: Optional[Dict[str, Any]] = None
+    file_config: Optional[Dict[str, Any]] = None
+    format: Optional[Dict[str, Any]] = None
+    components: Optional[Dict[str, Any]] = None
+    filters: Optional[Dict[str, Any]] = None
+    structured: Optional[Dict[str, Any]] = None
+
+
+@dataclass
+class SystemConfig:
+    """System configuration."""
+    
+    reproducibility: Optional[Dict[str, Any]] = None
+    checkpointing: Optional[Dict[str, Any]] = None
+    progress: Optional[Dict[str, Any]] = None
+    early_stopping: Optional[Dict[str, Any]] = None
+    error_handling: Optional[Dict[str, Any]] = None
+    cleanup: Optional[Dict[str, Any]] = None
+
+
 class ConfigurationParser:
-    """Parser modular para configurações CSPBench."""
+    """Modular parser for CSPBench configurations."""
 
     @staticmethod
     def load_file(file_path: Union[str, Path]) -> Dict[str, Any]:
-        """Carrega arquivo de configuração YAML ou JSON."""
+        """Load YAML or JSON configuration file."""
         file_path = Path(file_path)
 
         if not file_path.exists():
-            raise BatchConfigurationError(f"Arquivo não encontrado: {file_path}")
+            raise BatchConfigurationError(f"File not found: {file_path}")
 
         with open(file_path, "r", encoding="utf-8") as f:
             if file_path.suffix.lower() in [".yaml", ".yml"]:
@@ -80,22 +165,22 @@ class ConfigurationParser:
                 config = json.load(f)
             else:
                 raise BatchConfigurationError(
-                    f"Formato não suportado: {file_path.suffix}"
+                    f"Unsupported format: {file_path.suffix}"
                 )
 
         if not isinstance(config, dict):
-            raise BatchConfigurationError("Configuração deve ser um objeto/dicionário")
+            raise BatchConfigurationError("Configuration must be an object/dictionary")
 
         return config
 
     @staticmethod
     def parse_metadata(config: Dict[str, Any]) -> BatchMetadata:
-        """Extrai metadados do batch."""
-        # Suporte a ambos batch_info (legado) e metadados (novo)
+        """Extract batch metadata."""
+        # Support both batch_info (legacy) and metadados (new)
         metadata_section = config.get("metadados", config.get("batch_info", {}))
 
         if not metadata_section:
-            raise BatchConfigurationError("Seção metadados/batch_info não encontrada")
+            raise BatchConfigurationError("metadados/batch_info section not found")
 
         return BatchMetadata(
             nome=metadata_section.get("nome", "sem nome"),
@@ -109,49 +194,49 @@ class ConfigurationParser:
 
     @staticmethod
     def parse_optimization_configs(config: Dict[str, Any]) -> List[OptimizationConfig]:
-        """Extrai configurações de otimização."""
+        """Extract optimization configurations."""
         optimization_section = config.get("optimization", {})
 
         if not optimization_section:
-            raise OptimizationConfigurationError("Seção optimization não encontrada")
+            raise OptimizationConfigurationError("optimization section not found")
 
-        # Suporte a estrutura nova (optimizations) e legada (campos diretos)
+        # Support new structure (optimizations) and legacy (direct fields)
         optimizations_list = optimization_section.get("optimizations")
 
         if optimizations_list is not None:
-            # Nova estrutura: lista de otimizações
+            # New structure: list of optimizations
             return [
                 ConfigurationParser._parse_single_optimization(opt_config)
                 for opt_config in optimizations_list
             ]
         else:
-            # Estrutura legada: configuração única
-            # Converte para lista de uma otimização
+            # Legacy structure: single configuration
+            # Convert to list of one optimization
             legacy_config = optimization_section.copy()
 
-            # Garantir campos obrigatórios para estrutura legada
+            # Ensure required fields for legacy structure
             if "target_dataset" in legacy_config:
                 legacy_config["target_datasets"] = [legacy_config.pop("target_dataset")]
 
             if "nome" not in legacy_config:
                 legacy_config["nome"] = (
-                    f"Otimização {legacy_config.get('target_algorithm', 'Unknown')}"
+                    f"Optimization {legacy_config.get('target_algorithm', 'Unknown')}"
                 )
 
             return [ConfigurationParser._parse_single_optimization(legacy_config)]
 
     @staticmethod
     def _parse_single_optimization(opt_config: Dict[str, Any]) -> OptimizationConfig:
-        """Parse uma única configuração de otimização."""
+        """Parse a single optimization configuration."""
         required_fields = ["target_algorithm", "parameters"]
         for field in required_fields:
             if field not in opt_config:
                 raise OptimizationConfigurationError(
-                    f"Campo obrigatório ausente: {field}"
+                    f"Required field missing: {field}"
                 )
 
         return OptimizationConfig(
-            nome=opt_config.get("nome", "Otimização sem nome"),
+            nome=opt_config.get("nome", "Unnamed optimization"),
             study_name=opt_config.get("study_name", "default_study"),
             direction=opt_config.get("direction", "minimize"),
             n_trials=opt_config.get("n_trials", 100),
@@ -164,22 +249,22 @@ class ConfigurationParser:
 
     @staticmethod
     def parse_sensitivity_configs(config: Dict[str, Any]) -> List[SensitivityConfig]:
-        """Extrai configurações de análise de sensibilidade."""
+        """Extract sensitivity analysis configurations."""
         sensitivity_section = config.get("sensitivity", {})
 
         if not sensitivity_section:
-            raise SensitivityConfigurationError("Seção sensitivity não encontrada")
+            raise SensitivityConfigurationError("sensitivity section not found")
 
-        # Extrair configurações globais
+        # Extract global configurations
         global_config = sensitivity_section.get("global_salib_config", {})
         global_n_samples = global_config.get("n_samples", 1000)
         global_repetitions = global_config.get("repetitions_per_sample", 3)
 
-        # Suporte a estrutura nova (analyses) e legada (campos diretos)
+        # Support new structure (analyses) and legacy (direct fields)
         analyses_list = sensitivity_section.get("analyses")
 
         if analyses_list is not None:
-            # Nova estrutura: lista de análises
+            # New structure: list of analyses
             return [
                 ConfigurationParser._parse_single_sensitivity(
                     sens_config, global_n_samples, global_repetitions
@@ -187,16 +272,16 @@ class ConfigurationParser:
                 for sens_config in analyses_list
             ]
         else:
-            # Estrutura legada: configuração única
+            # Legacy structure: single configuration
             legacy_config = sensitivity_section.copy()
 
-            # Garantir campos obrigatórios para estrutura legada
+            # Ensure required fields for legacy structure
             if "target_dataset" in legacy_config:
                 legacy_config["target_datasets"] = [legacy_config.pop("target_dataset")]
 
             if "nome" not in legacy_config:
                 legacy_config["nome"] = (
-                    f"Análise {legacy_config.get('target_algorithm', 'Unknown')}"
+                    f"Analysis {legacy_config.get('target_algorithm', 'Unknown')}"
                 )
 
             return [
@@ -211,15 +296,15 @@ class ConfigurationParser:
         global_n_samples: int = 1000,
         global_repetitions: int = 3,
     ) -> SensitivityConfig:
-        """Parse uma única configuração de análise de sensibilidade."""
+        """Parse a single sensitivity analysis configuration."""
         required_fields = ["target_algorithm", "parameters"]
         for field in required_fields:
             if field not in sens_config:
                 raise SensitivityConfigurationError(
-                    f"Campo obrigatório ausente: {field}"
+                    f"Required field missing: {field}"
                 )
 
-        # Coletar configuração específica do método
+        # Collect method-specific configuration
         analysis_method = sens_config.get("analysis_method", "morris")
         method_config = None
 
@@ -231,7 +316,7 @@ class ConfigurationParser:
             method_config = sens_config["fast"]
 
         return SensitivityConfig(
-            nome=sens_config.get("nome", "Análise sem nome"),
+            nome=sens_config.get("nome", "Unnamed analysis"),
             analysis_method=analysis_method,
             target_datasets=sens_config.get("target_datasets", []),
             target_algorithm=sens_config["target_algorithm"],
@@ -248,7 +333,7 @@ class ConfigurationParser:
 
     @staticmethod
     def parse_resources_config(config: Dict[str, Any]) -> Dict[str, Any]:
-        """Parse configurações de recursos do batch."""
+        """Parse batch resource configurations."""
         resources_section = config.get("resources", {})
         parallel_config = resources_section.get("parallel", {})
 
@@ -260,105 +345,299 @@ class ConfigurationParser:
             "timeouts": resources_section.get("timeouts", {}),
         }
 
+    @staticmethod
+    def parse_infrastructure_config(config: Dict[str, Any]) -> InfrastructureConfig:
+        """Parse infrastructure configuration."""
+        infrastructure_section = config.get("infrastructure", {})
+        
+        return InfrastructureConfig(
+            history=infrastructure_section.get("history"),
+            result=infrastructure_section.get("result")
+        )
+
+    @staticmethod
+    def parse_export_config(config: Dict[str, Any]) -> ExportConfig:
+        """Parse export configuration."""
+        export_section = config.get("export", {})
+        
+        return ExportConfig(
+            enabled=export_section.get("enabled", True),
+            destination=export_section.get("destination", "outputs/{session_folder}"),
+            formats=export_section.get("formats"),
+            csv_config=export_section.get("csv_config"),
+            json_config=export_section.get("json_config"),
+            directory_structure=export_section.get("directory_structure"),
+            include=export_section.get("include")
+        )
+
+    @staticmethod
+    def parse_plots_config(config: Dict[str, Any]) -> PlotsConfig:
+        """Parse plots configuration."""
+        plots_section = config.get("plots", {})
+        
+        return PlotsConfig(
+            enabled=plots_section.get("enabled", True),
+            plot_convergence=plots_section.get("plot_convergence", True),
+            plot_comparison=plots_section.get("plot_comparison", True),
+            plot_boxplots=plots_section.get("plot_boxplots", True),
+            plot_scatter=plots_section.get("plot_scatter", True),
+            plot_heatmap=plots_section.get("plot_heatmap", True),
+            plot_runtime=plots_section.get("plot_runtime", True),
+            plot_success_rate=plots_section.get("plot_success_rate", True),
+            plot_optimization_history=plots_section.get("plot_optimization_history", True),
+            plot_parameter_importance=plots_section.get("plot_parameter_importance", True),
+            plot_parallel_coordinate=plots_section.get("plot_parallel_coordinate", True),
+            plot_sensitivity_indices=plots_section.get("plot_sensitivity_indices", True),
+            plot_morris_trajectories=plots_section.get("plot_morris_trajectories", True),
+            plot_interaction_effects=plots_section.get("plot_interaction_effects", True),
+            style=plots_section.get("style", "seaborn-v0_8"),
+            figure_size=plots_section.get("figure_size", [12, 8]),
+            dpi=plots_section.get("dpi", 300),
+            color_palette=plots_section.get("color_palette", "Set2"),
+            formats=plots_section.get("formats", ["png"]),
+            font_size=plots_section.get("font_size", 12),
+            title_size=plots_section.get("title_size", 16),
+            label_size=plots_section.get("label_size", 14),
+            legend_size=plots_section.get("legend_size", 10),
+            tight_layout=plots_section.get("tight_layout", True)
+        )
+
+    @staticmethod
+    def parse_monitoring_config(config: Dict[str, Any]) -> MonitoringConfig:
+        """Parse monitoring configuration."""
+        monitoring_section = config.get("monitoring", {})
+        
+        return MonitoringConfig(
+            enabled=monitoring_section.get("enabled", True),
+            interface=monitoring_section.get("interface", "simple"),
+            update_interval=monitoring_section.get("update_interval", 3)
+        )
+
+    @staticmethod
+    def parse_logging_config(config: Dict[str, Any]) -> LoggingConfig:
+        """Parse logging configuration."""
+        logging_section = config.get("logging", {})
+        
+        return LoggingConfig(
+            level=logging_section.get("level", "INFO"),
+            output=logging_section.get("output"),
+            file_config=logging_section.get("file_config"),
+            format=logging_section.get("format"),
+            components=logging_section.get("components"),
+            filters=logging_section.get("filters"),
+            structured=logging_section.get("structured")
+        )
+
+    @staticmethod
+    def parse_system_config(config: Dict[str, Any]) -> SystemConfig:
+        """Parse system configuration."""
+        system_section = config.get("system", {})
+        
+        return SystemConfig(
+            reproducibility=system_section.get("reproducibility"),
+            checkpointing=system_section.get("checkpointing"),
+            progress=system_section.get("progress"),
+            early_stopping=system_section.get("early_stopping"),
+            error_handling=system_section.get("error_handling"),
+            cleanup=system_section.get("cleanup")
+        )
+
+    @staticmethod
+    def parse_infrastructure_config(config: Dict[str, Any]) -> InfrastructureConfig:
+        """Parse infrastructure configuration."""
+        infrastructure_section = config.get("infrastructure", {})
+        
+        return InfrastructureConfig(
+            history=infrastructure_section.get("history"),
+            result=infrastructure_section.get("result")
+        )
+
+    @staticmethod
+    def parse_export_config(config: Dict[str, Any]) -> ExportConfig:
+        """Parse export configuration."""
+        export_section = config.get("export", {})
+        
+        return ExportConfig(
+            enabled=export_section.get("enabled", True),
+            destination=export_section.get("destination", "outputs/{session_folder}"),
+            formats=export_section.get("formats"),
+            csv_config=export_section.get("csv_config"),
+            json_config=export_section.get("json_config"),
+            directory_structure=export_section.get("directory_structure"),
+            include=export_section.get("include")
+        )
+
+    @staticmethod
+    def parse_plots_config(config: Dict[str, Any]) -> PlotsConfig:
+        """Parse plots/visualization configuration."""
+        plots_section = config.get("plots", {})
+        
+        return PlotsConfig(
+            enabled=plots_section.get("enabled", True),
+            plot_convergence=plots_section.get("plot_convergence", True),
+            plot_comparison=plots_section.get("plot_comparison", True),
+            plot_boxplots=plots_section.get("plot_boxplots", True),
+            plot_scatter=plots_section.get("plot_scatter", True),
+            plot_heatmap=plots_section.get("plot_heatmap", True),
+            plot_runtime=plots_section.get("plot_runtime", True),
+            plot_success_rate=plots_section.get("plot_success_rate", True),
+            plot_optimization_history=plots_section.get("plot_optimization_history", True),
+            plot_parameter_importance=plots_section.get("plot_parameter_importance", True),
+            plot_parallel_coordinate=plots_section.get("plot_parallel_coordinate", True),
+            plot_sensitivity_indices=plots_section.get("plot_sensitivity_indices", True),
+            plot_morris_trajectories=plots_section.get("plot_morris_trajectories", True),
+            plot_interaction_effects=plots_section.get("plot_interaction_effects", True),
+            style=plots_section.get("style", "seaborn-v0_8"),
+            figure_size=plots_section.get("figure_size", [12, 8]),
+            dpi=plots_section.get("dpi", 300),
+            color_palette=plots_section.get("color_palette", "Set2"),
+            formats=plots_section.get("formats", ["png"]),
+            font_size=plots_section.get("font_size", 12),
+            title_size=plots_section.get("title_size", 16),
+            label_size=plots_section.get("label_size", 14),
+            legend_size=plots_section.get("legend_size", 10),
+            tight_layout=plots_section.get("tight_layout", True)
+        )
+
+    @staticmethod
+    def parse_monitoring_config(config: Dict[str, Any]) -> MonitoringConfig:
+        """Parse monitoring configuration."""
+        monitoring_section = config.get("monitoring", {})
+        
+        return MonitoringConfig(
+            enabled=monitoring_section.get("enabled", True),
+            interface=monitoring_section.get("interface", "simple"),
+            update_interval=monitoring_section.get("update_interval", 3)
+        )
+
+    @staticmethod
+    def parse_logging_config(config: Dict[str, Any]) -> LoggingConfig:
+        """Parse logging configuration."""
+        logging_section = config.get("logging", {})
+        
+        return LoggingConfig(
+            level=logging_section.get("level", "INFO"),
+            output=logging_section.get("output"),
+            file_config=logging_section.get("file_config"),
+            format=logging_section.get("format"),
+            components=logging_section.get("components"),
+            filters=logging_section.get("filters"),
+            structured=logging_section.get("structured")
+        )
+
+    @staticmethod
+    def parse_system_config(config: Dict[str, Any]) -> SystemConfig:
+        """Parse system configuration."""
+        system_section = config.get("system", {})
+        
+        return SystemConfig(
+            reproducibility=system_section.get("reproducibility"),
+            checkpointing=system_section.get("checkpointing"),
+            progress=system_section.get("progress"),
+            early_stopping=system_section.get("early_stopping"),
+            error_handling=system_section.get("error_handling"),
+            cleanup=system_section.get("cleanup")
+        )
+
 
 class ConfigurationValidator:
-    """Validador modular para configurações CSPBench."""
+    """Modular validator for CSPBench configurations."""
 
     @staticmethod
     def validate_batch_structure(config: Dict[str, Any]) -> str:
-        """Valida e retorna o tipo de estrutura do batch."""
-        # Detectar tipo de estrutura
+        """Validate and return batch structure type."""
+        # Detect structure type
         task_type = config.get("task", {}).get("type")
 
         if task_type in ["execution", "optimization", "sensitivity"]:
-            # Nova estrutura unificada
+            # New unified structure
             required_sections = ["metadados", "datasets", "algorithms", "task"]
             missing = [
                 section for section in required_sections if section not in config
             ]
 
             if missing:
-                # Verificar se é batch_info em vez de metadados (retrocompatibilidade)
+                # Check if it's batch_info instead of metadados (backward compatibility)
                 if "batch_info" in config and "metadados" in missing:
                     missing.remove("metadados")
 
             if missing:
                 raise BatchConfigurationError(
-                    f"Seções obrigatórias ausentes: {missing}"
+                    f"Required sections missing: {missing}"
                 )
 
             return task_type
 
         elif "experiments" in config:
-            # Estrutura legada de processamento
+            # Legacy processing structure
             return "execution"
 
         else:
             raise BatchConfigurationError(
-                "Estrutura de configuração não reconhecida. "
-                "Verifique se há seção 'task' com 'type' válido ou seção 'experiments'"
+                "Configuration structure not recognized. "
+                "Check if there's a 'task' section with valid 'type' or 'experiments' section"
             )
 
     @staticmethod
     def validate_optimization_config(opt_config: OptimizationConfig) -> None:
-        """Valida configuração de otimização."""
+        """Validate optimization configuration."""
         if not opt_config.target_datasets:
             raise OptimizationConfigurationError(
-                "Lista target_datasets não pode estar vazia"
+                "target_datasets list cannot be empty"
             )
 
         if not opt_config.target_algorithm:
-            raise OptimizationConfigurationError("Campo target_algorithm é obrigatório")
+            raise OptimizationConfigurationError("target_algorithm field is required")
 
         if not opt_config.parameters:
             raise OptimizationConfigurationError(
-                "Seção parameters não pode estar vazia"
+                "parameters section cannot be empty"
             )
 
-        # Validar parâmetros
+        # Validate parameters
         for param_name, param_config in opt_config.parameters.items():
             if not isinstance(param_config, dict):
                 raise OptimizationConfigurationError(
-                    f"Configuração do parâmetro {param_name} deve ser um objeto"
+                    f"Parameter configuration {param_name} must be an object"
                 )
 
             param_type = param_config.get("type")
             if param_type not in ["int", "uniform", "categorical"]:
                 raise OptimizationConfigurationError(
-                    f"Tipo de parâmetro inválido para {param_name}: {param_type}"
+                    f"Invalid parameter type for {param_name}: {param_type}"
                 )
 
     @staticmethod
     def validate_sensitivity_config(sens_config: SensitivityConfig) -> None:
-        """Valida configuração de análise de sensibilidade."""
+        """Validate sensitivity analysis configuration."""
         if not sens_config.target_datasets:
             raise SensitivityConfigurationError(
-                "Lista target_datasets não pode estar vazia"
+                "target_datasets list cannot be empty"
             )
 
         if not sens_config.target_algorithm:
-            raise SensitivityConfigurationError("Campo target_algorithm é obrigatório")
+            raise SensitivityConfigurationError("target_algorithm field is required")
 
         if not sens_config.parameters:
-            raise SensitivityConfigurationError("Seção parameters não pode estar vazia")
+            raise SensitivityConfigurationError("parameters section cannot be empty")
 
-        # Validar método de análise
+        # Validate analysis method
         valid_methods = ["morris", "sobol", "fast", "delta"]
         if sens_config.analysis_method not in valid_methods:
             raise SensitivityConfigurationError(
-                f"Método de análise inválido: {sens_config.analysis_method}. "
-                f"Métodos válidos: {valid_methods}"
+                f"Invalid analysis method: {sens_config.analysis_method}. "
+                f"Valid methods: {valid_methods}"
             )
 
-        # Validar parâmetros
+        # Validate parameters
         for param_name, param_config in sens_config.parameters.items():
             if not isinstance(param_config, dict):
                 raise SensitivityConfigurationError(
-                    f"Configuração do parâmetro {param_name} deve ser um objeto"
+                    f"Parameter configuration {param_name} must be an object"
                 )
 
             param_type = param_config.get("type")
             if param_type not in ["integer", "float", "categorical"]:
                 raise SensitivityConfigurationError(
-                    f"Tipo de parâmetro inválido para {param_name}: {param_type}"
+                    f"Invalid parameter type for {param_name}: {param_type}"
                 )

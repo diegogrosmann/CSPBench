@@ -1,7 +1,7 @@
 """
-Pacote baseline do CSP.
+CSP baseline package.
 
-Expõe a classe BaselineAlg para registro automático.
+Exposes the BaselineAlg class for automatic registration.
 """
 
 from .algorithm import BaselineAlg

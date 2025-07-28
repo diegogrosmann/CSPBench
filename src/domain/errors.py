@@ -1,173 +1,173 @@
 """
-Exceções do Domínio CSPBench
+CSPBench Domain Exceptions
 
-Define exceções customizadas para erros de domínio e aplicação.
+Defines custom exceptions for domain and application errors.
 """
 
 
 class CSPBenchError(Exception):
-    """Exceção base para todas as exceções do CSPBench."""
+    """Base exception for all CSPBench exceptions."""
 
     pass
 
 
 class DomainError(CSPBenchError):
-    """Exceção base para erros de domínio."""
+    """Base exception for domain errors."""
 
     pass
 
 
 class ApplicationError(CSPBenchError):
-    """Exceção base para erros de aplicação."""
+    """Base exception for application errors."""
 
     pass
 
 
-# Exceções de Dataset
+# Dataset Exceptions
 class DatasetError(DomainError):
-    """Erro relacionado a datasets."""
+    """Error related to datasets."""
 
     pass
 
 
 class DatasetNotFoundError(DatasetError):
-    """Dataset não encontrado."""
+    """Dataset not found."""
 
     pass
 
 
 class DatasetValidationError(DatasetError):
-    """Erro de validação de dataset."""
+    """Dataset validation error."""
 
     pass
 
 
 class DatasetEmptyError(DatasetError):
-    """Dataset vazio."""
+    """Empty dataset."""
 
     pass
 
 
-# Exceções de Algoritmo
+# Algorithm Exceptions
 class AlgorithmError(DomainError):
-    """Erro relacionado a algoritmos."""
+    """Error related to algorithms."""
 
     pass
 
 
 class AlgorithmNotFoundError(AlgorithmError):
-    """Algoritmo não encontrado."""
+    """Algorithm not found."""
 
     pass
 
 
 class AlgorithmExecutionError(AlgorithmError):
-    """Erro na execução de algoritmo."""
+    """Error in algorithm execution."""
 
     pass
 
 
 class AlgorithmRegistrationError(AlgorithmError):
-    """Erro no registro de algoritmo."""
+    """Error in algorithm registration."""
 
     pass
 
 
 class AlgorithmTimeoutError(AlgorithmError):
-    """Timeout na execução de algoritmo."""
+    """Timeout in algorithm execution."""
 
     pass
 
 
 class AlgorithmParameterError(AlgorithmError):
-    """Erro nos parâmetros do algoritmo."""
+    """Error in algorithm parameters."""
 
     pass
 
 
-# Exceções de Configuração
+# Configuration Exceptions
 class ConfigurationError(ApplicationError):
-    """Erro de configuração."""
+    """Configuration error."""
 
     pass
 
 
 class BatchConfigurationError(ConfigurationError):
-    """Erro na configuração de batch."""
+    """Error in batch configuration."""
 
     pass
 
 
 class OptimizationConfigurationError(ConfigurationError):
-    """Erro na configuração de otimização."""
+    """Error in optimization configuration."""
 
     pass
 
 
 class SensitivityConfigurationError(ConfigurationError):
-    """Erro na configuração de análise de sensibilidade."""
+    """Error in sensitivity analysis configuration."""
 
     pass
 
 
-# Exceções de Execução
+# Execution Exceptions
 class ExecutionError(ApplicationError):
-    """Erro de execução."""
+    """Execution error."""
 
     pass
 
 
 class BatchExecutionError(ExecutionError):
-    """Erro na execução de batch."""
+    """Error in batch execution."""
 
     pass
 
 
 class OptimizationExecutionError(ExecutionError):
-    """Erro na execução de otimização."""
+    """Error in optimization execution."""
 
     pass
 
 
 class SensitivityExecutionError(ExecutionError):
-    """Erro na execução de análise de sensibilidade."""
+    """Error in sensitivity analysis execution."""
 
     pass
 
 
-# Exceções de Export
+# Export Exceptions
 class ExportError(ApplicationError):
-    """Erro de exportação."""
+    """Export error."""
 
     pass
 
 
 class UnsupportedFormatError(ExportError):
-    """Formato de exportação não suportado."""
+    """Unsupported export format."""
 
     pass
 
 
 class ExportDestinationError(ExportError):
-    """Erro no destino de exportação."""
+    """Error in export destination."""
 
     pass
 
 
-# Exceções de Repositório
+# Repository Exceptions
 class RepositoryError(ApplicationError):
-    """Erro de repositório."""
+    """Repository error."""
 
     pass
 
 
 class RepositoryConnectionError(RepositoryError):
-    """Erro de conexão com repositório."""
+    """Repository connection error."""
 
     pass
 
 
 class RepositoryPermissionError(RepositoryError):
-    """Erro de permissão no repositório."""
+    """Repository permission error."""
 
     pass

@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "cspbench"
 version = "0.1.0"
-description = "Framework para Closest String Problem com arquitetura hexagonal"
+description = "Framework for Closest String Problem with hexagonal architecture"
 readme = "README.md"
 authors = [
     {name = "Diego Grosmann", email = "diego.grosmann@example.com"}
@@ -65,7 +65,7 @@ exclude = ["tests*", "docs*"]
 cspbench = ["config/*.yaml"]
 
 # ===================================================================
-# CONFIGURAÇÕES DE FERRAMENTAS
+# TOOL CONFIGURATIONS
 # ===================================================================
 
 [tool.black]

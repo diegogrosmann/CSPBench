@@ -1,15 +1,15 @@
 """
-Exportador para formato CSV.
+CSV Format Exporter.
 
-Especialização do FileExporter para formato CSV simples.
+FileExporter specialization for simple CSV format.
 """
 
 from .file_exporter import FileExporter
 
 
 class CsvExporter(FileExporter):
-    """Exportador para formato CSV."""
+    """CSV format exporter."""
 
     def get_supported_formats(self) -> list[str]:
-        """Lista formatos suportados."""
+        """List supported formats."""
         return ["csv"]

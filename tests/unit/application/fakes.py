@@ -5,8 +5,25 @@ Implementações simples das portas para uso em testes unitários.
 """
 
 from typing import Any, Dict, List, Optional
+from unittest.mock import Mock
 
 from src.domain import CSPAlgorithm, Dataset, SyntheticDatasetGenerator
+
+
+class MockAlgorithmClass(CSPAlgorithm):
+    """Mock algorithm class for testing."""
+    
+    name = "MockAlgorithm"
+    default_params = {}
+    
+    def run(self, dataset: Dataset, **kwargs) -> tuple[str, int, dict]:
+        """Mock run method."""
+        # Return a simple mock result
+        return "ACGT" * (len(dataset.sequences[0]) // 4), 2, {"iterations": 10}
+    
+    def _report_progress(self, message: str) -> None:
+        """Mock progress reporting."""
+        pass
 
 
 class FakeDatasetRepository:
@@ -58,6 +75,8 @@ class FakeAlgorithmRegistry:
         self._algorithms = {
             "baseline": "BaselineAlgorithm",
             "test_algo": "TestAlgorithm",
+            "BLF-GA": "BLFGAAlgorithm",
+            "CSC": "CSCAlgorithm",
         }
 
     def get_algorithm(self, name: str) -> type[CSPAlgorithm]:
@@ -65,12 +84,12 @@ class FakeAlgorithmRegistry:
         if name not in self._algorithms:
             from src.domain import AlgorithmNotFoundError
 
-            raise AlgorithmNotFoundError(f"Algoritmo não encontrado: {name}")
-        # Retornar uma classe mock que herda de CSPAlgorithm
+            raise AlgorithmNotFoundError(f"Algorithm not found: {name}")
+        # Return a mock class that inherits from CSPAlgorithm
         return MockAlgorithmClass
 
     def list_algorithms(self) -> List[str]:
-        """Lista algoritmos disponíveis."""
+        """List available algorithms."""
         return list(self._algorithms.keys())
 
     def register_algorithm(self, algorithm_class) -> None:
@@ -83,11 +102,11 @@ class FakeAlgorithmRegistry:
         return name in self._algorithms
 
     def get_algorithm_metadata(self, name: str) -> Dict[str, Any]:
-        """Obtém metadados de algoritmo."""
+        """Get algorithm metadata."""
         if name not in self._algorithms:
             from src.domain import AlgorithmNotFoundError
 
-            raise AlgorithmNotFoundError(f"Algoritmo não encontrado: {name}")
+            raise AlgorithmNotFoundError(f"Algorithm not found: {name}")
 
         return {
             "name": name,
@@ -102,6 +121,14 @@ class FakeExportPort:
 
     def __init__(self):
         self._exported_files = []
+
+    def export(self, results: Dict[str, Any], format_type: str, destination: str) -> str:
+        """Export data in specified format."""
+        file_path = f"{destination}.{format_type}"
+        self._exported_files.append(
+            {"path": file_path, "format": format_type, "data": results}
+        )
+        return file_path
 
     def export_results(
         self, results: Dict[str, Any], format_type: str, destination: str
@@ -125,7 +152,7 @@ class FakeExportPort:
 
     def get_supported_formats(self) -> List[str]:
         """Lista formatos suportados."""
-        return ["json", "csv", "xlsx"]
+        return ["json", "csv", "xlsx", "parquet", "pickle"]
 
     def export_optimization_results(
         self, optimization_data: Dict[str, Any], destination: str
@@ -153,48 +180,95 @@ class FakeExecutorPort:
         """Configura para falhar em algoritmo específico (para testes)."""
         self._fail_on_algorithm = algorithm_name
 
-    def execute_batch(self, batch_config: Dict[str, Any]) -> List[Dict[str, Any]]:
+    def execute_batch(self, batch_config: Dict[str, Any], monitoring_service=None, resources_config=None) -> List[Dict[str, Any]]:
         """Executa batch de experimentos."""
         results = []
 
-        for exp in batch_config.get("experiments", []):
-            try:
-                # Simular carregamento de dataset
-                dataset = SyntheticDatasetGenerator.generate_random(
-                    n=10, length=20, alphabet="ACGT", seed=42
-                )
+        # Support new batch structure
+        if "execution" in batch_config:
+            # New structure
+            executions = batch_config["execution"].get("executions", [])
+            for execution in executions:
+                for dataset_id in execution.get("datasets", []):
+                    for algo_config_id in execution.get("algorithms", []):
+                        for repetition in range(execution.get("repetitions", 1)):
+                            try:
+                                # Simulate dataset loading
+                                dataset = SyntheticDatasetGenerator.generate_random(
+                                    n=10, length=20, alphabet="ACGT", seed=42
+                                )
 
-                # Simular execução direta em vez de chamar execute_single
-                self._execution_count += 1
+                                self._execution_count += 1
 
-                if exp["algorithm"] == self._fail_on_algorithm:
-                    from src.domain import AlgorithmExecutionError
+                                if algo_config_id == self._fail_on_algorithm:
+                                    from src.domain import AlgorithmExecutionError
+                                    raise AlgorithmExecutionError(
+                                        f"Falha simulada para {algo_config_id}"
+                                    )
 
-                    raise AlgorithmExecutionError(
-                        f"Falha simulada para {exp['algorithm']}"
+                                result = {
+                                    "algorithm_name": algo_config_id,
+                                    "dataset_id": dataset_id,
+                                    "dataset_size": dataset.size,
+                                    "result": "ACGT" * (dataset.length // 4),
+                                    "distance": 2,
+                                    "execution_time": 1.5,
+                                    "status": "success",
+                                    "metadata": {"repetition": repetition + 1},
+                                    "execution_name": execution["nome"],
+                                }
+                                results.append(result)
+
+                            except Exception as e:
+                                results.append(
+                                    {
+                                        "algorithm_name": algo_config_id,
+                                        "dataset_id": dataset_id,
+                                        "status": "error",
+                                        "error": str(e),
+                                        "execution_name": execution["nome"],
+                                    }
+                                )
+        else:
+            # Legacy structure
+            for exp in batch_config.get("experiments", []):
+                try:
+                    # Simular carregamento de dataset
+                    dataset = SyntheticDatasetGenerator.generate_random(
+                        n=10, length=20, alphabet="ACGT", seed=42
                     )
 
-                result = {
-                    "algorithm": exp["algorithm"],
-                    "dataset_size": dataset.size,
-                    "result": "ACGT" * (dataset.length // 4),
-                    "distance": 2,
-                    "execution_time": 1.5,
-                    "status": "success",
-                    "metadata": {"params": exp.get("params", {})},
-                    "dataset": exp["dataset"],
-                }
-                results.append(result)
+                    # Simular execução direta em vez de chamar execute_single
+                    self._execution_count += 1
 
-            except Exception as e:
-                results.append(
-                    {
+                    if exp["algorithm"] == self._fail_on_algorithm:
+                        from src.domain import AlgorithmExecutionError
+
+                        raise AlgorithmExecutionError(
+                            f"Falha simulada para {exp['algorithm']}"
+                        )
+
+                    result = {
                         "algorithm": exp["algorithm"],
+                        "dataset_size": dataset.size,
+                        "result": "ACGT" * (dataset.length // 4),
+                        "distance": 2,
+                        "execution_time": 1.5,
+                        "status": "success",
+                        "metadata": {"params": exp.get("params", {})},
                         "dataset": exp["dataset"],
-                        "status": "error",
-                        "error": str(e),
                     }
-                )
+                    results.append(result)
+
+                except Exception as e:
+                    results.append(
+                        {
+                            "algorithm": exp["algorithm"],
+                            "dataset": exp["dataset"],
+                            "status": "error",
+                            "error": str(e),
+                        }
+                    )
 
         return results
 
@@ -252,6 +326,74 @@ class FakeExecutorPort:
     def get_execution_count(self) -> int:
         """Retorna número de execuções (para testes)."""
         return self._execution_count
+
+
+class FakeMonitoringService:
+    """Fake monitoring service for testing."""
+    
+    def __init__(self):
+        self._is_monitoring = False
+        self._task_type = None
+        self._task_name = None
+        self._interface = "simple"
+        self._update_interval = 3
+        self._errors = []
+        self._progress_messages = []
+    
+    def start_monitoring(self, task_type, task_name: str):
+        """Start monitoring a task."""
+        self._is_monitoring = True
+        self._task_type = task_type
+        self._task_name = task_name
+    
+    def finish_monitoring(self, results: dict):
+        """Finish monitoring."""
+        self._is_monitoring = False
+    
+    def show_error(self, error_message: str):
+        """Show an error message."""
+        self._errors.append(error_message)
+    
+    def show_progress(self, message: str):
+        """Show progress message."""
+        self._progress_messages.append(message)
+    
+    def set_interface(self, interface: str):
+        """Set monitoring interface."""
+        self._interface = interface
+    
+    def set_update_interval(self, interval: int):
+        """Set update interval."""
+        self._update_interval = interval
+    
+    # Test helper methods
+    def is_monitoring(self) -> bool:
+        """Check if currently monitoring."""
+        return self._is_monitoring
+    
+    def get_task_type(self):
+        """Get current task type."""
+        return self._task_type
+    
+    def get_task_name(self) -> str:
+        """Get current task name."""
+        return self._task_name
+    
+    def get_errors(self) -> List[str]:
+        """Get list of errors."""
+        return self._errors.copy()
+    
+    def get_progress_messages(self) -> List[str]:
+        """Get list of progress messages."""
+        return self._progress_messages.copy()
+    
+    def get_interface(self) -> str:
+        """Get current interface."""
+        return self._interface
+    
+    def get_update_interval(self) -> int:
+        """Get current update interval."""
+        return self._update_interval
 
 
 class MockAlgorithmClass(CSPAlgorithm):

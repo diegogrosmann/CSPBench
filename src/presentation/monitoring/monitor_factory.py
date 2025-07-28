@@ -1,4 +1,4 @@
-"""Factory para criação de monitores."""
+"""Factory for monitor creation."""
 
 from typing import Any, Dict, Optional
 
@@ -9,46 +9,46 @@ from .simple_monitor import SimpleMonitor
 
 
 class MonitorFactory:
-    """Factory para criação de monitores baseado na configuração."""
+    """Factory for creating monitors based on configuration."""
 
     @staticmethod
     def create_monitor(config: Dict[str, Any]) -> Optional[MonitoringInterface]:
         """
-        Cria um monitor baseado na configuração.
+        Create a monitor based on configuration.
 
         Args:
-            config: Configuração do batch
+            config: Batch configuration
 
         Returns:
-            MonitoringInterface ou None se monitoramento desabilitado
+            MonitoringInterface or None if monitoring disabled
         """
-        # Verifica se monitoramento está habilitado
+        # Check if monitoring is enabled
         monitoring_config = config.get("monitoring", {})
         if not monitoring_config.get("enabled", True):
             return None
 
-        # Determina tipo de interface
+        # Determine interface type
         interface_type = monitoring_config.get("interface", "simple")
 
         if interface_type == "tui":
-            # return TUIMonitor()  # Temporariamente desabilitado
-            return SimpleMonitor()  # Usar SimpleMonitor como fallback
+            # return TUIMonitor()  # Temporarily disabled
+            return SimpleMonitor()  # Use SimpleMonitor as fallback
         elif interface_type == "simple":
             return SimpleMonitor()
         else:
-            # Default para interface simples
+            # Default to simple interface
             return SimpleMonitor()
 
     @staticmethod
     def is_monitoring_enabled(config: Dict[str, Any]) -> bool:
         """
-        Verifica se monitoramento está habilitado na configuração.
+        Check if monitoring is enabled in configuration.
 
         Args:
-            config: Configuração do batch
+            config: Batch configuration
 
         Returns:
-            True se monitoramento habilitado
+            True if monitoring enabled
         """
         monitoring_config = config.get("monitoring", {})
         return monitoring_config.get("enabled", True)

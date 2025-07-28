@@ -1,191 +1,191 @@
 # DP-CSP (Dynamic Programming Closest String Problem)
 
-O algoritmo **DP-CSP** é uma solução **exata** para o Closest String Problem baseada em **programação dinâmica**. Diferentemente de heurísticas que buscam soluções aproximadas, o DP-CSP **garante encontrar a solução ótima** - a string central com o menor raio possível - usando uma busca sistemática sobre todos os possíveis valores de distância.
+The **DP-CSP** algorithm is an **exact** solution for the Closest String Problem based on **dynamic programming**. Unlike heuristics that seek approximate solutions, DP-CSP **guarantees finding the optimal solution** - the center string with the minimum possible radius - using a systematic search over all possible distance values.
 
-## 📋 Índice
+## 📋 Table of Contents
 
-- [Estratégia Algorítmica](#estratégia-algorítmica)
-- [Funcionamento Detalhado](#funcionamento-detalhado)
-- [Parâmetros e Configuração](#parâmetros-e-configuração)
-- [Casos de Uso](#casos-de-uso)
-- [Análise Algorítmica](#análise-algorítmica)
-- [Exemplos de Uso](#exemplos-de-uso)
-- [Limitações](#limitações)
-- [Integração com CSPBench](#integração-com-cspbench)
+- [Algorithmic Strategy](#algorithmic-strategy)
+- [Detailed Operation](#detailed-operation)
+- [Parameters and Configuration](#parameters-and-configuration)
+- [Use Cases](#use-cases)
+- [Algorithmic Analysis](#algorithmic-analysis)
+- [Usage Examples](#usage-examples)
+- [Limitations](#limitations)
+- [CSPBench Integration](#cspbench-integration)
 
-## 🎯 Estratégia Algorítmica
+## 🎯 Algorithmic Strategy
 
-### Abordagem Principal
-O DP-CSP utiliza uma estratégia de **busca binária incremental** combinada com **programação dinâmica decisória**:
+### Main Approach
+DP-CSP uses an **incremental binary search** strategy combined with **decision dynamic programming**:
 
-1. **Busca Incremental**: Testa valores crescentes de d (0, 1, 2, ...) até encontrar uma solução
-2. **DP Decisório**: Para cada d, verifica se existe uma string central com raio ≤ d
-3. **Estados DP**: Mantém vetores de "erros restantes" para cada string do dataset
-4. **Construção**: Reconstrói a string central ótima quando encontrada
+1. **Incremental Search**: Tests increasing values of d (0, 1, 2, ...) until finding a solution
+2. **Decision DP**: For each d, checks if there exists a center string with radius ≤ d
+3. **DP States**: Maintains "remaining errors" vectors for each string in the dataset
+4. **Construction**: Reconstructs the optimal center string when found
 
-### Vantagens
-- **Solução Exata**: Garante encontrar o raio mínimo possível (solução ótima)
-- **Determinístico**: Sempre produz o mesmo resultado para a mesma entrada
-- **Matematicamente Rigoroso**: Baseado em teoria sólida de programação dinâmica
-- **Verificável**: Resultados podem ser validados facilmente
+### Advantages
+- **Exact Solution**: Guarantees finding the minimum possible radius (optimal solution)
+- **Deterministic**: Always produces the same result for the same input
+- **Mathematically Rigorous**: Based on solid dynamic programming theory
+- **Verifiable**: Results can be easily validated
 
-### Filosofia
-O DP-CSP sacrifica tempo de execução em favor de **precisão absoluta**. É a referência para verificar a qualidade de algoritmos heurísticos.
+### Philosophy
+DP-CSP sacrifices execution time in favor of **absolute precision**. It is the reference for checking the quality of heuristic algorithms.
 
-## ⚙️ Funcionamento Detalhado
+## ⚙️ Detailed Operation
 
-### Algoritmo Principal: Busca Incremental
+### Main Algorithm: Incremental Search
 ```
-Para d = 0, 1, 2, ..., max_d:
-    Se existe_centro_com_raio(d):
-        Retorna centro encontrado
-    Senão:
-        Tenta próximo d
-Se nenhum d funciona:
-    Falha (não deveria acontecer)
-```
-
-### Subproblema: DP Decisório
-**Entrada**: Conjunto de strings S, alfabeto Σ, raio d  
-**Saída**: String central c tal que max(H(c,s)) ≤ d, ou NULL se não existir  
-
-### Estados da Programação Dinâmica
-```
-Estado: (posição, vetor_erros_restantes)
-onde:
-- posição: índice atual na string sendo construída (0 a L-1)
-- vetor_erros_restantes: [r₁, r₂, ..., rₙ]
-  rᵢ = número máximo de erros que ainda podemos cometer com string i
+For d = 0, 1, 2, ..., max_d:
+    If center_exists_with_radius(d):
+        Return found center
+    Else:
+        Try next d
+If no d works:
+    Failure (should not happen)
 ```
 
-### Transições de Estado
+### Subproblem: Decision DP
+**Input**: String set S, alphabet Σ, radius d  
+**Output**: Center string c such that max(H(c,s)) ≤ d, or NULL if doesn't exist  
+
+### Dynamic Programming States
 ```
-Estado atual: (pos, [r₁, r₂, ..., rₙ])
-Para cada caractere σ ∈ Σ:
-    Calcula desconto dᵢ = 1 se strings[i][pos] ≠ σ, senão 0
-    Novo estado: (pos+1, [r₁-d₁, r₂-d₂, ..., rₙ-dₙ])
-    Se min(rᵢ-dᵢ) ≥ 0: estado é viável
+State: (position, remaining_errors_vector)
+where:
+- position: current index in string being constructed (0 to L-1)
+- remaining_errors_vector: [r₁, r₂, ..., rₙ]
+  rᵢ = maximum number of errors we can still make with string i
 ```
 
-### Exemplo Detalhado
+### State Transitions
+```
+Current state: (pos, [r₁, r₂, ..., rₙ])
+For each character σ ∈ Σ:
+    Calculate discount dᵢ = 1 if strings[i][pos] ≠ σ, else 0
+    New state: (pos+1, [r₁-d₁, r₂-d₂, ..., rₙ-dₙ])
+    If min(rᵢ-dᵢ) ≥ 0: state is viable
+```
+
+### Detailed Example
 ```
 Strings: ["ACG", "ATG", "AAG"]
-Alfabeto: "ACGT"
-Testando d = 1:
+Alphabet: "ACGT"
+Testing d = 1:
 
-Estado inicial: (0, [1,1,1])  # posição 0, 1 erro permitido para cada
+Initial state: (0, [1,1,1])  # position 0, 1 error allowed for each
 
-Posição 0:
-├── Testa 'A': strings[0][0]='A', strings[1][0]='A', strings[2][0]='A'
-│   └── Desconto: [0,0,0] → novo estado: (1, [1,1,1])
-├── Testa 'C': descontos [1,1,1] → estado: (1, [0,0,0])
-├── Testa 'G': descontos [1,1,1] → estado: (1, [0,0,0])
-└── Testa 'T': descontos [1,1,1] → estado: (1, [0,0,0])
+Position 0:
+├── Test 'A': strings[0][0]='A', strings[1][0]='A', strings[2][0]='A'
+│   └── Discount: [0,0,0] → new state: (1, [1,1,1])
+├── Test 'C': discounts [1,1,1] → state: (1, [0,0,0])
+├── Test 'G': discounts [1,1,1] → state: (1, [0,0,0])
+└── Test 'T': discounts [1,1,1] → state: (1, [0,0,0])
 
-Posição 1 (a partir do melhor estado anterior):
-├── Testa 'A': descontos [1,1,1] → inviável (estados negativos)
-├── Testa 'C': descontos [0,1,1] → estado: (2, [1,0,0])
-├── Testa 'G': descontos [1,0,0] → estado: (2, [0,1,1])
-└── Testa 'T': descontos [1,0,1] → estado: (2, [0,1,0])
+Position 1 (from best previous state):
+├── Test 'A': discounts [1,1,1] → unfeasible (negative states)
+├── Test 'C': discounts [0,1,1] → state: (2, [1,0,0])
+├── Test 'G': discounts [1,0,0] → state: (2, [0,1,1])
+└── Test 'T': discounts [1,0,1] → state: (2, [0,1,0])
 
-Posição 2:
-└── Escolhe 'G' para chegar a estado final viável
+Position 2:
+└── Choose 'G' to reach final viable state
 
-Centro encontrado: "ACG" ou "ATG" (ambos têm raio 1)
+Center found: "ACG" or "ATG" (both have radius 1)
 ```
 
-### Reconstrução da Solução
+### Solution Reconstruction
 ```
-A partir do estado final, segue backtrack:
-- Estado final: (3, [0,0,0])
-- Posição 2: caractere escolhido = 'G'
-- Posição 1: caractere escolhido = 'T'  
-- Posição 0: caractere escolhido = 'A'
-Centro: "ATG"
+From final state, follow backtrack:
+- Final state: (3, [0,0,0])
+- Position 2: chosen character = 'G'
+- Position 1: chosen character = 'T'  
+- Position 0: chosen character = 'A'
+Center: "ATG"
 ```
 
-## 🔧 Parâmetros e Configuração
+## 🔧 Parameters and Configuration
 
-### Parâmetros Principais
+### Main Parameters
 
-| Parâmetro | Tipo | Padrão | Descrição |
-|-----------|------|--------|-----------|
-| `max_d` | int | Auto | Limite superior para busca de d (usa baseline se None) |
-| `max_time` | int | 300 | Timeout em segundos para evitar execução infinita |
-| `warn_threshold` | int | 9 | Alerta se (d+1)^n > 10^9 estados |
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `max_d` | int | Auto | Upper limit for d search (uses baseline if None) |
+| `max_time` | int | 300 | Timeout in seconds to prevent infinite execution |
+| `warn_threshold` | int | 9 | Alert if (d+1)^n > 10^9 states |
 
-### Cálculo Automático do max_d
+### Automatic max_d Calculation
 ```python
-# Se max_d não fornecido, usa baseline como upper bound
-baseline = max_distance(strings[0], strings)  # distância da primeira string
-max_d = baseline  # garante que pelo menos uma solução existe
+# If max_d not provided, use baseline as upper bound
+baseline = max_distance(strings[0], strings)  # distance from first string
+max_d = baseline  # guarantees at least one solution exists
 ```
 
-### Limites de Segurança
+### Safety Limits
 ```python
-# Memória: Estima estados como (d+1)^n
-# Para n=5, d=10: (10+1)^5 = 161M estados (~1GB RAM)
-# Para n=6, d=10: (10+1)^6 = 1.77B estados (~14GB RAM)
+# Memory: Estimate states as (d+1)^n
+# For n=5, d=10: (10+1)^5 = 161M states (~1GB RAM)
+# For n=6, d=10: (10+1)^6 = 1.77B states (~14GB RAM)
 
-# Tempo: Monitora elapsed_time < max_time
-# Cancelamento: Permite interrupção via SIGTERM
+# Time: Monitor elapsed_time < max_time
+# Cancellation: Allow interruption via SIGTERM
 ```
 
-## 📊 Casos de Uso
+## 📊 Use Cases
 
-### 🟢 Ideal Para:
-- **Verificação de Referência**: Validar qualidade de algoritmos heurísticos
-- **Instâncias Pequenas**: n ≤ 5-8 strings, comprimentos ≤ 20-50
-- **Análise Teórica**: Estudar propriedades exatas do CSP
-- **Benchmarking**: Estabelecer lower bounds para comparação
+### 🟢 Ideal For:
+- **Reference Verification**: Validate quality of heuristic algorithms
+- **Small Instances**: n ≤ 5-8 strings, lengths ≤ 20-50
+- **Theoretical Analysis**: Study exact CSP properties
+- **Benchmarking**: Establish lower bounds for comparison
 
-### 🟡 Adequado Para:
-- **Protótipos**: Desenvolvimento e teste de novos algoritmos
-- **Casos Críticos**: Quando precisão absoluta é essencial
-- **Datasets Específicos**: Strings curtas com alfabetos pequenos
-- **Pesquisa Acadêmica**: Experimentos controlados
+### 🟡 Suitable For:
+- **Prototypes**: Development and testing of new algorithms
+- **Critical Cases**: When absolute precision is essential
+- **Specific Datasets**: Short strings with small alphabets
+- **Academic Research**: Controlled experiments
 
-### 🔴 Limitado Para:
-- **Instâncias Grandes**: n > 10 strings (explosão exponencial)
-- **Strings Longas**: L > 100 caracteres (muitos estados)
-- **Aplicações em Tempo Real**: Execução pode ser muito lenta
-- **Datasets Reais**: Geralmente muito grandes para DP
+### 🔴 Limited For:
+- **Large Instances**: n > 10 strings (exponential explosion)
+- **Long Strings**: L > 100 characters (too many states)
+- **Real-time Applications**: Execution can be very slow
+- **Real Datasets**: Usually too large for DP
 
-## 📈 Análise Algorítmica
+## 📈 Algorithmic Analysis
 
-### Complexidade Temporal
-- **Busca Externa**: O(d_ótimo × F(n,d,L))
-- **DP Interno**: O(L × |Σ| × estados_únicos)
-- **Estados Únicos**: O((d+1)<sup>n</sup>) no pior caso
+### Time Complexity
+- **External Search**: O(optimal_d × F(n,d,L))
+- **Internal DP**: O(L × |Σ| × unique_states)
+- **Unique States**: O((d+1)<sup>n</sup>) in worst case
 - **Total**: O(d × L × |Σ| × (d+1)<sup>n</sup>)
 
-### Complexidade Espacial
-- **Armazenamento de Estados**: O((d+1)<sup>n</sup>)
-- **Tabela de Transições**: O(L × |Σ| × (d+1)^n)
+### Space Complexity
+- **State Storage**: O((d+1)<sup>n</sup>)
+- **Transition Table**: O(L × |Σ| × (d+1)^n)
 - **Backtracking**: O(L)
 - **Total**: O(L × |Σ| × (d+1)<sup>n</sup>)
 
-### Explosão Exponencial
+### Exponential Explosion
 ```
-n=3: (d+1)³ estados máximos
-n=4: (d+1)⁴ estados máximos  
-n=5: (d+1)⁵ estados máximos
-n=6: (d+1)⁶ estados máximos → 1B+ estados para d≥10
-n=7: (d+1)⁷ estados máximos → inviável para d>5
-```
-
-### Performance Estimada
-```
-n=3, L=10, d≤5:    < 1 segundo
-n=4, L=20, d≤8:    1-10 segundos  
-n=5, L=30, d≤6:    10 segundos - 2 minutos
-n=6, L=40, d≤4:    1-10 minutos
-n=7, L≥50:         Provavelmente inviável
+n=3: (d+1)³ maximum states
+n=4: (d+1)⁴ maximum states  
+n=5: (d+1)⁵ maximum states
+n=6: (d+1)⁶ maximum states → 1B+ states for d≥10
+n=7: (d+1)⁷ maximum states → unfeasible for d>5
 ```
 
-## 💡 Exemplos de Uso
+### Estimated Performance
+```
+n=3, L=10, d≤5:    < 1 second
+n=4, L=20, d≤8:    1-10 seconds  
+n=5, L=30, d≤6:    10 seconds - 2 minutes
+n=6, L=40, d≤4:    1-10 minutes
+n=7, L≥50:         Probably unfeasible
+```
 
-### Exemplo 1: Instância Pequena
+## 💡 Usage Examples
+
+### Example 1: Small Instance
 ```python
 from algorithms.dp_csp import DPCSPAlgorithm
 
@@ -193,45 +193,45 @@ strings = ["ACG", "ATG", "AAG"]
 algorithm = DPCSPAlgorithm(strings, alphabet="ACGT")
 center, distance, metadata = algorithm.run()
 
-print(f"Centro ótimo: {center}")
-print(f"Raio mínimo: {distance}")
-print(f"Solução exata: {metadata['solucao_exata']}")
+print(f"Optimal center: {center}")
+print(f"Minimum radius: {distance}")
+print(f"Exact solution: {metadata['exact_solution']}")
 ```
 
-### Exemplo 2: Com Limite de max_d
+### Example 2: With max_d Limit
 ```python
-# Limitar busca para evitar timeout
+# Limit search to avoid timeout
 algorithm = DPCSPAlgorithm(
     strings, 
     alphabet="ACGT",
-    max_d=5,  # não testa d > 5
-    max_time=60  # timeout em 1 minuto
+    max_d=5,  # don't test d > 5
+    max_time=60  # timeout in 1 minute
 )
 
 try:
     center, distance, metadata = algorithm.run()
-    print(f"Solução encontrada: {center} com d={distance}")
+    print(f"Solution found: {center} with d={distance}")
 except RuntimeError as e:
-    print(f"DP-CSP falhou: {e}")
+    print(f"DP-CSP failed: {e}")
 ```
 
-### Exemplo 3: Verificação de Benchmark
+### Example 3: Benchmark Verification
 ```python
-# Comparar DP-CSP (exato) vs Baseline (heurística)
+# Compare DP-CSP (exact) vs Baseline (heuristic)
 from algorithms.baseline import BaselineAlgorithm
 
-# Solução exata
+# Exact solution
 dp_center, dp_dist, _ = DPCSPAlgorithm(strings, "ACGT").run()
 
-# Solução heurística  
+# Heuristic solution  
 baseline_center, baseline_dist, _ = BaselineAlgorithm(strings, "ACGT").run()
 
-print(f"DP-CSP (ótimo): d={dp_dist}")
+print(f"DP-CSP (optimal): d={dp_dist}")
 print(f"Baseline: d={baseline_dist}")
 print(f"Gap: {baseline_dist - dp_dist} ({100*(baseline_dist-dp_dist)/dp_dist:.1f}%)")
 ```
 
-### Exemplo 4: Análise de Limites
+### Example 4: Limits Analysis
 ```python
 import time
 
@@ -243,60 +243,60 @@ def test_limits():
             start = time.time()
             center, dist, meta = DPCSPAlgorithm(strings, "ACGT", max_time=30).run()
             elapsed = time.time() - start
-            print(f"n={n}: SUCESSO d={dist} em {elapsed:.2f}s")
+            print(f"n={n}: SUCCESS d={dist} in {elapsed:.2f}s")
         except RuntimeError as e:
-            print(f"n={n}: FALHOU - {e}")
+            print(f"n={n}: FAILED - {e}")
 
 test_limits()
 ```
 
-## ⚠️ Limitações
+## ⚠️ Limitations
 
-### Limitações Fundamentais
-1. **Explosão Exponencial**: (d+1)<sup>n</sup> estados crescem exponencialmente
-2. **Limite de Memória**: Pode consumir gigabytes de RAM rapidamente
-3. **Timeout**: Execução pode demorar horas/dias para instâncias grandes
-4. **Escalabilidade**: Impraticável para n > 8-10 strings
+### Fundamental Limitations
+1. **Exponential Explosion**: (d+1)<sup>n</sup> states grow exponentially
+2. **Memory Limit**: Can consume gigabytes of RAM quickly
+3. **Timeout**: Execution can take hours/days for large instances
+4. **Scalability**: Impractical for n > 8-10 strings
 
-### Limitações Práticas
-1. **Datasets Reais**: A maioria é grande demais para DP exato
-2. **Aplicações Online**: Latência inaceitável para uso interativo
-3. **Recursos Computacionais**: Requer máquinas potentes para n > 6
-4. **Implementação**: Complexidade de código vs algoritmos simples
+### Practical Limitations
+1. **Real Datasets**: Most are too large for exact DP
+2. **Online Applications**: Unacceptable latency for interactive use
+3. **Computational Resources**: Requires powerful machines for n > 6
+4. **Implementation**: Code complexity vs simple algorithms
 
-### Cenários Problemáticos
+### Problematic Scenarios
 ```python
-# Caso 1: Muitas strings (explosão exponencial)
-strings = ["ACGT"] * 10  # n=10, inviável
+# Case 1: Many strings (exponential explosion)
+strings = ["ACGT"] * 10  # n=10, unfeasible
 
-# Caso 2: Raio alto necessário (muitos estados)
-strings = ["AAAA", "TTTT", "GGGG", "CCCC"]  # d=4, ainda ok para n=4
+# Case 2: High radius needed (many states)
+strings = ["AAAA", "TTTT", "GGGG", "CCCC"]  # d=4, still ok for n=4
 
-# Caso 3: Strings longas (muitas posições)
-strings = ["A"*1000, "T"*1000, "G"*1000]  # L=1000, muitas iterações
+# Case 3: Long strings (many positions)
+strings = ["A"*1000, "T"*1000, "G"*1000]  # L=1000, many iterations
 
-# Caso 4: Alfabeto grande (mais transições)
-strings = ["ABC", "DEF", "GHI"]  # alfabeto com 9 letras
+# Case 4: Large alphabet (more transitions)
+strings = ["ABC", "DEF", "GHI"]  # alphabet with 9 letters
 ```
 
 ### Workarounds
 ```python
-# Limite conservador de max_d
+# Conservative max_d limit
 algorithm = DPCSPAlgorithm(strings, alphabet, max_d=min(5, len(strings[0])//4))
 
-# Timeout agressivo
+# Aggressive timeout
 algorithm = DPCSPAlgorithm(strings, alphabet, max_time=30)
 
-# Pré-filtro por tamanho
+# Pre-filter by size
 if len(strings) > 8 or len(strings[0]) > 50:
-    print("Instância muito grande para DP-CSP, use heurística")
+    print("Instance too large for DP-CSP, use heuristic")
 else:
     result = algorithm.run()
 ```
 
-## 🔗 Integração com CSPBench
+## 🔗 CSPBench Integration
 
-### Registro Automático
+### Automatic Registration
 ```python
 @register_algorithm
 class DPCSPAlgorithm(CSPAlgorithm):
@@ -305,7 +305,7 @@ class DPCSPAlgorithm(CSPAlgorithm):
     is_deterministic = True
 ```
 
-### Configuração via YAML
+### YAML Configuration
 ```yaml
 algorithm:
   name: "DP-CSP"
@@ -314,55 +314,55 @@ algorithm:
     max_time: 120
 ```
 
-### Execução via CLI
+### CLI Execution
 ```bash
 python main.py --algorithm DP-CSP --dataset small_synthetic --max_d 3
 ```
 
-### Suporte a Paralelização
-- **Paralelismo Interno**: ❌ Não suportado (algoritmo sequencial)
-- **Paralelismo de Runs**: ✅ Múltiplas execuções independentes
-- **Compatibilidade**: ⚠️ Cuidado com consumo de memória em paralelo
+### Parallelization Support
+- **Internal Parallelism**: ❌ Not supported (sequential algorithm)
+- **Run Parallelism**: ✅ Multiple independent executions
+- **Compatibility**: ⚠️ Careful with memory consumption in parallel
 
-### Metadados Retornados
+### Returned Metadata
 ```python
 metadata = {
-    "iteracoes": 1,
-    "max_d_usado": 5,
-    "solucao_exata": True,
-    "centro_encontrado": "ACGT"
+    "iterations": 1,
+    "max_d_used": 5,
+    "exact_solution": True,
+    "center_found": "ACGT"
 }
 ```
 
-### Handling de Erros
+### Error Handling
 ```python
 try:
     center, distance, metadata = algorithm.run()
-    # Sucesso: solução ótima encontrada
+    # Success: optimal solution found
 except RuntimeError as e:
-    # Falha: timeout, limite de memória, ou max_d insuficiente
-    print(f"DP-CSP não conseguiu resolver: {e}")
-    # Fallback para algoritmo heurístico
+    # Failure: timeout, memory limit, or insufficient max_d
+    print(f"DP-CSP could not solve: {e}")
+    # Fallback to heuristic algorithm
 ```
 
 ### Troubleshooting
 
-**Problema**: "uso de memória excedeu limite seguro"
+**Problem**: "memory usage exceeded safe limit"
 ```
-Solução: Reduzir max_d ou usar máquina com mais RAM
-```
-
-**Problema**: "tempo de execução excedeu Xs"
-```
-Solução: Aumentar max_time ou reduzir tamanho da instância
+Solution: Reduce max_d or use machine with more RAM
 ```
 
-**Problema**: "(d+1)^n excede limite prático"
+**Problem**: "execution time exceeded Xs"
 ```
-Solução: Usar menos strings ou algoritmo heurístico
+Solution: Increase max_time or reduce instance size
+```
+
+**Problem**: "(d+1)^n exceeds practical limit"
+```
+Solution: Use fewer strings or heuristic algorithm
 ```
 
 ---
 
-**Desenvolvido para CSPBench** - Framework de Experimentação para o Closest String Problem  
-📚 Para mais informações, consulte a [documentação principal](../../README.md) do framework.
+**Developed for CSPBench** - Experimentation Framework for the Closest String Problem  
+📚 For more information, see the [main documentation](../../README.md) of the framework.

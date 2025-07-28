@@ -1,7 +1,7 @@
 """
-Módulo de Portas da Aplicação
+Application Ports Module
 
-Define interfaces (portas) que devem ser implementadas pela infraestrutura.
+Defines interfaces (ports) that must be implemented by infrastructure.
 """
 
 from .repositories import AlgorithmRegistry, DatasetRepository, ExecutorPort, ExportPort

@@ -1,9 +1,9 @@
 """
-Domínio: Métricas para Avaliação de Algoritmos CSP
+Domain: Metrics for CSP Algorithm Evaluation
 
-Este módulo contém funções e classes para cálculo de métricas de distância
-e avaliação de soluções no contexto do Closest String Problem.
-Implementação pura sem dependências externas.
+This module contains functions and classes for calculating distance metrics
+and evaluating solutions in the context of the Closest String Problem.
+Pure implementation without external dependencies.
 """
 
 from typing import List
@@ -11,34 +11,34 @@ from typing import List
 
 def hamming_distance(str1: str, str2: str) -> int:
     """
-    Calcula distância de Hamming entre duas strings.
+    Calculate Hamming distance between two strings.
 
     Args:
-        str1: Primeira string
-        str2: Segunda string
+        str1: First string
+        str2: Second string
 
     Returns:
-        int: Número de posições onde as strings diferem
+        int: Number of positions where strings differ
 
     Raises:
-        ValueError: Se strings têm comprimentos diferentes
+        ValueError: If strings have different lengths
     """
     if len(str1) != len(str2):
-        raise ValueError("Strings devem ter mesmo comprimento")
+        raise ValueError("Strings must have the same length")
 
     return sum(c1 != c2 for c1, c2 in zip(str1, str2))
 
 
 def max_distance(center: str, strings: List[str]) -> int:
     """
-    Calcula distância máxima de um centro para conjunto de strings.
+    Calculate maximum distance from a center to a set of strings.
 
     Args:
-        center: String central
-        strings: Lista de strings de referência
+        center: Center string
+        strings: List of reference strings
 
     Returns:
-        int: Distância máxima
+        int: Maximum distance
     """
     if not strings:
         return 0
@@ -48,28 +48,28 @@ def max_distance(center: str, strings: List[str]) -> int:
 
 def max_hamming(center: str, strings: List[str]) -> int:
     """
-    Alias para max_distance para compatibilidade.
+    Alias for max_distance for compatibility.
 
     Args:
-        center: String central
-        strings: Lista de strings de referência
+        center: Center string
+        strings: List of reference strings
 
     Returns:
-        int: Distância máxima
+        int: Maximum distance
     """
     return max_distance(center, strings)
 
 
 def average_distance(center: str, strings: List[str]) -> float:
     """
-    Calcula distância média de um centro para conjunto de strings.
+    Calculate average distance from a center to a set of strings.
 
     Args:
-        center: String central
-        strings: Lista de strings de referência
+        center: Center string
+        strings: List of reference strings
 
     Returns:
-        float: Distância média
+        float: Average distance
     """
     if not strings:
         return 0.0
@@ -80,14 +80,14 @@ def average_distance(center: str, strings: List[str]) -> float:
 
 def median_distance(center: str, strings: List[str]) -> float:
     """
-    Calcula distância mediana de um centro para conjunto de strings.
+    Calculate median distance from a center to a set of strings.
 
     Args:
-        center: String central
-        strings: Lista de strings de referência
+        center: Center string
+        strings: List of reference strings
 
     Returns:
-        float: Distância mediana
+        float: Median distance
     """
     if not strings:
         return 0.0
@@ -104,13 +104,13 @@ def median_distance(center: str, strings: List[str]) -> float:
 
 def diversity_metric(strings: List[str]) -> float:
     """
-    Calcula métrica de diversidade de um conjunto de strings.
+    Calculate diversity metric of a set of strings.
 
     Args:
-        strings: Lista de strings
+        strings: List of strings
 
     Returns:
-        float: Valor de diversidade (0-1, onde 1 é máxima diversidade)
+        float: Diversity value (0-1, where 1 is maximum diversity)
     """
     if len(strings) < 2:
         return 0.0
@@ -134,14 +134,14 @@ def diversity_metric(strings: List[str]) -> float:
 
 def consensus_strength(center: str, strings: List[str]) -> float:
     """
-    Calcula força do consenso de uma string central.
+    Calculate consensus strength of a center string.
 
     Args:
-        center: String central
-        strings: Lista de strings de referência
+        center: Center string
+        strings: List of reference strings
 
     Returns:
-        float: Força do consenso (0-1, onde 1 é consenso perfeito)
+        float: Consensus strength (0-1, where 1 is perfect consensus)
     """
     if not strings:
         return 1.0
@@ -157,14 +157,14 @@ def consensus_strength(center: str, strings: List[str]) -> float:
 
 def solution_quality(center: str, strings: List[str]) -> dict:
     """
-    Calcula múltiplas métricas de qualidade de uma solução.
+    Calculate multiple quality metrics for a solution.
 
     Args:
-        center: String central
-        strings: Lista de strings de referência
+        center: Center string
+        strings: List of reference strings
 
     Returns:
-        dict: Dicionário com várias métricas
+        dict: Dictionary with various metrics
     """
     return {
         "max_distance": max_distance(center, strings),
@@ -176,13 +176,13 @@ def solution_quality(center: str, strings: List[str]) -> dict:
 
 
 class DistanceCalculator:
-    """Calculadora de distâncias com cache para otimização."""
+    """Distance calculator with cache for optimization."""
 
     def __init__(self):
         self._cache = {}
 
     def hamming_distance_cached(self, str1: str, str2: str) -> int:
-        """Calcula distância de Hamming com cache."""
+        """Calculate Hamming distance with cache."""
         key = (str1, str2) if str1 <= str2 else (str2, str1)
 
         if key not in self._cache:
@@ -191,16 +191,16 @@ class DistanceCalculator:
         return self._cache[key]
 
     def clear_cache(self) -> None:
-        """Limpa o cache de distâncias."""
+        """Clear distance cache."""
         self._cache.clear()
 
     def cache_size(self) -> int:
-        """Retorna tamanho atual do cache."""
+        """Return current cache size."""
         return len(self._cache)
 
 
 class QualityEvaluator:
-    """Avaliador de qualidade de soluções CSP."""
+    """CSP solution quality evaluator."""
 
     def __init__(self, strings: List[str]):
         self.strings = strings
@@ -208,13 +208,13 @@ class QualityEvaluator:
 
     def evaluate(self, center: str) -> dict:
         """
-        Avalia qualidade de uma string central.
+        Evaluate quality of a center string.
 
         Args:
-            center: String central a ser avaliada
+            center: Center string to be evaluated
 
         Returns:
-            dict: Métricas de qualidade
+            dict: Quality metrics
         """
         distances = [
             self.calculator.hamming_distance_cached(center, s) for s in self.strings
@@ -233,14 +233,14 @@ class QualityEvaluator:
 
     def compare_solutions(self, center1: str, center2: str) -> dict:
         """
-        Compara duas soluções candidatas.
+        Compare two candidate solutions.
 
         Args:
-            center1: Primeira string central
-            center2: Segunda string central
+            center1: First center string
+            center2: Second center string
 
         Returns:
-            dict: Comparação das soluções
+            dict: Solution comparison
         """
         eval1 = self.evaluate(center1)
         eval2 = self.evaluate(center2)

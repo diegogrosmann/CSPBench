@@ -1,76 +1,76 @@
 """
-Implementação do algoritmo de consenso ganancioso (Baseline) para CSP.
+Implementation of the greedy consensus algorithm (Baseline) for CSP.
 
-O algoritmo Baseline representa a abordagem mais simples e fundamental para o
-Closest String Problem (CSP). Utiliza uma estratégia gulosa (greedy) que constrói
-a string center posição por posição, escolhendo sempre o símbolo que minimiza
-localmente a distância máxima naquele momento.
+The Baseline algorithm represents the simplest and most fundamental approach to the
+Closest String Problem (CSP). It uses a greedy strategy that constructs
+the center string position by position, always choosing the symbol that locally
+minimizes the maximum distance at that moment.
 
-ALGORITMO GREEDY CONSENSUS:
+GREEDY CONSENSUS ALGORITHM:
 
 ┌─────────────────────────────────────────────────────────────────────────────────┐
-│                        ALGORITMO BASELINE DETALHADO                             │
+│                        DETAILED BASELINE ALGORITHM                              │
 ├─────────────────────────────────────────────────────────────────────────────────┤
-│ 1. INICIALIZAÇÃO                                                               │
-│   ├── Valida entrada (strings não vazias, mesmo comprimento)                   │
-│   └── Inicializa string consenso vazia                                         │
+│ 1. INITIALIZATION                                                              │
+│   ├── Validate input (non-empty strings, same length)                          │
+│   └── Initialize empty consensus string                                         │
 ├─────────────────────────────────────────────────────────────────────────────────┤
-│ 2. CONSTRUÇÃO POSIÇÃO-A-POSIÇÃO                                               │
-│   ├── Para cada posição i de 0 a L-1:                                          │
-│   │   ├── Para cada símbolo c do alfabeto:                                     │
-│   │   │   ├── Calcula string parcial = consenso[0:i] + c                      │
-│   │   │   ├── Calcula distância máxima da string parcial                      │
-│   │   │   └── Armazena se for a melhor opção até agora                        │
-│   │   └── Escolhe símbolo que minimiza distância máxima                       │
-│   └── Adiciona melhor símbolo ao consenso                                      │
+│ 2. POSITION-BY-POSITION CONSTRUCTION                                          │
+│   ├── For each position i from 0 to L-1:                                       │
+│   │   ├── For each symbol c in alphabet:                                       │
+│   │   │   ├── Calculate partial string = consensus[0:i] + c                    │
+│   │   │   ├── Calculate maximum distance of partial string                     │
+│   │   │   └── Store if it's the best option so far                            │
+│   │   └── Choose symbol that minimizes maximum distance                        │
+│   └── Add best symbol to consensus                                             │
 ├─────────────────────────────────────────────────────────────────────────────────┤
-│ 3. VALIDAÇÃO E RETORNO                                                        │
-│   ├── Calcula distância final da string consenso completa                      │
-│   ├── Registra resultado no log para auditoria                                │
-│   └── Retorna string consenso construída                                       │
+│ 3. VALIDATION AND RETURN                                                      │
+│   ├── Calculate final distance of complete consensus string                     │
+│   ├── Log result for auditing                                                  │
+│   └── Return constructed consensus string                                       │
 └─────────────────────────────────────────────────────────────────────────────────┘
 
-CARACTERÍSTICAS DO ALGORITMO:
+ALGORITHM CHARACTERISTICS:
 
-• **SIMPLICIDADE**: Implementação direta e compreensível
-• **DETERMINÍSTICO**: Sempre produz o mesmo resultado para a mesma entrada
-• **GULOSO LOCAL**: Otimiza cada posição independentemente
-• **BASELINE CONFIÁVEL**: Serve como referência para comparação
-• **COMPLEXIDADE BAIXA**: O(L * |Σ| * n) onde L=comprimento, |Σ|=alfabeto, n=strings
+• **SIMPLICITY**: Direct and comprehensible implementation
+• **DETERMINISTIC**: Always produces the same result for the same input
+• **LOCAL GREEDY**: Optimizes each position independently
+• **RELIABLE BASELINE**: Serves as reference for comparison
+• **LOW COMPLEXITY**: O(L * |Σ| * n) where L=length, |Σ|=alphabet, n=strings
 
-LIMITAÇÕES:
+LIMITATIONS:
 
-• **ÓTIMO LOCAL**: Pode não encontrar a solução global ótima
-• **MIOPIA**: Decisões locais podem prejudicar qualidade global
-• **SEM BACKTRACKING**: Não reconsidera decisões anteriores
-• **QUALIDADE LIMITADA**: Geralmente inferior a metaheurísticas avançadas
+• **LOCAL OPTIMUM**: May not find global optimal solution
+• **MYOPIA**: Local decisions may harm global quality
+• **NO BACKTRACKING**: Does not reconsider previous decisions
+• **LIMITED QUALITY**: Generally inferior to advanced metaheuristics
 
-APLICAÇÃO E USO:
+APPLICATION AND USE:
 
-O Baseline é fundamental como:
-- **Referência de comparação** para outros algoritmos
-- **Solução inicial** para métodos mais sofisticados
-- **Validação de implementação** (deve funcionar corretamente)
-- **Análise de dificuldade** do problema (se Baseline resolve bem, problema é fácil)
+The Baseline is fundamental as:
+- **Comparison reference** for other algorithms
+- **Initial solution** for more sophisticated methods
+- **Implementation validation** (must work correctly)
+- **Problem difficulty analysis** (if Baseline solves well, problem is easy)
 
-EXEMPLO DE FUNCIONAMENTO:
+OPERATION EXAMPLE:
 
-Entrada: ["ACGT", "AGCT", "ATCT"]
-Posição 0: A=3/3, melhor='A' (distância parcial=0)
-Posição 1: C vs G vs T → C minimiza distância máxima
-Posição 2: G vs C vs T → C minimiza distância máxima
-Posição 3: T=3/3, melhor='T' (distância parcial mínima)
-Resultado: "ACCT" com distância máxima = 1
+Input: ["ACGT", "AGCT", "ATCT"]
+Position 0: A=3/3, best='A' (partial distance=0)
+Position 1: C vs G vs T → C minimizes maximum distance
+Position 2: G vs C vs T → C minimizes maximum distance
+Position 3: T=3/3, best='T' (minimal partial distance)
+Result: "ACCT" with maximum distance = 1
 
 Classes:
-    Nenhuma - Implementação funcional direta
+    None - Direct functional implementation
 
-Funções principais:
-    greedy_consensus(strings, alphabet): Algoritmo principal de consenso guloso
-    max_distance(center, strings): Função auxiliar para cálculo de distância
+Main functions:
+    greedy_consensus(strings, alphabet): Main greedy consensus algorithm
+    max_distance(center, strings): Auxiliary function for distance calculation
 
-Author: Implementação de referência baseada em algoritmos gulosos clássicos
-Version: Otimizada para clareza e servir como baseline confiável
+Author: Reference implementation based on classic greedy algorithms
+Version: Optimized for clarity and to serve as reliable baseline
 """
 
 import logging
@@ -80,156 +80,156 @@ logger = logging.getLogger(__name__)
 
 def greedy_consensus(strings: list[str], alphabet: str) -> str:
     """
-    Constrói uma string consenso usando estratégia gulosa posição por posição.
+    Constructs a consensus string using greedy strategy position by position.
 
-    Esta é a implementação do algoritmo Baseline para o Closest String Problem.
-    A estratégia gulosa (greedy) constrói a solução incrementalmente, tomando
-    a decisão localmente ótima em cada passo sem considerar o impacto global.
+    This is the Baseline algorithm implementation for the Closest String Problem.
+    The greedy strategy constructs the solution incrementally, making
+    the locally optimal decision at each step without considering global impact.
 
-    ALGORITMO DETALHADO:
+    DETAILED ALGORITHM:
 
-    1. **VALIDAÇÃO DE ENTRADA**:
-       - Verifica se há strings para processar
-       - Assume que todas têm o mesmo comprimento (pré-condição)
+    1. **INPUT VALIDATION**:
+       - Checks if there are strings to process
+       - Assumes all have the same length (precondition)
 
-    2. **CONSTRUÇÃO INCREMENTAL**:
-       - Para cada posição i de 0 a L-1:
-         a) Testa cada símbolo do alfabeto nessa posição
-         b) Para cada símbolo candidato:
-            - Constrói string parcial até posição i
-            - Calcula distância máxima da string parcial
-         c) Escolhe símbolo que minimiza a distância máxima
-         d) Adiciona símbolo escolhido ao consenso
+    2. **INCREMENTAL CONSTRUCTION**:
+       - For each position i from 0 to L-1:
+         a) Tests each alphabet symbol at this position
+         b) For each candidate symbol:
+            - Constructs partial string up to position i
+            - Calculates maximum distance of partial string
+         c) Chooses symbol that minimizes maximum distance
+         d) Adds chosen symbol to consensus
 
-    3. **ESTRATÉGIA DE OTIMIZAÇÃO LOCAL**:
-       - Em cada posição, escolhe símbolo que resulta na menor
-         distância máxima considerando apenas o prefixo construído
-       - Não considera impacto futuro (característica gulosa)
+    3. **LOCAL OPTIMIZATION STRATEGY**:
+       - At each position, chooses symbol that results in smallest
+         maximum distance considering only the constructed prefix
+       - Does not consider future impact (greedy characteristic)
 
-    COMPLEXIDADE TEMPORAL:
-    - O(L × |Σ| × n × L) onde:
-      - L = comprimento das strings
-      - |Σ| = tamanho do alfabeto
-      - n = número de strings
-      - Fator L adicional vem do cálculo de distância parcial
+    TEMPORAL COMPLEXITY:
+    - O(L × |Σ| × n × L) where:
+      - L = string length
+      - |Σ| = alphabet size
+      - n = number of strings
+      - Additional L factor comes from partial distance calculation
 
-    CARACTERÍSTICAS:
-    - **Determinístico**: Sempre produz o mesmo resultado
-    - **Guloso**: Otimização local sem backtracking
-    - **Incremental**: Constrói solução posição por posição
-    - **Baseline**: Referência para comparação com outros algoritmos
+    CHARACTERISTICS:
+    - **Deterministic**: Always produces the same result
+    - **Greedy**: Local optimization without backtracking
+    - **Incremental**: Constructs solution position by position
+    - **Baseline**: Reference for comparison with other algorithms
 
-    LIMITAÇÕES:
-    - Pode ficar preso em ótimos locais
-    - Não garante solução globalmente ótima
-    - Qualidade depende da ordem de construção
+    LIMITATIONS:
+    - May get stuck in local optima
+    - Does not guarantee globally optimal solution
+    - Quality depends on construction order
 
     Args:
-        strings: Lista de strings de entrada (todas com mesmo comprimento)
-        alphabet: String contendo todos os símbolos válidos do alfabeto
+        strings: List of input strings (all with same length)
+        alphabet: String containing all valid alphabet symbols
 
     Returns:
-        str: String consenso construída pela estratégia gulosa
+        str: Consensus string constructed by greedy strategy
 
     Example:
         >>> strings = ["ACGT", "AGCT", "ATCT"]
         >>> alphabet = "ACGT"
         >>> greedy_consensus(strings, alphabet)
-        "ACCT"  # Distância máxima = 1
+        "ACCT"  # Maximum distance = 1
 
     Note:
-        A função registra o resultado final no log para auditoria
-        e validação da implementação.
+        The function logs the final result for auditing
+        and implementation validation.
     """
-    # VALIDAÇÃO DE ENTRADA
+    # INPUT VALIDATION
     if not strings:
         return ""
 
-    # INICIALIZAÇÃO
-    L = len(strings[0])  # Comprimento das strings (assumido uniforme)
-    consensus = []  # String consenso sendo construída
+    # INITIALIZATION
+    L = len(strings[0])  # String length (assumed uniform)
+    consensus = []  # Consensus string being constructed
 
-    # CONSTRUÇÃO POSIÇÃO-A-POSIÇÃO
+    # POSITION-BY-POSITION CONSTRUCTION
     for pos in range(L):
-        best_char = None  # Melhor símbolo para posição atual
-        best_max_dist = float("inf")  # Menor distância máxima encontrada
+        best_char = None  # Best symbol for current position
+        best_max_dist = float("inf")  # Smallest maximum distance found
 
-        # TESTE DE CADA SÍMBOLO DO ALFABETO
+        # TEST EACH ALPHABET SYMBOL
         for char in alphabet:
-            # Construir string parcial com símbolo candidato
+            # Build partial string with candidate symbol
             partial_consensus = consensus + [char]
 
-            # CÁLCULO DA DISTÂNCIA MÁXIMA PARCIAL
-            # Calcula distância apenas considerando posições já decididas
+            # PARTIAL MAXIMUM DISTANCE CALCULATION
+            # Calculates distance only considering already decided positions
             max_dist = 0
             for s in strings:
-                # Distância de Hamming parcial (até posição atual + 1)
+                # Partial Hamming distance (up to current position + 1)
                 dist = sum(1 for i in range(pos + 1) if partial_consensus[i] != s[i])
                 max_dist = max(max_dist, dist)
 
-            # ATUALIZAÇÃO DO MELHOR CANDIDATO
-            # Se encontrou símbolo que resulta em menor distância máxima
+            # BEST CANDIDATE UPDATE
+            # If found symbol that results in smaller maximum distance
             if max_dist < best_max_dist:
                 best_max_dist = max_dist
                 best_char = char
 
-        # DECISÃO GULOSA: Adicionar melhor símbolo encontrado
+        # GREEDY DECISION: Add best symbol found
         consensus.append(best_char)
 
-    # CONSTRUÇÃO DA STRING FINAL
+    # FINAL STRING CONSTRUCTION
     result = "".join(consensus)
 
-    # VALIDAÇÃO E LOG DO RESULTADO
-    # Import local para evitar conflito de nomes
+    # RESULT VALIDATION AND LOGGING
+    # Local import to avoid name conflict
     from src.domain.metrics import max_distance as calc_max_distance
 
     final_distance = calc_max_distance(result, strings)
-    logger.info("[CONSENSUS] Consenso: %s, distância: %d", result, final_distance)
+    logger.info("[CONSENSUS] Consensus: %s, distance: %d", result, final_distance)
 
     return result
 
 
 def max_distance(center: str, strings: list[str]) -> int:
     """
-    Calcula a distância máxima de Hamming entre uma string center e um conjunto de strings.
+    Calculates the maximum Hamming distance between a center string and a set of strings.
 
-    Esta função implementa a função objetivo do Closest String Problem (CSP).
-    A distância máxima é o valor que precisamos minimizar para encontrar
-    a melhor string center possível.
+    This function implements the objective function of the Closest String Problem (CSP).
+    The maximum distance is the value we need to minimize to find
+    the best possible center string.
 
-    DEFINIÇÃO MATEMÁTICA:
-    Para uma string center c e conjunto de strings S = {s₁, s₂, ..., sₙ}:
+    MATHEMATICAL DEFINITION:
+    For a center string c and set of strings S = {s₁, s₂, ..., sₙ}:
     max_distance(c, S) = max{d_H(c, sᵢ) | sᵢ ∈ S}
 
-    onde d_H(a,b) é a distância de Hamming entre strings a e b.
+    where d_H(a,b) is the Hamming distance between strings a and b.
 
-    IMPORTÂNCIA NO CSP:
-    - **Função Objetivo**: Valor a ser minimizado
-    - **Critério de Qualidade**: Menor valor = melhor solução
-    - **Fitness**: Usado para avaliar candidatos em algoritmos evolutivos
-    - **Stopping Criterion**: Algoritmo para quando atinge 0 (ótimo)
+    IMPORTANCE IN CSP:
+    - **Objective Function**: Value to be minimized
+    - **Quality Criterion**: Lower value = better solution
+    - **Fitness**: Used to evaluate candidates in evolutionary algorithms
+    - **Stopping Criterion**: Algorithm stops when reaches 0 (optimal)
 
-    PROPRIEDADES:
-    - **Simétrica**: max_distance(c, S) = max_distance(c, S')
-    - **Limitada**: 0 ≤ resultado ≤ L (comprimento das strings)
-    - **Monotônica**: Mais diferenças → maior distância
-    - **Discreta**: Apenas valores inteiros
+    PROPERTIES:
+    - **Symmetric**: max_distance(c, S) = max_distance(c, S')
+    - **Bounded**: 0 ≤ result ≤ L (string length)
+    - **Monotonic**: More differences → greater distance
+    - **Discrete**: Only integer values
 
-    COMPLEXIDADE:
-    - Temporal: O(n × L) onde n=número de strings, L=comprimento
-    - Espacial: O(1) - não requer armazenamento adicional
+    COMPLEXITY:
+    - Temporal: O(n × L) where n=number of strings, L=length
+    - Spatial: O(1) - requires no additional storage
 
-    CASOS ESPECIAIS:
-    - Se center ∈ strings, então resultado ≤ diâmetro do conjunto
-    - Se strings são idênticas e center = string, resultado = 0
-    - Pior caso: center difere de todas em todas as posições
+    SPECIAL CASES:
+    - If center ∈ strings, then result ≤ set diameter
+    - If strings are identical and center = string, result = 0
+    - Worst case: center differs from all at all positions
 
     Args:
-        center: String candidata a center (mesmo comprimento que strings)
-        strings: Lista de strings de entrada para comparação
+        center: Candidate center string (same length as strings)
+        strings: List of input strings for comparison
 
     Returns:
-        int: Maior distância de Hamming encontrada entre center e strings
+        int: Largest Hamming distance found between center and strings
 
     Example:
         >>> center = "ACCT"
@@ -238,16 +238,16 @@ def max_distance(center: str, strings: list[str]) -> int:
         1  # max(1, 1, 1) = 1
 
     Note:
-        Esta função é wrapper para manter consistência com a interface
-        do módulo baseline, delegando o cálculo para implementação otimizada.
+        This function is a wrapper to maintain consistency with baseline
+        module interface, delegating calculation to optimized implementation.
     """
-    # Import local para usar implementação otimizada
+    # Local import to use optimized implementation
     from src.domain.metrics import hamming_distance
 
-    # CÁLCULO DE TODAS AS DISTÂNCIAS
-    # Calcula distância de Hamming entre center e cada string
+    # CALCULATE ALL DISTANCES
+    # Calculates Hamming distance between center and each string
     distances = [hamming_distance(center, s) for s in strings]
 
-    # RETORNA A DISTÂNCIA MÁXIMA
-    # max() encontra o maior valor na lista de distâncias
+    # RETURN MAXIMUM DISTANCE
+    # max() finds the largest value in the distance list
     return max(distances)

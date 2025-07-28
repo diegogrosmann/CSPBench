@@ -1,0 +1,40 @@
+# docker-compose.yml - CSPBench v0.1.0
+version: '3.9'
+
+services:
+  cspbench:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    container_name: cspbench
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - APP_ENV=docker
+    volumes:
+      # Mount only necessary directories
+      - ./datasets:/app/datasets:ro
+      - ./batches:/app/batches:ro
+      - ./outputs:/app/outputs
+    working_dir: /app
+    # Remove command to use Dockerfile's CMD
+    # command: python main.py
+    
+    # Resource configurations (optional)
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '2.0'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
+    
+    # Network configurations (if needed)
+    networks:
+      - cspbench-network
+
+networks:
+  cspbench-network:
+    driver: bridge
