@@ -130,6 +130,33 @@ def create_algorithm_registry(config: Dict[str, Any]) -> DomainAlgorithmRegistry
     return DomainAlgorithmRegistry()
 
 
+def create_entrez_repository(config: Dict[str, Any]) -> Optional[Any]:
+    """Create Entrez dataset repository based on configuration."""
+    try:
+        from src.infrastructure.persistence.entrez_dataset_repository import NCBIEntrezDatasetRepository
+        
+        # Check if required environment variables are set
+        email = os.getenv("NCBI_EMAIL")
+        if not email:
+            typer.echo("⚠️  NCBI_EMAIL not set. Entrez datasets will not be available.", err=True)
+            return None
+        
+        # Create repository
+        entrez_repo = NCBIEntrezDatasetRepository()
+        
+        # Test availability
+        if entrez_repo.is_available():
+            typer.echo("✅ Entrez datasets enabled")
+            return entrez_repo
+        else:
+            typer.echo("⚠️  Entrez service not available. Check network connection.", err=True)
+            return None
+            
+    except Exception as e:
+        typer.echo(f"⚠️  Failed to initialize Entrez repository: {str(e)}", err=True)
+        return None
+
+
 def create_executor(config: Dict[str, Any]) -> Executor:
     """Create executor based on configuration."""
     executor_impl = os.getenv("EXECUTOR_IMPL", "Executor")
@@ -271,6 +298,7 @@ def initialize_service() -> ExperimentService:
         algo_registry = create_algorithm_registry(config)
         executor = create_executor(config)
         exporter = create_exporter(config)
+        entrez_repo = create_entrez_repository(config)
         monitoring_service = create_monitoring_service(config)
 
         # Create service with DI
@@ -279,7 +307,9 @@ def initialize_service() -> ExperimentService:
             exporter=exporter,
             executor=executor,
             algo_registry=algo_registry,
+            entrez_repo=entrez_repo,
             monitoring_service=monitoring_service,
+            session_manager=session_manager,
         )
 
         typer.echo("✅ CSPBench initialized successfully!")
@@ -414,7 +444,7 @@ def show_algorithms_and_exit():
     try:
         # Import from algorithms module to activate auto-discovery
         import algorithms
-        from algorithms import global_registry
+        from src.domain.algorithms import global_registry
 
         print("🧠 Available algorithms:")
         for name, cls in global_registry.items():
@@ -507,7 +537,7 @@ def show_algorithms_and_exit():
     try:
         # Import from algorithms module to activate auto-discovery
         import algorithms
-        from algorithms import global_registry
+        from src.domain.algorithms import global_registry
 
         print("🧠 Available algorithms:")
         for name, cls in global_registry.items():

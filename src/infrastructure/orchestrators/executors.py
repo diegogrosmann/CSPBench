@@ -5,7 +5,7 @@ Implements standardized interface delegating execution to specialized orchestrat
 """
 
 import time
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from src.application.ports import ExecutorInterface
 from src.domain import Dataset
@@ -51,12 +51,23 @@ class Executor(ExecutorInterface):
             # Configure dependencies
             algorithm_registry = DomainAlgorithmRegistry()
             dataset_repository = FileDatasetRepository("./datasets")
+            
+            # Try to create Entrez repository if available
+            entrez_repository = None
+            try:
+                from src.infrastructure.persistence.entrez_dataset_repository import NCBIEntrezDatasetRepository
+                entrez_repository = NCBIEntrezDatasetRepository()
+                if not entrez_repository.is_available():
+                    entrez_repository = None
+            except Exception:
+                entrez_repository = None
 
             # Create execution orchestrator
             orchestrator = ExecutionOrchestrator(
                 algorithm_registry=algorithm_registry,
                 dataset_repository=dataset_repository,
                 monitoring_service=monitoring_service,
+                entrez_repository=entrez_repository,
             )
 
             # Delegate execution
@@ -200,6 +211,79 @@ class Executor(ExecutorInterface):
             self._logger.error(f"Error in sensitivity analysis: {e}")
             raise AlgorithmExecutionError(
                 f"Error in sensitivity analysis: {e}"
+            ) from e
+
+    def execute_single(
+        self,
+        algorithm_name: str,
+        dataset: Dataset,
+        params: Optional[Dict[str, Any]] = None,
+        timeout: Optional[int] = None,
+        monitoring_service=None,
+    ) -> Dict[str, Any]:
+        """
+        Execute a single algorithm delegating to ExecutionOrchestrator.
+
+        Args:
+            algorithm_name: Name of algorithm to execute
+            dataset: Dataset for processing
+            params: Algorithm-specific parameters
+            timeout: Timeout in seconds
+            monitoring_service: Optional monitoring service
+
+        Returns:
+            Dict[str, Any]: Execution result
+        """
+        try:
+            from src.infrastructure import (
+                DomainAlgorithmRegistry,
+                FileDatasetRepository,
+            )
+            from src.infrastructure.orchestrators.execution_orchestrator import (
+                ExecutionOrchestrator,
+            )
+
+            # Configure dependencies
+            algorithm_registry = DomainAlgorithmRegistry()
+            dataset_repository = FileDatasetRepository("./datasets")
+            
+            # Try to create Entrez repository if available  
+            entrez_repository = None
+            try:
+                from src.infrastructure.persistence.entrez_dataset_repository import NCBIEntrezDatasetRepository
+                entrez_repository = NCBIEntrezDatasetRepository()
+                if not entrez_repository.is_available():
+                    entrez_repository = None
+            except Exception:
+                entrez_repository = None
+
+            # Create execution orchestrator
+            orchestrator = ExecutionOrchestrator(
+                algorithm_registry=algorithm_registry,
+                dataset_repository=dataset_repository,
+                monitoring_service=monitoring_service,
+                entrez_repository=entrez_repository,
+            )
+
+            # Set batch config if available
+            if self._current_batch_config:
+                orchestrator.set_batch_config(self._current_batch_config)
+
+            # Execute single algorithm
+            result = orchestrator.execute_single(
+                algorithm_name=algorithm_name,
+                dataset=dataset,
+                params=params,
+                timeout=timeout,
+                monitoring_service=monitoring_service,
+            )
+
+            return result
+
+        except Exception as e:
+            self._logger.error(f"Error in single execution: {e}")
+            raise AlgorithmExecutionError(
+                f"Error in single execution: {e}"
             ) from e
 
     def get_execution_status(self, execution_id: str) -> str:

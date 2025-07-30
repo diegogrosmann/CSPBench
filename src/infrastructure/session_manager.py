@@ -94,10 +94,6 @@ class SessionManager:
             return self._base_result_dir
         return os.path.join(self._base_result_dir, self._session_folder)
 
-    def get_session_folder(self) -> str:
-        """Retorna o nome da pasta da sessão atual."""
-        return self._session_folder or ""
-
     def get_log_dir(self) -> str:
         """Retorna o diretório completo para logs da sessão atual."""
         if not self._session_folder:

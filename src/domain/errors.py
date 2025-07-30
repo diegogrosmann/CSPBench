@@ -171,3 +171,10 @@ class RepositoryPermissionError(RepositoryError):
     """Repository permission error."""
 
     pass
+
+
+# Infrastructure Exceptions
+class InfrastructureError(ApplicationError):
+    """Infrastructure error."""
+
+    pass

@@ -49,7 +49,7 @@ class OptimizationReportGenerator:
 
         # Configuração de gráficos
         self.plot_config = config.get("plots", {})
-        self.plot_format = self.formats.get("plots", "png")
+        self.plot_format = self.plot_config.get("formats", ["png"])[0] if self.plot_config.get("formats") else "png"
 
         # Criar diretórios
         self.plots_dir = self.destination / "plots"
@@ -137,12 +137,12 @@ class OptimizationReportGenerator:
         ]
 
         for plot_name, plot_func in plot_types:
-            if self.plot_config.get(f"plot_{plot_name}", True):
+            if self.plot_config.get(plot_name, True):
                 try:
-                    self.logger.debug(f"Gerando gráfico: {plot_name}")
+                    self.logger.debug(f"Generating plot: {plot_name}")
                     plot_func(study, df_trials, results)
                 except Exception as e:
-                    self.logger.error(f"Erro ao gerar gráfico {plot_name}: {e}")
+                    self.logger.error(f"Error generating plot {plot_name}: {e}")
 
     def _plot_convergence(
         self, study: optuna.Study, df_trials: pd.DataFrame, results: Dict[str, Any]

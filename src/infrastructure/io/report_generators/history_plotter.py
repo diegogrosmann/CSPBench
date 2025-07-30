@@ -32,8 +32,8 @@ class HistoryPlotter:
         self.config = config
         self.output_dir = output_dir
         self.history_config = config.get("infrastructure", {}).get("history", {})
-        self.plot_config = self.history_config.get("history_plots", {})
-        self.plot_format = self.plot_config.get("plot_format", "png")
+        self.plot_config = config.get("plots", {})
+        self.plot_format = self.plot_config.get("formats", ["png"])[0] if self.plot_config.get("formats") else "png"
 
         # Configure matplotlib
         plt.style.use("seaborn-v0_8")
@@ -46,7 +46,7 @@ class HistoryPlotter:
         Args:
             experiment_results: List of experiment results
         """
-        if not self.history_config.get("plot_history", False):
+        if not self.history_config.get("generate_plots", False):
             return
 
         print("📈 Generating history plots and export...")

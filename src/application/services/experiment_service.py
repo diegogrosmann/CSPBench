@@ -5,17 +5,22 @@ Orchestrates the execution of experiments, optimizations, and sensitivity analys
 Implements application use cases without infrastructure dependency.
 """
 
+from pathlib import Path
 from typing import Any, Dict, List, Optional
+
+# IMPORTANT: Import algorithms first to load the global_registry
+import algorithms
 
 from src.application.ports import (
     AlgorithmRegistry,
     DatasetRepository,
+    EntrezDatasetRepository,
     ExecutorPort,
     ExportPort,
 )
 from src.application.services.config_parser import (
-    ConfigurationParser,
-    ConfigurationValidator,
+    ConfigParser,
+    BatchConfig,
     InfrastructureConfig,
     ExportConfig,
     PlotsConfig,
@@ -54,7 +59,9 @@ class ExperimentService:
         exporter: ExportPort,
         executor: ExecutorPort,
         algo_registry: AlgorithmRegistry,
+        entrez_repo: Optional[EntrezDatasetRepository] = None,
         monitoring_service: Optional[Any] = None,
+        session_manager: Optional[Any] = None,
     ):
         """
         Initialize the experiments service.
@@ -64,13 +71,17 @@ class ExperimentService:
             exporter: Port for results exportation
             executor: Port for algorithm execution
             algo_registry: Algorithm registry
+            entrez_repo: Entrez dataset repository (optional)
             monitoring_service: Monitoring service (optional)
+            session_manager: Session manager for paths and sessions (optional)
         """
         self._dataset_repo = dataset_repo
         self._exporter = exporter
         self._executor = executor
         self._algo_registry = algo_registry
+        self._entrez_repo = entrez_repo
         self._monitoring_service = monitoring_service
+        self._session_manager = session_manager
         self._logger = get_logger(__name__)
 
     def _update_batch_logging_with_config(self, logging_config) -> None:
@@ -119,6 +130,67 @@ class ExperimentService:
                 f"Error updating batch logging configuration: {e}"
             )
 
+    def _convert_batch_config_to_dict(self, batch_config) -> Dict[str, Any]:
+        """Convert BatchConfig object back to dict for compatibility."""
+        result = {}
+        
+        # Metadata section
+        result["metadata"] = {
+            "name": batch_config.metadata.name,
+            "description": batch_config.metadata.description,
+            "author": batch_config.metadata.author,
+            "version": batch_config.metadata.version,
+            "creation_date": batch_config.metadata.creation_date,
+            "tags": batch_config.metadata.tags
+        }
+        
+        # Task section
+        result["task"] = {"type": batch_config.task.type}
+        
+        # Datasets section
+        result["datasets"] = []
+        for dataset in batch_config.datasets:
+            result["datasets"].append({
+                "id": dataset.id,
+                "name": dataset.name,
+                "type": dataset.type,
+                "parameters": dataset.parameters
+            })
+        
+        # Algorithms section
+        result["algorithms"] = []
+        for algorithm in batch_config.algorithms:
+            result["algorithms"].append({
+                "id": algorithm.id,
+                "name": algorithm.name,
+                "description": algorithm.description,
+                "algorithms": algorithm.algorithms,
+                "algorithm_params": algorithm.algorithm_params
+            })
+        
+        # Task-specific sections
+        if batch_config.execution:
+            result["execution"] = {
+                "executions": []
+            }
+            for exec_config in batch_config.execution.get("executions", []):
+                if hasattr(exec_config, 'name'):  # ExecutionConfig object
+                    result["execution"]["executions"].append({
+                        "name": exec_config.name,
+                        "datasets": exec_config.datasets,
+                        "algorithms": exec_config.algorithms,
+                        "repetitions": exec_config.repetitions
+                    })
+                else:  # Already a dict
+                    result["execution"]["executions"].append(exec_config)
+                    
+        if batch_config.optimization:
+            result["optimization"] = batch_config.optimization
+        if batch_config.sensitivity:
+            result["sensitivity"] = batch_config.sensitivity
+            
+        return result
+
     def run_batch(self, batch_cfg: str) -> Dict[str, Any]:
         """
         Execute batch experiments from configuration.
@@ -136,45 +208,52 @@ class ExperimentService:
             AlgorithmNotFoundError: If algorithm not found
         """
         try:
-            self._logger.info(f"Iniciando execução de batch: {batch_cfg}")
+            self._logger.info(f"Starting batch execution: {batch_cfg}")
 
-            # Parse batch configuration using new modular parser
-            batch_config = self._parse_batch_config(batch_cfg)
+            # Parse batch configuration using new parser
+            parsed_config = ConfigParser.parse_config(batch_cfg)
 
-            # Extract metadata using new parser
-            metadata = ConfigurationParser.parse_metadata(batch_config)
-            self._logger.info(f"Batch loaded: {metadata.nome}")
+            # Extract metadata
+            metadata = parsed_config.metadata
+            self._logger.info(f"Batch loaded: {metadata.name}")
 
-            # Parse all configuration sections
-            infrastructure_config = ConfigurationParser.parse_infrastructure_config(batch_config)
-            export_config = ConfigurationParser.parse_export_config(batch_config)
-            plots_config = ConfigurationParser.parse_plots_config(batch_config)
-            monitoring_config = ConfigurationParser.parse_monitoring_config(batch_config)
-            logging_config = ConfigurationParser.parse_logging_config(batch_config)
-            system_config = ConfigurationParser.parse_system_config(batch_config)
-            resources_config = ConfigurationParser.parse_resources_config(batch_config)
+            # Extract all configuration sections
+            infrastructure_config = parsed_config.infrastructure
+            export_config = parsed_config.export
+            plots_config = parsed_config.plots
+            monitoring_config = parsed_config.monitoring
+            logging_config = parsed_config.logging
+            system_config = parsed_config.system
+            resources_config = parsed_config.resources
+
+            # Apply global system configurations
+            self._apply_system_config(system_config, parsed_config)
 
             # Update logging configuration if specified in batch
             self._update_batch_logging_with_config(logging_config)
 
-            # Validar estrutura e determinar tipo
-            task_type = ConfigurationValidator.validate_batch_structure(batch_config)
-            self._logger.info(f"Tipo de task detectado: {task_type}")
+            # Determine task type from parsed config
+            task_type = parsed_config.task.type
+            self._logger.info(f"Task type detected: {task_type}")
 
             # Configure monitoring if enabled
-            if monitoring_config.enabled and self._monitoring_service:
+            if monitoring_config and monitoring_config.enabled and self._monitoring_service:
                 self._configure_monitoring(monitoring_config)
 
-            # Processar de acordo com o tipo de task
+            # Process according to task type
             if task_type == "execution":
-                results = self._process_execution_batch(batch_config, resources_config)
+                # Convert BatchConfig back to dict for compatibility
+                batch_dict = self._convert_batch_config_to_dict(parsed_config)
+                results = self._process_execution_batch(batch_dict, resources_config.__dict__ if resources_config else {})
             elif task_type == "optimization":
-                results = self._process_optimization_batch(batch_config, resources_config)
+                batch_dict = self._convert_batch_config_to_dict(parsed_config)
+                results = self._process_optimization_batch(batch_dict, resources_config.__dict__ if resources_config else {})
             elif task_type == "sensitivity":
-                results = self._process_sensitivity_batch(batch_config, resources_config)
+                batch_dict = self._convert_batch_config_to_dict(parsed_config)
+                results = self._process_sensitivity_batch(batch_dict, resources_config.__dict__ if resources_config else {})
             else:
                 raise BatchConfigurationError(
-                    f"Tipo de task não suportado: {task_type}"
+                    f"Unsupported task type: {task_type}"
                 )
 
             # Consolidate results
@@ -436,13 +515,16 @@ class ExperimentService:
 
         # Iniciar monitoramento se disponível
         if self._monitoring_service:
-            batch_name = batch_config.get("metadados", {}).get("nome", "Execução")
+            batch_name = batch_config.get("metadata", {}).get("name", "Execution")
             self._monitoring_service.start_monitoring(TaskType.EXECUTION, batch_name)
 
         try:
-            # Pass resources configuration to executor
+            # Include resources configuration in batch config
+            batch_config_with_resources = batch_config.copy()
+            batch_config_with_resources["resources"] = resources_config
+            
             results = self._executor.execute_batch(
-                batch_config, self._monitoring_service, resources_config
+                batch_config_with_resources, self._monitoring_service
             )
 
             # Finalizar monitoramento
@@ -473,11 +555,12 @@ class ExperimentService:
 
         # Iniciar monitoramento se disponível
         if self._monitoring_service:
-            batch_name = batch_config.get("metadados", {}).get("nome", "Otimização")
+            batch_name = batch_config.get("metadata", {}).get("name", "Optimization")
             self._monitoring_service.start_monitoring(TaskType.OPTIMIZATION, batch_name)
 
         try:
-            # Parsear configurações de otimização usando novo parser
+            # Use o método de compatibilidade do backup
+            from .config_parser_backup import ConfigurationParser
             optimization_configs = ConfigurationParser.parse_optimization_configs(
                 batch_config
             )
@@ -493,14 +576,15 @@ class ExperimentService:
             for opt_config in optimization_configs:
                 # Resolve algorithms to calculate total
                 algorithm_names, _ = self._resolve_algorithm_configuration(
-                    opt_config.target_algorithm, batch_config
+                    getattr(opt_config, 'target_algorithm', getattr(opt_config, 'algorithm', None)), batch_config
                 )
-                total_executions += len(opt_config.target_datasets) * len(
+                target_datasets = getattr(opt_config, 'target_datasets', getattr(opt_config, 'datasets', []))
+                total_executions += len(target_datasets) * len(
                     algorithm_names
                 )
 
             total_datasets = sum(
-                len(config.target_datasets) for config in optimization_configs
+                len(getattr(config, 'target_datasets', getattr(config, 'datasets', []))) for config in optimization_configs
             )
 
             current_optimization_index = 0
@@ -508,12 +592,12 @@ class ExperimentService:
 
             for opt_config in optimization_configs:
                 current_optimization_index += 1
-                self._logger.info(f"Executing optimization: {opt_config.nome}")
+                self._logger.info(f"Executing optimization: {opt_config.name}")
 
                 # Resolve algorithms and base parameters by ID
                 algorithm_names, all_algorithm_params = (
                     self._resolve_algorithm_configuration(
-                        opt_config.target_algorithm, batch_config
+                        getattr(opt_config, 'target_algorithm', getattr(opt_config, 'algorithm', None)), batch_config
                     )
                 )
 
@@ -525,7 +609,7 @@ class ExperimentService:
                     base_params = all_algorithm_params.get(algorithm_name, {})
 
                     # Process each dataset in configuration
-                    for dataset_id in opt_config.target_datasets:
+                    for dataset_id in getattr(opt_config, 'target_datasets', getattr(opt_config, 'datasets', [])):
                         current_dataset_index += 1
                         current_execution_index += 1
                         self._logger.info(f"Processando dataset: {dataset_id}")
@@ -537,8 +621,8 @@ class ExperimentService:
                             )
 
                             # Load dataset based on configuration
-                            if dataset_config["tipo"] == "file":
-                                filename = dataset_config["parametros"]["filename"]
+                            if dataset_config["type"] == "file":
+                                filename = dataset_config["parameters"]["filename"]
                                 dataset = self._load_dataset(filename)
                             else:
                                 # For synthetic datasets, create using existing method
@@ -551,6 +635,7 @@ class ExperimentService:
                             )
 
                             # Extrair configurações de recursos
+                            from .config_parser_backup import ConfigurationParser
                             resources_config = (
                                 ConfigurationParser.parse_resources_config(batch_config)
                             )
@@ -569,7 +654,7 @@ class ExperimentService:
                             executor_config = {
                                 "study_name": f"{opt_config.study_name}_{algorithm_name}_{dataset_id}",
                                 "direction": opt_config.direction,
-                                "n_trials": opt_config.n_trials,
+                                "n_trials": opt_config.trials,
                                 "timeout_per_trial": opt_config.timeout_per_trial,
                                 "parameters": optimization_params,
                                 "base_params": base_params,  # Base parameters from configuration
@@ -589,7 +674,7 @@ class ExperimentService:
                                 config_index=current_execution_index,
                                 total_configs=total_executions,
                                 dataset_index=current_dataset_index,
-                                total_datasets=len(opt_config.target_datasets),
+                                total_datasets=len(getattr(opt_config, 'target_datasets', getattr(opt_config, 'datasets', []))),
                                 dataset_name=dataset_id,  # Passar nome original do dataset
                             )
 
@@ -598,7 +683,7 @@ class ExperimentService:
                             # Criar sumário para esta otimização
                             optimization_summaries.append(
                                 {
-                                    "optimization_name": opt_config.nome,
+                                    "optimization_name": opt_config.name,
                                     "algorithm": algorithm_name,  # Usar nome do algoritmo resolvido
                                     "dataset": dataset_id,
                                     "best_value": optimization_results.get(
@@ -622,7 +707,7 @@ class ExperimentService:
                             )
                             # Adicionar resultado de erro
                             error_result = {
-                                "optimization_name": opt_config.nome,
+                                "optimization_name": opt_config.name,
                                 "algorithm": algorithm_name,  # Usar nome do algoritmo atual
                                 "dataset": dataset_id,
                                 "error": str(e),
@@ -658,13 +743,14 @@ class ExperimentService:
 
         # Iniciar monitoramento se disponível
         if self._monitoring_service:
-            batch_name = batch_config.get("metadados", {}).get(
-                "nome", "Análise de Sensibilidade"
+            batch_name = batch_config.get("metadata", {}).get(
+                "name", "Sensitivity Analysis"
             )
             self._monitoring_service.start_monitoring(TaskType.SENSITIVITY, batch_name)
 
         try:
-            # Parsear configurações de sensibilidade usando novo parser
+            # Use o método de compatibilidade do backup
+            from .config_parser_backup import ConfigurationParser
             sensitivity_configs = ConfigurationParser.parse_sensitivity_configs(
                 batch_config
             )
@@ -674,11 +760,11 @@ class ExperimentService:
 
             for sens_config in sensitivity_configs:
                 self._logger.info(
-                    f"Executing sensitivity analysis: {sens_config.nome}"
+                    f"Executing sensitivity analysis: {sens_config.name}"
                 )
 
                 # Processar cada dataset na configuração
-                for dataset_id in sens_config.target_datasets:
+                for dataset_id in getattr(sens_config, 'target_datasets', getattr(sens_config, 'datasets', [])):
                     self._logger.info(f"Processando dataset: {dataset_id}")
 
                     try:
@@ -688,8 +774,8 @@ class ExperimentService:
                         )
 
                         # Load dataset based on configuration
-                        if dataset_config["tipo"] == "file":
-                            filename = dataset_config["parametros"]["filename"]
+                        if dataset_config["type"] == "file":
+                            filename = dataset_config["parameters"]["filename"]
                             dataset = self._load_dataset(filename)
                         else:
                             # For synthetic datasets, create using existing method
@@ -700,17 +786,32 @@ class ExperimentService:
                         )
 
                         # Extrair configurações de recursos
+                        from .config_parser_backup import ConfigurationParser
                         resources_config = ConfigurationParser.parse_resources_config(
                             batch_config
                         )
 
                         # Preparar configuração para o executor
                         # Resolver algoritmo e parâmetros base por ID
-                        algorithm_name, base_params = (
+                        algorithm_names, base_params = (
                             self._resolve_algorithm_configuration(
-                                sens_config.target_algorithm, batch_config
+                                getattr(sens_config, 'target_algorithm', getattr(sens_config, 'algorithm', None)), batch_config
                             )
                         )
+                        
+                        # Para sensitivity analysis, usar apenas o primeiro algoritmo
+                        algorithm_name = algorithm_names[0] if isinstance(algorithm_names, list) else algorithm_names
+                        
+                        print(f"DEBUG: Resolved algorithm_names = {algorithm_names}")
+                        print(f"DEBUG: Using algorithm_name = {algorithm_name}")
+                        print(f"DEBUG: base_params = {base_params}")
+                        print(f"DEBUG: sens_config attributes:")
+                        print(f"  - method: {getattr(sens_config, 'method', 'NOT_FOUND')}")
+                        print(f"  - analysis_method: {getattr(sens_config, 'analysis_method', 'NOT_FOUND')}")
+                        print(f"  - samples: {getattr(sens_config, 'samples', 'NOT_FOUND')}")
+                        print(f"  - n_samples: {getattr(sens_config, 'n_samples', 'NOT_FOUND')}")
+                        print(f"  - repetitions: {getattr(sens_config, 'repetitions', 'NOT_FOUND')}")
+                        print(f"  - repetitions_per_sample: {getattr(sens_config, 'repetitions_per_sample', 'NOT_FOUND')}")
 
                         # Processar parâmetros de sensibilidade - nova estrutura
                         sensitivity_params = {}
@@ -719,20 +820,24 @@ class ExperimentService:
                         else:
                             # Fallback para estrutura antiga (compatibilidade)
                             sensitivity_params = sens_config.parameters
+                        
+                        print(f"DEBUG: sensitivity_params = {sensitivity_params}")
 
                         executor_config = {
-                            "analysis_method": sens_config.analysis_method,
-                            "n_samples": sens_config.n_samples,
-                            "repetitions_per_sample": sens_config.repetitions_per_sample,
+                            "analysis_method": getattr(sens_config, 'method', getattr(sens_config, 'analysis_method', 'morris')),
+                            "n_samples": getattr(sens_config, 'samples', getattr(sens_config, 'n_samples', 1000)),
+                            "repetitions_per_sample": getattr(sens_config, 'repetitions', getattr(sens_config, 'repetitions_per_sample', 3)),
                             "parameters": sensitivity_params,
                             "base_params": base_params,  # Parâmetros base da configuração
                             "output_metrics": sens_config.output_metrics,
-                            "method_config": sens_config.method_config or {},
+                            "method_config": getattr(sens_config, 'method_config', {}),  # Use getattr with default
                             "resources": resources_config,  # Incluir configurações de recursos
                             "internal_jobs": resources_config.get(
                                 "internal_jobs", 4
                             ),  # Paralelismo interno
                         }
+                        
+                        print(f"DEBUG: executor_config = {executor_config}")
 
                         # Executar análise de sensibilidade
                         sensitivity_results = (
@@ -746,7 +851,7 @@ class ExperimentService:
                         # Criar sumário para esta análise
                         sensitivity_summaries.append(
                             {
-                                "analysis_name": sens_config.nome,
+                                "analysis_name": sens_config.name,
                                 "algorithm": algorithm_name,  # Usar nome do algoritmo resolvido
                                 "dataset": dataset_id,
                                 "n_samples": sensitivity_results.get("n_samples"),
@@ -765,8 +870,8 @@ class ExperimentService:
                         )
                         # Adicionar resultado de erro
                         error_result = {
-                            "analysis_name": sens_config.nome,
-                            "algorithm": sens_config.target_algorithm,  # Manter ID original no erro
+                            "analysis_name": sens_config.name,
+                            "algorithm": getattr(sens_config, 'target_algorithm', getattr(sens_config, 'algorithm', None)),  # Manter ID original no erro
                             "dataset": dataset_id,
                             "error": str(e),
                             "status": "failed",
@@ -977,8 +1082,8 @@ class ExperimentService:
             for dataset in config["datasets"]:
                 if "id" not in dataset:
                     raise BatchConfigurationError("Campo 'id' obrigatório em dataset")
-                if "tipo" not in dataset:
-                    raise BatchConfigurationError("Campo 'tipo' obrigatório em dataset")
+                if "type" not in dataset:
+                    raise BatchConfigurationError("Campo 'type' obrigatório em dataset")
 
             # Validar algorithms
             if not isinstance(config["algorithms"], list):
@@ -1115,8 +1220,8 @@ class ExperimentService:
 
     def _create_dataset_from_config(self, dataset_config: Dict[str, Any]) -> Dataset:
         """Cria dataset a partir da configuração."""
-        dataset_type = dataset_config["tipo"]
-        params = dataset_config.get("parametros", {})
+        dataset_type = dataset_config["type"]
+        params = dataset_config.get("parameters", {})
 
         if dataset_type == "synthetic":
             generator = SyntheticDatasetGenerator()
@@ -1159,10 +1264,55 @@ class ExperimentService:
                 )
             return self._dataset_repo.load(filename)
         elif dataset_type == "entrez":
-            # TODO: Implementar suporte a Entrez
-            raise BatchConfigurationError(
-                "Tipo de dataset 'entrez' ainda não implementado"
-            )
+            # Check if Entrez repository is available
+            if not self._entrez_repo:
+                raise BatchConfigurationError(
+                    "Entrez dataset repository not configured. "
+                    "Check NCBI_EMAIL environment variable and Biopython installation."
+                )
+            
+            # Extract Entrez parameters
+            query = params.get("query")
+            if not query:
+                raise BatchConfigurationError(
+                    "Field 'query' is required for entrez dataset type"
+                )
+            
+            db = params.get("db", "nucleotide")
+            retmax = params.get("retmax", 20)
+            
+            # Fetch dataset from NCBI
+            try:
+                sequences, metadata = self._entrez_repo.fetch_dataset(
+                    query=query, db=db, retmax=retmax, **params
+                )
+                
+                # Create Dataset object
+                dataset = Dataset(
+                    sequences=sequences,
+                    metadata={
+                        "type": "entrez",
+                        "query": query,
+                        "db": db,
+                        "retmax": retmax,
+                        "n_obtained": len(sequences),
+                        "L": len(sequences[0]) if sequences else 0,
+                        **metadata
+                    }
+                )
+                
+                self._logger.info(
+                    "Created Entrez dataset: n=%d, L=%d, query='%s'",
+                    len(sequences), len(sequences[0]) if sequences else 0, query
+                )
+                
+                return dataset
+                
+            except Exception as e:
+                self._logger.error("Failed to create Entrez dataset: %s", str(e))
+                raise BatchConfigurationError(
+                    f"Failed to fetch Entrez dataset: {str(e)}"
+                ) from e
         else:
             raise BatchConfigurationError(
                 f"Tipo de dataset '{dataset_type}' não suportado"
@@ -1234,22 +1384,41 @@ class ExperimentService:
     ) -> str:
         """Export batch results using new export configuration."""
         try:
-            # Determine format based on configuration
-            format_type = "json"  # default
+            # Determine formats based on configuration (support multiple formats)
+            formats_to_export = []
             if export_config.formats:
                 if export_config.formats.get("json", False):
-                    format_type = "json"
-                elif export_config.formats.get("csv", False):
-                    format_type = "csv"
-                elif export_config.formats.get("parquet", False):
-                    format_type = "parquet"
-                elif export_config.formats.get("pickle", False):
-                    format_type = "pickle"
+                    formats_to_export.append("json")
+                if export_config.formats.get("csv", False):
+                    formats_to_export.append("csv")
+                if export_config.formats.get("parquet", False):
+                    formats_to_export.append("parquet")
+                if export_config.formats.get("pickle", False):
+                    formats_to_export.append("pickle")
+            
+            # Default to JSON if no formats specified
+            if not formats_to_export:
+                formats_to_export = ["json"]
 
             # Process destination template
             destination = export_config.destination
             destination = destination.replace("{task_type}", task_type)
-            # Additional template replacements can be added here
+            
+            # Replace {session} with current session timestamp
+            if hasattr(self, '_session_manager') and self._session_manager:
+                session_folder = self._session_manager.get_session_folder()
+                if session_folder:
+                    destination = destination.replace("{session}", session_folder)
+                else:
+                    # Fallback: use current timestamp if no session
+                    from datetime import datetime
+                    session_fallback = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    destination = destination.replace("{session}", session_fallback)
+            else:
+                # Fallback: use current timestamp if no session manager
+                from datetime import datetime
+                session_fallback = datetime.now().strftime("%Y%m%d_%H%M%S")
+                destination = destination.replace("{session}", session_fallback)
 
             # Filter results based on include configuration
             if export_config.include:
@@ -1267,7 +1436,23 @@ class ExperimentService:
                         pass
                 results = filtered_results
 
-            return self._exporter.export(results, format_type, destination)
+            # Export in all specified formats
+            exported_files = []
+            for format_type in formats_to_export:
+                try:
+                    # Try to export with format options if supported
+                    try:
+                        exported_file = self._exporter.export_results(results, format_type, destination, export_config.format_options)
+                    except TypeError:
+                        # Fallback for exporters that don't support options parameter
+                        exported_file = self._exporter.export_results(results, format_type, destination)
+                    exported_files.append(exported_file)
+                except Exception as format_error:
+                    self._logger.warning(f"Failed to export in {format_type} format: {format_error}")
+                    # Continue with other formats
+            
+            # Return primary exported file (first successful export)
+            return exported_files[0] if exported_files else None
         except Exception as e:
             self._logger.error(f"Error exporting results: {e}")
             # Fallback to simple export
@@ -1283,36 +1468,208 @@ class ExperimentService:
         try:
             self._logger.info("Generating plots...")
             
-            # TODO: Implement plot generation based on plots_config
-            # This is a placeholder for future plot generation implementation
+            # Debug: show results structure
+            self._logger.debug(f"Results structure: {list(results.keys()) if isinstance(results, dict) else type(results)}")
             
-            # Basic plots that could be generated:
-            if plots_config.plot_convergence:
-                self._logger.debug("Generating convergence plots...")
-                
-            if plots_config.plot_comparison:
-                self._logger.debug("Generating comparison plots...")
-                
-            if plots_config.plot_boxplots:
-                self._logger.debug("Generating box plots...")
-                
-            if plots_config.plot_runtime:
-                self._logger.debug("Generating runtime plots...")
-                
-            # Task-specific plots
-            if task_type == "optimization":
-                if plots_config.plot_optimization_history:
-                    self._logger.debug("Generating optimization history plots...")
-                if plots_config.plot_parameter_importance:
-                    self._logger.debug("Generating parameter importance plots...")
-                    
+            # Get current session path using standard pattern
+            from datetime import datetime
+            current_session = datetime.now().strftime("%Y%m%d_%H%M%S")
+            
+            # Use outputs/results pattern that matches the export path
+            session_base_path = Path("outputs/results") / current_session
+            plots_dir = session_base_path / "plots"
+            plots_dir.mkdir(parents=True, exist_ok=True)
+            
+            self._logger.info(f"Plots directory created: {plots_dir}")
+            
+            # Generate plots based on task type
+            if task_type == "execution":
+                self._generate_execution_plots(results, plots_config, plots_dir)
+            elif task_type == "optimization":
+                self._generate_optimization_plots(results, plots_config, plots_dir)
             elif task_type == "sensitivity":
-                if plots_config.plot_sensitivity_indices:
-                    self._logger.debug("Generating sensitivity indices plots...")
-                if plots_config.plot_morris_trajectories:
-                    self._logger.debug("Generating Morris trajectories plots...")
-                    
-            self._logger.info("Plot generation completed (placeholder implementation)")
+                self._generate_sensitivity_plots(results, plots_config, plots_dir)
+            else:
+                self._logger.warning(f"Unknown task type for plot generation: {task_type}")
+                
+            self._logger.info("Plot generation completed successfully")
             
         except Exception as e:
             self._logger.error(f"Error generating plots: {e}")
+
+    def _generate_execution_plots(
+        self, results: Dict[str, Any], plots_config, plots_dir: Path
+    ) -> None:
+        """Generate plots for execution tasks."""
+        try:
+            from src.infrastructure.io.report_generators.execution_report_generator import (
+                ExecutionReportGenerator,
+            )
+
+            # Create report generator with plots configuration
+            config_dict = {
+                "plots": {
+                    "enabled": plots_config.enabled,
+                    "plot_convergence": plots_config.plot_convergence,
+                    "plot_comparison": plots_config.plot_comparison,
+                    "plot_boxplots": plots_config.plot_boxplots,
+                    "plot_scatter": plots_config.plot_scatter,
+                    "plot_heatmap": plots_config.plot_heatmap,
+                    "plot_runtime": plots_config.plot_runtime,
+                    "plot_success_rate": plots_config.plot_success_rate,
+                    "formats": plots_config.formats,
+                }
+            }
+
+            session_path = plots_dir.parent
+            report_generator = ExecutionReportGenerator(config_dict, session_path)
+
+            # Prepare batch data for report generator
+            batch_data = {
+                "batch_results": results.get("results", []),  # Fixed key
+                "summary": results.get("summary", {}),
+            }
+            
+            # Debug log
+            self._logger.debug(f"Batch data structure: {batch_data}")
+
+            # Generate plots by calling the report generator
+            report_generator.generate_report(batch_data)
+            
+            # Copy plots from report/plots to main plots directory for easy access
+            report_plots_dir = plots_dir.parent / "report" / "plots"
+            if report_plots_dir.exists():
+                import shutil
+                for plot_file in report_plots_dir.glob("*.*"):
+                    shutil.copy2(plot_file, plots_dir)
+                self._logger.info(f"Plots copied to: {plots_dir}")
+            
+            self._logger.info("Execution plots generated successfully")
+
+        except ImportError as e:
+            self._logger.error(f"Cannot import execution report generator: {e}")
+        except Exception as e:
+            self._logger.error(f"Error generating execution plots: {e}")
+
+    def _generate_optimization_plots(
+        self, results: Dict[str, Any], plots_config, plots_dir: Path
+    ) -> None:
+        """Generate plots for optimization tasks."""
+        try:
+            from src.infrastructure.orchestrators.optimization_report_generator import (
+                OptimizationReportGenerator,
+            )
+
+            # Create configuration for optimization report generator
+            config_dict = {
+                "plots": {
+                    "enabled": plots_config.enabled,
+                    "plot_convergence": plots_config.plot_convergence,
+                    "plot_comparison": plots_config.plot_comparison,
+                    "plot_boxplots": plots_config.plot_boxplots,
+                    "plot_scatter": plots_config.plot_scatter,
+                    "plot_heatmap": plots_config.plot_heatmap,
+                    "plot_runtime": plots_config.plot_runtime,
+                    "plot_success_rate": plots_config.plot_success_rate,
+                    "plot_optimization_history": plots_config.plot_optimization_history,
+                    "plot_parameter_importance": plots_config.plot_parameter_importance,
+                    "plot_parallel_coordinate": plots_config.plot_parallel_coordinate,
+                    "formats": plots_config.formats,
+                }
+            }
+
+            session_path = plots_dir.parent
+            report_generator = OptimizationReportGenerator(config_dict, session_path)
+
+            # Note: This would require optuna study object
+            # For now, log that optimization plots need study object
+            self._logger.info("Optimization plots require optuna study object (not available in current context)")
+
+        except ImportError as e:
+            self._logger.error(f"Cannot import optimization report generator: {e}")
+        except Exception as e:
+            self._logger.error(f"Error generating optimization plots: {e}")
+
+    def _generate_sensitivity_plots(
+        self, results: Dict[str, Any], plots_config, plots_dir: Path
+    ) -> None:
+        """Generate plots for sensitivity analysis tasks."""
+        try:
+            from src.infrastructure.io.report_generators.sensitivity_report_generator import (
+                SensitivityReportGenerator,
+            )
+
+            session_path = plots_dir.parent
+            report_generator = SensitivityReportGenerator(session_path)
+
+            # Extract sensitivity analysis results
+            analysis_results = results.get("sensitivity_results", [])
+            if analysis_results:
+                report_dir = session_path / "reports"
+                report_dir.mkdir(exist_ok=True)
+                report_generator._generate_sensitivity_plots(analysis_results, report_dir)
+                self._logger.info("Sensitivity plots generated successfully")
+            else:
+                self._logger.warning("No sensitivity analysis results found for plot generation")
+
+        except ImportError as e:
+            self._logger.error(f"Cannot import sensitivity report generator: {e}")
+
+    def _apply_system_config(self, system_config: SystemConfig, parsed_config: BatchConfig) -> None:
+        """Apply global system configurations like global_seed substitution."""
+        if not system_config:
+            return
+        
+        # Apply global seed substitution if configured
+        if system_config.global_seed is not None:
+            self._logger.info(f"Applying global_seed: {system_config.global_seed}")
+            self._substitute_global_seed(parsed_config, system_config.global_seed)
+        
+        # Apply other system configurations
+        if system_config.force_cleanup:
+            self._logger.info("Force cleanup enabled")
+        
+        if system_config.checkpointing:
+            self._logger.info(f"Checkpointing configured: {system_config.checkpointing}")
+        
+        if system_config.error_handling:
+            self._logger.info(f"Error handling configured: {system_config.error_handling}")
+        
+        if system_config.progress_tracking:
+            self._logger.info(f"Progress tracking configured: {system_config.progress_tracking}")
+        
+        if system_config.environment:
+            self._logger.info(f"Environment configured: {system_config.environment}")
+
+    def _substitute_global_seed(self, parsed_config: BatchConfig, global_seed: int) -> None:
+        """Substitute all local seeds with global_seed throughout the configuration."""
+        self._logger.debug(f"Substituting seeds with global_seed: {global_seed}")
+        
+        # Substitute in algorithm parameters
+        for algorithm_config in parsed_config.algorithms:
+            if algorithm_config.algorithm_params:
+                for alg_name, params in algorithm_config.algorithm_params.items():
+                    if isinstance(params, dict) and "seed" in params:
+                        old_seed = params.get("seed")
+                        params["seed"] = global_seed
+                        self._logger.debug(f"Algorithm {alg_name}: seed {old_seed} -> {global_seed}")
+        
+        # Substitute in dataset parameters
+        for dataset_config in parsed_config.datasets:
+            if dataset_config.parameters and "seed" in dataset_config.parameters:
+                old_seed = dataset_config.parameters.get("seed")
+                dataset_config.parameters["seed"] = global_seed
+                self._logger.debug(f"Dataset {dataset_config.id}: seed {old_seed} -> {global_seed}")
+        
+        # Substitute in optimization/sensitivity trial parameters if present
+        if hasattr(parsed_config, 'optimization') and parsed_config.optimization:
+            if parsed_config.optimization.parameters and "seed" in parsed_config.optimization.parameters:
+                old_seed = parsed_config.optimization.parameters.get("seed")
+                parsed_config.optimization.parameters["seed"] = global_seed
+                self._logger.debug(f"Optimization: seed {old_seed} -> {global_seed}")
+        
+        if hasattr(parsed_config, 'sensitivity') and parsed_config.sensitivity:
+            if parsed_config.sensitivity.parameters and "seed" in parsed_config.sensitivity.parameters:
+                old_seed = parsed_config.sensitivity.parameters.get("seed")
+                parsed_config.sensitivity.parameters["seed"] = global_seed
+                self._logger.debug(f"Sensitivity: seed {old_seed} -> {global_seed}")

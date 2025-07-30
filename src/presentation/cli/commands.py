@@ -108,7 +108,7 @@ def register_commands(app: typer.Typer, experiment_service_getter) -> None:
 
             # Test available algorithm
             import algorithms
-            from algorithms import global_registry
+            from src.domain.algorithms import global_registry
 
             available_algorithms = list(global_registry.keys())
             if not available_algorithms:
@@ -209,7 +209,7 @@ def register_commands(app: typer.Typer, experiment_service_getter) -> None:
 
             # Import from algorithms module to activate auto-discovery
             import algorithms
-            from algorithms import global_registry
+            from src.domain.algorithms import global_registry
 
             typer.echo("🧠 Available algorithms:")
             for name, cls in global_registry.items():

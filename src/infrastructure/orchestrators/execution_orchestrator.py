@@ -14,16 +14,20 @@ from multiprocessing import cpu_count
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+# IMPORTANT: Import algorithms first to load the global_registry
+import algorithms
+
 from src.domain import Dataset
 from src.domain.errors import AlgorithmExecutionError
 from src.infrastructure.logging_config import get_logger
 from src.infrastructure.orchestrators.base_orchestrator import BaseOrchestrator
+from src.infrastructure.resource_control import create_resource_controller, ResourceController
 
 
 class ExecutionOrchestrator(BaseOrchestrator):
     """Orchestrator responsible for CSP algorithm execution."""
 
-    def __init__(self, algorithm_registry, dataset_repository, monitoring_service=None):
+    def __init__(self, algorithm_registry, dataset_repository, monitoring_service=None, entrez_repository=None):
         """
         Initialize execution orchestrator.
 
@@ -31,13 +35,16 @@ class ExecutionOrchestrator(BaseOrchestrator):
             algorithm_registry: Algorithm registry
             dataset_repository: Dataset repository
             monitoring_service: Optional monitoring service
+            entrez_repository: Optional Entrez dataset repository
         """
         super().__init__(monitoring_service)
         self._algorithm_registry = algorithm_registry
         self._dataset_repository = dataset_repository
+        self._entrez_repository = entrez_repository
         self._executions: Dict[str, Dict[str, Any]] = {}
         self._current_batch_config: Optional[Dict[str, Any]] = None
         self._partial_results_file: Optional[str] = None
+        self._resource_controller: Optional[ResourceController] = None
         self._logger = get_logger(__name__)
 
     def execute(self, config: Dict[str, Any]) -> Dict[str, Any]:
@@ -58,6 +65,19 @@ class ExecutionOrchestrator(BaseOrchestrator):
         """Define current batch configuration."""
         self._current_batch_config = batch_config
         self._logger.debug(f"Batch configuration defined: {type(batch_config)}")
+
+        # Initialize resource controller with batch resources config
+        resources_config = batch_config.get("resources", {})
+        if resources_config:
+            try:
+                self._resource_controller = create_resource_controller(resources_config)
+                # Apply initial resource limits
+                self._resource_controller.apply_cpu_limits()
+                self._resource_controller.apply_memory_limits()
+                self._logger.info("[RESOURCE] Resource controller initialized and limits applied")
+            except Exception as e:
+                self._logger.warning(f"[RESOURCE] Failed to initialize resource controller: {e}")
+                self._resource_controller = None
 
         # Configure partial saving if enabled
         if self._should_save_partial_results():
@@ -84,7 +104,11 @@ class ExecutionOrchestrator(BaseOrchestrator):
         Returns:
             Dict[str, Any]: Execution result
         """
-        from algorithms import global_registry
+        from src.domain.algorithms import global_registry
+
+        # Debug: Log available algorithms
+        self._logger.debug(f"Available algorithms in registry: {list(global_registry.keys())}")
+        self._logger.debug(f"Looking for algorithm: {algorithm_name}")
 
         # Check if algorithm exists
         if algorithm_name not in global_registry:
@@ -101,10 +125,15 @@ class ExecutionOrchestrator(BaseOrchestrator):
             history_config = infrastructure_config.get("history", {})
 
             # Injetar parâmetros de histórico se habilitados
-            if history_config.get("save_history", False):
+            # Support both template format (enabled/frequency) and implementation format (save_history/history_frequency)
+            history_enabled = history_config.get("enabled", history_config.get("save_history", False))
+            
+            if history_enabled:
                 params = params.copy()  # Não modificar o original
                 params["save_history"] = True
-                params["history_frequency"] = history_config.get("history_frequency", 1)
+                # Support both template format (frequency) and implementation format (history_frequency)
+                frequency = history_config.get("frequency", history_config.get("history_frequency", 1))
+                params["history_frequency"] = frequency
 
         # Cria identificador único para execução
         execution_id = str(uuid.uuid4())
@@ -138,8 +167,61 @@ class ExecutionOrchestrator(BaseOrchestrator):
 
                 algorithm.set_progress_callback(progress_callback)
 
-            # Executa algoritmo
-            best_string, max_distance, metadata = algorithm.run()
+            # Apply resource controls and execute algorithm
+            try:
+                if self._resource_controller:
+                    # Check batch timeout before starting algorithm
+                    self._resource_controller.check_batch_timeout()
+                    
+                    # Execute with algorithm timeout
+                    with self._resource_controller.algorithm_timeout():
+                        best_string, max_distance, metadata = algorithm.run()
+                else:
+                    # Fallback execution without resource control
+                    best_string, max_distance, metadata = algorithm.run()
+            except TimeoutError as e:
+                self._logger.error(f"[RESOURCE] Algorithm {algorithm_name} timed out: {e}")
+                # Return timeout result
+                end_time = time.time()
+                return {
+                    "algorithm": algorithm_name,
+                    "best_string": "",
+                    "max_distance": -1,
+                    "execution_time": end_time - start_time,
+                    "execution_id": execution_id,
+                    "params": params,
+                    "metadata": {"error": str(e), "timeout": True},
+                    "dataset": {
+                        "size": len(dataset.sequences),
+                        "length": len(dataset.sequences[0]) if dataset.sequences else 0,
+                        "alphabet": dataset.alphabet,
+                    },
+                    "status": "timeout",
+                }
+            except Exception as e:
+                if "Resource limit" in str(e) or "Memory limit" in str(e):
+                    self._logger.error(f"[RESOURCE] Algorithm {algorithm_name} exceeded resource limits: {e}")
+                    # Return resource limit result
+                    end_time = time.time()
+                    return {
+                        "algorithm": algorithm_name,
+                        "best_string": "",
+                        "max_distance": -1,
+                        "execution_time": end_time - start_time,
+                        "execution_id": execution_id,
+                        "params": params,
+                        "metadata": {"error": str(e), "resource_limit_exceeded": True},
+                        "dataset": {
+                            "size": len(dataset.sequences),
+                            "length": len(dataset.sequences[0]) if dataset.sequences else 0,
+                            "alphabet": dataset.alphabet,
+                        },
+                        "status": "resource_limit",
+                    }
+                else:
+                    # Re-raise other exceptions
+                    raise
+                    
             end_time = time.time()
 
             # Constroi resultado
@@ -273,7 +355,7 @@ class ExecutionOrchestrator(BaseOrchestrator):
 
         for execution in executions:
             execution_index += 1
-            execution_name = execution.get("nome", f"Execução {execution_index}")
+            execution_name = execution.get("name", f"Execution {execution_index}")
 
             # Iterar sobre configurações de algoritmo
             algorithm_ids = execution["algorithms"]
@@ -299,7 +381,7 @@ class ExecutionOrchestrator(BaseOrchestrator):
                     if not dataset_config:
                         results.append(
                             {
-                                "execution_name": execution.get("nome", "unknown"),
+                                "execution_name": execution.get("name", "unknown"),
                                 "dataset_id": dataset_id,
                                 "status": "error",
                                 "error": f"Dataset com ID '{dataset_id}' não encontrado",
@@ -318,11 +400,11 @@ class ExecutionOrchestrator(BaseOrchestrator):
                         )
 
                         # Obter nome do dataset
-                        dataset_name = dataset_config.get("nome", dataset_id)
+                        dataset_name = dataset_config.get("name", dataset_id)
 
                         # Obter nome da configuração de algoritmo
                         algorithm_config_name = algorithm_config.get(
-                            "nome", "Algoritmos"
+                            "name", "Algorithms"
                         )
 
                         monitoring_service.monitor.update_hierarchy(
@@ -550,13 +632,73 @@ class ExecutionOrchestrator(BaseOrchestrator):
         results = []
 
         try:
-            # Carregar dataset
-            if dataset_config["tipo"] == "file":
-                filename = dataset_config["parametros"]["filename"]
+            # Validar algorithm_config
+            if algorithm_config is None:
+                error_msg = f"Algorithm config is None for dataset {dataset_id}"
+                self._logger.error(error_msg)
+                return [{
+                    "execution_name": execution.get("name", "unknown"),
+                    "dataset_id": dataset_id,
+                    "status": "error",
+                    "error": error_msg,
+                    "execution_time": 0.0,
+                }]
+            
+            # Carregar dataset baseado no tipo
+            dataset_type = dataset_config["type"]
+            
+            if dataset_type == "file":
+                filename = dataset_config["parameters"]["filename"]
                 dataset = dataset_repo.load(filename)
-            else:
+            elif dataset_type == "synthetic":
                 # For synthetic datasets, create using generator
                 dataset = self._create_dataset_from_config(dataset_config)
+            elif dataset_type == "entrez":
+                # For entrez datasets, use the entrez repository
+                if not self._entrez_repository:
+                    raise ValueError(
+                        "Entrez dataset repository not available. "
+                        "Check NCBI_EMAIL environment variable and Biopython installation."
+                    )
+                
+                params = dataset_config.get("parameters", {})
+                query = params.get("query")
+                if not query:
+                    raise ValueError("Field 'query' is required for entrez dataset type")
+                
+                db = params.get("db", "nucleotide")
+                retmax = params.get("retmax", 20)
+                
+                # Fetch dataset from NCBI
+                # Extract only additional parameters, avoiding duplicates
+                additional_params = {k: v for k, v in params.items() 
+                                   if k not in ['query', 'db', 'retmax']}
+                
+                sequences, metadata = self._entrez_repository.fetch_dataset(
+                    query=query, db=db, retmax=retmax, **additional_params
+                )
+                
+                # Create Dataset object
+                from src.domain import Dataset
+                dataset = Dataset(
+                    sequences=sequences,
+                    metadata={
+                        "type": "entrez",
+                        "query": query,
+                        "db": db,
+                        "retmax": retmax,
+                        "n_obtained": len(sequences),
+                        "L": len(sequences[0]) if sequences else 0,
+                        **metadata
+                    }
+                )
+                
+                self._logger.info(
+                    "Created Entrez dataset: n=%d, L=%d, query='%s'",
+                    len(sequences), len(sequences[0]) if sequences else 0, query
+                )
+            else:
+                raise ValueError(f"Unsupported dataset type: {dataset_type}")
 
             self._logger.info(
                 f"Dataset {dataset_id} loaded: {len(dataset.sequences)} sequences"
@@ -578,7 +720,7 @@ class ExecutionOrchestrator(BaseOrchestrator):
                     params=params,
                     repetitions=repetitions,
                     execution_context={
-                        "execution_name": execution.get("nome", "unknown"),
+                        "execution_name": execution.get("name", "unknown"),
                         "dataset_id": dataset_id,
                         "algorithm_id": algorithm_config["id"],
                     },
@@ -593,7 +735,7 @@ class ExecutionOrchestrator(BaseOrchestrator):
             )
             results.append(
                 {
-                    "execution_name": execution.get("nome", "unknown"),
+                    "execution_name": execution.get("name", "unknown"),
                     "dataset_id": dataset_id,
                     "status": "error",
                     "error": str(e),
@@ -635,6 +777,10 @@ class ExecutionOrchestrator(BaseOrchestrator):
                 algorithm_name, dataset, params, monitoring_service=None
             )
 
+            # Sanitizar metadados para serialização
+            if "metadata" in result:
+                result["metadata"] = self._sanitize_metadata_for_process(result["metadata"])
+
             # Adicionar informações de contexto
             result.update(
                 {
@@ -667,6 +813,56 @@ class ExecutionOrchestrator(BaseOrchestrator):
 
             return error_result
 
+    def _sanitize_metadata_for_process(self, metadata: Any) -> Any:
+        """
+        Sanitiza metadados para serialização em ProcessPoolExecutor.
+        
+        Remove ou converte objetos não serializáveis para garantir que
+        os resultados possam ser transferidos entre processos.
+        """
+        import types
+        import pickle
+        
+        if isinstance(metadata, dict):
+            sanitized = {}
+            for key, value in metadata.items():
+                try:
+                    # Testa se o valor pode ser serializado
+                    pickle.dumps(value)
+                    sanitized[key] = self._sanitize_metadata_for_process(value)
+                except (TypeError, AttributeError):
+                    # Converte objetos não serializáveis
+                    if isinstance(value, types.ModuleType):
+                        sanitized[key] = f"<module '{value.__name__}'>"
+                    elif callable(value):
+                        sanitized[key] = f"<function '{getattr(value, '__name__', str(value))}'>"
+                    elif hasattr(value, '__dict__') and hasattr(value, '__class__'):
+                        # Para objetos complexos, extrai atributos serializáveis
+                        try:
+                            class_name = value.__class__.__name__
+                            repr_str = str(value)
+                            sanitized[key] = {
+                                '__class__': class_name,
+                                '__repr__': repr_str
+                            }
+                        except:
+                            sanitized[key] = str(value)
+                    else:
+                        sanitized[key] = str(value)
+            return sanitized
+        elif isinstance(metadata, (list, tuple)):
+            sanitized_items = []
+            for item in metadata:
+                try:
+                    pickle.dumps(item)
+                    sanitized_items.append(self._sanitize_metadata_for_process(item))
+                except (TypeError, AttributeError):
+                    sanitized_items.append(str(item))
+            return type(metadata)(sanitized_items)
+        else:
+            # Para tipos primitivos, retorna como está
+            return metadata
+
     def _get_max_workers(self) -> int:
         """
         Obtém o número máximo de workers para paralelização.
@@ -674,13 +870,19 @@ class ExecutionOrchestrator(BaseOrchestrator):
         Returns:
             int: Número de workers a usar
         """
-        if self._current_batch_config:
+        if self._current_batch_config and self._current_batch_config is not None:
             resources = self._current_batch_config.get("resources", {})
             parallel_config = resources.get("parallel", {})
-            max_workers = parallel_config.get("max_workers")
-
-            if max_workers is not None and max_workers > 0:
-                return max_workers
+            
+            # Handle different formats for parallel config
+            if isinstance(parallel_config, int):
+                # Direct integer value for max_workers
+                return parallel_config if parallel_config > 0 else 1
+            elif isinstance(parallel_config, dict) and parallel_config is not None:
+                # Dictionary format with max_workers key
+                max_workers = parallel_config.get("max_workers")
+                if max_workers is not None and max_workers > 0:
+                    return max_workers
 
         # Fallback para número de CPUs
         return cpu_count() or 1
@@ -699,8 +901,8 @@ class ExecutionOrchestrator(BaseOrchestrator):
 
         try:
             # Load dataset
-            if dataset_config["tipo"] == "file":
-                filename = dataset_config["parametros"]["filename"]
+            if dataset_config["type"] == "file":
+                filename = dataset_config["parameters"]["filename"]
                 dataset = dataset_repo.load(filename)
             else:
                 # For synthetic datasets, create using generator
@@ -725,7 +927,7 @@ class ExecutionOrchestrator(BaseOrchestrator):
                     )
                     results.append(
                         {
-                            "execution_name": execution.get("nome", "unknown"),
+                            "execution_name": execution.get("name", "unknown"),
                             "dataset_id": dataset_id,
                             "algorithm_id": algorithm_id,
                             "status": "error",
@@ -749,7 +951,7 @@ class ExecutionOrchestrator(BaseOrchestrator):
                         params=params,
                         repetitions=repetitions,
                         execution_context={
-                            "execution_name": execution.get("nome", "unknown"),
+                            "execution_name": execution.get("name", "unknown"),
                             "dataset_id": dataset_id,
                             "algorithm_id": algorithm_id,
                         },
@@ -764,7 +966,7 @@ class ExecutionOrchestrator(BaseOrchestrator):
             )
             results.append(
                 {
-                    "execution_name": execution.get("nome", "unknown"),
+                    "execution_name": execution.get("name", "unknown"),
                     "dataset_id": dataset_id,
                     "status": "error",
                     "error": f"Erro no dataset: {e}",
@@ -777,8 +979,8 @@ class ExecutionOrchestrator(BaseOrchestrator):
         """Cria dataset a partir da configuração."""
         from src.domain.dataset import SyntheticDatasetGenerator
 
-        dataset_type = dataset_config["tipo"]
-        params = dataset_config.get("parametros", {})
+        dataset_type = dataset_config["type"]
+        params = dataset_config.get("parameters", {})
 
         if dataset_type == "synthetic":
             generator = SyntheticDatasetGenerator()
@@ -814,7 +1016,7 @@ class ExecutionOrchestrator(BaseOrchestrator):
                 )
         else:
             raise ValueError(
-                f"Tipo de dataset '{dataset_type}' não suportado em dataset sintético"
+                f"Dataset type '{dataset_type}' not supported in synthetic dataset generation"
             )
 
     def get_execution_status(self, execution_id: str) -> str:
@@ -1082,3 +1284,17 @@ class ExecutionOrchestrator(BaseOrchestrator):
                     monitoring_service.finish_item(rep_id, False, error_result, str(e))
 
         return results
+
+    def cleanup(self) -> None:
+        """Cleanup orchestrator resources."""
+        if self._resource_controller:
+            self._resource_controller.cleanup()
+            self._resource_controller = None
+            self._logger.info("[RESOURCE] Orchestrator cleanup completed")
+
+    def __del__(self):
+        """Destructor to ensure cleanup."""
+        try:
+            self.cleanup()
+        except Exception:
+            pass  # Ignore cleanup errors during destruction

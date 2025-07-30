@@ -72,7 +72,7 @@ class OptimizationOrchestrator:
         self.monitoring_config = config.get("monitoring", {})
         self.resources_config = config.get("resources", {})
 
-        # Configuração do estudo
+        # Configuração do estudo - usar dados específicos do executor_config
         self.study_name = self.optimization_config.get(
             "study_name", "optimization_study"
         )
@@ -413,7 +413,23 @@ class OptimizationOrchestrator:
     def _generate_trial_params(self, trial: optuna.trial.Trial) -> Dict[str, Any]:
         """Gera parâmetros do trial baseado na configuração."""
         params = {}
+        # Use parameters from the specific optimization configuration
         parameters_config = self.optimization_config.get("parameters", {})
+        
+        # Handle case where parameters_config might contain algorithm name as key
+        # Check if first level contains algorithm names (like 'BLF-GA', 'CSC')
+        first_key = next(iter(parameters_config.keys())) if parameters_config else None
+        if first_key and isinstance(parameters_config[first_key], dict):
+            # Check if this looks like algorithm-specific config
+            first_value = parameters_config[first_key]
+            if isinstance(first_value, dict) and 'type' not in first_value:
+                # This is likely an algorithm name, extract the actual parameters
+                algorithm_name = self.optimization_config.get("algorithm")
+                if algorithm_name in parameters_config:
+                    parameters_config = parameters_config[algorithm_name]
+                else:
+                    # Take the first algorithm's parameters if exact match not found
+                    parameters_config = first_value
 
         for param_name, param_config in parameters_config.items():
             param_type = param_config.get("type", "uniform")

@@ -6,7 +6,7 @@ pela camada de infraestrutura seguindo o padrão de arquitetura hexagonal.
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional, Protocol, runtime_checkable
+from typing import Any, Dict, List, Optional, Protocol, runtime_checkable, Tuple
 
 from src.domain import CSPAlgorithm, Dataset
 
@@ -108,6 +108,71 @@ class AlgorithmRegistry(Protocol):
         """
         ...
 
+
+@runtime_checkable
+class EntrezDatasetRepository(Protocol):
+    """Port para repositório de datasets Entrez/NCBI."""
+
+    def fetch_dataset(
+        self, query: str, db: str = "nucleotide", retmax: int = 20, **kwargs
+    ) -> Tuple[List[str], Dict[str, Any]]:
+        """
+        Busca e baixa dataset do NCBI usando Entrez API.
+
+        Args:
+            query: Query de busca no NCBI
+            db: Base de dados NCBI (nucleotide, protein, etc.)
+            retmax: Número máximo de sequências
+            **kwargs: Parâmetros adicionais (email, api_key, etc.)
+
+        Returns:
+            Tuple[List[str], Dict[str, Any]]: (sequências, metadados)
+        """
+        ...
+
+    def is_available(self) -> bool:
+        """
+        Verifica se o serviço Entrez está disponível.
+
+        Returns:
+            bool: True se disponível
+        """
+        ...
+
+
+class AlgorithmRegistry(Protocol):
+    """Port para registry de algoritmos."""
+
+    def get_algorithm(self, name: str) -> type[CSPAlgorithm]:
+        """
+        Obtém classe de algoritmo por nome.
+
+        Args:
+            name: Nome do algoritmo
+
+        Returns:
+            type[CSPAlgorithm]: Classe do algoritmo
+        """
+        ...
+
+    def list_algorithms(self) -> List[str]:
+        """
+        Lista algoritmos disponíveis.
+
+        Returns:
+            List[str]: Nomes dos algoritmos disponíveis
+        """
+        ...
+
+    def register_algorithm(self, algorithm_class: type[CSPAlgorithm]) -> None:
+        """
+        Registra novo algoritmo.
+
+        Args:
+            algorithm_class: Classe do algoritmo a ser registrada
+        """
+        ...
+
     def algorithm_exists(self, name: str) -> bool:
         """
         Verifica se algoritmo existe.
@@ -129,6 +194,37 @@ class AlgorithmRegistry(Protocol):
 
         Returns:
             Dict[str, Any]: Metadados do algoritmo
+        """
+        ...
+
+
+@runtime_checkable
+class EntrezDatasetRepository(Protocol):
+    """Port para repositório de datasets Entrez/NCBI."""
+
+    def fetch_dataset(
+        self, query: str, db: str = "nucleotide", retmax: int = 20, **kwargs
+    ) -> Tuple[List[str], Dict[str, Any]]:
+        """
+        Busca e baixa dataset do NCBI usando Entrez API.
+
+        Args:
+            query: Query de busca no NCBI
+            db: Base de dados NCBI (nucleotide, protein, etc.)
+            retmax: Número máximo de sequências
+            **kwargs: Parâmetros adicionais (email, api_key, etc.)
+
+        Returns:
+            Tuple[List[str], Dict[str, Any]]: (sequências, metadados)
+        """
+        ...
+
+    def is_available(self) -> bool:
+        """
+        Verifica se o serviço Entrez está disponível.
+
+        Returns:
+            bool: True se disponível
         """
         ...
 

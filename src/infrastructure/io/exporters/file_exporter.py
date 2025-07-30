@@ -6,6 +6,7 @@ Implements the ExportPort interface and provides common functionality for all ex
 
 import csv
 import json
+import pickle
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -21,7 +22,7 @@ class FileExporter(ExportPort):
         self.output_path.mkdir(parents=True, exist_ok=True)
 
     def export_results(
-        self, results: Dict[str, Any], format_type: str, destination: str
+        self, results: Dict[str, Any], format_type: str, destination: str, options: Optional[Dict[str, Any]] = None
     ) -> str:
         """Export results in specific format."""
         dest_path = self.output_path / destination
@@ -37,19 +38,23 @@ class FileExporter(ExportPort):
         dest_path.parent.mkdir(parents=True, exist_ok=True)
 
         if format_type.lower() == "json":
-            self._write_json(results, dest_path)
+            self._write_json(results, dest_path, options)
         elif format_type.lower() == "csv":
-            self._write_csv(results, dest_path)
+            self._write_csv(results, dest_path, options)
+        elif format_type.lower() == "parquet":
+            self._write_parquet(results, dest_path)
+        elif format_type.lower() == "pickle":
+            self._write_pickle(results, dest_path)
         elif format_type.lower() == "txt":
             self._write_txt(results, dest_path)
         else:
             # Default to JSON
-            self._write_json(results, dest_path)
+            self._write_json(results, dest_path, options)
 
         return str(dest_path)
 
     def export_batch_results(
-        self, batch_results: List[Dict[str, Any]], format_type: str, destination: str
+        self, batch_results: List[Dict[str, Any]], format_type: str, destination: str, options: Optional[Dict[str, Any]] = None
     ) -> str:
         """Export batch results."""
         dest_path = self.output_path / destination
@@ -74,19 +79,23 @@ class FileExporter(ExportPort):
         }
 
         if format_type.lower() == "json":
-            self._write_json(batch_data, dest_path)
+            self._write_json(batch_data, dest_path, options)
         elif format_type.lower() == "csv":
-            self._write_csv(batch_results, dest_path)  # For CSV, only results
+            self._write_csv(batch_results, dest_path, options)  # For CSV, only results
+        elif format_type.lower() == "parquet":
+            self._write_parquet(batch_data, dest_path)
+        elif format_type.lower() == "pickle":
+            self._write_pickle(batch_data, dest_path)
         elif format_type.lower() == "txt":
             self._write_txt(batch_data, dest_path)
         else:
-            self._write_json(batch_data, dest_path)
+            self._write_json(batch_data, dest_path, options)
 
         return str(dest_path)
 
     def get_supported_formats(self) -> List[str]:
         """List supported formats."""
-        return ["json", "csv", "txt"]
+        return ["json", "csv", "parquet", "pickle", "txt"]
 
     def export_optimization_results(
         self, optimization_data: Dict[str, Any], destination: str
@@ -107,13 +116,24 @@ class FileExporter(ExportPort):
         file_path.parent.mkdir(parents=True, exist_ok=True)
         self._write_json(data, file_path)
 
-    def _write_json(self, data: Any, dest_path: Path) -> None:
+    def _write_json(self, data: Any, dest_path: Path, options: Optional[Dict[str, Any]] = None) -> None:
         """Write data in JSON format."""
+        # Get JSON format options
+        json_options = options.get("json", {}) if options else {}
+        indent = json_options.get("indent", 2)
+        ensure_ascii = json_options.get("ensure_ascii", False)
+        
         with open(dest_path, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, ensure_ascii=False, default=str)
+            json.dump(data, f, indent=indent, ensure_ascii=ensure_ascii, default=str)
 
-    def _write_csv(self, data: Any, dest_path: Path) -> None:
+    def _write_csv(self, data: Any, dest_path: Path, options: Optional[Dict[str, Any]] = None) -> None:
         """Write data in CSV format."""
+        # Get CSV format options
+        csv_options = options.get("csv", {}) if options else {}
+        separator = csv_options.get("separator", ",")
+        encoding = csv_options.get("encoding", "utf-8")
+        decimal = csv_options.get("decimal", ".")
+        
         if isinstance(data, list) and data:
             # Assume list of dictionaries
             fieldnames = set()
@@ -123,21 +143,33 @@ class FileExporter(ExportPort):
 
             fieldnames = sorted(fieldnames)
 
-            with open(dest_path, "w", newline="", encoding="utf-8") as f:
-                writer = csv.DictWriter(f, fieldnames=fieldnames)
+            with open(dest_path, "w", newline="", encoding=encoding) as f:
+                writer = csv.DictWriter(f, fieldnames=fieldnames, delimiter=separator)
                 writer.writeheader()
                 for item in data:
                     if isinstance(item, dict):
-                        writer.writerow(item)
+                        # Convert decimal separator if needed
+                        if decimal != ".":
+                            formatted_item = {}
+                            for k, v in item.items():
+                                if isinstance(v, float):
+                                    formatted_item[k] = str(v).replace(".", decimal)
+                                else:
+                                    formatted_item[k] = v
+                            writer.writerow(formatted_item)
+                        else:
+                            writer.writerow(item)
         elif isinstance(data, dict):
             # Try flatten for CSV
-            with open(dest_path, "w", newline="", encoding="utf-8") as f:
-                writer = csv.writer(f)
+            with open(dest_path, "w", newline="", encoding=encoding) as f:
+                writer = csv.writer(f, delimiter=separator)
                 for key, value in data.items():
+                    if isinstance(value, float) and decimal != ".":
+                        value = str(value).replace(".", decimal)
                     writer.writerow([key, value])
         else:
             # Fallback: convert to string
-            with open(dest_path, "w", encoding="utf-8") as f:
+            with open(dest_path, "w", encoding=encoding) as f:
                 f.write(str(data))
 
     def _write_txt(self, data: Any, dest_path: Path) -> None:
@@ -151,3 +183,91 @@ class FileExporter(ExportPort):
                     f.write(f"{key}: {value}\n")
             else:
                 f.write(str(data))
+
+    def _write_parquet(self, data: Any, dest_path: Path) -> None:
+        """Write data in Parquet format."""
+        try:
+            import pandas as pd
+            
+            # Convert data to DataFrame
+            if isinstance(data, list) and data:
+                df = pd.DataFrame(data)
+            elif isinstance(data, dict):
+                # Flatten dict or create single-row DataFrame
+                if all(isinstance(v, (list, tuple)) and len(set(len(v) if hasattr(v, '__len__') else 1 for v in data.values())) == 1 for v in data.values()):
+                    # All values are lists of same length
+                    df = pd.DataFrame(data)
+                else:
+                    # Mixed data - create single row
+                    df = pd.DataFrame([data])
+            else:
+                # Convert to single-column DataFrame
+                df = pd.DataFrame({"data": [data]})
+            
+            df.to_parquet(dest_path, index=False)
+            
+        except ImportError:
+            # Fallback to JSON if pandas/pyarrow not available
+            self._write_json(data, dest_path.with_suffix('.json'))
+        except Exception:
+            # Fallback to JSON on any error
+            self._write_json(data, dest_path.with_suffix('.json'))
+
+    def _write_pickle(self, data: Any, dest_path: Path) -> None:
+        """Write data in Pickle format."""
+        try:
+            # First attempt direct serialization
+            with open(dest_path, "wb") as f:
+                pickle.dump(data, f)
+        except (TypeError, AttributeError) as e:
+            if "cannot pickle" in str(e):
+                # Sanitize data by removing non-serializable objects
+                sanitized_data = self._sanitize_for_pickle(data)
+                with open(dest_path, "wb") as f:
+                    pickle.dump(sanitized_data, f)
+            else:
+                raise
+
+    def _sanitize_for_pickle(self, data: Any) -> Any:
+        """
+        Recursively sanitize data for pickle serialization.
+        
+        Removes or converts non-serializable objects like module references,
+        function objects, and other problematic types.
+        """
+        import types
+        
+        if isinstance(data, dict):
+            sanitized = {}
+            for key, value in data.items():
+                try:
+                    # Test if the value can be pickled
+                    pickle.dumps(value)
+                    sanitized[key] = self._sanitize_for_pickle(value)
+                except (TypeError, AttributeError):
+                    # Convert non-serializable objects to string representation
+                    if isinstance(value, types.ModuleType):
+                        sanitized[key] = f"<module '{value.__name__}'>"
+                    elif callable(value):
+                        sanitized[key] = f"<function '{getattr(value, '__name__', str(value))}'>"
+                    elif hasattr(value, '__dict__') and hasattr(value, '__class__'):
+                        # For complex objects, try to extract serializable attributes
+                        sanitized[key] = {
+                            '__class__': value.__class__.__name__,
+                            '__repr__': str(value)
+                        }
+                    else:
+                        sanitized[key] = str(value)
+            return sanitized
+        elif isinstance(data, (list, tuple)):
+            sanitized_items = []
+            for item in data:
+                try:
+                    pickle.dumps(item)
+                    sanitized_items.append(self._sanitize_for_pickle(item))
+                except (TypeError, AttributeError):
+                    sanitized_items.append(str(item))
+            return type(data)(sanitized_items)
+        else:
+            # For primitive types, return as-is
+            return data

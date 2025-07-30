@@ -49,6 +49,11 @@ class ExecutionReportGenerator:
         )
         self.logger = get_logger(__name__)
 
+        # Get plot format from config
+        plots_config = config.get("plots", {})
+        plot_formats = plots_config.get("formats", ["png"])
+        self.plot_format = plot_formats[0] if plot_formats else "png"
+
         # Initialize history plot generator
         self.history_plotter = HistoryPlotter(config, session_path)
 
@@ -364,7 +369,7 @@ class ExecutionReportGenerator:
             plt.tight_layout()
 
             plt.savefig(
-                plots_dir / "algorithm_comparison.png", dpi=300, bbox_inches="tight"
+                plots_dir / f"algorithm_comparison.{self.plot_format}", dpi=300, bbox_inches="tight"
             )
             plt.close()
 
@@ -381,7 +386,7 @@ class ExecutionReportGenerator:
                 plt.xticks(rotation=45)
                 plt.tight_layout()
                 plt.savefig(
-                    plots_dir / "distance_boxplots.png", dpi=300, bbox_inches="tight"
+                    plots_dir / f"distance_boxplots.{self.plot_format}", dpi=300, bbox_inches="tight"
                 )
                 plt.close()
 
@@ -396,7 +401,7 @@ class ExecutionReportGenerator:
                 plt.xticks(rotation=45)
                 plt.tight_layout()
                 plt.savefig(
-                    plots_dir / "runtime_boxplots.png", dpi=300, bbox_inches="tight"
+                    plots_dir / f"runtime_boxplots.{self.plot_format}", dpi=300, bbox_inches="tight"
                 )
                 plt.close()
 
@@ -422,7 +427,7 @@ class ExecutionReportGenerator:
                 plt.tight_layout()
 
                 plt.savefig(
-                    plots_dir / "runtime_distribution.png", dpi=300, bbox_inches="tight"
+                    plots_dir / f"runtime_distribution.{self.plot_format}", dpi=300, bbox_inches="tight"
                 )
                 plt.close()
 

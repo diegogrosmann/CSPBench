@@ -49,13 +49,26 @@ class BLFGAAlgorithm(CSPAlgorithm):
     def __init__(self, strings: list[str], alphabet: str, **params):
         super().__init__(strings, alphabet, **params)
 
-        # Filter parameters to pass only those that BLFGA implementation knows
-        # Remove framework-specific history parameters
-        blfga_params = {
-            k: v
-            for k, v in self.params.items()
-            if k not in ["save_history", "history_frequency"]
+        # Map TEMPLATE.yaml parameter names to BLF-GA implementation names
+        param_mapping = {
+            "crossover_method": "crossover_type",
+            "mutation_method": "mutation_type", 
+            "refinement_method": "refinement_type",
+            # selection_method is not directly supported, ignore it
         }
+        
+        # Filter and map parameters to pass only those that BLFGA implementation knows
+        blfga_params = {}
+        for k, v in self.params.items():
+            # Skip framework-specific history parameters
+            if k in ["save_history", "history_frequency"]:
+                continue
+            # Skip unsupported selection_method parameter
+            if k == "selection_method":
+                continue
+            # Map parameter name if needed
+            param_name = param_mapping.get(k, k)
+            blfga_params[param_name] = v
 
         self.blf_ga_instance = BLFGA(self.strings, self.alphabet, **blfga_params)
 
