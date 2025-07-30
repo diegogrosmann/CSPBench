@@ -24,6 +24,99 @@ from src.infrastructure.orchestrators.base_orchestrator import BaseOrchestrator
 from src.infrastructure.resource_control import create_resource_controller, ResourceController
 
 
+def _execute_algorithm_static(algorithm_name: str, dataset_data: dict, params: dict, rep_num: int, execution_metadata: dict):
+    """
+    Static function to execute algorithm - required for ProcessPoolExecutor.
+    
+    Args:
+        algorithm_name: Name of algorithm to execute
+        dataset_data: Serializable dataset data
+        params: Algorithm parameters
+        rep_num: Repetition number
+        execution_metadata: Execution metadata
+        
+    Returns:
+        tuple: (rep_num, repetition_results) or (rep_num, exception_info)
+    """
+    try:
+        from src.domain.algorithms import global_registry
+        from src.domain.dataset import Dataset
+        
+        # Get logger for this process
+        logger = get_logger(__name__)
+        
+        # Reconstruct dataset
+        dataset = Dataset(
+            sequences=dataset_data['sequences'],
+            metadata=dataset_data.get('metadata', {})
+        )
+        
+        # Set dataset name if provided (for identification purposes)
+        dataset_name = dataset_data.get('name', 'unknown')
+        
+        # Get algorithm instance
+        algorithm_class = global_registry.get(algorithm_name)
+        if not algorithm_class:
+            raise AlgorithmExecutionError(f"Algorithm '{algorithm_name}' not found")
+        
+        # Create algorithm instance with correct parameters (STANDARD INTERFACE)
+        # All algorithms use: __init__(strings, alphabet, **params) + run()
+        algorithm_instance = algorithm_class(
+            strings=dataset.sequences,
+            alphabet=dataset.alphabet,
+            **params
+        )
+        
+        # Execute algorithm using STANDARD INTERFACE (no parameters)
+        logger.info(f"Starting repetition {rep_num} of {algorithm_name}")
+        start_time = time.time()
+        
+        result = algorithm_instance.run()  # Standard interface - uses constructor data
+        
+        execution_time = time.time() - start_time
+        
+        # Build result data with only serializable components
+        if isinstance(result, tuple) and len(result) >= 3:
+            best_string, max_distance, metadata = result[:3]
+        else:
+            best_string, max_distance, metadata = str(result), 0, {}
+        
+        # Sanitize metadata
+        clean_metadata = {}
+        if isinstance(metadata, dict):
+            for key, value in metadata.items():
+                try:
+                    # Test if value is serializable
+                    json.dumps(value)
+                    clean_metadata[key] = value
+                except (TypeError, ValueError):
+                    # Convert to string if not serializable
+                    clean_metadata[key] = str(value)
+        
+        repetition_result = {
+            'repetition': rep_num,
+            'best_string': str(best_string),
+            'distance': int(max_distance) if isinstance(max_distance, (int, float)) else 0,
+            'execution_time': execution_time,
+            'metadata': clean_metadata,
+            'algorithm': algorithm_name,
+            'dataset': dataset_name
+        }
+        
+        logger.info(f"Completed repetition {rep_num} of {algorithm_name} in {execution_time:.2f}s")
+        return (rep_num, repetition_result)
+        
+    except Exception as e:
+        logger = get_logger(__name__)
+        logger.error(f"Error in repetition {rep_num} of {algorithm_name}: {e}")
+        return (rep_num, {
+            'error': str(e),
+            'repetition': rep_num,
+            'algorithm': algorithm_name,
+            'dataset': dataset_data.get('name', 'unknown')
+        })
+
+
 class ExecutionOrchestrator(BaseOrchestrator):
     """Orchestrator responsible for CSP algorithm execution."""
 
@@ -148,7 +241,8 @@ class ExecutionOrchestrator(BaseOrchestrator):
                 "params": params.copy(),
             }
 
-            # Instancia e executa algoritmo
+            # Instancia e executa algoritmo (STANDARD INTERFACE)
+            # All algorithms use: __init__(strings, alphabet, **params) + run()
             algorithm = algorithm_class(
                 strings=dataset.sequences, alphabet=dataset.alphabet, **params
             )
@@ -507,8 +601,13 @@ class ExecutionOrchestrator(BaseOrchestrator):
             print(f"📁 Sessão criada: {session_folder}")
             print(f"📁 Salvando resultados parciais em: {results_dir}")
         except Exception as e:
-            # Fallback para diretório padrão
-            base_dir = Path("./outputs/results")
+            # Fallback para diretório padrão - use outputs from config
+            output_config = self._config.get("output", {})
+            base_directory = output_config.get("base_directory", "outputs/{session}")
+            if "{session}" in base_directory:
+                base_dir = Path(base_directory.replace("{session}", ""))
+            else:
+                base_dir = Path(base_directory)
             timestamp = time.strftime("%Y%m%d_%H%M%S")
             results_dir = base_dir / timestamp
             print(f"📁 Usando diretório fallback: {results_dir}, erro: {e}")
@@ -748,7 +847,7 @@ class ExecutionOrchestrator(BaseOrchestrator):
     def _execute_single_repetition(
         self,
         algorithm_name: str,
-        dataset: Dataset,
+        dataset_data: Dict[str, Any],  # Dados serializáveis do dataset
         params: Dict[str, Any],
         execution_context: Dict[str, Any],
         rep_number: int,
@@ -762,7 +861,7 @@ class ExecutionOrchestrator(BaseOrchestrator):
 
         Args:
             algorithm_name: Nome do algoritmo a executar
-            dataset: Dataset para processamento
+            dataset_data: Dados serializáveis do dataset (sequences, alphabet)
             params: Parâmetros do algoritmo
             execution_context: Contexto da execução (nomes, IDs, etc.)
             rep_number: Número da repetição (1-based)
@@ -772,6 +871,10 @@ class ExecutionOrchestrator(BaseOrchestrator):
             Dict[str, Any]: Resultado da execução com contexto
         """
         try:
+            # Recriar objeto Dataset a partir dos dados serializáveis
+            from src.domain import Dataset
+            dataset = Dataset(dataset_data['sequences'], dataset_data['alphabet'])
+            
             # Executar algoritmo (sem monitoring_service pois não é thread-safe)
             result = self.execute_single(
                 algorithm_name, dataset, params, monitoring_service=None
@@ -795,6 +898,39 @@ class ExecutionOrchestrator(BaseOrchestrator):
                     "status": "success",
                 }
             )
+
+            # Sanitizar todo o resultado para garantir serialização
+            result = self._sanitize_metadata_for_process(result)
+            
+            # Teste final de serialização para debug
+            try:
+                import pickle
+                pickle.dumps(result)
+            except Exception as pickle_error:
+                self._logger.error(f"Resultado ainda não é serializável após sanitização: {pickle_error}")
+                # Fallback: converter tudo para strings
+                result = {
+                    "algorithm": algorithm_name,
+                    "best_string": str(result.get("best_string", "")),
+                    "max_distance": result.get("max_distance", -1),
+                    "execution_time": result.get("execution_time", 0.0),
+                    "execution_id": str(result.get("execution_id", "")),
+                    "params": str(result.get("params", {})),
+                    "metadata": str(result.get("metadata", {})),
+                    "dataset": {
+                        "size": len(dataset_data['sequences']),
+                        "length": len(dataset_data['sequences'][0]) if dataset_data['sequences'] else 0,
+                        "alphabet": dataset_data['alphabet']
+                    },
+                    "status": "completed",
+                    "execution_name": execution_context.get("execution_name", "unknown"),
+                    "dataset_id": execution_context.get("dataset_id", "unknown"),
+                    "algorithm_id": execution_context.get("algorithm_id", "unknown"),
+                    "algorithm_name": algorithm_name,
+                    "repetition": rep_number,
+                    "total_repetitions": total_repetitions,
+                    "serialization_fallback": True
+                }
 
             return result
 
@@ -1084,23 +1220,34 @@ class ExecutionOrchestrator(BaseOrchestrator):
         # Preparar argumentos para ProcessPoolExecutor
         args_list = []
         for rep in range(repetitions):
-            args_list.append(
-                (
-                    algorithm_name,
-                    dataset,
-                    params,
-                    execution_context,
-                    rep + 1,  # 1-based
-                    repetitions,
-                )
-            )
+            # Preparar dados serializáveis do dataset
+            dataset_data = {
+                'name': execution_context.get('dataset_id', 'unknown'),  # Use dataset_id from context
+                'sequences': dataset.sequences,
+                'metadata': getattr(dataset, 'metadata', {})  # Safe access to metadata
+            }
+            
+            # Preparar metadados de execução serializáveis
+            execution_metadata = {
+                'session_id': str(execution_context.get('session_id', '')),
+                'timestamp': execution_context.get('timestamp', ''),
+                'repetitions': repetitions
+            }
+            
+            args_list.append((
+                algorithm_name,
+                dataset_data,
+                params,
+                rep + 1,  # rep_num
+                execution_metadata
+            ))
 
         # Executar em paralelo
         with ProcessPoolExecutor(max_workers=max_workers) as executor:
-            # Submeter todas as tarefas
+            # Submeter todas as tarefas usando função estática
             future_to_rep = {}
             for i, args in enumerate(args_list):
-                future = executor.submit(self._execute_single_repetition, *args)
+                future = executor.submit(_execute_algorithm_static, *args)
                 future_to_rep[future] = i + 1
 
             # Coletar resultados conforme completam
@@ -1123,33 +1270,63 @@ class ExecutionOrchestrator(BaseOrchestrator):
                         # Iniciar item antes da execução
                         monitoring_service.start_item(rep_id, "repetition", context)
 
-                    # Obter resultado
-                    result = future.result()
+                    # Obter resultado da função estática
+                    returned_rep_num, result_data = future.result()
 
-                    # Verificar se houve erro
-                    if result.get("status") == "error":
+                    # Verificar se houve erro (result_data contém 'error')
+                    if isinstance(result_data, dict) and 'error' in result_data:
                         self._logger.error(
-                            f"Erro na execução do algoritmo {algorithm_name} (rep {rep_number}): {result.get('error')}"
+                            f"Erro na execução do algoritmo {algorithm_name} (rep {returned_rep_num}): {result_data.get('error')}"
                         )
+
+                        # Criar resultado de erro compatível
+                        error_result = {
+                            "execution_name": execution_context.get("execution_name", "unknown"),
+                            "dataset_id": execution_context.get("dataset_id", "unknown"),
+                            "algorithm_id": execution_context.get("algorithm_id", "unknown"),
+                            "algorithm_name": algorithm_name,
+                            "repetition": returned_rep_num,
+                            "total_repetitions": repetitions,
+                            "status": "error",
+                            "error": result_data.get('error'),
+                            "execution_time": 0.0,
+                        }
 
                         # Notificar monitoramento de erro
                         if monitoring_service:
                             monitoring_service.finish_item(
                                 rep_id,
                                 False,
-                                result,
-                                result.get("error", "Unknown error"),
+                                error_result,
+                                result_data.get("error", "Unknown error"),
                             )
+                        
+                        results.append(error_result)
                     else:
                         self._logger.debug(
-                            f"Algoritmo {algorithm_name} executado com sucesso (rep {rep_number}/{repetitions})"
+                            f"Algoritmo {algorithm_name} executado com sucesso (rep {returned_rep_num}/{repetitions})"
                         )
+
+                        # Criar resultado de sucesso compatível
+                        success_result = {
+                            "execution_name": execution_context.get("execution_name", "unknown"),
+                            "dataset_id": execution_context.get("dataset_id", "unknown"),
+                            "algorithm_id": execution_context.get("algorithm_id", "unknown"),
+                            "algorithm_name": algorithm_name,
+                            "repetition": returned_rep_num,
+                            "total_repetitions": repetitions,
+                            "status": "success",
+                            "best_string": result_data.get('best_string', ''),
+                            "distance": result_data.get('distance', 0),
+                            "execution_time": result_data.get('execution_time', 0.0),
+                            "metadata": result_data.get('metadata', {}),
+                        }
 
                         # Notificar monitoramento de conclusão
                         if monitoring_service:
-                            monitoring_service.finish_item(rep_id, True, result)
+                            monitoring_service.finish_item(rep_id, True, success_result)
 
-                    results.append(result)
+                        results.append(success_result)
 
                 except Exception as e:
                     self._logger.error(

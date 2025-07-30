@@ -182,11 +182,20 @@ def create_exporter(config: Dict[str, Any]):
     if session_manager:
         output_path = session_manager.get_result_dir()
     else:
-        # Use configuration from new structure
-        result_config = config.get("infrastructure", {}).get("result", {})
-        output_path = os.getenv(
-            "OUTPUT_PATH", result_config.get("base_result_dir", "./outputs/results")
-        )
+        # Use unified output configuration
+        output_config = config.get("output", {})
+        if output_config:
+            base_directory = output_config.get("base_directory", "outputs/{session}")
+            if "{session}" in base_directory:
+                output_path = base_directory.replace("{session}", "")
+            else:
+                output_path = base_directory
+        else:
+            # Fallback to old configuration
+            result_config = config.get("infrastructure", {}).get("result", {})
+            output_path = os.getenv(
+                "OUTPUT_PATH", result_config.get("base_result_dir", "./outputs/results")
+            )
 
     if export_fmt.lower() == "json":
         return JsonExporter(output_path, config)  # Pass complete configuration
@@ -222,17 +231,16 @@ def _initialize_logging(config: Dict[str, Any]) -> None:
         # Create new session
         session_folder = session_manager.create_session()
 
-        # Try to extract batch configurations (if exists)
-        log_config = {}
-        if "advanced" in config and "logs" in config["advanced"]:
-            log_config = config["advanced"]["logs"]
+        # Try to extract new unified output configuration
+        output_config = config.get("output", {})
+        log_config = output_config.get("logging", {})
 
         # Check if logs are enabled
-        if not log_config.get("enable", True):
+        if not log_config.get("enabled", True):
             return
 
         # Extract configurations
-        log_level = log_config.get("log_level", default_level)
+        log_level = log_config.get("level", default_level)
 
         # Use session path for logs
         log_file_path = session_manager.get_log_path()
@@ -264,19 +272,20 @@ def _initialize_logging(config: Dict[str, Any]) -> None:
 def _update_logging_from_batch_config(batch_config: Dict[str, Any]) -> None:
     """Update logging configuration based on specific batch file."""
     try:
-        if "advanced" in batch_config and "logs" in batch_config["advanced"]:
-            log_config = batch_config["advanced"]["logs"]
+        # Try new unified output configuration
+        output_config = batch_config.get("output", {})
+        log_config = output_config.get("logging", {})
 
-            # Check if logs are enabled
-            if not log_config.get("enable", True):
-                return
+        # Check if logs are enabled
+        if not log_config.get("enabled", True):
+            return
 
-            # Update level if specified
-            if "log_level" in log_config:
-                new_level = log_config["log_level"]
-                LoggerConfig.set_level(new_level)
-                logger = get_logger(__name__)
-                logger.info(f"Log level updated to: {new_level}")
+        # Update level if specified
+        if "level" in log_config:
+            new_level = log_config["level"]
+            LoggerConfig.set_level(new_level)
+            logger = get_logger(__name__)
+            logger.info(f"Log level updated to: {new_level}")
     except Exception as e:
         logger = get_logger(__name__)
         logger.warning(f"Error updating logging configuration from batch: {e}")
@@ -576,6 +585,44 @@ def show_datasetsave_and_exit():
     sys.exit(0)
 
 
+def initialize_service_with_batch_config(batch_config: Dict[str, Any]) -> ExperimentService:
+    """Initialize experiment service with batch-specific configuration."""
+    global config, experiment_service, session_manager
+
+    if config is None:
+        config = load_config()
+
+    # Merge batch output configuration with system config for session management
+    merged_config = config.copy()
+    if 'output' in batch_config:
+        merged_config['output'] = batch_config['output']
+
+    # Initialize logging system with batch configuration
+    _initialize_logging(merged_config)
+
+    # Create infrastructure components
+    dataset_repo = create_dataset_repository(config)
+    algo_registry = create_algorithm_registry(config)
+    executor = create_executor(config)
+    exporter = create_exporter(config)
+    entrez_repo = create_entrez_repository(config)
+    monitoring_service = create_monitoring_service(config)
+
+    # Create service with DI
+    experiment_service = ExperimentService(
+        dataset_repo=dataset_repo,
+        exporter=exporter,
+        executor=executor,
+        algo_registry=algo_registry,
+        entrez_repo=entrez_repo,
+        monitoring_service=monitoring_service,
+        session_manager=session_manager,
+    )
+
+    typer.echo("✅ CSPBench initialized successfully!")
+    return experiment_service
+
+
 def execute_batch_file(batch_file: str):
     """Execute batch file directly."""
     try:
@@ -589,9 +636,24 @@ def execute_batch_file(batch_file: str):
             print(f"❌ File must be .yaml or .yml: {batch_file}")
             sys.exit(1)
 
-        # Execute batch
-        service = initialize_service()
+        # Load batch configuration FIRST to use its output configuration for logging
         print(f"📋 Executing batch: {batch_file}...")
+        
+        # Load batch configuration to extract output config for proper session management
+        from src.application.services.config_parser import ConfigParser
+        batch_config = ConfigParser.parse_config(str(batch_path))
+        batch_dict = {
+            'output': {
+                'base_directory': batch_config.export.destination if batch_config.export else "outputs/{session}",
+                'logging': {
+                    'enabled': True,  # Default to enabled
+                    'level': batch_config.logging.level if batch_config.logging else "INFO"
+                }
+            }
+        }
+        
+        # Initialize service with batch-specific configuration for session management
+        service = initialize_service_with_batch_config(batch_dict)
 
         result = service.run_batch(str(batch_path))
         print(f"✅ Batch completed: {result.get('summary', 'Completed')}")

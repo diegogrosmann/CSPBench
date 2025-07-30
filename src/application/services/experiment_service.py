@@ -42,6 +42,7 @@ from src.domain import (
 )
 from src.domain.dataset import SyntheticDatasetGenerator
 from src.infrastructure.logging_config import LoggerConfig, get_logger
+from src.infrastructure.session_manager import SessionManager
 from src.presentation.monitoring.interfaces import TaskType
 
 
@@ -226,6 +227,14 @@ class ExperimentService:
             system_config = parsed_config.system
             resources_config = parsed_config.resources
 
+            # Update existing SessionManager with batch-specific configuration if needed
+            # Don't create a new one to preserve the current session
+            if not hasattr(self, '_session_manager') or not self._session_manager:
+                # Only create new SessionManager if none exists
+                batch_dict = self._convert_batch_config_to_dict(parsed_config)
+                self._session_manager = SessionManager(batch_dict)
+            # If SessionManager already exists, keep using it (preserves current session)
+
             # Apply global system configurations
             self._apply_system_config(system_config, parsed_config)
 
@@ -346,9 +355,16 @@ class ExperimentService:
             # Exportar resultados se configurado
             if opt_config.get("export", {}).get("enabled", False):
                 export_config = opt_config["export"]
+                
+                # Use session manager to determine export path
+                if hasattr(self, '_session_manager') and self._session_manager:
+                    destination = self._session_manager.get_session_result_path()
+                else:
+                    destination = export_config.get("destination", "outputs/optimization_results")
+                
                 self._exporter.export_optimization_results(
                     results,
-                    export_config.get("destination", "outputs/optimization_results"),
+                    destination,
                 )
 
             return results
@@ -456,9 +472,8 @@ class ExperimentService:
         # Load dataset
         dataset = self._load_dataset(dataset_id)
 
-        # Create batch configuration for single execution
+        # Create batch configuration for single execution (legacy format)
         batch_config = {
-            "task": {"type": "execution"},
             "experiments": [
                 {
                     "algorithm": algorithm_name,
@@ -1404,16 +1419,17 @@ class ExperimentService:
             destination = export_config.destination
             destination = destination.replace("{task_type}", task_type)
             
-            # Replace {session} with current session timestamp
+            # Handle session replacement differently depending on SessionManager availability
             if hasattr(self, '_session_manager') and self._session_manager:
-                session_folder = self._session_manager.get_session_folder()
-                if session_folder:
-                    destination = destination.replace("{session}", session_folder)
+                # When using SessionManager, FileExporter already has the full session path
+                # We should only use relative paths to avoid duplication
+                if "{session}" in destination:
+                    # For template like "outputs_test/{session}", extract just the relative part
+                    # Since FileExporter already has the session base, use empty or just filename
+                    destination = ""  # Let FileExporter generate filename automatically
                 else:
-                    # Fallback: use current timestamp if no session
-                    from datetime import datetime
-                    session_fallback = datetime.now().strftime("%Y%m%d_%H%M%S")
-                    destination = destination.replace("{session}", session_fallback)
+                    # If no {session} template, use destination as-is (should be relative)
+                    pass
             else:
                 # Fallback: use current timestamp if no session manager
                 from datetime import datetime
@@ -1472,12 +1488,17 @@ class ExperimentService:
             self._logger.debug(f"Results structure: {list(results.keys()) if isinstance(results, dict) else type(results)}")
             
             # Get current session path using standard pattern
-            from datetime import datetime
-            current_session = datetime.now().strftime("%Y%m%d_%H%M%S")
+            # Use session manager to determine base path
+            if hasattr(self, '_session_manager') and self._session_manager:
+                session_base_path = Path(self._session_manager.get_session_result_path())
+                plots_dir = session_base_path / "plots"
+            else:
+                # Fallback to old pattern
+                from datetime import datetime
+                current_session = datetime.now().strftime("%Y%m%d_%H%M%S")
+                session_base_path = Path("outputs/results") / current_session
+                plots_dir = session_base_path / "plots"
             
-            # Use outputs/results pattern that matches the export path
-            session_base_path = Path("outputs/results") / current_session
-            plots_dir = session_base_path / "plots"
             plots_dir.mkdir(parents=True, exist_ok=True)
             
             self._logger.info(f"Plots directory created: {plots_dir}")

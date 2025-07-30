@@ -1,0 +1,699 @@
+# ===================================================================
+# STANDARDIZED TEMPLATE CSPBench - UNIFIED STRUCTURE v0.7
+# ===================================================================
+# This template defines the standard structure for all batch types.
+# Supported types: execution, optimization, sensitivity
+# Usage: Copy this template and adapt for your specific needs
+#
+# =====================================================================
+# SECTION 1: METADATA (REQUIRED FOR ALL)
+# =====================================================================
+# This section contains basic information about the batch.
+# All fields are required for traceability and documentation.
+metadata:
+  name: "Batch Name"                  # Descriptive batch name (string)
+  description: "Detailed description of what the batch does"    # Complete description (string)
+  author: "Author Name"               # Responsible author (string)
+  version: "1.0"                      # Batch version (string)
+  creation_date: "2025-07-13"         # Creation date in YYYY-MM-DD format
+  tags: ["tag1", "tag2"]              # Tags for categorization (list)
+
+# =====================================================================
+# SECTION 2: INFRASTRUCTURE SETTINGS (OPTIONAL)
+# =====================================================================
+# This section allows overriding settings from the settings.yaml file.
+# Use only if you need specific settings for this batch.
+infrastructure:
+  # Dataset repository configuration
+  dataset_repository:
+    type: "FileDatasetRepository"     # string: Repository implementation type
+    config:
+      base_path: "./datasets"         # string: Base path for dataset files
+      supported_formats: ["fasta", "txt"]  # list: Supported file formats
+  
+  # Algorithm registry configuration
+  algorithm_registry:
+    type: "DomainAlgorithmRegistry"   # string: Registry implementation type
+    config:
+      auto_register: true             # bool: Automatically register discovered algorithms
+  
+  # Algorithm executor configuration
+  executor:
+    type: "Executor"                  # string: Executor implementation type
+    config:
+      timeout_default: 300            # int: Default timeout in seconds 
+
+# =====================================================================
+# SECTION 3: DATASETS (STANDARDIZED FOR ALL)
+# =====================================================================
+# Defines the datasets available for use in the batch.
+# Each dataset has a unique ID that can be referenced in executions.
+# Supported types: synthetic, file, entrez
+datasets:
+  # === SYNTHETIC DATASETS ===
+  # Generate artificial data for testing and development
+  - id: dataset_test                  # string: Unique dataset ID
+    name: "Test Dataset"              # string: Descriptive name
+    type: "synthetic"                 # string: Dataset type
+    parameters:                       # Parameters specific to synthetic datasets:
+      n: 10                           # int: Number of sequences (3-100 recommended)
+      L: 20                           # int: Sequence length (5-1000)
+      alphabet: "ACGT"                # string: Sequence alphabet
+                                      # "ACGT" = DNA, "01" = binary, "ACDEFGH..." = custom
+      noise: 0.1                      # float: Noise level (0.0-1.0)
+                                      # 0.0 = no noise, 0.5 = very noisy
+      seed: 42                        # int|null: Seed for reproducibility
+                                      # int = deterministic, null = random
+
+  # === FILE DATASETS ===
+  # Load data from existing FASTA files
+  - id: dataset_file                  # string: Unique dataset ID
+    name: "File Dataset"              # string: Descriptive name
+    type: "file"                      # string: Dataset type
+    parameters:                       # Parameters specific to file datasets:
+      filename: "example.fasta"       # string: Filename (must be in datasets/)
+                                      # Supported formats: .fasta, .fa, .txt
+
+  # === ENTREZ DATASETS (NCBI) - ✅ FULLY IMPLEMENTED ===
+  # Download data directly from NCBI using Entrez API
+  # NOTE: Requires NCBI_EMAIL environment variable and Biopython installation
+  - id: dataset_ncbi                  # string: Unique dataset ID
+    name: "NCBI Dataset"              # string: Descriptive name
+    type: "entrez"                    # string: Dataset type (FUNCTIONAL)
+    parameters:                       # Parameters for Entrez datasets:
+      query: "COIGene AND 600:650[SLEN]"                        # string: NCBI search query
+                                      # Syntax: https://www.ncbi.nlm.nih.gov/books/NBK25499/
+                                      # Examples: "escherichia coli", "COIGene", "ribosomal RNA"
+      db: "nucleotide"                # string: NCBI database
+                                      # "nucleotide", "protein", "pubmed", etc.
+      retmax: 10                      # int: Maximum number of sequences (1-1000)
+                                      # Higher values may take longer to download
+                                      # System will handle length filtering automatically
+
+# =====================================================================
+# SECTION 4: ALGORITHMS (STANDARDIZED FOR ALL)
+# =====================================================================
+# Defines algorithm configurations that can be reused.
+# Allows creating parameter "presets" for different scenarios.
+algorithms:
+  - id: "default_config"              # string: Unique configuration ID
+    name: "Default Configuration"     # string: Descriptive name
+    description: "Algorithms with default parameters"           # string: Detailed description
+    algorithms:                       # list: List of algorithms included in this configuration
+      - "Baseline"                    # Baseline algorithm (simplest)
+      - "BLF-GA"                      # Block-based Genetic Algorithm (main)
+      - "CSC"                         # Closest String with Constraints
+      - "H³-CSP"                      # Heuristic Closest String Problem
+      - "DP-CSP"                      # Dynamic Programming CSP
+    
+    # Algorithm-specific parameters
+    # For execution: fixed values used directly
+    # For optimization/sensitivity: base values that can be overridden
+    algorithm_params:
+      # === BASELINE - Simple Greedy Algorithm ===
+      "Baseline":
+        tie_break: "lex"              # string: Tie-breaking criterion
+                                      # "lex" = lexicographic, "random" = random, "first" = first
+      
+      # === BLF-GA - Block-based Genetic Algorithm ===
+      "BLF-GA":
+        # Population Parameters
+        pop_size: 1.5                 # int|float: Population size (fixed int or n multiplier)
+                                      # Examples: 100 (fixed), 1.5 (1.5*n), 2.0 (2*n)
+        min_pop_size: 20              # int: Minimum population size threshold
+        max_gens: 100                 # int: Maximum number of generations (30-500)
+        max_time: 1200.0              # float: Maximum execution time in seconds
+        seed: null                    # int|null: Seed for reproducibility (null = random)
+        
+        # Genetic Operators
+        cross_prob: 0.9               # float: Crossover probability (0.6-0.95)
+        mut_prob: 0.1                 # float: Mutation probability (0.01-0.3)
+        elite_rate: 0.05              # float: Elitism rate (0.01-0.15)
+        
+        # Block Parameters (BLF-GA specific)
+        initial_blocks: 0.2           # float: Initial block proportion (0.1-0.5)
+        min_block_len: 1              # int: Minimum block length
+        rediv_freq: 10                # int: Redivision frequency (5-25)
+        
+        # Diversity and Immigration
+        immigrant_freq: 10            # int: Immigration frequency (10-30)
+        immigrant_ratio: 0.2          # float: Immigration rate (0.1-0.3)
+        diversity_threshold: 0.4      # float: Diversity threshold for adaptive mutation (0-1)
+        
+        # Operator Methods
+        crossover_type: "one_point"   # string: Crossover method (original parameter name)
+                                      # "one_point", "uniform", "blend_blocks"
+        mutation_type: "multi"        # string: Mutation method (original parameter name)
+                                      # "multi", "inversion", "transposition"
+        mutation_multi_n: 2          # int: Number of mutations for multi-mutation method
+        tournament_k: 2               # int: Tournament size for tournament selection
+        refinement_type: "greedy"     # string: Local refinement method (original parameter name)
+                                      # "greedy", "swap", "insertion", "2opt"
+        refine_elites: "best"         # string: Which elites to refine ("all", "best")
+        refine_iter_limit: 100        # int: Maximum iterations per refinement
+        
+        # Adaptive Mutation Parameters
+        mutation_adapt_N: 10          # int: Generations to detect convergence for adaptive mutation
+        mutation_adapt_factor: 2.0    # float: Temporary mutation increase factor
+        mutation_adapt_duration: 5    # int: Duration of mutation increase in generations
+        
+        # Niching Parameters
+        niching: false                # bool: Enable niching for diversity preservation
+        niching_radius: 3             # int: Minimum distance between solutions in niche
+        
+        # Stopping and Restart Criteria
+        no_improve_patience: 0.2      # float: Patience without improvement (0.1-0.5)
+                                      # Proportion of generations without improvement before stopping
+        restart_patience: 20          # int: Generations without improvement for partial restart
+        restart_ratio: 0.3            # float: Proportion of population to restart (0.1-0.5)
+        disable_elitism_gens: 5       # int: Disable elitism every N generations to prevent convergence
+      
+      # === CSC - Closest String with Constraints ===
+      "CSC":
+        min_d: 2                      # int: Initial minimum distance (1-5)
+        d_factor: 0.75                # float: Distance increment factor (0.5-1.0)
+        min_blocks: 4                 # int: Minimum number of blocks (2-8)
+        max_blocks: 8                 # int: Maximum number of blocks (4-16)
+        n_div: 6                      # int: Divisor for number of sequences
+        l_div: 25                     # int: Divisor for block length (10-50)
+      
+      # === H³-CSP - Heuristic Closest String Problem ===
+      "H³-CSP":
+        # Block Division Parameters
+        auto_blocks: true             # bool: Use automatic block division (√L method)
+                                      # true = automatic, false = manual
+        min_block_size: 2             # int: Minimum block size (1-5)
+        max_blocks: null              # int|null: Maximum number of blocks (null = automatic)
+        block_size: 4                 # int: Base block size when not automatic (2-8)
+        block_strategy: null          # string|null: Division strategy (null = default)
+        
+        # Difficulty Thresholds per Block
+        block_small: 2                # int: Threshold for "small" blocks (exhaustive search)
+        block_medium: 4               # int: Threshold for "medium" blocks (reduced beam search)
+        block_large: 8                # int: Threshold for "large" blocks (full beam search)
+        
+        # Search Parameters
+        exhaustive_limit: 10000       # int: Limit for exhaustive search (|Σ|^m combinations)
+        beam_width: 32                # int: Beam search width for large blocks
+        k_candidates: 5               # int: Number of candidates considered per block (3-10)
+        
+        # Refinement Parameters
+        local_iters: 3                # int: Local search iterations (1-5)
+        local_search_iters: 3         # int: Alias for local_iters (compatibility)
+        
+        # Execution Control
+        max_time: 300                 # int: Maximum execution time in seconds
+        seed: null                    # int|null: Seed for reproducibility
+        
+        # Experimental Parameters
+        diversity_threshold: 1        # int: Diversity threshold (experimental feature)
+        fallback_enabled: true        # bool: Enable fallback for large blocks
+      
+      # === DP-CSP - Dynamic Programming CSP ===
+      "DP-CSP":
+        max_d: null                   # int|null: Maximum distance considered (3-10)
+                                      # High values greatly increase execution time
+                                      # null = use baseline distance as reference
+        warn_threshold: 9             # int: Sequence limit for warning (actual default is 9)
+                                      # Above this value, the algorithm may be very slow
+        max_time: 300                 # int: Maximum execution time in seconds
+        seed: null                    # int|null: Seed for reproducibility
+  
+  # You can add multiple algorithms:
+  - id: "aggressive_csc"              # string: Unique configuration ID
+    name: "Aggressive CSC Configuration"                        # string: Descriptive name
+    description: "Aggressive parameters for CSC algorithm"      # string: Detailed description
+    algorithms:                       # list: List of algorithms included in this configuration
+      - "CSC"                         # Closest String with Constraints
+    
+    algorithm_params:
+      "CSC":
+        min_d: 1                      # int: Tighter clustering
+        d_factor: 0.6                 # float: Lower distance factor
+        min_blocks: 3                 # int: More blocks
+        max_blocks: 6                 # int: Higher maximum
+        l_div: 20                     # int: More divisions
+
+# =====================================================================
+# SECTION 5: TASK TYPE (REQUIRED)
+# =====================================================================
+# Defines the type of operation to be performed.
+# Each type has specific configurations in the corresponding section.
+task:
+  type: "execution"                   # string: Task type
+                                      # "execution" = run algorithms with fixed parameters
+                                      # "optimization" = optimize hyperparameters with Optuna
+                                      # "sensitivity" = analyze sensitivity with SALib
+
+# =====================================================================
+# SECTION 6A: SPECIFIC CONFIGURATION - EXECUTION
+# =====================================================================
+# Use this section when task.type = "execution"
+# Runs algorithms on datasets with pre-defined parameters
+execution:
+  # List of executions to perform
+  executions:
+    - name: "Test Execution"          # string: Descriptive execution name
+      datasets:                       # list: Dataset IDs to use (reference to section 3)
+        - "dataset_test"
+        - "dataset_file"
+      algorithms:
+        - "default_config"
+        - "aggressive_csc"
+      repetitions: 3                  # int: Number of repetitions per combination (1-10 recommended)
+                                      # Each dataset+algorithm combination will be executed N times
+    # You can add multiple executions:
+    - name: "Complete Execution"
+      datasets: 
+        - "dataset_ncbi"
+      algorithms: 
+        - "aggressive_csc"
+      repetitions: 2
+
+# =====================================================================
+# SECTION 6B: SPECIFIC CONFIGURATION - OPTIMIZATION
+# =====================================================================
+# Use this section when task.type = "optimization"
+# Optimize algorithm hyperparameters using Optuna
+optimization:
+  # Optimization framework (global configuration)
+  method: "optuna"                    # string: Optimization framework (only "optuna" supported)
+  
+  # Global Optuna configurations (applied to all optimizations)
+  optuna_defaults:
+    sampler: "TPESampler"             # string: Default sampling algorithm
+                                      # "TPESampler" = Tree-structured Parzen Estimator (recommended)
+                                      # "RandomSampler" = Random sampling
+                                      # "CmaEsSampler" = CMA-ES for continuous problems
+    pruner: "MedianPruner"            # string: Default pruning algorithm
+                                      # "MedianPruner" = prune based on median
+                                      # "SuccessiveHalvingPruner" = successive halving
+    startup_trials: 10                # int: Trials before using intelligent sampler
+    warmup_steps: 10                  # int: Warmup steps for pruner
+    interval_steps: 5                 # int: Interval for pruner evaluation
+    multivariate: true                # bool: Use multivariate TPE (recommended)
+    ei_candidates: 24                 # int: Candidates for Expected Improvement
+    storage: null                     # string|null: Database URL (null = in memory)
+  
+  # List of optimizations to perform
+  optimizations:
+    - name: "BLF-GA Optimization"     # string: Descriptive optimization name
+      study_name: "blfga_study"       # string: Study name for identification
+      direction: "minimize"           # string: Optimization direction
+                                      # "minimize" = minimize objective (for distance)
+                                      # "maximize" = maximize objective (for quality)
+      trials: 100                     # int: Number of trials/attempts (50-1000 recommended)
+      timeout_per_trial: 300          # int: Timeout per trial in seconds (60-600)
+      repetitions: 1                  # int: Repetitions per trial (1-5 recommended)
+                                      # Each trial will be repeated N times for statistical robustness
+      
+      # Specific datasets and algorithm to optimize
+      datasets: 
+        - "dataset_test"
+        - "dataset_file"              # list: Dataset IDs to use (reference to section 3)
+      algorithm: "default_config"     # string: Algorithm configuration ID (reference to section 4)
+      
+      # Parameters to optimize (override algorithm_params from section 4)
+      # Supported types: int, uniform (float), categorical
+      parameters:
+        "BLF-GA":                     # string: Algorithm name (must exist in configuration)
+          pop_size:                   # Parameter name (must exist in algorithm)
+            type: "int"               # string: Parameter type
+            low: 50                   # int: Minimum value (for int/uniform)
+            high: 200                 # int: Maximum value (for int/uniform)
+            step: 10                  # int: Step for integer values (optional)
+          
+          max_gens:
+            type: "int"
+            low: 100
+            high: 500
+            step: 25
+          
+          cross_prob:
+            type: "uniform"           # uniform float between low and high
+            low: 0.6
+            high: 0.95
+          
+          mut_prob:
+            type: "uniform"
+            low: 0.01
+            high: 0.3
+          
+          crossover_type:
+            type: "categorical"       # Choice between discrete values
+            choices:                  # list: Available options
+              - "one_point"
+              - "uniform"
+              - "blend_blocks"  
+
+      # Specific Optuna configurations (optional - overrides optuna_defaults)
+      optuna_config:
+        sampler: "TPESampler"         # string: Specific sampling algorithm
+        pruner: "MedianPruner"        # string: Specific pruning algorithm
+        storage: null                 # string|null: Specific database URL
+    
+    # Example of second optimization (you can add as many as needed)
+    - name: "CSC Optimization"
+      study_name: "csc_study"
+      direction: "minimize"
+      trials: 50                      # int: Number of trials
+      timeout_per_trial: 180
+      repetitions: 2                  # int: Repetitions per trial
+      datasets: 
+        - "dataset_ncbi"
+      algorithm: "aggressive_csc"     # Reference configuration ID
+      parameters:
+         "CSC":                       # Algorithm name in configuration
+           min_d:
+             type: "int"
+             low: 1
+             high: 5
+           d_factor:
+             type: "uniform"
+             low: 0.5
+             high: 1.0
+
+# =====================================================================
+# SECTION 6C: SPECIFIC CONFIGURATION - SENSITIVITY
+# =====================================================================
+# Use this section when task.type = "sensitivity"
+# Performs sensitivity analysis of parameters using SALib
+sensitivity:
+  # Analysis framework (global configuration)
+  method: "SALib"                     # string: Analysis framework (only "SALib" supported)
+  
+  # Global SALib configurations (applied to all analyses)
+  salib_defaults:
+    samples: 1000                     # int: Default number of samples to generate (100-10000)
+                                      # More samples = higher precision but more time
+    seed: 42                          # int: Global seed for reproducibility
+    parallel: true                    # bool: Use parallel processing
+  
+  # List of sensitivity analyses to perform
+  analyses:
+    - name: "Morris Analysis BLF-GA"  # string: Descriptive analysis name
+      method: "morris"                # string: Sensitivity analysis method
+                                      # "morris" = Morris analysis (elementary effects) - recommended for screening
+                                      # "sobol" = Sobol analysis (first order and total indices)
+                                      # "fast" = FAST analysis (Fourier Amplitude Sensitivity)
+                                      # "delta" = Delta method
+      
+      # Specific datasets and algorithm to analyze
+      datasets: 
+        - "dataset_test"              # list: Dataset IDs to use (reference to section 3)
+        - "dataset_file"
+      algorithm: "default_config"     # string: Algorithm name to analyze
+      
+      # Specific analysis configurations (optional - overrides salib_defaults)
+      samples: 1000                   # int: Specific number of samples
+      repetitions: 3                  # int: Specific repetitions per sample
+      
+      # Parameters to analyze (defines variation ranges)
+      parameters:
+        pop_size:                     # Parameter name
+          type: "integer"             # string: Parameter type
+          bounds: [50, 200]           # list: [min, max] for int/float
+          default: 100                # default value for reference
+          
+        max_gens:
+          type: "integer"
+          bounds: [100, 500]
+          default: 200
+          
+        cross_prob:
+          type: "float"               # continuous float
+          bounds: [0.6, 0.95]
+          default: 0.8
+          
+        mut_prob:
+          type: "float"
+          bounds: [0.01, 0.3]
+          default: 0.1
+          
+        crossover_type:
+          type: "categorical"         # Discrete values
+          values: ["one_point", "uniform", "blend_blocks"]      # list: Options to vary
+          default: "one_point"
+      
+      # Specific configuration for Morris method (if method = "morris")
+      morris:
+        levels: 4                     # int: Levels for Morris grid (4-10)
+        grid_jump: 2                  # int: Grid jump size
+        trajectories: 20              # int: Number of trajectories to generate
+        optimal_trajectories: null    # int|null: Optimize trajectories (null = don't optimize)
+      
+      # Specific configuration for Sobol method (if method = "sobol")
+      sobol:
+        second_order: true            # bool: Calculate second order indices
+        resamples: 1000               # int: Resamples for confidence bootstrap
+        confidence_level: 0.95        # float: Confidence level (0.90-0.99)
+        seed: 42                      # int: Seed for reproducibility
+      
+      # Specific configuration for FAST method (if method = "fast")
+      fast:
+        M: 4                          # int: Interference frequency factor
+        interference: false           # bool: Consider frequency interference
+        
+      # Output metrics to analyze
+      output_metrics:                 # list: Metrics to calculate sensitivity
+        - "distance"                  # Maximum distance achieved
+        - "execution_time"            # Execution time
+        # Other options: "convergence_rate", "fitness_calls", "diversity"
+    
+    # Example of second analysis (you can add as many as needed)
+    - name: "Sobol Analysis CSC"
+      method: "sobol"
+      datasets: 
+        - "dataset_ncbi"
+      algorithm: "aggressive_csc"     # Reference configuration ID
+      samples: 2000                   # int: Number of samples
+      repetitions: 5                  # int: Repetitions per sample
+      parameters:
+        min_d:
+          type: "integer"
+          bounds: [1, 5]
+          default: 2
+        d_factor:
+          type: "float"
+          bounds: [0.5, 1.0]
+          default: 0.75
+      sobol:
+        second_order: true
+        resamples: 1000               # int: Resamples for confidence bootstrap
+        confidence_level: 0.95
+      output_metrics:
+        - "distance"
+        - "execution_time"
+        - "convergence_rate"
+
+# =====================================================================
+# SECTION 7: OUTPUT SETTINGS (REQUIRED) - UNIFIED CONFIGURATION
+# =====================================================================
+# UNIFIED CONFIGURATION: All outputs (logs, results, plots) in one location
+# This section consolidates all output configurations for maximum clarity
+output:
+  # === GENERAL SETTINGS ===
+  enabled: true                       # bool: Enable all outputs (logs, results, plots)
+                                      # true = save everything, false = execute only
+  
+  base_directory: "outputs/{session}" # string: Single base directory for ALL outputs
+                                      # {session} = current session folder (timestamp format: YYYYMMDD_HHMMSS)
+                                      # {task_type} = task type (execution/optimization/sensitivity)
+                                      # {algorithm} = algorithm name (for subfolders)
+                                      # {dataset} = dataset name (for subfolders)
+                                      # Example: "outputs/20250730_143052/" contains logs/, results/, plots/
+  
+  # === DIRECTORY STRUCTURE ===
+  structure:
+    create_subfolders: true           # bool: Create organized subfolders
+    algorithm_subfolders: true        # bool: Create subfolder per algorithm
+    dataset_subfolders: true          # bool: Create subfolder per dataset
+    timestamp_suffix: true            # bool: Add timestamp to file names
+    session_folder_format: "%Y%m%d_%H%M%S"  # string: Format for session folders
+  
+  # === LOGGING CONFIGURATION ===
+  logging:
+    enabled: true                     # bool: Enable logging
+    level: "INFO"                     # string: Log level (DEBUG, INFO, WARNING, ERROR)
+    console_output: true              # bool: Display logs in console
+    file_output: true                 # bool: Save logs to file
+    filename: "cspbench.log"          # string: Main log filename
+    subdirectory: "logs"              # string: Logs subdirectory within base_directory
+    
+  # === RESULTS CONFIGURATION ===
+  results:
+    enabled: true                     # bool: Enable results export
+    subdirectory: "results"           # string: Results subdirectory within base_directory
+    
+    # Export formats
+    formats:
+      csv: true                       # bool: Export results in CSV
+      json: true                      # bool: Export results in JSON
+      parquet: false                  # bool: Export in Parquet format (for large volumes)
+      pickle: false                   # bool: Export in Pickle format (Python native)
+    
+    # Format-specific options
+    format_options:
+      csv:
+        separator: ","                # string: Field separator (,;|)
+        encoding: "utf-8"             # string: Character encoding
+        decimal: "."                  # string: Decimal separator
+      json:
+        indent: 2                     # int|null: Indentation (null = compact)
+        ensure_ascii: false           # bool: Ensure ASCII (false = allows UTF-8)
+    
+    # Content configuration
+    content:
+      summary: true                   # bool: Executive summary of results
+      detailed_results: true          # bool: Detailed results from each execution
+      statistics: true                # bool: Calculate statistical summaries
+      partial_results: true           # bool: Save partial results during execution
+      partial_filename: "partial_results.json"  # string: Partial results filename
+      metadata: true                  # bool: Include execution metadata
+  
+  # === PLOTS CONFIGURATION ===
+  plots:
+    enabled: true                     # bool: Enable plot generation
+    subdirectory: "plots"             # string: Plots subdirectory within base_directory
+    
+    # Output formats for plots
+    formats:
+      - "png"                         # PNG format (recommended for web/viewing)
+      - "pdf"                         # PDF format (recommended for publication)
+    
+    # General plots (all task types)
+    general:
+      convergence: true               # bool: Algorithm convergence plots
+      comparison: true                # bool: Comparison between algorithms/parameters
+      boxplots: true                  # bool: Box plots of distributions
+      scatter: true                   # bool: Scatter plots of correlations
+      heatmap: true                   # bool: Parameter heatmaps
+      runtime: true                   # bool: Execution time analysis
+      success_rate: true              # bool: Success/convergence rate
+    
+    # Task-specific plots
+    execution:
+      fitness_evolution: true         # bool: Fitness evolution over time
+      best_solutions: true            # bool: Timeline of best solutions found
+      parameters_evolution: true      # bool: Adaptive parameter evolution
+    
+    optimization:
+      optimization_history: true      # bool: Optuna optimization history
+      parameter_importance: true      # bool: Parameter importance analysis
+      parallel_coordinate: true       # bool: Parallel coordinate plots
+    
+    sensitivity:
+      sensitivity_indices: true       # bool: Sensitivity indices plots
+      morris_trajectories: true       # bool: Morris trajectories (if method=morris)
+      interaction_effects: true       # bool: Parameter interaction effects
+  
+  # === HISTORY CONFIGURATION ===
+  history:
+    enabled: true                     # bool: Save detailed execution history
+    subdirectory: "history"           # string: History subdirectory within base_directory
+    frequency: 1                      # int: Save frequency (every N iterations)
+    include_plots: true               # bool: Generate history-specific plots
+
+# =====================================================================
+# SECTION 8: MONITORING SETTINGS (OPTIONAL)
+# =====================================================================
+# Settings for real-time execution monitoring
+monitoring:
+  # General monitoring
+  enabled: true                       # bool: Enable monitoring
+  interface: "simple"                 # string: Interface type
+                                      # "simple" = simple terminal interface (default)
+                                      # "tui" = advanced interface with curses
+  update_interval: 3                  # int: Update interval in seconds (1-10)
+   
+# =====================================================================
+# SECTION 9: RESOURCE SETTINGS (OPTIONAL)
+# =====================================================================
+# Control of computational resource usage
+resources:
+  # CPU limitations
+  cpu:
+    max_cores: null                   # int|null: Maximum cores to use (null = all)
+    affinity: null                    # list|null: Specific cores to use [0,1,2,3]
+    
+  # Memory limitations
+  memory:
+    max_memory_gb: null               # float|null: Maximum memory in GB
+    
+  # Parallel processing
+  parallel:
+    enabled: true                     # bool: Enable parallelization when possible
+    max_workers: null                 # int|null: Maximum parallel workers (null = auto)
+    internal_jobs: 4                  # int: Maximum internal parallel jobs per algorithm
+                                      # Controls internal algorithm parallelism (threads/processes)
+                                      # Suggested value: 4 for CPUs with 8+ cores
+                                      # Relation: max_workers × internal_jobs ≤ CPU_cores
+    
+  # Timeouts and limits
+  timeouts:
+    timeout_per_algorithm: 3600       # int: Timeout per individual algorithm execution (seconds)
+                                      # Applied to each algorithm run independently
+                                      # Common values: 1800 (30min), 3600 (1h), 7200 (2h)
+    timeout_total_batch: 86400        # int: Total timeout for entire batch execution (seconds)
+                                      # Applied to the complete batch process
+                                      # Common values: 21600 (6h), 43200 (12h), 86400 (24h)
+    
+# =====================================================================
+# SECTION 10: SYSTEM SETTINGS (OPTIONAL)
+# =====================================================================
+# General system configurations and behavior
+system:
+  # Global seed substitution - overrides all local seeds
+  global_seed: null                   # int|null: Global seed that replaces all algorithm and dataset seeds
+                                      # When set, substitutes ALL seed parameters throughout configuration
+                                      # null = use individual seeds, int = override all with this value
+  
+  # Work directory configuration
+  work_directory: null                # string|null: Custom work directory path
+                                      # Supports {session} variable replacement with timestamp
+                                      # Example: "custom_results_{session}" -> "custom_results_20250729_143052"
+                                      # null = use default structure
+  
+  # Cleanup and maintenance
+  force_cleanup: false                # bool: Force cleanup of previous results
+                                      # true = remove existing results before execution
+                                      # false = preserve existing results
+  
+  # Checkpointing system
+  checkpointing:
+    enabled: false                    # bool: Enable execution checkpointing
+    interval: 100                     # int: Save checkpoint every N iterations/trials
+    auto_recovery: true               # bool: Automatically recover from last checkpoint
+    compress: true                    # bool: Compress checkpoint files
+  
+  # Error handling strategy
+  error_handling:
+    strategy: "continue"              # string: Error handling strategy
+                                      # "continue" = continue with next item on error
+                                      # "stop" = stop execution on first error
+                                      # "retry" = retry failed items
+    max_retries: 3                    # int: Maximum retry attempts for failed items
+    retry_delay: 5                    # int: Delay between retries in seconds
+    log_errors: true                  # bool: Log detailed error information
+  
+  # Progress tracking
+  progress_tracking:
+    enabled: true                     # bool: Enable detailed progress tracking
+    update_interval: 10               # int: Update progress every N iterations/trials
+    save_intermediate: false          # bool: Save intermediate results
+    show_eta: true                    # bool: Show estimated time to completion
+  
+  # Environment variables
+  environment:
+    PYTHONPATH: null                  # string|null: Override PYTHONPATH
+    OMP_NUM_THREADS: null             # string|null: Override OpenMP thread count
+    NUMBA_NUM_THREADS: null           # string|null: Override Numba thread count
+    CSPBENCH_DEBUG: null              # string|null: Enable CSPBench debug mode
+  
+  # Reproducibility control
+  reproducibility:
+    strict: true                      # bool: Strict reproducibility mode
+                                      # true = ensures deterministic results
+                                      # false = allows some non-deterministic behavior
+    log_seeds: false                  # bool: Log all seeds used during execution
+    verify_determinism: false         # bool: Verify results are deterministic by running twice

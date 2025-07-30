@@ -68,7 +68,16 @@ class OptimizationOrchestrator:
 
         # Configuração de otimização
         self.optimization_config = config.get("optimization", {})
-        self.export_config = config.get("export", {})
+        
+        # Use new unified output configuration
+        output_config = config.get("output", {})
+        results_config = output_config.get("results", {})
+        self.export_config = {
+            "enabled": results_config.get("enabled", True),
+            "formats": results_config.get("formats", {}),
+            "destination": output_config.get("base_directory", "outputs/{session}")
+        }
+        
         self.monitoring_config = config.get("monitoring", {})
         self.resources_config = config.get("resources", {})
 
@@ -103,12 +112,23 @@ class OptimizationOrchestrator:
         if not session_manager.get_session_folder():
             session_manager.create_session()
 
-        # Usar base_result_dir + session_folder para otimização
-        base_result_dir = (
-            settings.get("infrastructure", {})
-            .get("result", {})
-            .get("base_result_dir", "./outputs/results")
-        )
+        # Use unified output configuration or fallback
+        output_config = settings.get("output", {})
+        if output_config:
+            # Use new unified configuration
+            base_directory = output_config.get("base_directory", "outputs/{session}")
+            if "{session}" in base_directory:
+                base_result_dir = base_directory.replace("{session}", "")
+            else:
+                base_result_dir = base_directory
+        else:
+            # Fallback to old configuration
+            base_result_dir = (
+                settings.get("infrastructure", {})
+                .get("result", {})
+                .get("base_result_dir", "./outputs/results")
+            )
+        
         session_folder = session_manager.get_session_folder()
 
         if session_folder:

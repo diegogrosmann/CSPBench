@@ -116,7 +116,37 @@ class MyAlgorithm(CSPAlgorithm):
 
 ## 3. ⚙️ Configuração e Ambiente
 
-### 3.1 Hierarquia de Configuração
+### 3.1 Ambiente Virtual Python
+
+O projeto utiliza um ambiente virtual Python localizado em `.venv/`:
+
+| Componente | Localização | Descrição |
+|------------|-------------|-----------|
+| **Executável Python** | `.venv/bin/python` | Interpretador Python do ambiente |
+| **Pip** | `.venv/bin/pip` | Gerenciador de pacotes |
+| **Scripts** | `.venv/bin/` | Executáveis e scripts do ambiente |
+
+#### Ativação do Ambiente
+
+```bash
+# Ativar ambiente virtual (Linux/macOS)
+source .venv/bin/activate
+
+# Verificar ambiente ativo
+which python  # Deve retornar .venv/bin/python
+```
+
+#### Execução Direta
+
+```bash
+# Executar sem ativar o ambiente
+.venv/bin/python main.py
+
+# Instalar dependências
+.venv/bin/pip install -r requirements.txt
+```
+
+### 3.2 Hierarquia de Configuração
 
 | Prioridade | Fonte | Localização | Propósito |
 |------------|-------|-------------|-----------|
@@ -124,7 +154,7 @@ class MyAlgorithm(CSPAlgorithm):
 | 2 | Arquivo Batch | `batches/*.yaml` | Configuração específica |
 | 3 (Menor) | Settings Global | `config/settings.yaml` | Configuração base |
 
-### 3.2 Arquivos de Configuração
+### 3.3 Arquivos de Configuração
 
 ```yaml
 # config/settings.yaml - Configuração base do sistema
@@ -142,7 +172,7 @@ execution:
     population_size: 100
 ```
 
-### 3.3 Variáveis de Ambiente
+### 3.4 Variáveis de Ambiente
 
 ```bash
 # .env (não versionado)
@@ -150,7 +180,7 @@ NCBI_EMAIL=user@example.com
 NCBI_API_KEY=your_key_here
 ```
 
-### 3.4 Credenciais e Segurança
+### 3.5 Credenciais e Segurança
 
 - ✅ **Versionamento**: Commit apenas `.env.example`
 - ❌ **Dados Sensíveis**: NUNCA commit credenciais reais
@@ -166,18 +196,52 @@ NCBI_API_KEY=your_key_here
 |---------|-----------|---------|
 | `python main.py` | Menu interativo | - |
 | `python main.py --help` | Ajuda geral | - |
-| `python main.py --algorithms` | Lista algoritmos | - |
+| `python main.py --algorithms` | Lista algoritmos disponíveis | - |
 | `python main.py --datasetsave` | Gera/salva datasets | - |
-| `python main.py <config.yaml>` | Executa batch | `python main.py batches/teste.yaml` |
+| `python main.py <file.yaml>` | Executa batch | `python main.py batches/teste.yaml` |
+
+#### Comandos Específicos
+
+| Comando | Descrição | Exemplo |
+|---------|-----------|---------|
+| `test` | Teste básico do sistema | `python main.py test` |
+| `run <algorithm> <dataset>` | Executa algoritmo em dataset | `python main.py run Baseline test.fasta` |
+| `batch <file.yaml>` | Executa batch | `python main.py batch batches/example.yaml` |
+| `algorithms` | Lista algoritmos | `python main.py algorithms` |
+| `config-info` | Mostra configuração | `python main.py config-info` |
+| `sessions` | Lista sessões | `python main.py sessions` |
+| `cleanup` | Remove sessões antigas | `python main.py cleanup` |
+| `show-session <name>` | Mostra detalhes da sessão | `python main.py show-session session_name` |
+| `view-report <name>` | Abre relatório no browser | `python main.py view-report session_name` |
+
+#### Uso com Ambiente Virtual
+
+```bash
+# Forma recomendada - usando ambiente virtual diretamente
+.venv/bin/python main.py
+.venv/bin/python main.py test
+.venv/bin/python main.py run BLF_GA test_dataset.fasta
+.venv/bin/python main.py batches/example.yaml
+
+# Alternativa - ativando ambiente primeiro
+source .venv/bin/activate
+python main.py
+python main.py test
+deactivate  # Para desativar o ambiente
+```
 
 ### 4.2 Tasks do VS Code
 
 | Task | Propósito | Comando |
 |------|-----------|---------|
-| Run CSP-BLFGA | Executar aplicação | `python main.py` |
+| Run CSPBench | Executar aplicação | `python main.py` |
 | Run Tests | Executar testes | `pytest tests/ -v` |
 | Format Code | Formatar código | `black .` |
-| Lint | Análise estática | `ruff check .` |
+| Lint Code | Análise estática | `ruff check .` |
+| Type Check | Verificação de tipos | `mypy src/` |
+| Run Coverage | Cobertura de testes | `pytest --cov=src --cov-report=html tests/` |
+
+**Nota**: As tasks do VS Code utilizam o ambiente virtual automaticamente quando configurado corretamente.
 
 ### 4.3 Fluxo de Batch
 
@@ -420,6 +484,7 @@ grep -r "[àáâãäçéêëíîïóôõöúûüÀÁÂÃÄÇÉÊËÍÎÏÓÔÕÖ
 - ✅ **Contexto**: Considerar arquitetura existente
 
 ### 11.2 Implementação
+- ✅ **Ambiente Virtual**: Sempre usar `.venv/bin/python` para execução
 - ✅ **Ferramentas Internas**: Priorizar APIs/funções internas vs comandos externos
 - ✅ **Incrementalidade**: Mudanças pequenas e testáveis
 - ✅ **Validação**: Testar após mudanças significativas

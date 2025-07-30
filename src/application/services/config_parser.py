@@ -505,17 +505,33 @@ class ConfigParser:
 
     @staticmethod
     def parse_export(config: Dict[str, Any]) -> ExportConfig:
-        """Parse export section (Section 7)."""
-        export_section = config.get("export", {})
-        
-        return ExportConfig(
-            enabled=export_section.get("enabled", True),
-            destination=export_section.get("destination", "outputs/{session}"),
-            formats=export_section.get("formats"),
-            format_options=export_section.get("format_options"),
-            directory_structure=export_section.get("directory_structure"),
-            include=export_section.get("include")
-        )
+        """Parse export section - supports both new (output) and old (export) formats."""
+        # Try new unified output configuration first
+        output_section = config.get("output", {})
+        if output_section:
+            # Use new unified format
+            results_config = output_section.get("results", {})
+            structure_config = output_section.get("structure", {})
+            
+            return ExportConfig(
+                enabled=results_config.get("enabled", True),
+                destination=output_section.get("base_directory", "outputs/{session}"),
+                formats=results_config.get("formats", {}),
+                format_options=results_config.get("format_options", {}),
+                directory_structure=structure_config,
+                include=list(results_config.get("content", {}).keys()) if results_config.get("content") else []
+            )
+        else:
+            # Fallback to old export format
+            export_section = config.get("export", {})
+            return ExportConfig(
+                enabled=export_section.get("enabled", True),
+                destination=export_section.get("destination", "outputs/{session}"),
+                formats=export_section.get("formats"),
+                format_options=export_section.get("format_options"),
+                directory_structure=export_section.get("directory_structure"),
+                include=export_section.get("include")
+            )
 
     @staticmethod
     def parse_plots(config: Dict[str, Any]) -> PlotsConfig:

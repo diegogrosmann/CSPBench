@@ -26,22 +26,31 @@ class SessionManager:
         self._logger = get_logger(__name__)
         self._session_folder: Optional[str] = None
 
-        # Extrair configurações de logging e resultados
-        logging_config = config.get("infrastructure", {}).get("logging", {})
-        result_config = config.get("infrastructure", {}).get("result", {})
-
-        self._base_log_dir = logging_config.get("base_log_dir", "./outputs/logs")
-        self._base_result_dir = result_config.get(
-            "base_result_dir", "./outputs/results"
-        )
-        self._session_folder_format = logging_config.get(
-            "session_folder_format", "%Y%m%d_%H%M%S"
-        )
-        self._log_filename = logging_config.get("log_filename", "cspbench.log")
-        self._result_filename = result_config.get("result_filename", "results.json")
-        self._create_session_folders = logging_config.get(
-            "create_session_folders", True
-        )
+        # Extract unified output configuration
+        output_config = config.get("output", {})
+        
+        # Use new unified configuration
+        base_directory = output_config.get("base_directory", "outputs/{session}")
+        structure_config = output_config.get("structure", {})
+        logging_config = output_config.get("logging", {})
+        
+        # Parse base directory to extract components
+        if "{session}" in base_directory:
+            self._base_output_dir = base_directory.replace("{session}", "")
+            if self._base_output_dir.endswith("/"):
+                self._base_output_dir = self._base_output_dir[:-1]
+        else:
+            self._base_output_dir = base_directory
+            
+        self._session_folder_format = structure_config.get("session_folder_format", "%Y%m%d_%H%M%S")
+        self._log_filename = logging_config.get("filename", "cspbench.log")
+        
+        # Set unified directories
+        self._base_log_dir = self._base_output_dir
+        self._base_result_dir = self._base_output_dir
+        
+        self._result_filename = "results.json"  # Default result filename
+        self._create_session_folders = True  # Always create session folders
 
     def create_session(self, session_name: Optional[str] = None) -> str:
         """
@@ -94,17 +103,13 @@ class SessionManager:
             return self._base_result_dir
         return os.path.join(self._base_result_dir, self._session_folder)
 
-    def get_log_dir(self) -> str:
-        """Retorna o diretório completo para logs da sessão atual."""
-        if not self._session_folder:
-            return self._base_log_dir
-        return os.path.join(self._base_log_dir, self._session_folder)
+    def get_session_log_path(self) -> str:
+        """Return the complete path for session log directory."""
+        return self.get_log_dir()
 
-    def get_result_dir(self) -> str:
-        """Retorna o diretório completo para resultados da sessão atual."""
-        if not self._session_folder:
-            return self._base_result_dir
-        return os.path.join(self._base_result_dir, self._session_folder)
+    def get_session_result_path(self) -> str:
+        """Return the complete path for session result directory."""
+        return self.get_result_dir()
 
     def get_log_path(self, filename: Optional[str] = None) -> str:
         """

@@ -18,7 +18,4 @@ outputs/*
 
 # Ignore all files in batches, except examples
 batches/*
-!batches/TEMPLATE_PADRONIZADO.yaml
-!batches/otimizacao_padrao.yaml
-!batches/processamento_padrao.yaml
-!batches/sensibilidade_padrao.yaml
+!batches/TEMPLATE.yaml

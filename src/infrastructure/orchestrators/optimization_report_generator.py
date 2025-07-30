@@ -42,16 +42,25 @@ class OptimizationReportGenerator:
         self.config = config
         self.logger = get_logger(__name__)
 
-        # Configuração de exportação
-        self.export_config = config.get("export", {})
-        self.formats = self.export_config.get("formats", {})
-        self.include = self.export_config.get("include", [])
+        # Use new unified output configuration
+        output_config = config.get("output", {})
+        results_config = output_config.get("results", {})
+        plots_config = output_config.get("plots", {})
+        
+        self.export_config = {
+            "enabled": results_config.get("enabled", True),
+            "formats": results_config.get("formats", {}),
+            "include": results_config.get("content", {})
+        }
+        self.formats = results_config.get("formats", {})
+        self.include = list(results_config.get("content", {}).keys())
+        
+        # Plot configuration
+        self.plot_config = plots_config
+        plot_formats = plots_config.get("formats", ["png"])
+        self.plot_format = plot_formats[0] if plot_formats else "png"
 
-        # Configuração de gráficos
-        self.plot_config = config.get("plots", {})
-        self.plot_format = self.plot_config.get("formats", ["png"])[0] if self.plot_config.get("formats") else "png"
-
-        # Criar diretórios
+        # Create directories
         self.plots_dir = self.destination / "plots"
         self.reports_dir = self.destination / "reports"
         self.data_dir = self.destination / "data"

@@ -31,9 +31,14 @@ class HistoryPlotter:
         """
         self.config = config
         self.output_dir = output_dir
-        self.history_config = config.get("infrastructure", {}).get("history", {})
-        self.plot_config = config.get("plots", {})
-        self.plot_format = self.plot_config.get("formats", ["png"])[0] if self.plot_config.get("formats") else "png"
+        
+        # Use new unified output configuration
+        output_config = config.get("output", {})
+        self.history_config = output_config.get("history", {})
+        plots_config = output_config.get("plots", {})
+        plot_formats = plots_config.get("formats", ["png"])
+        
+        self.plot_format = plot_formats[0] if plot_formats else "png"
 
         # Configure matplotlib
         plt.style.use("seaborn-v0_8")

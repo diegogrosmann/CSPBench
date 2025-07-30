@@ -41,17 +41,19 @@ class ExecutionReportGenerator:
         """
         self.config = config
         self.session_path = session_path
-        self.report_config = (
-            config.get("infrastructure", {}).get("result", {}).get("report", {})
-        )
-        self.export_config = (
-            config.get("infrastructure", {}).get("result", {}).get("export", {})
-        )
-        self.logger = get_logger(__name__)
-
-        # Get plot format from config
-        plots_config = config.get("plots", {})
+        
+        # Use new unified output configuration
+        output_config = config.get("output", {})
+        results_config = output_config.get("results", {})
+        plots_config = output_config.get("plots", {})
+        
+        self.report_config = results_config.get("content", {})
+        self.export_config = results_config.get("formats", {})
+        
+        # Get plot format from new config
         plot_formats = plots_config.get("formats", ["png"])
+        
+        self.logger = get_logger(__name__)
         self.plot_format = plot_formats[0] if plot_formats else "png"
 
         # Initialize history plot generator
