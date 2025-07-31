@@ -26,7 +26,10 @@ Main Usage (according to guidelines):
     python main.py --datasetsave
 
     # Execute batch directly (.yaml/.yml file)
-    python main.py batches/example.yaml
+    python main.p    view-report <n>               Open report in browser
+    web                              Start web interface (with options)
+
+Examples:atches/example.yaml
     python main.py configuration.yml
     ```
 
@@ -489,6 +492,45 @@ def show_datasetsave_and_exit():
         print(f"❌ Error: {e}")
 
 
+def start_web_interface():
+    """Start the web interface with default settings and exit."""
+    try:
+        print("🌐 Starting CSPBench Web Interface...")
+        print("🖥️  Host: 0.0.0.0")
+        print("🔌 Port: 8000")
+        print("🛠️  Mode: Production")
+        
+        # Check if web dependencies are available
+        try:
+            import uvicorn
+            from src.presentation.web.app import app as web_app
+        except ImportError as e:
+            print(f"❌ Web dependencies not installed: {e}")
+            print("💡 Install with: pip install -r requirements.web.txt")
+            sys.exit(1)
+        
+        print(f"\n🚀 Web interface starting at http://localhost:8000")
+        print("🔗 Click the link above or paste it into your browser")
+        print("⏹️  Press Ctrl+C to stop the server")
+        
+        # Start uvicorn server with default settings
+        uvicorn.run(
+            "src.presentation.web.app:app",
+            host="0.0.0.0",
+            port=8000,
+            reload=False,
+            log_level="info",
+            access_log=False
+        )
+        
+    except KeyboardInterrupt:
+        print("\n🛑 Web server stopped")
+        sys.exit(0)
+    except Exception as e:
+        print(f"❌ Error starting web server: {e}")
+        sys.exit(1)
+
+
 def _display_manual_commands() -> None:
     """Display list of available manual commands."""
     print("📋 Available manual commands:")
@@ -718,6 +760,9 @@ if __name__ == "__main__":
                 show_algorithms_and_exit()
             elif arg == "--datasetsave":
                 show_datasetsave_and_exit()
+            elif arg == "--web":
+                # Start web interface directly
+                start_web_interface()
             elif arg == "--help":
                 print(
                     """
@@ -728,6 +773,7 @@ Usage:
     python main.py --help            This help
     python main.py --algorithms      List available algorithms
     python main.py --datasetsave     Generate/save datasets
+    python main.py --web             Start web interface
     python main.py <file.yaml>       Execute batch
     python main.py <command>         Execute specific command
 
@@ -747,6 +793,8 @@ Examples:
     python main.py run Baseline test.fasta
     python main.py batch batches/example.yaml
     python main.py batches/example.yaml
+    python main.py --web
+    python main.py web --dev --port 8080
 """
                 )
                 sys.exit(0)

@@ -168,6 +168,17 @@ algorithms/           # Algorithm implementations
 ├── csc/
 ├── h3_csp/
 └── dp_csp/
+
+deploy/               # Deployment configurations
+├── docker-compose.yml
+├── cloudbuild.yaml
+├── deploy-cloud.sh
+└── k8s/
+
+docs/                 # Documentation
+config/               # Configuration files
+datasets/             # Sample datasets
+batches/              # Batch configurations
 ```
 
 ## 🧪 Testing
@@ -197,15 +208,22 @@ CSPBench includes production-ready Docker configuration:
 
 ### Commands
 ```bash
-# Development
-docker-compose -f docker-compose.dev.yml up
+# Build and run locally
+make docker
+make docker-run
 
-# Production
-docker-compose up
+# Development with hot reload
+make run-web
 
-# Interactive execution
-make docker-run-interactive
+# Production deployment
+make deploy
+
+# Docker Compose
+make compose-up
+make compose-down
 ```
+
+For detailed deployment instructions, see [`deploy/README.md`](deploy/README.md).
 
 ## 🤝 Contributing
 

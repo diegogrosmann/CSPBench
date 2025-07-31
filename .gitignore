@@ -7,12 +7,7 @@ __pycache__
 
 # Ignore all files in datasets, except examples
 datasets/*
-!datasets/teste.fasta
-!datasets/entrez_nucleotide_COIGene AND 600650SLEN_n20.fasta
-!datasets/synthetic_n10_L20_noise0.1_ACTG.fasta
-!datasets/synthetic_n20_L50_noise0.1_01.fasta
-!datasets/synthetic_n20_L50_noise0.1_ACTG.fasta
-!datasets/synthetic_n30_L100_noise0.1_ACTG.fasta
+!datasets/example.fasta
 
 outputs/*
 

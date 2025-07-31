@@ -343,6 +343,50 @@ def register_commands(app: typer.Typer, experiment_service_getter) -> None:
             typer.echo(f"❌ Error showing session: {e}")
 
     @app.command()
+    def web(
+        host: str = typer.Option("0.0.0.0", "--host", "-h", help="Host to bind to"),
+        port: int = typer.Option(8000, "--port", "-p", help="Port to bind to"),
+        dev: bool = typer.Option(False, "--dev", help="Run in development mode"),
+    ) -> None:
+        """
+        Start the web interface for CSPBench.
+        """
+        try:
+            typer.echo("🌐 Starting CSPBench Web Interface...")
+            typer.echo(f"🖥️  Host: {host}")
+            typer.echo(f"🔌 Port: {port}")
+            typer.echo(f"🛠️  Mode: {'Development' if dev else 'Production'}")
+            
+            # Check if web dependencies are available
+            try:
+                import uvicorn
+                from src.presentation.web.app import app as web_app
+            except ImportError as e:
+                typer.echo(f"❌ Web dependencies not installed: {e}")
+                typer.echo("💡 Install with: pip install -r requirements.web.txt")
+                raise typer.Exit(1)
+            
+            typer.echo(f"\n🚀 Web interface starting at http://{host}:{port}")
+            typer.echo("🔗 Click the link above or paste it into your browser")
+            typer.echo("⏹️  Press Ctrl+C to stop the server")
+            
+            # Start uvicorn server
+            uvicorn.run(
+                "src.presentation.web.app:app",
+                host=host,
+                port=port,
+                reload=dev,
+                log_level="info" if dev else "warning",
+                access_log=dev
+            )
+            
+        except KeyboardInterrupt:
+            typer.echo("\n🛑 Web server stopped")
+        except Exception as e:
+            typer.echo(f"❌ Error starting web server: {e}")
+            raise typer.Exit(1)
+
+    @app.command()
     def view_report(
         session_name: str = typer.Argument(
             ..., help="Session name (format: YYYYMMDD_HHMMSS)"

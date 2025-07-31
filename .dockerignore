@@ -58,14 +58,13 @@ logs/
 
 # Datasets (keep only examples)
 datasets/*
-!datasets/teste.fasta
-!datasets/entrez_nucleotide_COIGene*
-!datasets/synthetic_*
+!datasets/example.fasta
+!datasets/web_example.fasta
+!datasets/*test*
 
-# Custom batches (keep only standard ones)
+# Custom batches (keep template files)
 batches/*
-!batches/TEMPLATE_PADRONIZADO.yaml
-!batches/*_padrao.yaml
+!batches/TEMPLATE.yaml
 
 # Generated documentation
 docs/_build/

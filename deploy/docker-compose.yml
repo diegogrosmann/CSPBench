@@ -1,7 +1,7 @@
 services:
   cspbench-web:
     build:
-      context: .
+      context: ..
       dockerfile: Dockerfile
     ports:
       - "8000:8000"
@@ -16,13 +16,17 @@ services:
       - /tmp:/app/tmp
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.cspbench.rule=Host(`cspbench.local`)"
+      - "traefik.http.services.cspbench.loadbalancer.server.port=8000"
 
-  # Optional: Redis for caching and async tasks
+  # Optional: Redis for caching and async tasks (future enhancement)
   redis:
     image: redis:7-alpine
     restart: unless-stopped
