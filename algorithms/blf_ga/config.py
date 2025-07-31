@@ -1,52 +1,73 @@
 """
-Configurações padrão para o algoritmo BLF-GA.
+Default configurations for BLF-GA algorithm.
 
-Atributos:
-    BLF_GA_DEFAULTS (dict): Parâmetros padrão do BLF-GA.
+BLF-GA (Blockwise Learning Fusion + Genetic Algorithm) is a hybrid metaheuristic
+that combines local block learning with global genetic algorithm.
+
+MAIN PARAMETERS:
+- Population: Controls search size and quality
+- Blocks: Defines local learning granularity
+- Operators: Configures genetic evolution
+- Adaptation: Dynamic adjustment mechanisms
+- Criteria: Controls when to stop/restart
+
+USAGE RECOMMENDATIONS:
+- Small instances (n<10): pop_size=50-100, max_gens=50-100
+- Medium instances (n=10-50): pop_size=100-200, max_gens=100-200
+- Large instances (n>50): pop_size=200-500, max_gens=200-500
+
+Attributes:
+    BLF_GA_DEFAULTS (dict): Default BLF-GA parameters.
 """
 
 # BLF-GA Configuration
 BLF_GA_DEFAULTS = {
-    # --- Parâmetros de População ---
-    'pop_size': 1.5,           # Tamanho da população (int fixo ou float >=1 para multiplicador de n)
-    'seed': None,              # Semente para reprodutibilidade
-
-    # --- Parâmetros de Blocos ---
-    'initial_blocks': 0.2,     # Número de blocos iniciais (int fixo ou float 0-1 para proporção de L)
-    'min_block_len': 1,        # Tamanho mínimo do bloco
-    'rediv_freq': 10,          # Frequência de redivisão (a cada X gerações)
-
-    # --- Operadores Genéticos ---
-    'cross_prob': 0.9,         # Probabilidade de crossover (0.6 a 0.95)
-    'crossover_type': 'one_point', # Tipo de crossover: one_point, uniform, blend_blocks
-    'mut_prob': 0.1,           # Probabilidade de mutação (0.01 a 0.2)
-    'mutation_type': 'multi',  # Tipo de mutação: multi, inversion, transposition
-    'mutation_multi_n': 2,     # Número de posições para mutação multi
-    'elite_rate': 0.05,        # Taxa de elite (0.01 a 0.1)
-    'tournament_k': 2,         # Parâmetro externo do torneio
-
-    # --- Diversidade e Imigrantes ---
-    'immigrant_freq': 10,      # Gera imigrantes a cada X gerações
-    'immigrant_ratio': 0.2,    # Proporção de imigrantes
-    'diversity_threshold': 0.4,# Limite para diversidade
-    'mutation_adapt_N': 10,    # N gerações para detectar convergência
-    'mutation_adapt_factor': 2.0, # Fator de aumento temporário da mutação
-    'mutation_adapt_duration': 5, # Duração do aumento da mutação
-
-    # --- Niching (Nichos) ---
-    'niching': False,          # Ativa niching
-    'niching_radius': 3,       # Raio de nicho
-
-    # --- Refinamento Local ---
-    'refinement_type': 'greedy',   # greedy, swap, insertion, 2opt
-    'refine_elites': 'best',       # all, best
-    'refine_iter_limit': 100,      # Limite de iterações por refinamento
-
-    # --- Critérios de Parada e Reinício ---
-    'max_gens': 400,            # Número máximo de gerações (30 a 100+)
-    'max_time': 1200.0,         # Tempo máximo em segundos
-    'no_improve_patience': 0.2, # Gerações sem melhoria para encerrar (int fixo ou float 0-1 para proporção de max_gens)
-    'restart_patience': 20,     # Gerações sem melhoria para restart
-    'restart_ratio': 0.3,       # Proporção da população a reiniciar
-    'disable_elitism_gens': 5,  # Gerações sem elitismo
+    # --- POPULATION PARAMETERS ---
+    "pop_size": 1.5,  # Population size (fixed int or float >=1 for n multiplier)
+    # Examples: 100 (fixed), 1.5 (1.5*n), 2.0 (2*n)
+    "min_pop_size": 20,  # Minimum population size when using n proportion
+    # Prevents very small populations in smaller instances
+    "seed": None,  # Seed for reproducibility (None = random)
+    # --- BLOCK PARAMETERS (LEARNING) ---
+    "initial_blocks": 0.2,  # Number of initial blocks (fixed int or float 0-1 for L proportion)
+    # Examples: 5 (fixed), 0.2 (20% of length)
+    "min_block_len": 1,  # Minimum block size (prevents very small blocks)
+    "rediv_freq": 10,  # Redivision frequency (every X generations)
+    # Allows dynamic adaptation of block structure
+    # --- GENETIC OPERATORS ---
+    "cross_prob": 0.9,  # Crossover probability (0.6 to 0.95)
+    # Higher value = more recombination
+    "crossover_type": "one_point",  # Crossover type: one_point, uniform, blend_blocks
+    "mut_prob": 0.1,  # Mutation probability (0.01 to 0.2)
+    # Balances exploration vs exploitation
+    "mutation_type": "multi",  # Mutation type: multi, inversion, transposition
+    "mutation_multi_n": 2,  # Number of positions for multi mutation
+    "elite_rate": 0.05,  # Elite rate (0.01 to 0.1) - % of best preserved
+    "tournament_k": 2,  # Tournament size for selection
+    # --- DIVERSITY AND IMMIGRANTS ---
+    "immigrant_freq": 10,  # Generate immigrants every X generations
+    # Injects diversity by replacing worst with random
+    "immigrant_ratio": 0.2,  # Immigrant proportion (% of population)
+    "diversity_threshold": 0.4,  # Diversity threshold (0-1)
+    # Below this value, activates adaptive mutation
+    # --- ADAPTIVE MUTATION ---
+    "mutation_adapt_N": 10,  # N generations to detect convergence
+    "mutation_adapt_factor": 2.0,  # Temporary mutation increase factor
+    "mutation_adapt_duration": 5,  # Duration of mutation increase (generations)
+    # --- NICHING ---
+    "niching": False,  # Activate niching (preserves local diversity)
+    "niching_radius": 3,  # Niche radius (minimum distance between solutions)
+    # --- LOCAL REFINEMENT ---
+    "refinement_type": "greedy",  # Type: greedy, swap, insertion, 2opt
+    "refine_elites": "best",  # Who to refine: all (all elites), best (only best)
+    "refine_iter_limit": 100,  # Iteration limit per refinement
+    # --- STOPPING AND RESTART CRITERIA ---
+    "max_gens": 100,  # Maximum number of generations (30 to 100+)
+    "max_time": 1200.0,  # Maximum time in seconds (20 minutes)
+    "no_improve_patience": 0.2,  # Generations without improvement for early stopping
+    # (fixed int or float 0-1 for proportion of max_gens)
+    "restart_patience": 20,  # Generations without improvement for partial restart
+    "restart_ratio": 0.3,  # Proportion of population to restart
+    "disable_elitism_gens": 5,  # Disable elitism every X generations
+    # Prevents premature convergence
 }

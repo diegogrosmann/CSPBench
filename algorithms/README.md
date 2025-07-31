@@ -1,6 +1,6 @@
-# Guia para Adição de Novos Algoritmos ao CSP
+# Guia para Adição de Novos Algoritmos ao CSPBench
 
-A plataforma CSP possui uma interface padronizada e documentação detalhada (Google style docstrings) em todos os arquivos, facilitando a integração de novos algoritmos sem modificar o código principal (`main.py`). O registro é automático via decorador.
+O framework CSPBench possui uma interface padronizada e documentação detalhada (Google style docstrings) em todos os arquivos, facilitando a integração de novos algoritmos sem modificar o código principal (`main.py`). O registro é automático via decorador.
 
 ## Estrutura Recomendada
 
@@ -55,15 +55,15 @@ algorithms/
 
 4. **Criar o wrapper (`algorithm.py`)**
     ```python
-    from algorithms.base import Algorithm, register_algorithm
+    from cspbench.domain.algorithms import CSPAlgorithm, register_algorithm
     from .config import MEU_ALGORITMO_DEFAULTS
     from .implementation import meu_algoritmo_funcao
     from utils.distance import max_hamming
 
     @register_algorithm
-    class MeuAlgoritmo(Algorithm):
+    class MeuAlgoritmo(CSPAlgorithm):
         """
-        Wrapper para integração do MeuAlgoritmo ao framework CSP.
+        Wrapper para integração do MeuAlgoritmo ao framework CSPBench.
         """
         name = "Meu Algoritmo"
         default_params = MEU_ALGORITMO_DEFAULTS

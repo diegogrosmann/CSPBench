@@ -1,0 +1,63 @@
+# ===================================================================
+# CSPBENCH MAIN CONFIGURATION
+# ===================================================================
+
+# Application settings
+application:
+  name: "CSPBench"
+  version: "0.1.0"
+  description: "Framework for Closest String Problem"
+
+# Infrastructure settings
+infrastructure:
+  # Dataset repository
+  dataset_repository:
+    type: "FileDatasetRepository"
+    config:
+      base_path: "./datasets"
+      supported_formats: ["fasta", "txt"]
+  
+  # Algorithm registry
+  algorithm_registry:
+    type: "DomainAlgorithmRegistry"
+    config:
+      auto_register: true
+  
+  # Algorithm executor
+  executor:
+    type: "Executor"
+    config:
+      timeout_default: 300
+  
+  # Logging system
+  logging:
+    base_log_dir: "./outputs/logs"
+    session_folder_format: "%Y%m%d_%H%M%S"
+    default_log_level: "INFO"
+    log_filename: "cspbench.log"
+    create_session_folders: true
+    
+  # Results system
+  result:
+    base_result_dir: "./outputs/results"
+    save_partial_results: false       # Save partial results during execution
+    session_folder_format: "%Y%m%d_%H%M%S"  # Same format as logs
+    create_session_folders: true      # Create folders per session
+    
+    # Report settings
+    report:
+      save_plots: true
+      plot_format: "png"
+      calculate_statistics: true
+      include_summary: true
+      save_detailed_results: true
+      
+    # Export settings
+    export:
+      export_csv: true
+      export_json: true
+
+  # History system
+  history:
+    save_history: false               # Save detailed history
+    history_frequency: 1              # Save frequency (every N iterations)

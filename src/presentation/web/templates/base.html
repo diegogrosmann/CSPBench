@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}CSPBench Web Interface{% endblock %}</title>
+    
+    <!-- CSS Base -->
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/components/algorithm-selector.css">
+    <link rel="stylesheet" href="/static/css/components/dataset-selector.css">
+    <link rel="stylesheet" href="/static/css/components/algorithm-config.css">
+    <link rel="stylesheet" href="/static/css/components/execution-monitor.css">
+    <link rel="stylesheet" href="/static/css/components/dataset-generator.css">
+    
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🧬 CSPBench Web Interface</h1>
+            <p>Closest String Problem Benchmarking Tool</p>
+            {% block header_extra %}{% endblock %}
+        </header>
+        
+        <nav class="breadcrumb">
+            <a href="/">🏠 Home</a>
+            {% block breadcrumb %}{% endblock %}
+        </nav>
+        
+        <main>
+            {% block content %}{% endblock %}
+        </main>
+        
+        <footer>
+            <p>CSPBench v0.1.0 | Hexagonal Architecture | Plugin System</p>
+        </footer>
+    </div>
+    
+    <!-- JavaScript Base -->
+    <script src="/static/js/components/api-client.js"></script>
+    <script src="/static/js/components/algorithm-selector.js"></script>
+    <script src="/static/js/components/dataset-selector.js"></script>
+    <script src="/static/js/components/algorithm-config.js"></script>
+    <script src="/static/js/components/execution-monitor.js"></script>
+    <script src="/static/js/components/dataset-generator.js"></script>
+    
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

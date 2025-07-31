@@ -1,0 +1,24 @@
+apiVersion: skaffold/v4beta6
+kind: Config
+metadata:
+  name: cspbench-web
+build:
+  artifacts:
+  - image: cspbench-web
+    docker:
+      dockerfile: Dockerfile
+      buildArgs:
+        BUILDKIT_INLINE_CACHE: "1"
+  tagPolicy:
+    sha256: {}
+  local:
+    push: true
+deploy:
+  cloudrun:
+    projectid: "{{.GOOGLE_CLOUD_PROJECT}}"
+    region: "{{.GOOGLE_CLOUD_REGION}}"
+portForward:
+- resourceType: service
+  resourceName: cspbench-web
+  port: 8000
+  localPort: 8080

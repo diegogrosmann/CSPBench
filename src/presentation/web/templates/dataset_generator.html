@@ -1,0 +1,242 @@
+{% extends "base.html" %}
+
+{% block title %}CSPBench - Dataset Generator{% endblock %}
+
+{% block content %}
+<div class="dataset-generator-container">
+    <h2>🧬 Dataset Generator</h2>
+    <p>Create synthetic datasets or download real datasets from NCBI for CSP algorithm testing.</p>
+    
+    <!-- Dataset Type Selection -->
+    <div class="dataset-type-selector">
+        <h3>Select Dataset Type</h3>
+        <div class="type-buttons">
+            <button id="synthetic-tab" class="type-button active" onclick="switchDatasetType('synthetic')">
+                🧪 Synthetic Dataset
+            </button>
+            <button id="ncbi-tab" class="type-button" onclick="switchDatasetType('ncbi')">
+                🌐 NCBI Dataset
+            </button>
+        </div>
+    </div>
+
+    <!-- Synthetic Dataset Generator -->
+    <div id="synthetic-generator" class="generator-section active">
+        <h3>🧪 Synthetic Dataset Configuration</h3>
+        <form id="synthetic-form" class="generator-form">
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="synthetic-sequences">Number of Sequences</label>
+                    <input type="number" id="synthetic-sequences" name="sequences" 
+                           min="3" max="1000" value="20" required>
+                    <small>Number of sequences to generate (3-1000)</small>
+                </div>
+                
+                <div class="form-group">
+                    <label for="synthetic-length">Sequence Length</label>
+                    <input type="number" id="synthetic-length" name="length" 
+                           min="5" max="10000" value="50" required>
+                    <small>Length of each sequence (5-10000)</small>
+                </div>
+                
+                <div class="form-group">
+                    <label for="synthetic-alphabet">Alphabet</label>
+                    <select id="synthetic-alphabet" name="alphabet" required>
+                        <option value="ACGT">DNA (ACGT)</option>
+                        <option value="ACGU">RNA (ACGU)</option>
+                        <option value="ACDEFGHIKLMNPQRSTVWY">Protein (20 amino acids)</option>
+                        <option value="01">Binary (01)</option>
+                        <option value="custom">Custom...</option>
+                    </select>
+                    <input type="text" id="custom-alphabet" name="custom_alphabet" 
+                           placeholder="Enter custom alphabet" style="display: none;">
+                    <small>Character set for sequence generation</small>
+                </div>
+                
+                <div class="form-group">
+                    <label for="synthetic-method">Generation Method</label>
+                    <select id="synthetic-method" name="method" required>
+                        <option value="random">Random Generation</option>
+                        <option value="noise">Center-based with Noise</option>
+                        <option value="clustered">Clustered Sequences</option>
+                        <option value="mutations">Mutation-based</option>
+                    </select>
+                    <small>Method for generating sequences</small>
+                </div>
+            </div>
+            
+            <!-- Method-specific parameters -->
+            <div id="method-params" class="method-parameters">
+                <!-- Parameters will be dynamically loaded here -->
+            </div>
+            
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="synthetic-seed">Seed (Optional)</label>
+                    <input type="number" id="synthetic-seed" name="seed" 
+                           placeholder="Enter seed for reproducibility">
+                    <small>Leave empty for random generation</small>
+                </div>
+                
+                <div class="form-group">
+                    <label for="synthetic-filename">Output Filename</label>
+                    <input type="text" id="synthetic-filename" name="filename" 
+                           placeholder="auto-generated" pattern="[a-zA-Z0-9._-]+\.fasta$">
+                    <small>Filename ending in .fasta (auto-generated if empty)</small>
+                </div>
+            </div>
+            
+            <button type="submit" class="generate-button">
+                🧪 Generate Synthetic Dataset
+            </button>
+        </form>
+    </div>
+
+    <!-- NCBI Dataset Downloader -->
+    <div id="ncbi-generator" class="generator-section">
+        <h3>🌐 NCBI Dataset Download</h3>
+        <form id="ncbi-form" class="generator-form">
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="ncbi-query">Search Query</label>
+                    <input type="text" id="ncbi-query" name="query" 
+                           value="COI[Gene]" required>
+                    <small>NCBI search query (e.g., "COI[Gene]", "ribosomal RNA")</small>
+                </div>
+                
+                <div class="form-group">
+                    <label for="ncbi-database">Database</label>
+                    <select id="ncbi-database" name="database" required>
+                        <option value="nucleotide">Nucleotide</option>
+                        <option value="protein">Protein</option>
+                        <option value="genome">Genome</option>
+                        <option value="sra">SRA</option>
+                    </select>
+                    <small>NCBI database to search</small>
+                </div>
+                
+                <div class="form-group">
+                    <label for="ncbi-max-sequences">Max Sequences</label>
+                    <input type="number" id="ncbi-max-sequences" name="max_sequences" 
+                           min="1" max="1000" value="50" required>
+                    <small>Maximum sequences to download (1-1000)</small>
+                </div>
+                
+                <div class="form-group">
+                    <label for="ncbi-min-length">Min Length</label>
+                    <input type="number" id="ncbi-min-length" name="min_length" 
+                           min="1" max="50000" value="100" required>
+                    <small>Minimum sequence length</small>
+                </div>
+                
+                <div class="form-group">
+                    <label for="ncbi-max-length">Max Length</label>
+                    <input type="number" id="ncbi-max-length" name="max_length" 
+                           min="1" max="50000" value="2000" required>
+                    <small>Maximum sequence length</small>
+                </div>
+                
+                <div class="form-group">
+                    <label for="ncbi-filename">Output Filename</label>
+                    <input type="text" id="ncbi-filename" name="filename" 
+                           placeholder="auto-generated" pattern="[a-zA-Z0-9._-]+\.fasta$">
+                    <small>Filename ending in .fasta (auto-generated if empty)</small>
+                </div>
+            </div>
+            
+            <button type="submit" class="generate-button">
+                🌐 Download NCBI Dataset
+            </button>
+        </form>
+    </div>
+    
+    <!-- Generation Status -->
+    <div id="generation-status" class="status-section" style="display: none;">
+        <h3>📊 Generation Status</h3>
+        <div class="status-content">
+            <div class="progress-bar">
+                <div id="progress-fill" class="progress-fill"></div>
+            </div>
+            <div id="status-message" class="status-message">Initializing...</div>
+            <div id="status-details" class="status-details"></div>
+        </div>
+        <button id="cancel-generation" class="cancel-button" style="display: none;">
+            ❌ Cancel Generation
+        </button>
+    </div>
+    
+    <!-- Results Section -->
+    <div id="results-section" class="results-section" style="display: none;">
+        <h3>✅ Dataset Generated Successfully</h3>
+        <div class="results-content">
+            <div class="dataset-info">
+                <h4>Dataset Information</h4>
+                <div id="dataset-details" class="dataset-details">
+                    <!-- Dataset details will be populated here -->
+                </div>
+            </div>
+            
+            <div class="dataset-preview">
+                <h4>Preview (First 5 sequences)</h4>
+                <div id="sequence-preview" class="sequence-preview">
+                    <!-- Sequence preview will be populated here -->
+                </div>
+            </div>
+            
+            <div class="results-actions">
+                <button id="download-dataset" class="download-button">
+                    💾 Download Dataset
+                </button>
+                <button id="use-in-execution" class="use-button">
+                    🚀 Use in Algorithm Execution
+                </button>
+                <button id="generate-another" class="secondary-button">
+                    🔄 Generate Another Dataset
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Saved Datasets Manager -->
+    <div class="saved-datasets-section">
+        <h3>📁 Saved Datasets</h3>
+        <div id="saved-datasets-list" class="datasets-list">
+            <div class="loading-message">Loading saved datasets...</div>
+        </div>
+        <button id="refresh-datasets" class="refresh-button">
+            🔄 Refresh List
+        </button>
+    </div>
+</div>
+
+<script>
+// Initialize dataset generator components
+document.addEventListener('DOMContentLoaded', function() {
+    if (typeof DatasetGenerator !== 'undefined') {
+        new DatasetGenerator();
+    } else {
+        console.warn('DatasetGenerator class not loaded');
+    }
+});
+
+// Basic tab switching (fallback if DatasetGenerator not loaded)
+function switchDatasetType(type) {
+    const syntheticTab = document.getElementById('synthetic-tab');
+    const ncbiTab = document.getElementById('ncbi-tab');
+    const syntheticGenerator = document.getElementById('synthetic-generator');
+    const ncbiGenerator = document.getElementById('ncbi-generator');
+    
+    if (type === 'synthetic') {
+        syntheticTab.classList.add('active');
+        ncbiTab.classList.remove('active');
+        syntheticGenerator.classList.add('active');
+        ncbiGenerator.classList.remove('active');
+    } else {
+        syntheticTab.classList.remove('active');
+        ncbiTab.classList.add('active');
+        syntheticGenerator.classList.remove('active');
+        ncbiGenerator.classList.add('active');
+    }
+}
+</script>
+{% endblock %}

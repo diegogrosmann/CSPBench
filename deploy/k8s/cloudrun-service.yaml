@@ -1,0 +1,61 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: cspbench-web
+  annotations:
+    # Cloud Run specific annotations
+    run.googleapis.com/ingress: all
+    run.googleapis.com/execution-environment: gen2
+    run.googleapis.com/cpu-throttling: "false"
+spec:
+  template:
+    metadata:
+      annotations:
+        # Resource limits
+        run.googleapis.com/memory: "2Gi"
+        run.googleapis.com/cpu: "1000m"
+        run.googleapis.com/max-scale: "10"
+        run.googleapis.com/min-scale: "0"
+        # Session affinity and timeout
+        run.googleapis.com/timeout: "900s"
+    spec:
+      containerConcurrency: 80
+      timeoutSeconds: 900
+      containers:
+      - image: cspbench-web
+        ports:
+        - containerPort: 8000
+        env:
+        - name: PORT
+          value: "8000"
+        - name: HOST
+          value: "0.0.0.0"
+        - name: WORKERS
+          value: "1"
+        - name: PYTHONUNBUFFERED
+          value: "1"
+        # Resource requests and limits
+        resources:
+          requests:
+            cpu: "500m"
+            memory: "1Gi"
+          limits:
+            cpu: "1000m"
+            memory: "2Gi"
+        # Startup and liveness probes
+        startupProbe:
+          httpGet:
+            path: /api/health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        livenessProbe:
+          httpGet:
+            path: /api/health
+            port: 8000
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 5
+          failureThreshold: 3

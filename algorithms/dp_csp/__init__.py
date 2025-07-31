@@ -1,6 +1,7 @@
 """
-Pacote DP-CSP do CSP.
+CSP DP-CSP package.
 
-Expõe a classe DPCSPAlgorithm para registro automático.
+Exposes the DPCSPAlgorithm class for automatic registration.
 """
+
 from .algorithm import DPCSPAlgorithm

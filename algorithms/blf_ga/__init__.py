@@ -1,6 +1,7 @@
 """
-Pacote BLF-GA do CSP.
+CSP BLF-GA package.
 
-Expõe a classe BLFGAAlgorithm para registro automático.
+Exposes the BLFGAAlgorithm class for automatic registration.
 """
+
 from .algorithm import BLFGAAlgorithm

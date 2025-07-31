@@ -1,6 +1,7 @@
 """
-Pacote H³-CSP do CSP.
+CSP H³-CSP package.
 
-Expõe a classe H3CSPAlgorithm para registro automático.
+Exposes the H3CSPAlgorithm class for automatic registration.
 """
+
 from .algorithm import H3CSPAlgorithm

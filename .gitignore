@@ -1,8 +1,15 @@
 __pycache__
 .venv
-.vscode
-logs
-results
-saved_datasets
-batch_configs
 .pytest_cache
+.ruff_cache
+.env
+
+# Ignore all files in datasets, except examples
+datasets/*
+!datasets/example.fasta
+
+outputs/*
+
+# Ignore all files in batches, except examples
+batches/*
+!batches/TEMPLATE.yaml

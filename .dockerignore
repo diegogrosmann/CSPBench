@@ -1,0 +1,85 @@
+# .dockerignore - CSPBench v0.1.0
+# Python files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# IDEs and editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Git
+.git
+.gitignore
+
+# Cache and temporary files
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+.tox/
+.cache
+
+# Logs and outputs
+*.log
+outputs/
+logs/
+
+# Datasets (keep only examples)
+datasets/*
+!datasets/example.fasta
+!datasets/web_example.fasta
+!datasets/*test*
+
+# Custom batches (keep template files)
+batches/*
+!batches/TEMPLATE.yaml
+
+# Generated documentation
+docs/_build/
+site/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+Dockerfile*
+docker-compose*
+.dockerignore
+
+# Development files
+Makefile
+README.md
+CITATION.cff
