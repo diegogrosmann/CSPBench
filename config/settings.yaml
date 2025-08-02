@@ -1,63 +1,172 @@
 # ===================================================================
-# CSPBENCH MAIN CONFIGURATION
+# STANDARDIZED SETTINGS CSPBench - v0.8
 # ===================================================================
-
-# Application settings
-application:
-  name: "CSPBench"
-  version: "0.1.0"
-  description: "Framework for Closest String Problem"
-
-# Infrastructure settings
-infrastructure:
-  # Dataset repository
-  dataset_repository:
-    type: "FileDatasetRepository"
-    config:
-      base_path: "./datasets"
-      supported_formats: ["fasta", "txt"]
+# EXECUTION CONFIGURATION - "Como executa por padrão"
+# This file stores execution configurations for CSPBench.
+# Infrastructure settings (paths, directories, cleanup) are in .env
+# 
+# CONFIGURATION HIERARCHY:
+# 1. Infrastructure (.env) - paths, directories, infrastructure settings
+# 2. Default execution (this file) - execution behavior defaults
+# 3. Template/Batch configurations - override execution defaults
+# 4. Runtime parameters - override all previous configurations
+#
+# This file only contains SECTIONS 7-10 with execution defaults
+# Infrastructure settings are now in .env file
+#
+# =====================================================================
+# SECTION 7: OUTPUT SETTINGS (REQUIRED) - DEFAULT VALUES
+# =====================================================================
+# Output behavior configuration (what to export and how)
+# Infrastructure paths and directories are configured in .env
+output:
+  # === GENERAL SETTINGS ===
+  enabled: true                       # bool: Enable all outputs (logs, results, plots)
+                                      # true = save everything, false = execute only
   
-  # Algorithm registry
-  algorithm_registry:
-    type: "DomainAlgorithmRegistry"
-    config:
-      auto_register: true
-  
-  # Algorithm executor
-  executor:
-    type: "Executor"
-    config:
-      timeout_default: 300
-  
-  # Logging system
+  # === LOGGING CONFIGURATION ===
+  # Note: LOG_LEVEL is configured in .env
   logging:
-    base_log_dir: "./outputs/logs"
-    session_folder_format: "%Y%m%d_%H%M%S"
-    default_log_level: "INFO"
-    log_filename: "cspbench.log"
-    create_session_folders: true
+    enabled: true                     # bool: Enable logging
+    console_output: true              # bool: Display logs in console
+    file_output: true                 # bool: Save logs to file
+    filename: "cspbench.log"          # string: Main log filename
+    subdirectory: "logs_settings"     # string: Logs subdirectory within base_directory
     
-  # Results system
-  result:
-    base_result_dir: "./outputs/results"
-    save_partial_results: false       # Save partial results during execution
-    session_folder_format: "%Y%m%d_%H%M%S"  # Same format as logs
-    create_session_folders: true      # Create folders per session
+  # === RESULTS CONFIGURATION ===
+  results:
+    enabled: true                     # bool: Enable results export
+    subdirectory: "results_settings"  # string: Results subdirectory within base_directory
     
-    # Report settings
-    report:
-      save_plots: true
-      plot_format: "png"
-      calculate_statistics: true
-      include_summary: true
-      save_detailed_results: true
-      
-    # Export settings
-    export:
-      export_csv: true
-      export_json: true
-
-  # History system
+    # Export formats
+    formats:
+      csv: true                       # bool: Export results in CSV
+      json: true                      # bool: Export results in JSON
+      parquet: false                  # bool: Export in Parquet format (for large volumes)
+      pickle: false                   # bool: Export in Pickle format (Python native)
+    
+    # Format-specific options
+    format_options:
+      csv:
+        separator: ","                # string: Field separator (,;|)
+        encoding: "utf-8"             # string: Character encoding
+        decimal: "."                  # string: Decimal separator
+      json:
+        indent: 2                     # int|null: Indentation (null = compact)
+        ensure_ascii: false           # bool: Ensure ASCII (false = allows UTF-8)
+    
+    # Content configuration
+    content:
+      summary: true                   # bool: Executive summary of results
+      detailed_results: true          # bool: Detailed results from each execution
+      statistics: true                # bool: Calculate statistical summaries
+      partial_results: true           # bool: Save partial results during execution
+      partial_filename: "partial_results.json"  # string: Partial results filename
+      metadata: true                  # bool: Include execution metadata
+  
+  # === PLOTS CONFIGURATION ===
+  plots:
+    enabled: true                     # bool: Enable plot generation
+    subdirectory: "plots"             # string: Plots subdirectory within base_directory
+    
+    # Output formats for plots
+    formats:
+      - "png"                         # PNG format (recommended for web/viewing)
+      - "pdf"                         # PDF format (recommended for publication)
+    
+    # General plots (all task types)
+    general:
+      convergence: true               # bool: Algorithm convergence plots
+      comparison: true                # bool: Comparison between algorithms/parameters
+      boxplots: true                  # bool: Box plots of distributions
+      scatter: true                   # bool: Scatter plots of correlations
+      heatmap: true                   # bool: Parameter heatmaps
+      runtime: true                   # bool: Execution time analysis
+      success_rate: true              # bool: Success/convergence rate
+    
+    # Task-specific plots
+    execution:
+      fitness_evolution: true         # bool: Fitness evolution over time
+      best_solutions: true            # bool: Timeline of best solutions found
+      parameters_evolution: true      # bool: Adaptive parameter evolution
+    
+    optimization:
+      optimization_history: true      # bool: Optuna optimization history
+      parameter_importance: true      # bool: Parameter importance analysis
+      parallel_coordinate: true       # bool: Parallel coordinate plots
+    
+    sensitivity:
+      sensitivity_indices: true       # bool: Sensitivity indices plots
+      morris_trajectories: true       # bool: Morris trajectories (if method=morris)
+      interaction_effects: true       # bool: Parameter interaction effects
+  
+  # === HISTORY CONFIGURATION ===
   history:
-    save_history: false               # Save detailed history
-    history_frequency: 1              # Save frequency (every N iterations)
+    enabled: true                     # bool: Save detailed execution history
+    subdirectory: "history"           # string: History subdirectory within base_directory
+    frequency: 1                      # int: Save frequency (every N iterations)
+    include_plots: true               # bool: Generate history-specific plots
+
+# =====================================================================
+# SECTION 8: MONITORING SETTINGS (OPTIONAL)
+# =====================================================================
+# Settings for real-time execution monitoring
+monitoring:
+  # General monitoring
+  enabled: true                       # bool: Enable monitoring
+  interface: "simple"                 # string: Interface type
+                                      # "simple" = simple terminal interface (default)
+                                      # "tui" = advanced interface with curses
+  update_interval: 3                  # int: Update interval in seconds (1-10)
+   
+# =====================================================================
+# SECTION 9: RESOURCE SETTINGS (OPTIONAL)
+# =====================================================================
+# Control of computational resource usage
+resources:
+  # CPU limitations
+  cpu:
+    max_cores: null                   # int|null: Maximum cores to use (null = all)
+    affinity: null                    # list|null: Specific cores to use [0,1,2,3]
+    
+  # Memory limitations
+  memory:
+    max_memory_gb: null               # float|null: Maximum memory in GB
+    
+  # Parallel processing
+  parallel:
+    enabled: true                     # bool: Enable parallelization when possible
+    max_workers: null                 # int|null: Maximum parallel workers (null = auto)
+    internal_jobs: 4                  # int: Maximum internal parallel jobs per algorithm
+                                      # Controls internal algorithm parallelism (threads/processes)
+                                      # Suggested value: 4 for CPUs with 8+ cores
+                                      # Relation: max_workers × internal_jobs ≤ CPU_cores
+    
+  # Timeouts and limits
+  timeouts:
+    timeout_per_algorithm: 1800       # int: Timeout per individual algorithm execution (seconds)
+                                      # Applied to each algorithm run independently
+                                      # Common values: 1800 (30min), 3600 (1h), 7200 (2h)
+    timeout_total_batch: 43200        # int: Total timeout for entire batch execution (seconds)
+                                      # Applied to the complete batch process
+                                      # Common values: 21600 (6h), 43200 (12h), 86400 (24h)
+    
+# =====================================================================
+# SECTION 10: SYSTEM SETTINGS (OPTIONAL)
+# =====================================================================
+# General system configurations and behavior
+system:
+  # Global seed substitution - overrides all local seeds
+  global_seed: null                   # int|null: Global seed that replaces all algorithm and dataset seeds
+                                      # When set, substitutes ALL seed parameters throughout configuration
+                                      # null = use individual seeds, int = override all with this value
+  
+  # Cleanup and maintenance
+  # Note: FORCE_CLEANUP is configured in .env
+  
+  # Reproducibility control
+  reproducibility:
+    strict: true                      # bool: Strict reproducibility mode
+                                      # true = ensures deterministic results
+                                      # false = allows some non-deterministic behavior
+    verify_determinism: false         # bool: Verify results are deterministic by running twice

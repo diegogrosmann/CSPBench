@@ -43,7 +43,8 @@ COPY --chown=cspbench:cspbench main.py pyproject.toml ./
 
 # Create runtime directories
 RUN mkdir -p outputs tmp logs batches \
-    && chown -R cspbench:cspbench /app
+    && chown -R cspbench:cspbench /app \
+    && chmod -R 755 /app
 
 # Switch to non-root user
 USER cspbench
@@ -53,16 +54,17 @@ ENV PYTHONPATH=/app \
     PATH=/home/cspbench/.local/bin:$PATH \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    PORT=8000 \
+    PORT=8080 \
     HOST=0.0.0.0 \
-    WORKERS=1
+    WORKERS=1 \
+    UVICORN_ACCESS_LOG=false
 
-# Expose port (configurable via ENV)
-EXPOSE $PORT
+# Expose port
+EXPOSE 8080
 
 # Health check (works with most cloud providers)
-HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD curl -f http://localhost:${PORT}/api/health || exit 1
+HEALTHCHECK --interval=30s --timeout=10s --start-period=180s --retries=3 \
+    CMD curl -f http://localhost:8080/health || exit 1
 
-# Default command (respects cloud provider PORT env var)
-CMD ["python", "-m", "uvicorn", "src.presentation.web.app:app", "--host", "0.0.0.0", "--port", "8000"]
+# Default command (optimized for Cloud Run with faster startup)
+CMD ["uvicorn", "src.presentation.web.app:app", "--host", "0.0.0.0", "--port", "8080", "--workers", "1", "--log-level", "warning"]

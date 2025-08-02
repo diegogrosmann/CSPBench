@@ -22,26 +22,27 @@ resources:
 network:
   session_affinity: false
   forwarded_ports:
-    - 8000
+    - 8080
 
 # Environment variables
 env_variables:
   PYTHONUNBUFFERED: "1"
   PYTHONDONTWRITEBYTECODE: "1"
-  PORT: "8000"
+  PORT: "8080"
   HOST: "0.0.0.0"
   WORKERS: "1"
+  PYTHONPATH: "/app"
 
 # Health check configuration
 liveness_check:
-  path: "/api/health"
+  path: "/health"
   check_interval_sec: 30
   timeout_sec: 4
   failure_threshold: 2
   success_threshold: 2
 
 readiness_check:
-  path: "/api/health"
+  path: "/health"
   check_interval_sec: 5
   timeout_sec: 4
   failure_threshold: 2

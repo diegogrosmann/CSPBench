@@ -4,10 +4,11 @@ Testes unitários para ExperimentService.
 Testa a lógica de negócio do serviço usando fakes para as portas.
 """
 
-import pytest
 import tempfile
-import yaml
 from pathlib import Path
+
+import pytest
+import yaml
 
 from src.application.services import ExperimentService
 from src.domain import (
@@ -71,7 +72,7 @@ class TestExperimentService:
                         "alphabet": "ACGT",
                         "noise": 0.1,
                         "seed": 42,
-                    }
+                    },
                 }
             ],
             "algorithms": [
@@ -79,9 +80,7 @@ class TestExperimentService:
                     "id": "test_config",
                     "nome": "Test Config",
                     "algorithms": ["baseline"],
-                    "algorithm_params": {
-                        "baseline": {"tie_break": "lex"}
-                    }
+                    "algorithm_params": {"baseline": {"tie_break": "lex"}},
                 }
             ],
             "task": {"type": "execution"},
@@ -122,7 +121,7 @@ class TestExperimentService:
                     "max_workers": 2,
                     "internal_jobs": 2,
                 }
-            }
+            },
         }
 
     @pytest.fixture
@@ -200,13 +199,13 @@ class TestExperimentService:
     def test_run_batch_success_new_format(self, service, valid_batch_config):
         """Testa execução bem-sucedida de batch no novo formato."""
         # Create temporary file
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(valid_batch_config, f)
             temp_path = f.name
 
         try:
             result = service.run_batch(temp_path)
-            
+
             assert "total_experiments" in result
             assert result["total_experiments"] >= 1
             assert "summary" in result
@@ -218,23 +217,25 @@ class TestExperimentService:
     def test_run_batch_success_legacy_format(self, service, legacy_batch_config):
         """Testa execução bem-sucedida de batch no formato legado."""
         # Add required sections for legacy format
-        legacy_batch_config.update({
-            "metadados": {
-                "nome": "Teste Legacy",
-                "descricao": "Teste de formato legado"
-            },
-            "datasets": ["test_dataset"],
-            "algorithms": ["baseline"]
-        })
-        
+        legacy_batch_config.update(
+            {
+                "metadados": {
+                    "nome": "Teste Legacy",
+                    "descricao": "Teste de formato legado",
+                },
+                "datasets": ["test_dataset"],
+                "algorithms": ["baseline"],
+            }
+        )
+
         # Create temporary file
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(legacy_batch_config, f)
             temp_path = f.name
 
         try:
             result = service.run_batch(temp_path)
-            
+
             assert "total_experiments" in result
             assert result["total_experiments"] >= 1
         finally:
@@ -242,13 +243,13 @@ class TestExperimentService:
 
     def test_run_batch_with_export(self, service, valid_batch_config):
         """Testa execução de batch com exportação habilitada."""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(valid_batch_config, f)
             temp_path = f.name
 
         try:
             result = service.run_batch(temp_path)
-            
+
             # Verify export was called
             exported_files = service._exporter.get_exported_files()
             assert len(exported_files) > 0
@@ -258,13 +259,13 @@ class TestExperimentService:
 
     def test_run_batch_with_monitoring(self, service, valid_batch_config):
         """Testa execução de batch com monitoramento."""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(valid_batch_config, f)
             temp_path = f.name
 
         try:
             result = service.run_batch(temp_path)
-            
+
             # Verify monitoring was used
             monitoring = service._monitoring_service
             assert monitoring.get_interface() == "simple"
@@ -275,8 +276,8 @@ class TestExperimentService:
     def test_run_batch_invalid_config(self, service):
         """Testa erro com configuração inválida de batch."""
         invalid_config = {"invalid": "config"}
-        
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(invalid_config, f)
             temp_path = f.name
 
@@ -288,7 +289,9 @@ class TestExperimentService:
 
     def test_run_batch_file_not_found(self, service):
         """Testa erro quando arquivo de batch não existe."""
-        with pytest.raises(BatchConfigurationError, match="Erro ao parsear configuração"):
+        with pytest.raises(
+            BatchConfigurationError, match="Erro ao parsear configuração"
+        ):
             service.run_batch("nonexistent.yaml")
 
     def test_run_single_experiment_success(self, service):
@@ -324,7 +327,7 @@ class TestExperimentService:
     def test_get_algorithm_info_success(self, service):
         """Testa obtenção de informações de algoritmo."""
         info = service.get_algorithm_info("baseline")
-        
+
         assert info["name"] == "baseline"
         assert "class" in info
 
@@ -336,7 +339,7 @@ class TestExperimentService:
     def test_list_datasets(self, service):
         """Testa listagem de datasets disponíveis."""
         datasets = service.list_datasets()
-        
+
         assert isinstance(datasets, list)
         assert "test_dataset" in datasets
         assert "small_dataset" in datasets
@@ -344,7 +347,7 @@ class TestExperimentService:
     def test_list_algorithms(self, service):
         """Testa listagem de algoritmos disponíveis."""
         algorithms = service.list_algorithms()
-        
+
         assert isinstance(algorithms, list)
         assert "baseline" in algorithms
         assert "test_algo" in algorithms
@@ -352,7 +355,7 @@ class TestExperimentService:
     def test_load_dataset_success(self, service):
         """Testa carregamento bem-sucedido de dataset."""
         dataset = service.load_dataset("test_dataset")
-        
+
         assert dataset is not None
         assert dataset.size > 0
         assert len(dataset.sequences) > 0
@@ -365,7 +368,7 @@ class TestExperimentService:
     def test_configuration_parsing_integration(self, service, valid_batch_config):
         """Testa integração do parsing de configuração."""
         # Test that all configuration sections are parsed correctly
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(valid_batch_config, f)
             temp_path = f.name
 
@@ -381,14 +384,14 @@ class TestExperimentService:
         # Modify export config for testing
         valid_batch_config["export"]["formats"]["csv"] = True
         valid_batch_config["export"]["include"] = ["summary"]
-        
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(valid_batch_config, f)
             temp_path = f.name
 
         try:
             service.run_batch(temp_path)
-            
+
             # Check that export was called with correct format
             exported_files = service._exporter.get_exported_files()
             assert len(exported_files) > 0
@@ -400,8 +403,8 @@ class TestExperimentService:
         valid_batch_config["plots"]["enabled"] = True
         valid_batch_config["plots"]["plot_convergence"] = True
         valid_batch_config["plots"]["style"] = "ggplot"
-        
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(valid_batch_config, f)
             temp_path = f.name
 
@@ -417,10 +420,10 @@ class TestExperimentService:
         # Add system config that exists
         valid_batch_config["system"] = {
             "reproducibility": {"global_seed": 123},
-            "performance": {"parallel_execution": True}
+            "performance": {"parallel_execution": True},
         }
-        
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(valid_batch_config, f)
             temp_path = f.name
 
@@ -435,8 +438,8 @@ class TestExperimentService:
         """Test that resources configuration is properly applied."""
         valid_batch_config["resources"]["parallel"]["max_workers"] = 8
         valid_batch_config["resources"]["parallel"]["internal_jobs"] = 4
-        
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(valid_batch_config, f)
             temp_path = f.name
 
@@ -451,8 +454,8 @@ class TestExperimentService:
         """Test that logging configuration is properly applied."""
         valid_batch_config["logging"]["level"] = "DEBUG"
         valid_batch_config["logging"]["output"] = {"console": True, "file": False}
-        
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(valid_batch_config, f)
             temp_path = f.name
 
@@ -466,7 +469,7 @@ class TestExperimentService:
 
 class TestExperimentServiceOptimization:
     """Tests for optimization functionality."""
-    
+
     @pytest.fixture
     def service(self):
         """Service with optimization support."""
@@ -502,7 +505,7 @@ class TestExperimentServiceOptimization:
                     "id": "test_dataset",
                     "nome": "Test Dataset",
                     "tipo": "synthetic",
-                    "parametros": {"n": 10, "L": 20, "alphabet": "ACGT", "seed": 42}
+                    "parametros": {"n": 10, "L": 20, "alphabet": "ACGT", "seed": 42},
                 }
             ],
             "algorithms": [
@@ -510,9 +513,7 @@ class TestExperimentServiceOptimization:
                     "id": "test_config",
                     "nome": "Test Config",
                     "algorithms": ["BLF-GA"],
-                    "algorithm_params": {
-                        "BLF-GA": {"pop_size": 100, "max_gens": 200}
-                    }
+                    "algorithm_params": {"BLF-GA": {"pop_size": 100, "max_gens": 200}},
                 }
             ],
             "task": {"type": "optimization"},
@@ -529,22 +530,18 @@ class TestExperimentServiceOptimization:
                         "target_algorithm": "test_config",
                         "parameters": {
                             "BLF-GA": {
-                                "pop_size": {
-                                    "type": "int",
-                                    "low": 50,
-                                    "high": 200
-                                }
+                                "pop_size": {"type": "int", "low": 50, "high": 200}
                             }
-                        }
+                        },
                     }
-                ]
+                ],
             },
             "export": {"enabled": True, "destination": "outputs/opt_test"},
         }
 
     def test_optimization_batch_execution(self, service, optimization_batch_config):
         """Test optimization batch execution."""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(optimization_batch_config, f)
             temp_path = f.name
 
@@ -558,7 +555,7 @@ class TestExperimentServiceOptimization:
 
 class TestExperimentServiceSensitivity:
     """Tests for sensitivity analysis functionality."""
-    
+
     @pytest.fixture
     def service(self):
         """Service with sensitivity support."""
@@ -594,7 +591,7 @@ class TestExperimentServiceSensitivity:
                     "id": "test_dataset",
                     "nome": "Test Dataset",
                     "tipo": "synthetic",
-                    "parametros": {"n": 10, "L": 20, "alphabet": "ACGT", "seed": 42}
+                    "parametros": {"n": 10, "L": 20, "alphabet": "ACGT", "seed": 42},
                 }
             ],
             "algorithms": [
@@ -602,9 +599,7 @@ class TestExperimentServiceSensitivity:
                     "id": "test_config",
                     "nome": "Test Config",
                     "algorithms": ["BLF-GA"],
-                    "algorithm_params": {
-                        "BLF-GA": {"pop_size": 100, "max_gens": 200}
-                    }
+                    "algorithm_params": {"BLF-GA": {"pop_size": 100, "max_gens": 200}},
                 }
             ],
             "task": {"type": "sensitivity"},
@@ -622,19 +617,19 @@ class TestExperimentServiceSensitivity:
                             "pop_size": {
                                 "type": "integer",
                                 "bounds": [50, 200],
-                                "default": 100
+                                "default": 100,
                             }
                         },
-                        "output_metrics": ["distance", "execution_time"]
+                        "output_metrics": ["distance", "execution_time"],
                     }
-                ]
+                ],
             },
             "export": {"enabled": True, "destination": "outputs/sens_test"},
         }
 
     def test_sensitivity_batch_execution(self, service, sensitivity_batch_config):
         """Test sensitivity batch execution."""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(sensitivity_batch_config, f)
             temp_path = f.name
 

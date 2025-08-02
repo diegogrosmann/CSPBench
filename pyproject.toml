@@ -10,11 +10,11 @@ readme = "README.md"
 authors = [
     {name = "Diego Grosmann", email = "diego.grosmann@example.com"}
 ]
-license = {text = "MIT"}
+license = {text = "CC-BY-NC-SA-4.0"}
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Science/Research",
-    "License :: OSI Approved :: MIT License",
+    "License :: Other/Proprietary License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",

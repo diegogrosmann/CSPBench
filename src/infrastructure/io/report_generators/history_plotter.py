@@ -11,7 +11,6 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 import matplotlib.pyplot as plt
-import pandas as pd
 import seaborn as sns
 
 
@@ -31,13 +30,13 @@ class HistoryPlotter:
         """
         self.config = config
         self.output_dir = output_dir
-        
+
         # Use new unified output configuration
         output_config = config.get("output", {})
         self.history_config = output_config.get("history", {})
         plots_config = output_config.get("plots", {})
         plot_formats = plots_config.get("formats", ["png"])
-        
+
         self.plot_format = plot_formats[0] if plot_formats else "png"
 
         # Configure matplotlib
@@ -186,4 +185,4 @@ class HistoryPlotter:
                 writer.writeheader()
                 writer.writerows(summary_rows)
 
-        print(f"✅ Dados exportados: JSON, CSV detalhado e resumo")
+        print("✅ Dados exportados: JSON, CSV detalhado e resumo")

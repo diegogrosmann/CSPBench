@@ -340,7 +340,7 @@ class TUIMonitor(MonitoringInterface):
 
         try:
             # Informações adicionais
-            self._safe_addstr(current_line, 2, f"🎯 Objetivo: Minimizar distância")
+            self._safe_addstr(current_line, 2, "🎯 Objetivo: Minimizar distância")
             current_line += 1
 
             # Linha divisória e título da seção
@@ -511,7 +511,7 @@ class TUIMonitor(MonitoringInterface):
                 self._safe_addstr(current_line, 2, "📈 Trajetórias: 20/20 completas")
                 current_line += 1
                 self._safe_addstr(
-                    current_line, 2, f"🎯 Método: Morris (num_levels=4, grid_jump=2)"
+                    current_line, 2, "🎯 Método: Morris (num_levels=4, grid_jump=2)"
                 )
                 current_line += 2
 

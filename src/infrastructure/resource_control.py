@@ -5,31 +5,30 @@ Implements actual resource limits enforcement for CSPBench.
 This module provides mechanisms to apply CPU, memory, and timeout constraints.
 """
 
-import os
-import psutil
 import signal
-import subprocess
 import threading
 import time
-from typing import Any, Dict, Optional, List
 from contextlib import contextmanager
-from multiprocessing import Process
+from typing import Any, Dict, List, Optional
+
+import psutil
 
 from src.infrastructure.logging_config import get_logger
 
 
 class ResourceLimitError(Exception):
     """Raised when resource limits are exceeded."""
+
     pass
 
 
 class ResourceController:
     """Controls and enforces resource limits for algorithm execution."""
-    
+
     def __init__(self, config: Dict[str, Any]):
         """
         Initialize resource controller.
-        
+
         Args:
             config: Resource configuration dictionary containing:
                 - cpu: {max_cores, affinity}
@@ -41,79 +40,95 @@ class ResourceController:
         self._logger = get_logger(__name__)
         self._active_processes: List[psutil.Process] = []
         self._start_time = time.time()
-        
+
         # Extract configurations
         self._cpu_config = config.get("cpu", {})
         self._memory_config = config.get("memory", {})
         self._parallel_config = config.get("parallel", {})
         self._timeout_config = config.get("timeouts", {})
-        
+
         # Resource limits
         self._max_cores = self._cpu_config.get("max_cores")
         self._cpu_affinity = self._cpu_config.get("affinity")
         self._max_memory_gb = self._memory_config.get("max_memory_gb")
-        self._timeout_per_algorithm = self._timeout_config.get("timeout_per_algorithm", 3600)
-        self._timeout_total_batch = self._timeout_config.get("timeout_total_batch", 86400)
-        
+        self._timeout_per_algorithm = self._timeout_config.get(
+            "timeout_per_algorithm", 3600
+        )
+        self._timeout_total_batch = self._timeout_config.get(
+            "timeout_total_batch", 86400
+        )
+
         # Monitor thread
         self._monitor_thread = None
         self._stop_monitoring = threading.Event()
-        
-        self._logger.info(f"[RESOURCE] Controller initialized with limits: "
-                         f"cores={self._max_cores}, memory={self._max_memory_gb}GB, "
-                         f"timeout_algo={self._timeout_per_algorithm}s, timeout_batch={self._timeout_total_batch}s")
+
+        self._logger.info(
+            f"[RESOURCE] Controller initialized with limits: "
+            f"cores={self._max_cores}, memory={self._max_memory_gb}GB, "
+            f"timeout_algo={self._timeout_per_algorithm}s, timeout_batch={self._timeout_total_batch}s"
+        )
 
     def apply_cpu_limits(self, process: Optional[psutil.Process] = None) -> None:
         """
         Apply CPU limits to current process or specified process.
-        
+
         Args:
             process: Process to apply limits to (current process if None)
         """
         if process is None:
             process = psutil.Process()
-            
+
         try:
             # Apply CPU affinity if specified
             if self._cpu_affinity:
                 available_cpus = list(range(psutil.cpu_count()))
-                valid_affinity = [cpu for cpu in self._cpu_affinity if cpu in available_cpus]
+                valid_affinity = [
+                    cpu for cpu in self._cpu_affinity if cpu in available_cpus
+                ]
                 if valid_affinity:
                     process.cpu_affinity(valid_affinity)
-                    self._logger.info(f"[RESOURCE] CPU affinity set to: {valid_affinity}")
+                    self._logger.info(
+                        f"[RESOURCE] CPU affinity set to: {valid_affinity}"
+                    )
                 else:
-                    self._logger.warning(f"[RESOURCE] Invalid CPU affinity: {self._cpu_affinity}")
-                    
+                    self._logger.warning(
+                        f"[RESOURCE] Invalid CPU affinity: {self._cpu_affinity}"
+                    )
+
             # Apply CPU core limit (nice value - not perfect but helps)
             if self._max_cores and self._max_cores < psutil.cpu_count():
                 # Lower priority for processes when core limit is set
                 process.nice(10)  # Higher nice value = lower priority
-                self._logger.info(f"[RESOURCE] CPU limit applied: max_cores={self._max_cores}")
-                
+                self._logger.info(
+                    f"[RESOURCE] CPU limit applied: max_cores={self._max_cores}"
+                )
+
         except (psutil.NoSuchProcess, psutil.AccessDenied, PermissionError) as e:
             self._logger.warning(f"[RESOURCE] Cannot apply CPU limits: {e}")
 
     def apply_memory_limits(self, process: Optional[psutil.Process] = None) -> None:
         """
         Apply memory limits using system resource limits.
-        
+
         Args:
             process: Process to monitor (current process if None)
         """
         if not self._max_memory_gb:
             return
-            
+
         try:
             import resource
-            
+
             # Convert GB to bytes
             max_memory_bytes = int(self._max_memory_gb * 1024 * 1024 * 1024)
-            
+
             # Set memory limit using resource module
             resource.setrlimit(resource.RLIMIT_AS, (max_memory_bytes, max_memory_bytes))
-            
-            self._logger.info(f"[RESOURCE] Memory limit set to {self._max_memory_gb}GB ({max_memory_bytes} bytes)")
-            
+
+            self._logger.info(
+                f"[RESOURCE] Memory limit set to {self._max_memory_gb}GB ({max_memory_bytes} bytes)"
+            )
+
         except (ImportError, OSError, ValueError) as e:
             self._logger.warning(f"[RESOURCE] Cannot apply memory limit: {e}")
             # Fallback to monitoring approach
@@ -123,39 +138,43 @@ class ResourceController:
         """Start memory monitoring thread for enforcement."""
         if not self._max_memory_gb:
             return
-            
+
         if process is None:
             process = psutil.Process()
-            
+
         def monitor_memory():
             """Monitor memory usage and terminate if exceeded."""
             max_memory_bytes = self._max_memory_gb * 1024 * 1024 * 1024
-            
+
             while not self._stop_monitoring.is_set():
                 try:
                     memory_info = process.memory_info()
                     current_memory = memory_info.rss  # Resident Set Size
-                    
+
                     if current_memory > max_memory_bytes:
-                        self._logger.error(f"[RESOURCE] Memory limit exceeded: "
-                                         f"{current_memory / (1024**3):.2f}GB > {self._max_memory_gb}GB")
-                        
+                        self._logger.error(
+                            f"[RESOURCE] Memory limit exceeded: "
+                            f"{current_memory / (1024**3):.2f}GB > {self._max_memory_gb}GB"
+                        )
+
                         # Terminate the process
                         process.terminate()
                         time.sleep(1)
                         if process.is_running():
                             process.kill()
-                            
-                        raise ResourceLimitError(f"Memory limit exceeded: {self._max_memory_gb}GB")
-                        
+
+                        raise ResourceLimitError(
+                            f"Memory limit exceeded: {self._max_memory_gb}GB"
+                        )
+
                     time.sleep(1)  # Check every second
-                    
+
                 except (psutil.NoSuchProcess, psutil.AccessDenied):
                     break
                 except Exception as e:
                     self._logger.warning(f"[RESOURCE] Memory monitor error: {e}")
                     break
-                    
+
         self._monitor_thread = threading.Thread(target=monitor_memory, daemon=True)
         self._monitor_thread.start()
 
@@ -163,20 +182,22 @@ class ResourceController:
     def algorithm_timeout(self, timeout_seconds: Optional[int] = None):
         """
         Context manager for algorithm timeout enforcement.
-        
+
         Args:
             timeout_seconds: Timeout in seconds (uses config default if None)
         """
         if timeout_seconds is None:
             timeout_seconds = self._timeout_per_algorithm
-            
+
         def timeout_handler(signum, frame):
-            raise TimeoutError(f"Algorithm execution exceeded {timeout_seconds} seconds")
-        
+            raise TimeoutError(
+                f"Algorithm execution exceeded {timeout_seconds} seconds"
+            )
+
         # Set alarm for timeout
         old_handler = signal.signal(signal.SIGALRM, timeout_handler)
         signal.alarm(timeout_seconds)
-        
+
         try:
             self._logger.debug(f"[RESOURCE] Algorithm timeout set: {timeout_seconds}s")
             yield
@@ -189,20 +210,22 @@ class ResourceController:
         """Check if total batch timeout has been exceeded."""
         elapsed = time.time() - self._start_time
         if elapsed > self._timeout_total_batch:
-            raise TimeoutError(f"Batch execution exceeded {self._timeout_total_batch} seconds")
+            raise TimeoutError(
+                f"Batch execution exceeded {self._timeout_total_batch} seconds"
+            )
 
     def register_process(self, process: psutil.Process) -> None:
         """Register a process for resource monitoring."""
         self._active_processes.append(process)
         self.apply_cpu_limits(process)
-        
+
     def cleanup(self) -> None:
         """Cleanup resource controller and stop monitoring."""
         self._stop_monitoring.set()
-        
+
         if self._monitor_thread and self._monitor_thread.is_alive():
             self._monitor_thread.join(timeout=2.0)
-            
+
         # Terminate any remaining processes
         for process in self._active_processes:
             try:
@@ -210,7 +233,7 @@ class ResourceController:
                     process.terminate()
             except (psutil.NoSuchProcess, psutil.AccessDenied):
                 pass
-                
+
         self._active_processes.clear()
         self._logger.info("[RESOURCE] Resource controller cleanup completed")
 
@@ -219,7 +242,7 @@ class ResourceController:
         try:
             process = psutil.Process()
             memory_info = process.memory_info()
-            
+
             return {
                 "cpu_percent": process.cpu_percent(),
                 "memory_mb": memory_info.rss / (1024 * 1024),
@@ -231,8 +254,8 @@ class ResourceController:
                     "cpu_affinity": self._cpu_affinity,
                     "max_memory_gb": self._max_memory_gb,
                     "timeout_per_algorithm": self._timeout_per_algorithm,
-                    "timeout_total_batch": self._timeout_total_batch
-                }
+                    "timeout_total_batch": self._timeout_total_batch,
+                },
             }
         except Exception as e:
             self._logger.warning(f"[RESOURCE] Cannot get resource info: {e}")
@@ -242,10 +265,10 @@ class ResourceController:
 def create_resource_controller(config: Dict[str, Any]) -> ResourceController:
     """
     Factory function to create resource controller.
-    
+
     Args:
         config: Resource configuration
-        
+
     Returns:
         ResourceController instance
     """

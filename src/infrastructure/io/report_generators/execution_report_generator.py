@@ -6,16 +6,13 @@ including comparison charts, statistics and analyses.
 """
 
 import json
-import os
 import warnings
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict
 
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
-from jinja2 import Environment, FileSystemLoader
-from scipy import stats
 
 from .history_plotter import HistoryPlotter
 
@@ -41,18 +38,18 @@ class ExecutionReportGenerator:
         """
         self.config = config
         self.session_path = session_path
-        
+
         # Use new unified output configuration
         output_config = config.get("output", {})
         results_config = output_config.get("results", {})
         plots_config = output_config.get("plots", {})
-        
+
         self.report_config = results_config.get("content", {})
         self.export_config = results_config.get("formats", {})
-        
+
         # Get plot format from new config
         plot_formats = plots_config.get("formats", ["png"])
-        
+
         self.logger = get_logger(__name__)
         self.plot_format = plot_formats[0] if plot_formats else "png"
 
@@ -371,7 +368,9 @@ class ExecutionReportGenerator:
             plt.tight_layout()
 
             plt.savefig(
-                plots_dir / f"algorithm_comparison.{self.plot_format}", dpi=300, bbox_inches="tight"
+                plots_dir / f"algorithm_comparison.{self.plot_format}",
+                dpi=300,
+                bbox_inches="tight",
             )
             plt.close()
 
@@ -388,7 +387,9 @@ class ExecutionReportGenerator:
                 plt.xticks(rotation=45)
                 plt.tight_layout()
                 plt.savefig(
-                    plots_dir / f"distance_boxplots.{self.plot_format}", dpi=300, bbox_inches="tight"
+                    plots_dir / f"distance_boxplots.{self.plot_format}",
+                    dpi=300,
+                    bbox_inches="tight",
                 )
                 plt.close()
 
@@ -403,7 +404,9 @@ class ExecutionReportGenerator:
                 plt.xticks(rotation=45)
                 plt.tight_layout()
                 plt.savefig(
-                    plots_dir / f"runtime_boxplots.{self.plot_format}", dpi=300, bbox_inches="tight"
+                    plots_dir / f"runtime_boxplots.{self.plot_format}",
+                    dpi=300,
+                    bbox_inches="tight",
                 )
                 plt.close()
 
@@ -429,7 +432,9 @@ class ExecutionReportGenerator:
                 plt.tight_layout()
 
                 plt.savefig(
-                    plots_dir / f"runtime_distribution.{self.plot_format}", dpi=300, bbox_inches="tight"
+                    plots_dir / f"runtime_distribution.{self.plot_format}",
+                    dpi=300,
+                    bbox_inches="tight",
                 )
                 plt.close()
 

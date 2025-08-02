@@ -6,7 +6,7 @@ including standardized integration with monitoring system.
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 from src.infrastructure.logging_config import get_logger
 
@@ -79,7 +79,7 @@ class BaseOrchestrator(ABC):
             error: Exception that occurred
             context: Additional error context
         """
-        error_msg = f"Error in orchestration"
+        error_msg = "Error in orchestration"
         if context:
             error_msg += f" ({context})"
         error_msg += f": {error}"

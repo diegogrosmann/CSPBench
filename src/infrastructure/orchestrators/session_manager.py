@@ -5,6 +5,7 @@ Responsible for creating and managing session folders organized by datetime
 for CSPBench logs and results.
 """
 
+import os
 import shutil
 from datetime import datetime
 from pathlib import Path
@@ -25,21 +26,17 @@ class SessionManager:
         Initialize the session manager.
 
         Args:
-            config: System configuration containing base paths
+            config: System configuration (used for execution settings, infrastructure from .env)
         """
         self.config = config
-        self.session_format = config["infrastructure"]["logging"][
-            "session_folder_format"
-        ]
-        self.create_session_folders = config["infrastructure"]["logging"][
-            "create_session_folders"
-        ]
+        
+        # Get infrastructure settings from environment variables
+        self.session_format = os.getenv("SESSION_FOLDER_FORMAT", "%Y%m%d_%H%M%S")
+        self.create_session_folders = os.getenv("CREATE_SESSION_FOLDERS", "true").lower() == "true"
 
-        # Base directories for logs and results
-        self.logs_base_dir = Path(config["infrastructure"]["logging"]["base_log_dir"])
-        self.results_base_dir = Path(
-            config["infrastructure"]["result"]["base_result_dir"]
-        )
+        # Base directories from environment variables
+        self.logs_base_dir = Path(os.getenv("OUTPUT_BASE_DIRECTORY", "outputs"))
+        self.results_base_dir = Path(os.getenv("OUTPUT_BASE_DIRECTORY", "outputs"))
 
         # Current session
         self.current_session: Optional[str] = None

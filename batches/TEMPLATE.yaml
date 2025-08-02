@@ -1,7 +1,10 @@
 # ===================================================================
-# STANDARDIZED TEMPLATE CSPBench - UNIFIED STRUCTURE v0.7
+# STANDARDIZED TEMPLATE CSPBench - UNIFIED STRUCTURE v0.8
 # ===================================================================
 # This template defines the standard structure for all batch types.
+# Infrastructure settings (paths, directories) are configured in .env
+# This template only contains execution-specific configurations
+# 
 # Supported types: execution, optimization, sensitivity
 # Usage: Copy this template and adapt for your specific needs
 #
@@ -19,32 +22,7 @@ metadata:
   tags: ["tag1", "tag2"]              # Tags for categorization (list)
 
 # =====================================================================
-# SECTION 2: INFRASTRUCTURE SETTINGS (OPTIONAL)
-# =====================================================================
-# This section allows overriding settings from the settings.yaml file.
-# Use only if you need specific settings for this batch.
-infrastructure:
-  # Dataset repository configuration
-  dataset_repository:
-    type: "FileDatasetRepository"     # string: Repository implementation type
-    config:
-      base_path: "./datasets"         # string: Base path for dataset files
-      supported_formats: ["fasta", "txt"]  # list: Supported file formats
-  
-  # Algorithm registry configuration
-  algorithm_registry:
-    type: "DomainAlgorithmRegistry"   # string: Registry implementation type
-    config:
-      auto_register: true             # bool: Automatically register discovered algorithms
-  
-  # Algorithm executor configuration
-  executor:
-    type: "Executor"                  # string: Executor implementation type
-    config:
-      timeout_default: 300            # int: Default timeout in seconds 
-
-# =====================================================================
-# SECTION 3: DATASETS (STANDARDIZED FOR ALL)
+# SECTION 2: DATASETS (STANDARDIZED FOR ALL)
 # =====================================================================
 # Defines the datasets available for use in the batch.
 # Each dataset has a unique ID that can be referenced in executions.
@@ -91,7 +69,7 @@ datasets:
                                       # System will handle length filtering automatically
 
 # =====================================================================
-# SECTION 4: ALGORITHMS (STANDARDIZED FOR ALL)
+# SECTION 3: ALGORITHMS (STANDARDIZED FOR ALL)
 # =====================================================================
 # Defines algorithm configurations that can be reused.
 # Allows creating parameter "presets" for different scenarios.
@@ -235,7 +213,7 @@ algorithms:
         l_div: 20                     # int: More divisions
 
 # =====================================================================
-# SECTION 5: TASK TYPE (REQUIRED)
+# SECTION 4: TASK TYPE (REQUIRED)
 # =====================================================================
 # Defines the type of operation to be performed.
 # Each type has specific configurations in the corresponding section.
@@ -246,7 +224,7 @@ task:
                                       # "sensitivity" = analyze sensitivity with SALib
 
 # =====================================================================
-# SECTION 6A: SPECIFIC CONFIGURATION - EXECUTION
+# SECTION 5A: SPECIFIC CONFIGURATION - EXECUTION
 # =====================================================================
 # Use this section when task.type = "execution"
 # Runs algorithms on datasets with pre-defined parameters
@@ -271,7 +249,7 @@ execution:
       repetitions: 2
 
 # =====================================================================
-# SECTION 6B: SPECIFIC CONFIGURATION - OPTIMIZATION
+# SECTION 5B: SPECIFIC CONFIGURATION - OPTIMIZATION
 # =====================================================================
 # Use this section when task.type = "optimization"
 # Optimize algorithm hyperparameters using Optuna
@@ -374,7 +352,7 @@ optimization:
              high: 1.0
 
 # =====================================================================
-# SECTION 6C: SPECIFIC CONFIGURATION - SENSITIVITY
+# SECTION 5C: SPECIFIC CONFIGURATION - SENSITIVITY
 # =====================================================================
 # Use this section when task.type = "sensitivity"
 # Performs sensitivity analysis of parameters using SALib
@@ -496,25 +474,10 @@ output:
   enabled: true                       # bool: Enable all outputs (logs, results, plots)
                                       # true = save everything, false = execute only
   
-  base_directory: "outputs/{session}" # string: Single base directory for ALL outputs
-                                      # {session} = current session folder (timestamp format: YYYYMMDD_HHMMSS)
-                                      # {task_type} = task type (execution/optimization/sensitivity)
-                                      # {algorithm} = algorithm name (for subfolders)
-                                      # {dataset} = dataset name (for subfolders)
-                                      # Example: "outputs/20250730_143052/" contains logs/, results/, plots/
-  
-  # === DIRECTORY STRUCTURE ===
-  structure:
-    create_subfolders: true           # bool: Create organized subfolders
-    algorithm_subfolders: true        # bool: Create subfolder per algorithm
-    dataset_subfolders: true          # bool: Create subfolder per dataset
-    timestamp_suffix: true            # bool: Add timestamp to file names
-    session_folder_format: "%Y%m%d_%H%M%S"  # string: Format for session folders
-  
   # === LOGGING CONFIGURATION ===
+  # Note: LOG_LEVEL is configured in .env
   logging:
     enabled: true                     # bool: Enable logging
-    level: "INFO"                     # string: Log level (DEBUG, INFO, WARNING, ERROR)
     console_output: true              # bool: Display logs in console
     file_output: true                 # bool: Save logs to file
     filename: "cspbench.log"          # string: Main log filename
@@ -648,52 +611,9 @@ system:
                                       # When set, substitutes ALL seed parameters throughout configuration
                                       # null = use individual seeds, int = override all with this value
   
-  # Work directory configuration
-  work_directory: null                # string|null: Custom work directory path
-                                      # Supports {session} variable replacement with timestamp
-                                      # Example: "custom_results_{session}" -> "custom_results_20250729_143052"
-                                      # null = use default structure
-  
-  # Cleanup and maintenance
-  force_cleanup: false                # bool: Force cleanup of previous results
-                                      # true = remove existing results before execution
-                                      # false = preserve existing results
-  
-  # Checkpointing system
-  checkpointing:
-    enabled: false                    # bool: Enable execution checkpointing
-    interval: 100                     # int: Save checkpoint every N iterations/trials
-    auto_recovery: true               # bool: Automatically recover from last checkpoint
-    compress: true                    # bool: Compress checkpoint files
-  
-  # Error handling strategy
-  error_handling:
-    strategy: "continue"              # string: Error handling strategy
-                                      # "continue" = continue with next item on error
-                                      # "stop" = stop execution on first error
-                                      # "retry" = retry failed items
-    max_retries: 3                    # int: Maximum retry attempts for failed items
-    retry_delay: 5                    # int: Delay between retries in seconds
-    log_errors: true                  # bool: Log detailed error information
-  
-  # Progress tracking
-  progress_tracking:
-    enabled: true                     # bool: Enable detailed progress tracking
-    update_interval: 10               # int: Update progress every N iterations/trials
-    save_intermediate: false          # bool: Save intermediate results
-    show_eta: true                    # bool: Show estimated time to completion
-  
-  # Environment variables
-  environment:
-    PYTHONPATH: null                  # string|null: Override PYTHONPATH
-    OMP_NUM_THREADS: null             # string|null: Override OpenMP thread count
-    NUMBA_NUM_THREADS: null           # string|null: Override Numba thread count
-    CSPBENCH_DEBUG: null              # string|null: Enable CSPBench debug mode
-  
   # Reproducibility control
   reproducibility:
     strict: true                      # bool: Strict reproducibility mode
                                       # true = ensures deterministic results
                                       # false = allows some non-deterministic behavior
-    log_seeds: false                  # bool: Log all seeds used during execution
     verify_determinism: false         # bool: Verify results are deterministic by running twice

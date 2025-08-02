@@ -98,7 +98,7 @@ class H3CSPAlgorithm(CSPAlgorithm):
         The callback will be called during algorithm execution with
         descriptive messages about current progress, enabling
         graphical interfaces or progress logs.
-    """
+        """
 
     name = "H³-CSP"
     default_params = H3_CSP_DEFAULTS

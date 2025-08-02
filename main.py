@@ -71,6 +71,14 @@ from typing import Any, Dict, Optional
 import typer
 import yaml
 
+# Load environment variables from .env file
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    # If python-dotenv is not installed, continue without it
+    pass
+
 # Add the root directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent))
 
@@ -122,9 +130,8 @@ def load_config() -> Dict[str, Any]:
 
 def create_dataset_repository(config: Dict[str, Any]) -> FileDatasetRepository:
     """Create dataset repository based on configuration."""
-    repo_config = config["infrastructure"]["dataset_repository"]["config"]
-    base_path = os.getenv("DATASET_PATH", repo_config["base_path"])
-
+    # Priority: Environment variable > fallback default
+    base_path = os.getenv("DATASET_PATH", "./datasets")
     return FileDatasetRepository(base_path)
 
 
@@ -175,40 +182,31 @@ def create_exporter(config: Dict[str, Any]):
     """Create exporter based on configuration."""
     global session_manager
 
-    # Configuração do exportador (se existir na configuração legada)
-    exporter_config = (
-        config.get("infrastructure", {}).get("exporter", {}).get("config", {})
-    )
-    export_fmt = os.getenv("EXPORT_FORMAT", exporter_config.get("format", "json"))
+    # Priority: Environment variable > settings.yaml fallback
+    default_format = "json"
+    if "output" in config and "results" in config["output"]:
+        export_formats = config["output"]["results"].get("export_formats", [default_format])
+        default_format = export_formats[0] if export_formats else default_format
+    
+    export_fmt = os.getenv("EXPORT_FORMAT", default_format)
 
     # Use session directory if SessionManager exists
     if session_manager:
         output_path = session_manager.get_result_dir()
     else:
-        # Use unified output configuration
-        output_config = config.get("output", {})
-        if output_config:
-            base_directory = output_config.get("base_directory", "outputs/{session}")
-            if "{session}" in base_directory:
-                output_path = base_directory.replace("{session}", "")
-            else:
-                output_path = base_directory
-        else:
-            # Fallback to old configuration
-            result_config = config.get("infrastructure", {}).get("result", {})
-            output_path = os.getenv(
-                "OUTPUT_PATH", result_config.get("base_result_dir", "./outputs/results")
-            )
+        # Use environment variable with fallback
+        base_output_dir = os.getenv("OUTPUT_BASE_DIRECTORY", "outputs")
+        output_path = Path(base_output_dir)
 
     if export_fmt.lower() == "json":
-        return JsonExporter(output_path, config)  # Pass complete configuration
+        return JsonExporter(str(output_path), config)  # Pass complete configuration
     elif export_fmt.lower() == "csv":
-        return CsvExporter(output_path)
+        return CsvExporter(str(output_path))
     elif export_fmt.lower() == "txt":
-        return TxtExporter(output_path)
+        return TxtExporter(str(output_path))
     else:
         typer.echo(f"⚠️  Format '{export_fmt}' not supported, using JSON")
-        return JsonExporter(output_path, config)  # Pass complete configuration
+        return JsonExporter(str(output_path), config)  # Pass complete configuration
 
 
 def create_monitoring_service(config: Dict[str, Any]):
@@ -301,6 +299,23 @@ def initialize_service() -> ExperimentService:
     if experiment_service is None:
         if config is None:
             config = load_config()
+
+        # IMPORTANT: Ensure algorithms are imported and registered
+        import algorithms  # This triggers auto-discovery
+        
+        # Force algorithm registration by importing the registry
+        from src.domain import global_registry
+        
+        # Debug: Check if algorithms are loaded
+        algo_count = len(global_registry.keys())
+        print(f"DEBUG: {algo_count} algorithms in registry: {list(global_registry.keys())}")
+        
+        if algo_count == 0:
+            print("WARNING: No algorithms found in registry! Forcing reload...")
+            # Force reload algorithms module
+            import importlib
+            importlib.reload(algorithms)
+            print(f"DEBUG: After reload: {len(global_registry.keys())} algorithms: {list(global_registry.keys())}")
 
         # Initialize logging system
         _initialize_logging(config)

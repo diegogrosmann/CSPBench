@@ -1,7 +1,7 @@
 """
 Genetic Operations for BLF-GA (Block Letter Frequency Genetic Algorithm)
 
-This module implements a complete suite of genetic operators specialized for the 
+This module implements a complete suite of genetic operators specialized for the
 Closest String Problem (CSP) using genetic algorithms. BLF-GA is an evolutionary algorithm that
 evolves a population of candidate strings to find the consensus string that minimizes the
 maximum distance to a set of input strings.

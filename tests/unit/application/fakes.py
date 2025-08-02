@@ -12,15 +12,15 @@ from src.domain import CSPAlgorithm, Dataset, SyntheticDatasetGenerator
 
 class MockAlgorithmClass(CSPAlgorithm):
     """Mock algorithm class for testing."""
-    
+
     name = "MockAlgorithm"
     default_params = {}
-    
+
     def run(self, dataset: Dataset, **kwargs) -> tuple[str, int, dict]:
         """Mock run method."""
         # Return a simple mock result
         return "ACGT" * (len(dataset.sequences[0]) // 4), 2, {"iterations": 10}
-    
+
     def _report_progress(self, message: str) -> None:
         """Mock progress reporting."""
         pass
@@ -122,7 +122,9 @@ class FakeExportPort:
     def __init__(self):
         self._exported_files = []
 
-    def export(self, results: Dict[str, Any], format_type: str, destination: str) -> str:
+    def export(
+        self, results: Dict[str, Any], format_type: str, destination: str
+    ) -> str:
         """Export data in specified format."""
         file_path = f"{destination}.{format_type}"
         self._exported_files.append(
@@ -180,7 +182,12 @@ class FakeExecutorPort:
         """Configura para falhar em algoritmo específico (para testes)."""
         self._fail_on_algorithm = algorithm_name
 
-    def execute_batch(self, batch_config: Dict[str, Any], monitoring_service=None, resources_config=None) -> List[Dict[str, Any]]:
+    def execute_batch(
+        self,
+        batch_config: Dict[str, Any],
+        monitoring_service=None,
+        resources_config=None,
+    ) -> List[Dict[str, Any]]:
         """Executa batch de experimentos."""
         results = []
 
@@ -202,6 +209,7 @@ class FakeExecutorPort:
 
                                 if algo_config_id == self._fail_on_algorithm:
                                     from src.domain import AlgorithmExecutionError
+
                                     raise AlgorithmExecutionError(
                                         f"Falha simulada para {algo_config_id}"
                                     )
@@ -330,7 +338,7 @@ class FakeExecutorPort:
 
 class FakeMonitoringService:
     """Fake monitoring service for testing."""
-    
+
     def __init__(self):
         self._is_monitoring = False
         self._task_type = None
@@ -339,58 +347,58 @@ class FakeMonitoringService:
         self._update_interval = 3
         self._errors = []
         self._progress_messages = []
-    
+
     def start_monitoring(self, task_type, task_name: str):
         """Start monitoring a task."""
         self._is_monitoring = True
         self._task_type = task_type
         self._task_name = task_name
-    
+
     def finish_monitoring(self, results: dict):
         """Finish monitoring."""
         self._is_monitoring = False
-    
+
     def show_error(self, error_message: str):
         """Show an error message."""
         self._errors.append(error_message)
-    
+
     def show_progress(self, message: str):
         """Show progress message."""
         self._progress_messages.append(message)
-    
+
     def set_interface(self, interface: str):
         """Set monitoring interface."""
         self._interface = interface
-    
+
     def set_update_interval(self, interval: int):
         """Set update interval."""
         self._update_interval = interval
-    
+
     # Test helper methods
     def is_monitoring(self) -> bool:
         """Check if currently monitoring."""
         return self._is_monitoring
-    
+
     def get_task_type(self):
         """Get current task type."""
         return self._task_type
-    
+
     def get_task_name(self) -> str:
         """Get current task name."""
         return self._task_name
-    
+
     def get_errors(self) -> List[str]:
         """Get list of errors."""
         return self._errors.copy()
-    
+
     def get_progress_messages(self) -> List[str]:
         """Get list of progress messages."""
         return self._progress_messages.copy()
-    
+
     def get_interface(self) -> str:
         """Get current interface."""
         return self._interface
-    
+
     def get_update_interval(self) -> int:
         """Get current update interval."""
         return self._update_interval

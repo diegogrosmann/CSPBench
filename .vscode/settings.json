@@ -1,7 +1,7 @@
 {
     "makefile.configureOnOpen": false,
     "python.analysis.autoImportCompletions": true,
-    "python.defaultInterpreterPath": "./.venv/bin/python",
+    "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
     "python.terminal.activateEnvironment": false,
     "python.testing.pytestEnabled": true,
     "python.testing.pytestArgs": [
@@ -49,8 +49,8 @@
     },
     "python.analysis.typeCheckingMode": "basic",
     "python.analysis.extraPaths": [
-        "./src",
-        "./algorithms"
+        "${workspaceFolder}/src",
+        "${workspaceFolder}/algorithms"
     ],
     "cloudcode.gcp": {
         "project": "teste-398723"
@@ -61,5 +61,18 @@
     "cloudcode.gke": {
         "cluster": "autopilot-cluster-1",
         "region": "us-central1"
-    }
+    },
+    "codespaces.accountProvider": "GitHub",
+    "git.autofetch": true,
+    "git.enableSmartCommit": true,
+    "workbench.startupEditor": "readme",
+    "terminal.integrated.defaultProfile.linux": "bash",
+    "terminal.integrated.profiles.linux": {
+        "bash": {
+            "path": "/bin/bash",
+            "args": []
+        }
+    },
+    "remote.autoForwardPorts": true,
+    "remote.autoForwardPortsSource": "hybrid"
 }

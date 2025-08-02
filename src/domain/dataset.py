@@ -281,6 +281,7 @@ class SyntheticDatasetGenerator:
 
         metadata = {
             "type": "synthetic",
+            "generation_method": "noise_based",
             "center_string": center,
             "noise_rate": noise_rate,
             "generation_seed": seed,
@@ -313,7 +314,8 @@ class SyntheticDatasetGenerator:
             sequences.append(sequence)
 
         metadata = {
-            "type": "random",
+            "type": "synthetic",
+            "generation_method": "random",
             "generation_seed": seed,
             "alphabet_used": alphabet,
         }
@@ -363,7 +365,8 @@ class SyntheticDatasetGenerator:
             all_sequences.extend(cluster_dataset.sequences)
 
         metadata = {
-            "type": "clustered",
+            "type": "synthetic",
+            "generation_method": "clustered",
             "n_clusters": n_clusters,
             "sequences_per_cluster": sequences_per_cluster,
             "noise_rate": noise_rate,

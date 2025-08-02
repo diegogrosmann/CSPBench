@@ -11,7 +11,6 @@ from typing import Optional
 
 import typer
 
-from src.application.services.experiment_service import ExperimentService
 from src.domain import SyntheticDatasetGenerator
 from src.infrastructure.orchestrators.session_manager import SessionManager
 
@@ -27,7 +26,7 @@ def load_config():
         raise typer.Exit(1)
 
     try:
-        with open(config_path, "r", encoding="utf-8") as f:
+        with open(config_path, encoding="utf-8") as f:
             return yaml.safe_load(f)
     except Exception as e:
         typer.echo(f"❌ Error loading configuration: {e}")
@@ -75,9 +74,7 @@ def cleanup_old_sessions(keep_last: int = 10) -> None:
         config = load_config()
         session_mgr = SessionManager(config)
         session_mgr.cleanup_old_sessions(keep_last)
-        typer.echo(
-            f"🧹 Cleanup completed. Kept the {keep_last} most recent sessions."
-        )
+        typer.echo(f"🧹 Cleanup completed. Kept the {keep_last} most recent sessions.")
     except Exception as e:
         typer.echo(f"❌ Cleanup error: {e}")
 
@@ -107,7 +104,6 @@ def register_commands(app: typer.Typer, experiment_service_getter) -> None:
             )
 
             # Test available algorithm
-            import algorithms
             from src.domain.algorithms import global_registry
 
             available_algorithms = list(global_registry.keys())
@@ -187,10 +183,8 @@ def register_commands(app: typer.Typer, experiment_service_getter) -> None:
             result = service.run_batch(str(cfg))
 
             if verbose:
-                typer.echo(f"📊 Detailed results:")
-                for i, res in enumerate(
-                    result["results"][:5]
-                ):  # First 5 results
+                typer.echo("📊 Detailed results:")
+                for i, res in enumerate(result["results"][:5]):  # First 5 results
                     typer.echo(f"  Result {i+1}: {res}")
                 if len(result["results"]) > 5:
                     typer.echo(f"  ... and {len(result['results']) - 5} more results")
@@ -208,7 +202,6 @@ def register_commands(app: typer.Typer, experiment_service_getter) -> None:
             service = experiment_service_getter()  # To ensure initialization
 
             # Import from algorithms module to activate auto-discovery
-            import algorithms
             from src.domain.algorithms import global_registry
 
             typer.echo("🧠 Available algorithms:")
@@ -233,7 +226,7 @@ def register_commands(app: typer.Typer, experiment_service_getter) -> None:
                 typer.echo(f"❌ Configuration file not found: {config_path}")
                 raise typer.Exit(1)
 
-            with open(config_path, "r", encoding="utf-8") as f:
+            with open(config_path, encoding="utf-8") as f:
                 config = yaml.safe_load(f)
 
             app_info = config["application"]
@@ -251,11 +244,13 @@ def register_commands(app: typer.Typer, experiment_service_getter) -> None:
             typer.echo(
                 f"  • NCBI_API_KEY: {'defined' if os.getenv('NCBI_API_KEY') else 'not defined'}"
             )
-            typer.echo(
-                f"  • EXECUTOR_IMPL: {os.getenv('EXECUTOR_IMPL', 'not defined')}"
-            )
-            typer.echo(f"  • EXPORT_FMT: {os.getenv('EXPORT_FMT', 'not defined')}")
+            typer.echo(f"  • LOG_LEVEL: {os.getenv('LOG_LEVEL', 'not defined')}")
+            typer.echo(f"  • WEB_HOST: {os.getenv('WEB_HOST', 'not defined')}")
+            typer.echo(f"  • WEB_PORT: {os.getenv('WEB_PORT', 'not defined')}")
             typer.echo(f"  • DATASET_PATH: {os.getenv('DATASET_PATH', 'not defined')}")
+            typer.echo(f"  • OUTPUT_BASE_DIRECTORY: {os.getenv('OUTPUT_BASE_DIRECTORY', 'not defined')}")
+            typer.echo(f"  • OUTPUT_BASE_DIRECTORY: {os.getenv('OUTPUT_BASE_DIRECTORY', 'not defined')}")
+            typer.echo(f"  • FORCE_CLEANUP: {os.getenv('FORCE_CLEANUP', 'not defined')}")
 
         except Exception as e:
             typer.echo(f"❌ Error: {e}")
@@ -329,7 +324,7 @@ def register_commands(app: typer.Typer, experiment_service_getter) -> None:
                     try:
                         import json
 
-                        with open(result_path, "r") as f:
+                        with open(result_path) as f:
                             result_data = json.load(f)
 
                         if "summary" in result_data:
@@ -356,20 +351,21 @@ def register_commands(app: typer.Typer, experiment_service_getter) -> None:
             typer.echo(f"🖥️  Host: {host}")
             typer.echo(f"🔌 Port: {port}")
             typer.echo(f"🛠️  Mode: {'Development' if dev else 'Production'}")
-            
+
             # Check if web dependencies are available
             try:
                 import uvicorn
+
                 from src.presentation.web.app import app as web_app
             except ImportError as e:
                 typer.echo(f"❌ Web dependencies not installed: {e}")
                 typer.echo("💡 Install with: pip install -r requirements.web.txt")
                 raise typer.Exit(1)
-            
+
             typer.echo(f"\n🚀 Web interface starting at http://{host}:{port}")
             typer.echo("🔗 Click the link above or paste it into your browser")
             typer.echo("⏹️  Press Ctrl+C to stop the server")
-            
+
             # Start uvicorn server
             uvicorn.run(
                 "src.presentation.web.app:app",
@@ -377,9 +373,9 @@ def register_commands(app: typer.Typer, experiment_service_getter) -> None:
                 port=port,
                 reload=dev,
                 log_level="info" if dev else "warning",
-                access_log=dev
+                access_log=dev,
             )
-            
+
         except KeyboardInterrupt:
             typer.echo("\n🛑 Web server stopped")
         except Exception as e:

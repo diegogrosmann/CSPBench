@@ -10,7 +10,7 @@ import logging
 import os
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List
 
 import optuna
 from optuna.pruners import MedianPruner, SuccessiveHalvingPruner
@@ -68,16 +68,16 @@ class OptimizationOrchestrator:
 
         # Configuração de otimização
         self.optimization_config = config.get("optimization", {})
-        
+
         # Use new unified output configuration
         output_config = config.get("output", {})
         results_config = output_config.get("results", {})
         self.export_config = {
             "enabled": results_config.get("enabled", True),
             "formats": results_config.get("formats", {}),
-            "destination": output_config.get("base_directory", "outputs/{session}")
+            "destination": output_config.get("base_directory", "outputs/{session}"),
         }
-        
+
         self.monitoring_config = config.get("monitoring", {})
         self.resources_config = config.get("resources", {})
 
@@ -101,7 +101,7 @@ class OptimizationOrchestrator:
         # Carregar configuração principal
         config_path = Path("config/settings.yaml")
         if config_path.exists():
-            with open(config_path, "r", encoding="utf-8") as f:
+            with open(config_path, encoding="utf-8") as f:
                 settings = yaml.safe_load(f)
         else:
             settings = {}
@@ -128,7 +128,7 @@ class OptimizationOrchestrator:
                 .get("result", {})
                 .get("base_result_dir", "./outputs/results")
             )
-        
+
         session_folder = session_manager.get_session_folder()
 
         if session_folder:
@@ -435,14 +435,14 @@ class OptimizationOrchestrator:
         params = {}
         # Use parameters from the specific optimization configuration
         parameters_config = self.optimization_config.get("parameters", {})
-        
+
         # Handle case where parameters_config might contain algorithm name as key
         # Check if first level contains algorithm names (like 'BLF-GA', 'CSC')
         first_key = next(iter(parameters_config.keys())) if parameters_config else None
         if first_key and isinstance(parameters_config[first_key], dict):
             # Check if this looks like algorithm-specific config
             first_value = parameters_config[first_key]
-            if isinstance(first_value, dict) and 'type' not in first_value:
+            if isinstance(first_value, dict) and "type" not in first_value:
                 # This is likely an algorithm name, extract the actual parameters
                 algorithm_name = self.optimization_config.get("algorithm")
                 if algorithm_name in parameters_config:
@@ -685,7 +685,7 @@ class OptimizationOrchestrator:
                 # Carregar configuração principal para SessionManager
                 config_path = Path("config/settings.yaml")
                 if config_path.exists():
-                    with open(config_path, "r", encoding="utf-8") as f:
+                    with open(config_path, encoding="utf-8") as f:
                         settings = yaml.safe_load(f)
                 else:
                     settings = {}

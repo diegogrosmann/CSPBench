@@ -4,24 +4,25 @@ Testes unitários para ConfigurationParser.
 Testa o parsing e validação de configurações de batch.
 """
 
-import pytest
-import tempfile
 import json
-import yaml
+import tempfile
 from pathlib import Path
 
+import pytest
+import yaml
+
 from src.application.services.config_parser import (
+    BatchMetadata,
     ConfigurationParser,
     ConfigurationValidator,
-    BatchMetadata,
-    InfrastructureConfig,
     ExportConfig,
-    PlotsConfig,
-    MonitoringConfig,
+    InfrastructureConfig,
     LoggingConfig,
-    SystemConfig,
+    MonitoringConfig,
     OptimizationConfig,
+    PlotsConfig,
     SensitivityConfig,
+    SystemConfig,
 )
 from src.domain.errors import (
     BatchConfigurationError,
@@ -55,7 +56,7 @@ class TestConfigurationParser:
                 "result": {
                     "save_partial_results": True,
                     "partial_file": "partial.json",
-                }
+                },
             },
             "datasets": [
                 {
@@ -67,7 +68,7 @@ class TestConfigurationParser:
                         "L": 20,
                         "alphabet": "ACGT",
                         "noise": 0.1,
-                    }
+                    },
                 }
             ],
             "algorithms": [
@@ -75,9 +76,7 @@ class TestConfigurationParser:
                     "id": "test_config",
                     "nome": "Test Config",
                     "algorithms": ["Baseline"],
-                    "algorithm_params": {
-                        "Baseline": {"tie_break": "lex"}
-                    }
+                    "algorithm_params": {"Baseline": {"tie_break": "lex"}},
                 }
             ],
             "task": {"type": "execution"},
@@ -120,12 +119,12 @@ class TestConfigurationParser:
                     "max_workers": 4,
                     "internal_jobs": 2,
                 }
-            }
+            },
         }
 
     def test_load_file_yaml(self, valid_batch_config):
         """Test loading YAML file."""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(valid_batch_config, f)
             temp_path = f.name
 
@@ -137,7 +136,7 @@ class TestConfigurationParser:
 
     def test_load_file_json(self, valid_batch_config):
         """Test loading JSON file."""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
             json.dump(valid_batch_config, f)
             temp_path = f.name
 
@@ -154,7 +153,7 @@ class TestConfigurationParser:
 
     def test_load_file_unsupported_format(self):
         """Test loading unsupported file format."""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
             f.write("test content")
             temp_path = f.name
 
@@ -167,7 +166,7 @@ class TestConfigurationParser:
     def test_parse_metadata_success(self, valid_batch_config):
         """Test successful metadata parsing."""
         metadata = ConfigurationParser.parse_metadata(valid_batch_config)
-        
+
         assert isinstance(metadata, BatchMetadata)
         assert metadata.nome == "Test Batch"
         assert metadata.descricao == "Test description"
@@ -189,7 +188,7 @@ class TestConfigurationParser:
                 "timeout_global": 1800,
             }
         }
-        
+
         metadata = ConfigurationParser.parse_metadata(config)
         assert metadata.nome == "Legacy Batch"
         assert metadata.timeout_global == 1800
@@ -197,14 +196,16 @@ class TestConfigurationParser:
     def test_parse_metadata_missing(self):
         """Test parsing metadata when section is missing."""
         config = {"other_section": {}}
-        
-        with pytest.raises(BatchConfigurationError, match="metadados/batch_info section not found"):
+
+        with pytest.raises(
+            BatchConfigurationError, match="metadados/batch_info section not found"
+        ):
             ConfigurationParser.parse_metadata(config)
 
     def test_parse_infrastructure_config(self, valid_batch_config):
         """Test parsing infrastructure configuration."""
         config = ConfigurationParser.parse_infrastructure_config(valid_batch_config)
-        
+
         assert isinstance(config, InfrastructureConfig)
         assert config.history is not None
         assert config.history["save_history"] is True
@@ -214,7 +215,7 @@ class TestConfigurationParser:
     def test_parse_export_config(self, valid_batch_config):
         """Test parsing export configuration."""
         config = ConfigurationParser.parse_export_config(valid_batch_config)
-        
+
         assert isinstance(config, ExportConfig)
         assert config.enabled is True
         assert config.destination == "outputs/test"
@@ -223,7 +224,7 @@ class TestConfigurationParser:
     def test_parse_plots_config(self, valid_batch_config):
         """Test parsing plots configuration."""
         config = ConfigurationParser.parse_plots_config(valid_batch_config)
-        
+
         assert isinstance(config, PlotsConfig)
         assert config.enabled is True
         assert config.plot_convergence is True
@@ -232,7 +233,7 @@ class TestConfigurationParser:
     def test_parse_monitoring_config(self, valid_batch_config):
         """Test parsing monitoring configuration."""
         config = ConfigurationParser.parse_monitoring_config(valid_batch_config)
-        
+
         assert isinstance(config, MonitoringConfig)
         assert config.enabled is True
         assert config.interface == "simple"
@@ -241,7 +242,7 @@ class TestConfigurationParser:
     def test_parse_logging_config(self, valid_batch_config):
         """Test parsing logging configuration."""
         config = ConfigurationParser.parse_logging_config(valid_batch_config)
-        
+
         assert isinstance(config, LoggingConfig)
         assert config.level == "INFO"
         assert config.output["console"] is True
@@ -249,7 +250,7 @@ class TestConfigurationParser:
     def test_parse_system_config(self, valid_batch_config):
         """Test parsing system configuration."""
         config = ConfigurationParser.parse_system_config(valid_batch_config)
-        
+
         assert isinstance(config, SystemConfig)
         assert config.reproducibility["global_seed"] == 42
         assert config.checkpointing["enabled"] is True
@@ -257,7 +258,7 @@ class TestConfigurationParser:
     def test_parse_resources_config(self, valid_batch_config):
         """Test parsing resources configuration."""
         config = ConfigurationParser.parse_resources_config(valid_batch_config)
-        
+
         assert config["enabled"] is True
         assert config["max_workers"] == 4
         assert config["internal_jobs"] == 2
@@ -275,7 +276,7 @@ class TestConfigurationParser:
                 "timeout_global": 3600,
             }
         }
-        
+
         # Test that missing sections return default configurations
         infrastructure = ConfigurationParser.parse_infrastructure_config(minimal_config)
         export_config = ConfigurationParser.parse_export_config(minimal_config)
@@ -283,7 +284,7 @@ class TestConfigurationParser:
         monitoring_config = ConfigurationParser.parse_monitoring_config(minimal_config)
         logging_config = ConfigurationParser.parse_logging_config(minimal_config)
         system_config = ConfigurationParser.parse_system_config(minimal_config)
-        
+
         # Check defaults
         assert isinstance(infrastructure, InfrastructureConfig)
         assert export_config.enabled is True
@@ -308,18 +309,14 @@ class TestConfigurationParser:
                         "target_algorithm": "BLF-GA",
                         "parameters": {
                             "BLF-GA": {
-                                "pop_size": {
-                                    "type": "int",
-                                    "low": 50,
-                                    "high": 200
-                                }
+                                "pop_size": {"type": "int", "low": 50, "high": 200}
                             }
-                        }
+                        },
                     }
-                ]
+                ],
             }
         }
-        
+
         configs = ConfigurationParser.parse_optimization_configs(config)
         assert len(configs) == 1
         assert isinstance(configs[0], OptimizationConfig)
@@ -331,10 +328,7 @@ class TestConfigurationParser:
         config = {
             "sensitivity": {
                 "method": "SALib",
-                "global_salib_config": {
-                    "n_samples": 1000,
-                    "repetitions_per_sample": 3
-                },
+                "global_salib_config": {"n_samples": 1000, "repetitions_per_sample": 3},
                 "analyses": [
                     {
                         "nome": "Test Analysis",
@@ -345,15 +339,15 @@ class TestConfigurationParser:
                             "pop_size": {
                                 "type": "integer",
                                 "bounds": [50, 200],
-                                "default": 100
+                                "default": 100,
                             }
                         },
-                        "output_metrics": ["distance", "execution_time"]
+                        "output_metrics": ["distance", "execution_time"],
                     }
-                ]
+                ],
             }
         }
-        
+
         configs = ConfigurationParser.parse_sensitivity_configs(config)
         assert len(configs) == 1
         assert isinstance(configs[0], SensitivityConfig)
@@ -371,9 +365,9 @@ class TestConfigurationValidator:
             "datasets": [],
             "algorithms": [],
             "task": {"type": "execution"},
-            "execution": {}
+            "execution": {},
         }
-        
+
         task_type = ConfigurationValidator.validate_batch_structure(config)
         assert task_type == "execution"
 
@@ -384,9 +378,9 @@ class TestConfigurationValidator:
             "datasets": [],
             "algorithms": [],
             "task": {"type": "optimization"},
-            "optimization": {}
+            "optimization": {},
         }
-        
+
         task_type = ConfigurationValidator.validate_batch_structure(config)
         assert task_type == "optimization"
 
@@ -397,20 +391,16 @@ class TestConfigurationValidator:
             "datasets": [],
             "algorithms": [],
             "task": {"type": "sensitivity"},
-            "sensitivity": {}
+            "sensitivity": {},
         }
-        
+
         task_type = ConfigurationValidator.validate_batch_structure(config)
         assert task_type == "sensitivity"
 
     def test_validate_batch_structure_legacy(self):
         """Test validation of legacy batch structure."""
-        config = {
-            "experiments": [
-                {"algorithm": "baseline", "dataset": "test"}
-            ]
-        }
-        
+        config = {"experiments": [{"algorithm": "baseline", "dataset": "test"}]}
+
         task_type = ConfigurationValidator.validate_batch_structure(config)
         assert task_type == "execution"
 
@@ -418,10 +408,10 @@ class TestConfigurationValidator:
         """Test validation with missing required sections."""
         config = {
             "metadados": {"nome": "test"},
-            "task": {"type": "execution"}
+            "task": {"type": "execution"},
             # Missing datasets and algorithms
         }
-        
+
         with pytest.raises(BatchConfigurationError, match="Required sections missing"):
             ConfigurationValidator.validate_batch_structure(config)
 
@@ -433,17 +423,17 @@ class TestConfigurationValidator:
             "algorithms": [],
             "task": {"type": "execution"},
         }
-        
+
         task_type = ConfigurationValidator.validate_batch_structure(config)
         assert task_type == "execution"
 
     def test_validate_batch_structure_unrecognized(self):
         """Test validation with unrecognized structure."""
-        config = {
-            "unknown_section": {}
-        }
-        
-        with pytest.raises(BatchConfigurationError, match="Configuration structure not recognized"):
+        config = {"unknown_section": {}}
+
+        with pytest.raises(
+            BatchConfigurationError, match="Configuration structure not recognized"
+        ):
             ConfigurationValidator.validate_batch_structure(config)
 
     def test_validate_optimization_config(self):
@@ -456,9 +446,9 @@ class TestConfigurationValidator:
             timeout_per_trial=300,
             target_datasets=["dataset1"],
             target_algorithm="BLF-GA",
-            parameters={"param1": {"type": "int", "low": 1, "high": 10}}
+            parameters={"param1": {"type": "int", "low": 1, "high": 10}},
         )
-        
+
         # Should not raise exception
         ConfigurationValidator.validate_optimization_config(config)
 
@@ -472,10 +462,12 @@ class TestConfigurationValidator:
             timeout_per_trial=300,
             target_datasets=[],  # Empty
             target_algorithm="BLF-GA",
-            parameters={"param1": {"type": "int"}}
+            parameters={"param1": {"type": "int"}},
         )
-        
-        with pytest.raises(OptimizationConfigurationError, match="target_datasets list cannot be empty"):
+
+        with pytest.raises(
+            OptimizationConfigurationError, match="target_datasets list cannot be empty"
+        ):
             ConfigurationValidator.validate_optimization_config(config)
 
     def test_validate_sensitivity_config(self):
@@ -488,9 +480,9 @@ class TestConfigurationValidator:
             n_samples=1000,
             repetitions_per_sample=3,
             parameters={"param1": {"type": "integer", "bounds": [1, 10]}},
-            output_metrics=["distance"]
+            output_metrics=["distance"],
         )
-        
+
         # Should not raise exception
         ConfigurationValidator.validate_sensitivity_config(config)
 
@@ -504,8 +496,10 @@ class TestConfigurationValidator:
             n_samples=1000,
             repetitions_per_sample=3,
             parameters={"param1": {"type": "integer"}},
-            output_metrics=["distance"]
+            output_metrics=["distance"],
         )
-        
-        with pytest.raises(SensitivityConfigurationError, match="Invalid analysis method"):
+
+        with pytest.raises(
+            SensitivityConfigurationError, match="Invalid analysis method"
+        ):
             ConfigurationValidator.validate_sensitivity_config(config)

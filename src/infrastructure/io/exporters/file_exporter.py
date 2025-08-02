@@ -22,7 +22,11 @@ class FileExporter(ExportPort):
         self.output_path.mkdir(parents=True, exist_ok=True)
 
     def export_results(
-        self, results: Dict[str, Any], format_type: str, destination: str, options: Optional[Dict[str, Any]] = None
+        self,
+        results: Dict[str, Any],
+        format_type: str,
+        destination: str,
+        options: Optional[Dict[str, Any]] = None,
     ) -> str:
         """Export results in specific format."""
         dest_path = self.output_path / destination
@@ -54,7 +58,11 @@ class FileExporter(ExportPort):
         return str(dest_path)
 
     def export_batch_results(
-        self, batch_results: List[Dict[str, Any]], format_type: str, destination: str, options: Optional[Dict[str, Any]] = None
+        self,
+        batch_results: List[Dict[str, Any]],
+        format_type: str,
+        destination: str,
+        options: Optional[Dict[str, Any]] = None,
     ) -> str:
         """Export batch results."""
         dest_path = self.output_path / destination
@@ -116,24 +124,28 @@ class FileExporter(ExportPort):
         file_path.parent.mkdir(parents=True, exist_ok=True)
         self._write_json(data, file_path)
 
-    def _write_json(self, data: Any, dest_path: Path, options: Optional[Dict[str, Any]] = None) -> None:
+    def _write_json(
+        self, data: Any, dest_path: Path, options: Optional[Dict[str, Any]] = None
+    ) -> None:
         """Write data in JSON format."""
         # Get JSON format options
         json_options = options.get("json", {}) if options else {}
         indent = json_options.get("indent", 2)
         ensure_ascii = json_options.get("ensure_ascii", False)
-        
+
         with open(dest_path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=indent, ensure_ascii=ensure_ascii, default=str)
 
-    def _write_csv(self, data: Any, dest_path: Path, options: Optional[Dict[str, Any]] = None) -> None:
+    def _write_csv(
+        self, data: Any, dest_path: Path, options: Optional[Dict[str, Any]] = None
+    ) -> None:
         """Write data in CSV format."""
         # Get CSV format options
         csv_options = options.get("csv", {}) if options else {}
         separator = csv_options.get("separator", ",")
         encoding = csv_options.get("encoding", "utf-8")
         decimal = csv_options.get("decimal", ".")
-        
+
         if isinstance(data, list) and data:
             # Assume list of dictionaries
             fieldnames = set()
@@ -188,13 +200,23 @@ class FileExporter(ExportPort):
         """Write data in Parquet format."""
         try:
             import pandas as pd
-            
+
             # Convert data to DataFrame
             if isinstance(data, list) and data:
                 df = pd.DataFrame(data)
             elif isinstance(data, dict):
                 # Flatten dict or create single-row DataFrame
-                if all(isinstance(v, (list, tuple)) and len(set(len(v) if hasattr(v, '__len__') else 1 for v in data.values())) == 1 for v in data.values()):
+                if all(
+                    isinstance(v, (list, tuple))
+                    and len(
+                        set(
+                            len(v) if hasattr(v, "__len__") else 1
+                            for v in data.values()
+                        )
+                    )
+                    == 1
+                    for v in data.values()
+                ):
                     # All values are lists of same length
                     df = pd.DataFrame(data)
                 else:
@@ -203,15 +225,15 @@ class FileExporter(ExportPort):
             else:
                 # Convert to single-column DataFrame
                 df = pd.DataFrame({"data": [data]})
-            
+
             df.to_parquet(dest_path, index=False)
-            
+
         except ImportError:
             # Fallback to JSON if pandas/pyarrow not available
-            self._write_json(data, dest_path.with_suffix('.json'))
+            self._write_json(data, dest_path.with_suffix(".json"))
         except Exception:
             # Fallback to JSON on any error
-            self._write_json(data, dest_path.with_suffix('.json'))
+            self._write_json(data, dest_path.with_suffix(".json"))
 
     def _write_pickle(self, data: Any, dest_path: Path) -> None:
         """Write data in Pickle format."""
@@ -231,12 +253,12 @@ class FileExporter(ExportPort):
     def _sanitize_for_pickle(self, data: Any) -> Any:
         """
         Recursively sanitize data for pickle serialization.
-        
+
         Removes or converts non-serializable objects like module references,
         function objects, and other problematic types.
         """
         import types
-        
+
         if isinstance(data, dict):
             sanitized = {}
             for key, value in data.items():
@@ -249,12 +271,14 @@ class FileExporter(ExportPort):
                     if isinstance(value, types.ModuleType):
                         sanitized[key] = f"<module '{value.__name__}'>"
                     elif callable(value):
-                        sanitized[key] = f"<function '{getattr(value, '__name__', str(value))}'>"
-                    elif hasattr(value, '__dict__') and hasattr(value, '__class__'):
+                        sanitized[key] = (
+                            f"<function '{getattr(value, '__name__', str(value))}'>"
+                        )
+                    elif hasattr(value, "__dict__") and hasattr(value, "__class__"):
                         # For complex objects, try to extract serializable attributes
                         sanitized[key] = {
-                            '__class__': value.__class__.__name__,
-                            '__repr__': str(value)
+                            "__class__": value.__class__.__name__,
+                            "__repr__": str(value),
                         }
                     else:
                         sanitized[key] = str(value)

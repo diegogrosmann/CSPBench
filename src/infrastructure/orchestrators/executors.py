@@ -51,11 +51,14 @@ class Executor(ExecutorInterface):
             # Configure dependencies
             algorithm_registry = DomainAlgorithmRegistry()
             dataset_repository = FileDatasetRepository("./datasets")
-            
+
             # Try to create Entrez repository if available
             entrez_repository = None
             try:
-                from src.infrastructure.persistence.entrez_dataset_repository import NCBIEntrezDatasetRepository
+                from src.infrastructure.persistence.entrez_dataset_repository import (
+                    NCBIEntrezDatasetRepository,
+                )
+
                 entrez_repository = NCBIEntrezDatasetRepository()
                 if not entrez_repository.is_available():
                     entrez_repository = None
@@ -209,9 +212,7 @@ class Executor(ExecutorInterface):
 
         except Exception as e:
             self._logger.error(f"Error in sensitivity analysis: {e}")
-            raise AlgorithmExecutionError(
-                f"Error in sensitivity analysis: {e}"
-            ) from e
+            raise AlgorithmExecutionError(f"Error in sensitivity analysis: {e}") from e
 
     def execute_single(
         self,
@@ -246,11 +247,14 @@ class Executor(ExecutorInterface):
             # Configure dependencies
             algorithm_registry = DomainAlgorithmRegistry()
             dataset_repository = FileDatasetRepository("./datasets")
-            
-            # Try to create Entrez repository if available  
+
+            # Try to create Entrez repository if available
             entrez_repository = None
             try:
-                from src.infrastructure.persistence.entrez_dataset_repository import NCBIEntrezDatasetRepository
+                from src.infrastructure.persistence.entrez_dataset_repository import (
+                    NCBIEntrezDatasetRepository,
+                )
+
                 entrez_repository = NCBIEntrezDatasetRepository()
                 if not entrez_repository.is_available():
                     entrez_repository = None
@@ -282,9 +286,7 @@ class Executor(ExecutorInterface):
 
         except Exception as e:
             self._logger.error(f"Error in single execution: {e}")
-            raise AlgorithmExecutionError(
-                f"Error in single execution: {e}"
-            ) from e
+            raise AlgorithmExecutionError(f"Error in single execution: {e}") from e
 
     def get_execution_status(self, execution_id: str) -> str:
         """

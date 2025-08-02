@@ -43,7 +43,9 @@ steps:
       - '--timeout'
       - '900'
       - '--port'
-      - '8000'
+      - '8080'
+      - '--set-env-vars'
+      - 'PYTHONPATH=/app,PYTHONUNBUFFERED=1,PYTHONDONTWRITEBYTECODE=1,PORT=8080'
 
 substitutions:
   _REGION: us-central1

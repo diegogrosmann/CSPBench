@@ -1,0 +1,3 @@
+"""
+Core web application components.
+"""

@@ -24,12 +24,15 @@ class DatasetGenerator {
             // Type selector
             syntheticTab: document.getElementById('synthetic-tab'),
             ncbiTab: document.getElementById('ncbi-tab'),
+            uploadTab: document.getElementById('upload-tab'),
             syntheticGenerator: document.getElementById('synthetic-generator'),
             ncbiGenerator: document.getElementById('ncbi-generator'),
+            uploadGenerator: document.getElementById('upload-generator'),
             
             // Forms
             syntheticForm: document.getElementById('synthetic-form'),
             ncbiForm: document.getElementById('ncbi-form'),
+            uploadForm: document.getElementById('upload-form'),
             
             // Synthetic form elements
             syntheticAlphabet: document.getElementById('synthetic-alphabet'),
@@ -64,10 +67,12 @@ class DatasetGenerator {
         // Type switching
         this.elements.syntheticTab?.addEventListener('click', () => this.switchType('synthetic'));
         this.elements.ncbiTab?.addEventListener('click', () => this.switchType('ncbi'));
+        this.elements.uploadTab?.addEventListener('click', () => this.switchType('upload'));
         
         // Form submissions
         this.elements.syntheticForm?.addEventListener('submit', (e) => this.handleSyntheticSubmit(e));
         this.elements.ncbiForm?.addEventListener('submit', (e) => this.handleNCBISubmit(e));
+        this.elements.uploadForm?.addEventListener('submit', (e) => this.handleUploadSubmit(e));
         
         // Alphabet selection
         this.elements.syntheticAlphabet?.addEventListener('change', (e) => this.handleAlphabetChange(e));
@@ -96,10 +101,12 @@ class DatasetGenerator {
         // Update tabs
         this.elements.syntheticTab?.classList.toggle('active', type === 'synthetic');
         this.elements.ncbiTab?.classList.toggle('active', type === 'ncbi');
+        this.elements.uploadTab?.classList.toggle('active', type === 'upload');
         
         // Update generators
         this.elements.syntheticGenerator?.classList.toggle('active', type === 'synthetic');
         this.elements.ncbiGenerator?.classList.toggle('active', type === 'ncbi');
+        this.elements.uploadGenerator?.classList.toggle('active', type === 'upload');
         
         // Hide status and results when switching
         this.hideStatus();
@@ -307,6 +314,7 @@ class DatasetGenerator {
     
     async handleSyntheticSubmit(event) {
         event.preventDefault();
+        console.log('DatasetGenerator: handleSyntheticSubmit called');
         
         if (!this.validateForm(this.elements.syntheticForm)) {
             return;
@@ -314,6 +322,7 @@ class DatasetGenerator {
         
         const formData = new FormData(this.elements.syntheticForm);
         const params = this.extractSyntheticParams(formData);
+        console.log('DatasetGenerator: Sending params:', params);
         
         try {
             this.showStatus('Generating synthetic dataset...');
@@ -360,11 +369,11 @@ class DatasetGenerator {
     
     extractSyntheticParams(formData) {
         const params = {
-            n: parseInt(formData.get('sequences')),
-            length: parseInt(formData.get('length')),
+            num_strings: parseInt(formData.get('sequences')),
+            string_length: parseInt(formData.get('length')),
             alphabet: formData.get('alphabet') === 'custom' ? 
                      formData.get('custom_alphabet') : formData.get('alphabet'),
-            method: formData.get('method'),
+            generation_method: formData.get('method'),
             filename: formData.get('filename') || null
         };
         
@@ -381,18 +390,22 @@ class DatasetGenerator {
     }
     
     extractNCBIParams(formData) {
-        return {
+        const params = {
             query: formData.get('query'),
-            database: formData.get('database'),
+            sequence_type: formData.get('database'), // Map database to sequence_type
             max_sequences: parseInt(formData.get('max_sequences')),
-            min_length: parseInt(formData.get('min_length')),
-            max_length: parseInt(formData.get('max_length')),
+            email: 'web-interface@cspbench.local', // Default email for web interface
             filename: formData.get('filename') || null
         };
+        
+        // Note: min_length and max_length are not currently supported in the backend
+        // They would need to be added to NCBIDatasetRequest model if needed
+        
+        return params;
     }
     
     addMethodParams(params, formData) {
-        switch (params.method) {
+        switch (params.generation_method) {
             case 'noise':
                 const centerSequence = formData.get('center_sequence');
                 if (centerSequence) params.center_sequence = centerSequence;
@@ -441,14 +454,22 @@ class DatasetGenerator {
     }
     
     async handleGenerationResult(result, type) {
-        if (result.session_id) {
+        console.log('DatasetGenerator: handleGenerationResult called with:', result);
+        
+        if (result.status === 'completed' && result.filename) {
+            // Generation completed successfully
             this.currentSession = result.session_id;
-            
-            // Monitor progress
+            this.showResults(result);
+        } else if (result.status === 'failed') {
+            // Generation failed
+            throw new Error(result.error || 'Generation failed');
+        } else if (result.session_id && !result.filename) {
+            // Need to monitor progress (for long-running operations)
+            this.currentSession = result.session_id;
             await this.monitorGeneration(result.session_id);
         } else {
-            // Immediate result
-            this.showResults(result.result);
+            // Immediate result without session
+            this.showResults(result);
         }
     }
     
@@ -495,14 +516,18 @@ class DatasetGenerator {
         
         this.elements.resultsSection.style.display = 'block';
         
+        // Store download URL for later use
+        this.currentDownloadUrl = result.download_url;
+        
         // Populate dataset details
         this.populateDatasetDetails(result.dataset_info);
         
         // Show sequence preview
         this.populateSequencePreview(result.sequences);
         
-        // Set up download
+        // Set up download - use stored URL
         if (result.download_url) {
+            this.currentDownloadUrl = result.download_url;
             this.elements.downloadButton.onclick = () => {
                 window.open(result.download_url, '_blank');
             };
@@ -557,6 +582,15 @@ class DatasetGenerator {
         alert(`${message}\n\nError: ${error.message || error.toString()}`);
     }
     
+    showSuccess(message) {
+        this.hideStatus();
+        
+        console.log('Dataset Generator Success:', message);
+        
+        // Show success message with green background
+        alert(`✅ ${message}`);
+    }
+    
     cancelGeneration() {
         if (this.currentSession) {
             this.apiClient.cancelGeneration(this.currentSession);
@@ -566,7 +600,10 @@ class DatasetGenerator {
     }
     
     downloadDataset() {
-        if (this.currentSession) {
+        if (this.currentDownloadUrl) {
+            window.open(this.currentDownloadUrl, '_blank');
+        } else if (this.currentSession) {
+            // Fallback for old sessions
             window.open(`/api/dataset/download/${this.currentSession}`, '_blank');
         }
     }
@@ -627,14 +664,20 @@ class DatasetGenerator {
         try {
             this.elements.savedDatasetsList.innerHTML = '<div class="loading-message">Loading saved datasets...</div>';
             
-            const datasets = await this.apiClient.getSavedDatasets();
+            const response = await this.apiClient.getSavedDatasets();
             
-            if (datasets.length === 0) {
+            if (!Array.isArray(response)) {
+                console.error('Expected array, got:', typeof response, response);
+                this.elements.savedDatasetsList.innerHTML = '<div class="loading-message">Invalid data format received.</div>';
+                return;
+            }
+            
+            if (response.length === 0) {
                 this.elements.savedDatasetsList.innerHTML = '<div class="loading-message">No saved datasets found.</div>';
                 return;
             }
             
-            this.elements.savedDatasetsList.innerHTML = datasets.map(dataset => 
+            this.elements.savedDatasetsList.innerHTML = response.map(dataset => 
                 this.createDatasetItemHTML(dataset)
             ).join('');
             
@@ -649,25 +692,22 @@ class DatasetGenerator {
     
     createDatasetItemHTML(dataset) {
         return `
-            <div class="dataset-item" data-id="${dataset.id}">
+            <div class="dataset-item" data-filename="${dataset.filename}">
                 <div class="dataset-item-info">
                     <div class="dataset-item-name">${dataset.filename}</div>
                     <div class="dataset-item-details">
                         <span>📊 ${dataset.num_sequences} sequences</span>
                         <span>📏 ${dataset.sequence_length} bp</span>
                         <span>🧬 ${dataset.alphabet}</span>
-                        <span>📅 ${new Date(dataset.created_at).toLocaleDateString()}</span>
+                        <span>📅 ${new Date(dataset.created_at * 1000).toLocaleDateString()}</span>
                         <span>💾 ${dataset.file_size}</span>
                     </div>
                 </div>
                 <div class="dataset-item-actions">
-                    <button class="dataset-action-button download" onclick="window.datasetGenerator.downloadSavedDataset('${dataset.id}')">
+                    <button class="dataset-action-button download" onclick="window.datasetGenerator.downloadSavedDataset('${dataset.filename}')">
                         💾 Download
                     </button>
-                    <button class="dataset-action-button" onclick="window.datasetGenerator.useSavedDataset('${dataset.id}')">
-                        🚀 Use
-                    </button>
-                    <button class="dataset-action-button delete" onclick="window.datasetGenerator.deleteSavedDataset('${dataset.id}')">
+                    <button class="dataset-action-button delete" onclick="window.datasetGenerator.deleteSavedDataset('${dataset.filename}')">
                         🗑️ Delete
                     </button>
                 </div>
@@ -675,42 +715,86 @@ class DatasetGenerator {
         `;
     }
     
+    async handleUploadSubmit(e) {
+        e.preventDefault();
+        
+        const fileInput = document.getElementById('upload-file');
+        const nameInput = document.getElementById('upload-name');
+        
+        if (!fileInput.files[0]) {
+            this.showError('Please select a file to upload.');
+            return;
+        }
+        
+        const file = fileInput.files[0];
+        const fileName = nameInput.value.trim() || file.name;
+        
+        // Validate file type
+        if (!file.name.toLowerCase().endsWith('.fasta') && !file.name.toLowerCase().endsWith('.fa')) {
+            this.showError('Please select a valid FASTA file (.fasta or .fa).');
+            return;
+        }
+        
+        try {
+            this.showStatus('Uploading dataset...', 'info');
+            
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('name', fileName);
+            
+            const response = await fetch('/api/datasets/upload', {
+                method: 'POST',
+                body: formData
+            });
+            
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.detail || 'Upload failed');
+            }
+            
+            const result = await response.json();
+            
+            this.showSuccess(`Dataset "${fileName}" uploaded successfully!`);
+            
+            // Reset form first
+            this.elements.uploadForm.reset();
+            
+            // Hide status section to clean up the UI
+            this.hideStatus();
+            
+            // Refresh saved datasets list after a small delay to ensure file is processed
+            setTimeout(() => {
+                this.loadSavedDatasets();
+            }, 500);
+            
+        } catch (error) {
+            console.error('Upload failed:', error);
+            this.showError(`Upload failed: ${error.message}`);
+        }
+    }
+    
     bindDatasetActions() {
         // Actions are bound via onclick attributes in HTML
         // This could be refactored to use proper event delegation
     }
     
-    async downloadSavedDataset(datasetId) {
+    async downloadSavedDataset(filename) {
         try {
-            const downloadUrl = await this.apiClient.getDatasetDownloadUrl(datasetId);
+            // Create direct download URL for saved datasets
+            const downloadUrl = `/datasets/${filename}`;
             window.open(downloadUrl, '_blank');
         } catch (error) {
             alert('Failed to download dataset: ' + error.message);
         }
     }
     
-    async useSavedDataset(datasetId) {
-        try {
-            // Store dataset info for use in execution
-            localStorage.setItem('selectedDataset', JSON.stringify({
-                type: 'saved',
-                dataset_id: datasetId
-            }));
-            
-            // Navigate to single execution page
-            window.location.href = '/execution/single';
-        } catch (error) {
-            alert('Failed to select dataset: ' + error.message);
-        }
-    }
-    
-    async deleteSavedDataset(datasetId) {
+    async deleteSavedDataset(filename) {
         if (!confirm('Are you sure you want to delete this dataset? This action cannot be undone.')) {
             return;
         }
         
         try {
-            await this.apiClient.deleteDataset(datasetId);
+            await this.apiClient.deleteDataset(filename);
             this.loadSavedDatasets(); // Refresh list
         } catch (error) {
             alert('Failed to delete dataset: ' + error.message);
@@ -728,9 +812,4 @@ function switchDatasetType(type) {
 // Make DatasetGenerator globally available
 window.DatasetGenerator = DatasetGenerator;
 
-// Auto-initialize when DOM is ready
-document.addEventListener('DOMContentLoaded', function() {
-    if (document.querySelector('.dataset-generator-container')) {
-        window.datasetGenerator = new DatasetGenerator();
-    }
-});
+// Component is initialized by the template to avoid double initialization

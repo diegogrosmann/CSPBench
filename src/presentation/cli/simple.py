@@ -44,9 +44,7 @@ experiment_service = ExperimentService(
 def run(
     algorithm: str = typer.Argument(..., help="Algorithm name"),
     dataset: str = typer.Argument(..., help="Dataset path or name"),
-    output: Optional[str] = typer.Option(
-        None, "--output", "-o", help="Output file"
-    ),
+    output: Optional[str] = typer.Option(None, "--output", "-o", help="Output file"),
 ):
     """Execute an algorithm on a dataset."""
     try:

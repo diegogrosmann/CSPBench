@@ -4,15 +4,16 @@ Testes unitários para algoritmos CSP.
 Testa funcionalidades básicas dos algoritmos implementados.
 """
 
-import pytest
 from unittest.mock import Mock, patch
 
-from src.domain import Dataset, SyntheticDatasetGenerator
+import pytest
+
 from algorithms.baseline.algorithm import BaselineAlg
 from algorithms.blf_ga.algorithm import BLFGAAlgorithm
 from algorithms.csc.algorithm import CSCAlgorithm
-from algorithms.h3_csp.algorithm import H3CSPAlgorithm
 from algorithms.dp_csp.algorithm import DPCSPAlgorithm
+from algorithms.h3_csp.algorithm import H3CSPAlgorithm
+from src.domain import Dataset, SyntheticDatasetGenerator
 
 
 class TestBaselineAlgorithm:
@@ -40,7 +41,7 @@ class TestBaselineAlgorithm:
     def test_algorithm_run(self, algorithm):
         """Test algorithm execution."""
         result, distance, metadata = algorithm.run()
-        
+
         assert isinstance(result, str)
         assert isinstance(distance, int)
         assert isinstance(metadata, dict)
@@ -55,7 +56,7 @@ class TestBaselineAlgorithm:
             "random": BaselineAlg(small_dataset.sequences, "ACGT", tie_break="random"),
             "first": BaselineAlg(small_dataset.sequences, "ACGT", tie_break="first"),
         }
-        
+
         for name, algo in algorithms.items():
             result, distance, metadata = algo.run()
             assert isinstance(result, str)
@@ -88,12 +89,12 @@ class TestBLFGAAlgorithm:
     def algorithm(self, small_dataset):
         """BLF-GA algorithm instance."""
         return BLFGAAlgorithm(
-            small_dataset.sequences, 
+            small_dataset.sequences,
             "ACGT",
             pop_size=20,
             max_gens=10,  # Small for testing
             cross_prob=0.8,
-            mut_prob=0.1
+            mut_prob=0.1,
         )
 
     def test_algorithm_initialization(self, algorithm):
@@ -106,7 +107,7 @@ class TestBLFGAAlgorithm:
     def test_algorithm_run(self, algorithm):
         """Test algorithm execution."""
         result, distance, metadata = algorithm.run()
-        
+
         assert isinstance(result, str)
         assert isinstance(distance, int)
         assert isinstance(metadata, dict)
@@ -128,9 +129,9 @@ class TestBLFGAAlgorithm:
             elite_rate=0.1,
             initial_blocks=0.3,
             crossover_type="uniform",
-            mutation_type="inversion"
+            mutation_type="inversion",
         )
-        
+
         result, distance, metadata = algorithm.run()
         assert isinstance(result, str)
         assert isinstance(distance, int)
@@ -145,10 +146,10 @@ class TestBLFGAAlgorithm:
         algorithm2 = BLFGAAlgorithm(
             small_dataset.sequences, "ACGT", pop_size=10, max_gens=5, seed=123
         )
-        
+
         result1, distance1, _ = algorithm1.run()
         result2, distance2, _ = algorithm2.run()
-        
+
         # With same seed, should get same results
         assert result1 == result2
         assert distance1 == distance2
@@ -168,12 +169,12 @@ class TestCSCAlgorithm:
     def algorithm(self, small_dataset):
         """CSC algorithm instance."""
         return CSCAlgorithm(
-            small_dataset.sequences, 
+            small_dataset.sequences,
             "ACGT",
             min_d=1,
             d_factor=0.8,
             min_blocks=2,
-            max_blocks=4
+            max_blocks=4,
         )
 
     def test_algorithm_initialization(self, algorithm):
@@ -186,7 +187,7 @@ class TestCSCAlgorithm:
     def test_algorithm_run(self, algorithm):
         """Test algorithm execution."""
         result, distance, metadata = algorithm.run()
-        
+
         assert isinstance(result, str)
         assert isinstance(distance, int)
         assert isinstance(metadata, dict)
@@ -205,9 +206,9 @@ class TestCSCAlgorithm:
             d_factor=0.75,
             min_blocks=3,
             max_blocks=6,
-            l_div=20
+            l_div=20,
         )
-        
+
         result, distance, metadata = algorithm.run()
         assert isinstance(result, str)
         assert isinstance(distance, int)
@@ -229,12 +230,12 @@ class TestH3CSPAlgorithm:
     def algorithm(self, small_dataset):
         """H³-CSP algorithm instance."""
         return H3CSPAlgorithm(
-            small_dataset.sequences, 
+            small_dataset.sequences,
             "ACGT",
             auto_blocks=True,
             min_block_size=2,
             k_candidates=3,
-            local_iters=2
+            local_iters=2,
         )
 
     def test_algorithm_initialization(self, algorithm):
@@ -247,7 +248,7 @@ class TestH3CSPAlgorithm:
     def test_algorithm_run(self, algorithm):
         """Test algorithm execution."""
         result, distance, metadata = algorithm.run()
-        
+
         assert isinstance(result, str)
         assert isinstance(distance, int)
         assert isinstance(metadata, dict)
@@ -266,9 +267,9 @@ class TestH3CSPAlgorithm:
             block_size=3,
             k_candidates=4,
             local_iters=3,
-            fallback_enabled=True
+            fallback_enabled=True,
         )
-        
+
         result, distance, metadata = algorithm.run()
         assert isinstance(result, str)
         assert isinstance(distance, int)
@@ -290,10 +291,10 @@ class TestDPCSPAlgorithm:
     def algorithm(self, very_small_dataset):
         """DP-CSP algorithm instance."""
         return DPCSPAlgorithm(
-            very_small_dataset.sequences, 
+            very_small_dataset.sequences,
             "ACGT",
             max_d=3,
-            warn_threshold=10  # Small threshold for testing
+            warn_threshold=10,  # Small threshold for testing
         )
 
     def test_algorithm_initialization(self, algorithm):
@@ -306,7 +307,7 @@ class TestDPCSPAlgorithm:
     def test_algorithm_run(self, algorithm):
         """Test algorithm execution."""
         result, distance, metadata = algorithm.run()
-        
+
         assert isinstance(result, str)
         assert isinstance(distance, int)
         assert isinstance(metadata, dict)
@@ -319,13 +320,9 @@ class TestDPCSPAlgorithm:
     def test_algorithm_with_seed(self, very_small_dataset):
         """Test algorithm with seed for reproducibility."""
         algorithm = DPCSPAlgorithm(
-            very_small_dataset.sequences,
-            "ACGT",
-            max_d=2,
-            warn_threshold=20,
-            seed=456
+            very_small_dataset.sequences, "ACGT", max_d=2, warn_threshold=20, seed=456
         )
-        
+
         result, distance, metadata = algorithm.run()
         assert isinstance(result, str)
         assert isinstance(distance, int)
@@ -337,15 +334,12 @@ class TestDPCSPAlgorithm:
         large_dataset = SyntheticDatasetGenerator.generate_random(
             n=15, length=10, alphabet="ACGT", seed=42
         )
-        
+
         # Should handle large dataset gracefully
         algorithm = DPCSPAlgorithm(
-            large_dataset.sequences,
-            "ACGT",
-            max_d=2,
-            warn_threshold=10
+            large_dataset.sequences, "ACGT", max_d=2, warn_threshold=10
         )
-        
+
         # Should still work but might be slow or issue warnings
         result, distance, metadata = algorithm.run()
         assert isinstance(result, str)
@@ -368,13 +362,15 @@ class TestAlgorithmCommon:
             BaselineAlg(test_dataset.sequences, "ACGT"),
             BLFGAAlgorithm(test_dataset.sequences, "ACGT", pop_size=10, max_gens=5),
             CSCAlgorithm(test_dataset.sequences, "ACGT", min_d=1, max_blocks=3),
-            H3CSPAlgorithm(test_dataset.sequences, "ACGT", k_candidates=2, local_iters=1),
+            H3CSPAlgorithm(
+                test_dataset.sequences, "ACGT", k_candidates=2, local_iters=1
+            ),
             DPCSPAlgorithm(test_dataset.sequences, "ACGT", max_d=2),
         ]
-        
+
         for algorithm in algorithms:
             result, distance, metadata = algorithm.run()
-            
+
             # Common assertions for all algorithms
             assert isinstance(result, str)
             assert isinstance(distance, int)
@@ -382,8 +378,8 @@ class TestAlgorithmCommon:
             assert distance >= 0
             assert len(result) == len(test_dataset.sequences[0])
             assert all(c in algorithm.alphabet for c in result)
-            assert hasattr(algorithm, 'name')
-            assert hasattr(algorithm, 'is_deterministic')
+            assert hasattr(algorithm, "name")
+            assert hasattr(algorithm, "is_deterministic")
 
     def test_algorithm_metadata_consistency(self, test_dataset):
         """Test that algorithm metadata is consistent."""
@@ -394,10 +390,10 @@ class TestAlgorithmCommon:
             H3CSPAlgorithm(test_dataset.sequences, "ACGT"),
             DPCSPAlgorithm(test_dataset.sequences, "ACGT", max_d=2),
         ]
-        
+
         for algorithm in algorithms:
             _, _, metadata = algorithm.run()
-            
+
             # Common metadata checks
             assert "algorithm" in metadata
             assert metadata["algorithm"] == algorithm.name
@@ -408,24 +404,24 @@ class TestAlgorithmCommon:
     def test_algorithm_result_validation(self, test_dataset):
         """Test that algorithm results are valid closest strings."""
         from src.domain.metrics import hamming_distance
-        
+
         algorithms = [
             BaselineAlg(test_dataset.sequences, "ACGT"),
             BLFGAAlgorithm(test_dataset.sequences, "ACGT", pop_size=10, max_gens=5),
         ]
-        
+
         for algorithm in algorithms:
             result, reported_distance, _ = algorithm.run()
-            
+
             # Verify the reported distance is correct
             max_hamming = max(
                 hamming_distance(result, seq) for seq in test_dataset.sequences
             )
             assert reported_distance == max_hamming
-            
+
             # Verify result is in the correct alphabet
             assert all(c in algorithm.alphabet for c in result)
-            
+
             # Verify result has correct length
             assert len(result) == len(test_dataset.sequences[0])
 
@@ -436,7 +432,7 @@ class TestAlgorithmEdgeCases:
     def test_algorithms_with_single_sequence(self):
         """Test algorithms with a single sequence."""
         sequences = ["ACGTACGT"]
-        
+
         algorithms = [
             BaselineAlg(sequences, "ACGT"),
             BLFGAAlgorithm(sequences, "ACGT", pop_size=5, max_gens=3),
@@ -444,10 +440,10 @@ class TestAlgorithmEdgeCases:
             H3CSPAlgorithm(sequences, "ACGT"),
             DPCSPAlgorithm(sequences, "ACGT", max_d=1),
         ]
-        
+
         for algorithm in algorithms:
             result, distance, metadata = algorithm.run()
-            
+
             # With single sequence, closest string should be the sequence itself
             assert result == sequences[0]
             assert distance == 0
@@ -455,7 +451,7 @@ class TestAlgorithmEdgeCases:
     def test_algorithms_with_identical_sequences(self):
         """Test algorithms with identical sequences."""
         sequences = ["ACGTACGT", "ACGTACGT", "ACGTACGT"]
-        
+
         algorithms = [
             BaselineAlg(sequences, "ACGT"),
             BLFGAAlgorithm(sequences, "ACGT", pop_size=5, max_gens=3),
@@ -463,10 +459,10 @@ class TestAlgorithmEdgeCases:
             H3CSPAlgorithm(sequences, "ACGT"),
             DPCSPAlgorithm(sequences, "ACGT", max_d=1),
         ]
-        
+
         for algorithm in algorithms:
             result, distance, metadata = algorithm.run()
-            
+
             # With identical sequences, closest string should be any of them
             assert result == sequences[0]
             assert distance == 0
@@ -474,7 +470,7 @@ class TestAlgorithmEdgeCases:
     def test_algorithms_with_very_short_sequences(self):
         """Test algorithms with very short sequences."""
         sequences = ["AC", "AT", "AG"]
-        
+
         algorithms = [
             BaselineAlg(sequences, "ACGT"),
             BLFGAAlgorithm(sequences, "ACGT", pop_size=5, max_gens=3),
@@ -482,10 +478,10 @@ class TestAlgorithmEdgeCases:
             H3CSPAlgorithm(sequences, "ACGT", min_block_size=1),
             DPCSPAlgorithm(sequences, "ACGT", max_d=2),
         ]
-        
+
         for algorithm in algorithms:
             result, distance, metadata = algorithm.run()
-            
+
             assert len(result) == 2
             assert all(c in "ACGT" for c in result)
             assert distance >= 0

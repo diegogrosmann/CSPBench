@@ -2,52 +2,113 @@
 
 {% block title %}CSPBench - Single Execution{% endblock %}
 
-{% block breadcrumb %}
-<span class="breadcrumb-separator">›</span>
-<span class="current">Single Execution</span>
+{% block breadcrumb_items %}
+<li class="breadcrumb-item active" aria-current="page">Single Execution</li>
+{% endblock %}
+
+{% block header %}
+<div class="text-center mb-5">
+    <div class="hero-section p-4 rounded-4 shadow" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+        <h1 class="h2 fw-bold text-white mb-2">
+            <i class="bi bi-rocket-takeoff me-3"></i>Single Algorithm Execution
+        </h1>
+        <p class="text-white-50 mb-0">
+            Configure and execute a single algorithm on your dataset
+        </p>
+    </div>
+</div>
 {% endblock %}
 
 {% block content %}
-<div class="single-execution-container">
-    <div class="execution-header">
-        <h2>🚀 Single Algorithm Execution</h2>
-        <p>Configure and execute a single algorithm on your dataset.</p>
-    </div>
-    
-    <form id="execution-form" class="execution-form">
-        <!-- Step 1: Algorithm Selection -->
-        <div class="form-step active" data-step="1">
-            <div class="step-header">
-                <h3><span class="step-number">1</span> Select Algorithm</h3>
-                <p>Choose the CSP algorithm you want to execute.</p>
-            </div>
-            
-            <div class="algorithm-selector-component">
-                <!-- This will be populated by the AlgorithmSelector component -->
-            </div>
-            
-            <div class="step-actions">
-                <button type="button" class="btn btn-primary" onclick="nextStep()" disabled id="step1-next">
-                    Next: Configure Dataset
-                </button>
+<div class="row">
+    <div class="col-12">
+        <!-- Progress Stepper -->
+        <div class="card shadow mb-4">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div class="step-item active" data-step="1">
+                        <div class="step-circle">
+                            <i class="bi bi-cpu"></i>
+                        </div>
+                        <span class="step-label">Algorithm</span>
+                    </div>
+                    <div class="step-connector"></div>
+                    <div class="step-item" data-step="2">
+                        <div class="step-circle">
+                            <i class="bi bi-database"></i>
+                        </div>
+                        <span class="step-label">Dataset</span>
+                    </div>
+                    <div class="step-connector"></div>
+                    <div class="step-item" data-step="3">
+                        <div class="step-circle">
+                            <i class="bi bi-sliders"></i>
+                        </div>
+                        <span class="step-label">Parameters</span>
+                    </div>
+                    <div class="step-connector"></div>
+                    <div class="step-item" data-step="4">
+                        <div class="step-circle">
+                            <i class="bi bi-play-circle"></i>
+                        </div>
+                        <span class="step-label">Execute</span>
+                    </div>
+                </div>
             </div>
         </div>
-        
-        <!-- Step 2: Dataset Configuration -->
-        <div class="form-step" data-step="2">
-            <div class="step-header">
-                <h3><span class="step-number">2</span> Configure Dataset</h3>
-                <p>Provide the dataset for algorithm execution.</p>
+
+        <form id="execution-form" class="execution-form">
+            <!-- Step 1: Algorithm Selection -->
+            <div class="form-step active" data-step="1">
+                <div class="card shadow">
+                    <div class="card-header">
+                        <h4 class="card-title mb-0">
+                            <i class="bi bi-cpu me-2 text-primary"></i>
+                            Step 1: Select Algorithm
+                        </h4>
+                        <p class="card-subtitle text-muted mb-0 mt-1">
+                            Choose the CSP algorithm you want to execute
+                        </p>
+                    </div>
+                    <div class="card-body">
+                        <div class="algorithm-selector-component" data-algorithm-selector>
+                            <!-- Algorithm selector will be initialized here -->
+                        </div>
+                    </div>
+                    <div class="card-footer bg-transparent">
+                        <div class="d-flex justify-content-end">
+                            <button type="button" class="btn btn-primary btn-lg" onclick="nextStep()" disabled id="step1-next">
+                                <i class="bi bi-arrow-right me-2"></i>
+                                Next: Configure Dataset
+                            </button>
+                        </div>
+                    </div>
+                </div>
             </div>
             
-            <div class="dataset-selector-component">
-                <!-- This will be populated by the DatasetSelector component -->
-            </div>
-            
-            <div class="step-actions">
-                <button type="button" class="btn btn-secondary" onclick="prevStep()">
-                    Previous
-                </button>
+            <!-- Step 2: Dataset Configuration -->
+            <div class="form-step" data-step="2" style="display: none;">
+                <div class="card shadow">
+                    <div class="card-header">
+                        <h4 class="card-title mb-0">
+                            <i class="bi bi-database me-2 text-success"></i>
+                            Step 2: Configure Dataset
+                        </h4>
+                        <p class="card-subtitle text-muted mb-0 mt-1">
+                            Provide the dataset for algorithm execution
+                        </p>
+                    </div>
+                    <div class="card-body">
+                        <div class="dataset-selector-component">
+                            <!-- Dataset selector will be initialized here -->
+                        </div>
+                    </div>
+                    <div class="card-footer bg-transparent">
+                        <div class="d-flex justify-content-between">
+                            <button type="button" class="btn btn-outline-secondary btn-lg" onclick="prevStep()">
+                                <i class="bi bi-arrow-left me-2"></i>
+                                Previous
+                            </button>
                 <button type="button" class="btn btn-primary" onclick="nextStep()" disabled id="step2-next">
                     Next: Set Parameters
                 </button>

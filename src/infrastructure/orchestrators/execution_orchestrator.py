@@ -9,78 +9,85 @@ import json
 import os
 import time
 import uuid
-from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from multiprocessing import cpu_count
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 # IMPORTANT: Import algorithms first to load the global_registry
 import algorithms
-
 from src.domain import Dataset
+from src.domain.algorithms import global_registry
 from src.domain.errors import AlgorithmExecutionError
 from src.infrastructure.logging_config import get_logger
 from src.infrastructure.orchestrators.base_orchestrator import BaseOrchestrator
-from src.infrastructure.resource_control import create_resource_controller, ResourceController
+from src.infrastructure.resource_control import (
+    ResourceController,
+    create_resource_controller,
+)
 
 
-def _execute_algorithm_static(algorithm_name: str, dataset_data: dict, params: dict, rep_num: int, execution_metadata: dict):
+def _execute_algorithm_static(
+    algorithm_name: str,
+    dataset_data: dict,
+    params: dict,
+    rep_num: int,
+    execution_metadata: dict,
+):
     """
     Static function to execute algorithm - required for ProcessPoolExecutor.
-    
+
     Args:
         algorithm_name: Name of algorithm to execute
         dataset_data: Serializable dataset data
         params: Algorithm parameters
         rep_num: Repetition number
         execution_metadata: Execution metadata
-        
+
     Returns:
         tuple: (rep_num, repetition_results) or (rep_num, exception_info)
     """
     try:
         from src.domain.algorithms import global_registry
         from src.domain.dataset import Dataset
-        
+
         # Get logger for this process
         logger = get_logger(__name__)
-        
+
         # Reconstruct dataset
         dataset = Dataset(
-            sequences=dataset_data['sequences'],
-            metadata=dataset_data.get('metadata', {})
+            sequences=dataset_data["sequences"],
+            metadata=dataset_data.get("metadata", {}),
         )
-        
+
         # Set dataset name if provided (for identification purposes)
-        dataset_name = dataset_data.get('name', 'unknown')
-        
+        dataset_name = dataset_data.get("name", "unknown")
+
         # Get algorithm instance
         algorithm_class = global_registry.get(algorithm_name)
         if not algorithm_class:
             raise AlgorithmExecutionError(f"Algorithm '{algorithm_name}' not found")
-        
+
         # Create algorithm instance with correct parameters (STANDARD INTERFACE)
         # All algorithms use: __init__(strings, alphabet, **params) + run()
         algorithm_instance = algorithm_class(
-            strings=dataset.sequences,
-            alphabet=dataset.alphabet,
-            **params
+            strings=dataset.sequences, alphabet=dataset.alphabet, **params
         )
-        
+
         # Execute algorithm using STANDARD INTERFACE (no parameters)
         logger.info(f"Starting repetition {rep_num} of {algorithm_name}")
         start_time = time.time()
-        
+
         result = algorithm_instance.run()  # Standard interface - uses constructor data
-        
+
         execution_time = time.time() - start_time
-        
+
         # Build result data with only serializable components
         if isinstance(result, tuple) and len(result) >= 3:
             best_string, max_distance, metadata = result[:3]
         else:
             best_string, max_distance, metadata = str(result), 0, {}
-        
+
         # Sanitize metadata
         clean_metadata = {}
         if isinstance(metadata, dict):
@@ -92,35 +99,48 @@ def _execute_algorithm_static(algorithm_name: str, dataset_data: dict, params: d
                 except (TypeError, ValueError):
                     # Convert to string if not serializable
                     clean_metadata[key] = str(value)
-        
+
         repetition_result = {
-            'repetition': rep_num,
-            'best_string': str(best_string),
-            'distance': int(max_distance) if isinstance(max_distance, (int, float)) else 0,
-            'execution_time': execution_time,
-            'metadata': clean_metadata,
-            'algorithm': algorithm_name,
-            'dataset': dataset_name
+            "repetition": rep_num,
+            "best_string": str(best_string),
+            "distance": (
+                int(max_distance) if isinstance(max_distance, (int, float)) else 0
+            ),
+            "execution_time": execution_time,
+            "metadata": clean_metadata,
+            "algorithm": algorithm_name,
+            "dataset": dataset_name,
         }
-        
-        logger.info(f"Completed repetition {rep_num} of {algorithm_name} in {execution_time:.2f}s")
+
+        logger.info(
+            f"Completed repetition {rep_num} of {algorithm_name} in {execution_time:.2f}s"
+        )
         return (rep_num, repetition_result)
-        
+
     except Exception as e:
         logger = get_logger(__name__)
         logger.error(f"Error in repetition {rep_num} of {algorithm_name}: {e}")
-        return (rep_num, {
-            'error': str(e),
-            'repetition': rep_num,
-            'algorithm': algorithm_name,
-            'dataset': dataset_data.get('name', 'unknown')
-        })
+        return (
+            rep_num,
+            {
+                "error": str(e),
+                "repetition": rep_num,
+                "algorithm": algorithm_name,
+                "dataset": dataset_data.get("name", "unknown"),
+            },
+        )
 
 
 class ExecutionOrchestrator(BaseOrchestrator):
     """Orchestrator responsible for CSP algorithm execution."""
 
-    def __init__(self, algorithm_registry, dataset_repository, monitoring_service=None, entrez_repository=None):
+    def __init__(
+        self,
+        algorithm_registry,
+        dataset_repository,
+        monitoring_service=None,
+        entrez_repository=None,
+    ):
         """
         Initialize execution orchestrator.
 
@@ -167,9 +187,13 @@ class ExecutionOrchestrator(BaseOrchestrator):
                 # Apply initial resource limits
                 self._resource_controller.apply_cpu_limits()
                 self._resource_controller.apply_memory_limits()
-                self._logger.info("[RESOURCE] Resource controller initialized and limits applied")
+                self._logger.info(
+                    "[RESOURCE] Resource controller initialized and limits applied"
+                )
             except Exception as e:
-                self._logger.warning(f"[RESOURCE] Failed to initialize resource controller: {e}")
+                self._logger.warning(
+                    f"[RESOURCE] Failed to initialize resource controller: {e}"
+                )
                 self._resource_controller = None
 
         # Configure partial saving if enabled
@@ -200,14 +224,14 @@ class ExecutionOrchestrator(BaseOrchestrator):
         from src.domain.algorithms import global_registry
 
         # Debug: Log available algorithms
-        self._logger.debug(f"Available algorithms in registry: {list(global_registry.keys())}")
+        self._logger.debug(
+            f"Available algorithms in registry: {list(global_registry.keys())}"
+        )
         self._logger.debug(f"Looking for algorithm: {algorithm_name}")
 
         # Check if algorithm exists
         if algorithm_name not in global_registry:
-            raise AlgorithmExecutionError(
-                f"Algorithm '{algorithm_name}' not found"
-            )
+            raise AlgorithmExecutionError(f"Algorithm '{algorithm_name}' not found")
 
         algorithm_class = global_registry[algorithm_name]
         params = params or {}
@@ -219,13 +243,17 @@ class ExecutionOrchestrator(BaseOrchestrator):
 
             # Injetar parâmetros de histórico se habilitados
             # Support both template format (enabled/frequency) and implementation format (save_history/history_frequency)
-            history_enabled = history_config.get("enabled", history_config.get("save_history", False))
-            
+            history_enabled = history_config.get(
+                "enabled", history_config.get("save_history", False)
+            )
+
             if history_enabled:
                 params = params.copy()  # Não modificar o original
                 params["save_history"] = True
                 # Support both template format (frequency) and implementation format (history_frequency)
-                frequency = history_config.get("frequency", history_config.get("history_frequency", 1))
+                frequency = history_config.get(
+                    "frequency", history_config.get("history_frequency", 1)
+                )
                 params["history_frequency"] = frequency
 
         # Cria identificador único para execução
@@ -266,7 +294,7 @@ class ExecutionOrchestrator(BaseOrchestrator):
                 if self._resource_controller:
                     # Check batch timeout before starting algorithm
                     self._resource_controller.check_batch_timeout()
-                    
+
                     # Execute with algorithm timeout
                     with self._resource_controller.algorithm_timeout():
                         best_string, max_distance, metadata = algorithm.run()
@@ -274,7 +302,9 @@ class ExecutionOrchestrator(BaseOrchestrator):
                     # Fallback execution without resource control
                     best_string, max_distance, metadata = algorithm.run()
             except TimeoutError as e:
-                self._logger.error(f"[RESOURCE] Algorithm {algorithm_name} timed out: {e}")
+                self._logger.error(
+                    f"[RESOURCE] Algorithm {algorithm_name} timed out: {e}"
+                )
                 # Return timeout result
                 end_time = time.time()
                 return {
@@ -294,7 +324,9 @@ class ExecutionOrchestrator(BaseOrchestrator):
                 }
             except Exception as e:
                 if "Resource limit" in str(e) or "Memory limit" in str(e):
-                    self._logger.error(f"[RESOURCE] Algorithm {algorithm_name} exceeded resource limits: {e}")
+                    self._logger.error(
+                        f"[RESOURCE] Algorithm {algorithm_name} exceeded resource limits: {e}"
+                    )
                     # Return resource limit result
                     end_time = time.time()
                     return {
@@ -307,7 +339,9 @@ class ExecutionOrchestrator(BaseOrchestrator):
                         "metadata": {"error": str(e), "resource_limit_exceeded": True},
                         "dataset": {
                             "size": len(dataset.sequences),
-                            "length": len(dataset.sequences[0]) if dataset.sequences else 0,
+                            "length": (
+                                len(dataset.sequences[0]) if dataset.sequences else 0
+                            ),
                             "alphabet": dataset.alphabet,
                         },
                         "status": "resource_limit",
@@ -315,7 +349,7 @@ class ExecutionOrchestrator(BaseOrchestrator):
                 else:
                     # Re-raise other exceptions
                     raise
-                    
+
             end_time = time.time()
 
             # Constroi resultado
@@ -559,7 +593,7 @@ class ExecutionOrchestrator(BaseOrchestrator):
                 )
                 result["dataset"] = exp["dataset"]
                 results.append(result)
-                print(f"[DEBUG] Resultado adicionado com sucesso")
+                print("[DEBUG] Resultado adicionado com sucesso")
 
                 # Salvar resultado parcial se habilitado
                 if self._should_save_partial_results():
@@ -621,7 +655,7 @@ class ExecutionOrchestrator(BaseOrchestrator):
         with open(self._partial_results_file, "w", encoding="utf-8") as f:
             json.dump([], f)
 
-        print(f"✅ Sistema de salvamento parcial inicializado")
+        print("✅ Sistema de salvamento parcial inicializado")
 
     def _save_partial_result(self, result: Dict[str, Any]) -> None:
         """Save a partial result to file."""
@@ -631,7 +665,7 @@ class ExecutionOrchestrator(BaseOrchestrator):
         try:
             # Carregar resultados existentes
             if os.path.exists(self._partial_results_file):
-                with open(self._partial_results_file, "r", encoding="utf-8") as f:
+                with open(self._partial_results_file, encoding="utf-8") as f:
                     existing_results = json.load(f)
             else:
                 existing_results = []
@@ -735,17 +769,19 @@ class ExecutionOrchestrator(BaseOrchestrator):
             if algorithm_config is None:
                 error_msg = f"Algorithm config is None for dataset {dataset_id}"
                 self._logger.error(error_msg)
-                return [{
-                    "execution_name": execution.get("name", "unknown"),
-                    "dataset_id": dataset_id,
-                    "status": "error",
-                    "error": error_msg,
-                    "execution_time": 0.0,
-                }]
-            
+                return [
+                    {
+                        "execution_name": execution.get("name", "unknown"),
+                        "dataset_id": dataset_id,
+                        "status": "error",
+                        "error": error_msg,
+                        "execution_time": 0.0,
+                    }
+                ]
+
             # Carregar dataset baseado no tipo
             dataset_type = dataset_config["type"]
-            
+
             if dataset_type == "file":
                 filename = dataset_config["parameters"]["filename"]
                 dataset = dataset_repo.load(filename)
@@ -759,26 +795,32 @@ class ExecutionOrchestrator(BaseOrchestrator):
                         "Entrez dataset repository not available. "
                         "Check NCBI_EMAIL environment variable and Biopython installation."
                     )
-                
+
                 params = dataset_config.get("parameters", {})
                 query = params.get("query")
                 if not query:
-                    raise ValueError("Field 'query' is required for entrez dataset type")
-                
+                    raise ValueError(
+                        "Field 'query' is required for entrez dataset type"
+                    )
+
                 db = params.get("db", "nucleotide")
                 retmax = params.get("retmax", 20)
-                
+
                 # Fetch dataset from NCBI
                 # Extract only additional parameters, avoiding duplicates
-                additional_params = {k: v for k, v in params.items() 
-                                   if k not in ['query', 'db', 'retmax']}
-                
+                additional_params = {
+                    k: v
+                    for k, v in params.items()
+                    if k not in ["query", "db", "retmax"]
+                }
+
                 sequences, metadata = self._entrez_repository.fetch_dataset(
                     query=query, db=db, retmax=retmax, **additional_params
                 )
-                
+
                 # Create Dataset object
                 from src.domain import Dataset
+
                 dataset = Dataset(
                     sequences=sequences,
                     metadata={
@@ -788,13 +830,15 @@ class ExecutionOrchestrator(BaseOrchestrator):
                         "retmax": retmax,
                         "n_obtained": len(sequences),
                         "L": len(sequences[0]) if sequences else 0,
-                        **metadata
-                    }
+                        **metadata,
+                    },
                 )
-                
+
                 self._logger.info(
                     "Created Entrez dataset: n=%d, L=%d, query='%s'",
-                    len(sequences), len(sequences[0]) if sequences else 0, query
+                    len(sequences),
+                    len(sequences[0]) if sequences else 0,
+                    query,
                 )
             else:
                 raise ValueError(f"Unsupported dataset type: {dataset_type}")
@@ -873,8 +917,9 @@ class ExecutionOrchestrator(BaseOrchestrator):
         try:
             # Recriar objeto Dataset a partir dos dados serializáveis
             from src.domain import Dataset
-            dataset = Dataset(dataset_data['sequences'], dataset_data['alphabet'])
-            
+
+            dataset = Dataset(dataset_data["sequences"], dataset_data["alphabet"])
+
             # Executar algoritmo (sem monitoring_service pois não é thread-safe)
             result = self.execute_single(
                 algorithm_name, dataset, params, monitoring_service=None
@@ -882,7 +927,9 @@ class ExecutionOrchestrator(BaseOrchestrator):
 
             # Sanitizar metadados para serialização
             if "metadata" in result:
-                result["metadata"] = self._sanitize_metadata_for_process(result["metadata"])
+                result["metadata"] = self._sanitize_metadata_for_process(
+                    result["metadata"]
+                )
 
             # Adicionar informações de contexto
             result.update(
@@ -901,13 +948,16 @@ class ExecutionOrchestrator(BaseOrchestrator):
 
             # Sanitizar todo o resultado para garantir serialização
             result = self._sanitize_metadata_for_process(result)
-            
+
             # Teste final de serialização para debug
             try:
                 import pickle
+
                 pickle.dumps(result)
             except Exception as pickle_error:
-                self._logger.error(f"Resultado ainda não é serializável após sanitização: {pickle_error}")
+                self._logger.error(
+                    f"Resultado ainda não é serializável após sanitização: {pickle_error}"
+                )
                 # Fallback: converter tudo para strings
                 result = {
                     "algorithm": algorithm_name,
@@ -918,18 +968,24 @@ class ExecutionOrchestrator(BaseOrchestrator):
                     "params": str(result.get("params", {})),
                     "metadata": str(result.get("metadata", {})),
                     "dataset": {
-                        "size": len(dataset_data['sequences']),
-                        "length": len(dataset_data['sequences'][0]) if dataset_data['sequences'] else 0,
-                        "alphabet": dataset_data['alphabet']
+                        "size": len(dataset_data["sequences"]),
+                        "length": (
+                            len(dataset_data["sequences"][0])
+                            if dataset_data["sequences"]
+                            else 0
+                        ),
+                        "alphabet": dataset_data["alphabet"],
                     },
                     "status": "completed",
-                    "execution_name": execution_context.get("execution_name", "unknown"),
+                    "execution_name": execution_context.get(
+                        "execution_name", "unknown"
+                    ),
                     "dataset_id": execution_context.get("dataset_id", "unknown"),
                     "algorithm_id": execution_context.get("algorithm_id", "unknown"),
                     "algorithm_name": algorithm_name,
                     "repetition": rep_number,
                     "total_repetitions": total_repetitions,
-                    "serialization_fallback": True
+                    "serialization_fallback": True,
                 }
 
             return result
@@ -952,13 +1008,13 @@ class ExecutionOrchestrator(BaseOrchestrator):
     def _sanitize_metadata_for_process(self, metadata: Any) -> Any:
         """
         Sanitiza metadados para serialização em ProcessPoolExecutor.
-        
+
         Remove ou converte objetos não serializáveis para garantir que
         os resultados possam ser transferidos entre processos.
         """
-        import types
         import pickle
-        
+        import types
+
         if isinstance(metadata, dict):
             sanitized = {}
             for key, value in metadata.items():
@@ -971,15 +1027,17 @@ class ExecutionOrchestrator(BaseOrchestrator):
                     if isinstance(value, types.ModuleType):
                         sanitized[key] = f"<module '{value.__name__}'>"
                     elif callable(value):
-                        sanitized[key] = f"<function '{getattr(value, '__name__', str(value))}'>"
-                    elif hasattr(value, '__dict__') and hasattr(value, '__class__'):
+                        sanitized[key] = (
+                            f"<function '{getattr(value, '__name__', str(value))}'>"
+                        )
+                    elif hasattr(value, "__dict__") and hasattr(value, "__class__"):
                         # Para objetos complexos, extrai atributos serializáveis
                         try:
                             class_name = value.__class__.__name__
                             repr_str = str(value)
                             sanitized[key] = {
-                                '__class__': class_name,
-                                '__repr__': repr_str
+                                "__class__": class_name,
+                                "__repr__": repr_str,
                             }
                         except:
                             sanitized[key] = str(value)
@@ -1009,7 +1067,7 @@ class ExecutionOrchestrator(BaseOrchestrator):
         if self._current_batch_config and self._current_batch_config is not None:
             resources = self._current_batch_config.get("resources", {})
             parallel_config = resources.get("parallel", {})
-            
+
             # Handle different formats for parallel config
             if isinstance(parallel_config, int):
                 # Direct integer value for max_workers
@@ -1222,25 +1280,29 @@ class ExecutionOrchestrator(BaseOrchestrator):
         for rep in range(repetitions):
             # Preparar dados serializáveis do dataset
             dataset_data = {
-                'name': execution_context.get('dataset_id', 'unknown'),  # Use dataset_id from context
-                'sequences': dataset.sequences,
-                'metadata': getattr(dataset, 'metadata', {})  # Safe access to metadata
+                "name": execution_context.get(
+                    "dataset_id", "unknown"
+                ),  # Use dataset_id from context
+                "sequences": dataset.sequences,
+                "metadata": getattr(dataset, "metadata", {}),  # Safe access to metadata
             }
-            
+
             # Preparar metadados de execução serializáveis
             execution_metadata = {
-                'session_id': str(execution_context.get('session_id', '')),
-                'timestamp': execution_context.get('timestamp', ''),
-                'repetitions': repetitions
+                "session_id": str(execution_context.get("session_id", "")),
+                "timestamp": execution_context.get("timestamp", ""),
+                "repetitions": repetitions,
             }
-            
-            args_list.append((
-                algorithm_name,
-                dataset_data,
-                params,
-                rep + 1,  # rep_num
-                execution_metadata
-            ))
+
+            args_list.append(
+                (
+                    algorithm_name,
+                    dataset_data,
+                    params,
+                    rep + 1,  # rep_num
+                    execution_metadata,
+                )
+            )
 
         # Executar em paralelo
         with ProcessPoolExecutor(max_workers=max_workers) as executor:
@@ -1274,21 +1336,27 @@ class ExecutionOrchestrator(BaseOrchestrator):
                     returned_rep_num, result_data = future.result()
 
                     # Verificar se houve erro (result_data contém 'error')
-                    if isinstance(result_data, dict) and 'error' in result_data:
+                    if isinstance(result_data, dict) and "error" in result_data:
                         self._logger.error(
                             f"Erro na execução do algoritmo {algorithm_name} (rep {returned_rep_num}): {result_data.get('error')}"
                         )
 
                         # Criar resultado de erro compatível
                         error_result = {
-                            "execution_name": execution_context.get("execution_name", "unknown"),
-                            "dataset_id": execution_context.get("dataset_id", "unknown"),
-                            "algorithm_id": execution_context.get("algorithm_id", "unknown"),
+                            "execution_name": execution_context.get(
+                                "execution_name", "unknown"
+                            ),
+                            "dataset_id": execution_context.get(
+                                "dataset_id", "unknown"
+                            ),
+                            "algorithm_id": execution_context.get(
+                                "algorithm_id", "unknown"
+                            ),
                             "algorithm_name": algorithm_name,
                             "repetition": returned_rep_num,
                             "total_repetitions": repetitions,
                             "status": "error",
-                            "error": result_data.get('error'),
+                            "error": result_data.get("error"),
                             "execution_time": 0.0,
                         }
 
@@ -1300,7 +1368,7 @@ class ExecutionOrchestrator(BaseOrchestrator):
                                 error_result,
                                 result_data.get("error", "Unknown error"),
                             )
-                        
+
                         results.append(error_result)
                     else:
                         self._logger.debug(
@@ -1309,17 +1377,23 @@ class ExecutionOrchestrator(BaseOrchestrator):
 
                         # Criar resultado de sucesso compatível
                         success_result = {
-                            "execution_name": execution_context.get("execution_name", "unknown"),
-                            "dataset_id": execution_context.get("dataset_id", "unknown"),
-                            "algorithm_id": execution_context.get("algorithm_id", "unknown"),
+                            "execution_name": execution_context.get(
+                                "execution_name", "unknown"
+                            ),
+                            "dataset_id": execution_context.get(
+                                "dataset_id", "unknown"
+                            ),
+                            "algorithm_id": execution_context.get(
+                                "algorithm_id", "unknown"
+                            ),
                             "algorithm_name": algorithm_name,
                             "repetition": returned_rep_num,
                             "total_repetitions": repetitions,
                             "status": "success",
-                            "best_string": result_data.get('best_string', ''),
-                            "distance": result_data.get('distance', 0),
-                            "execution_time": result_data.get('execution_time', 0.0),
-                            "metadata": result_data.get('metadata', {}),
+                            "best_string": result_data.get("best_string", ""),
+                            "distance": result_data.get("distance", 0),
+                            "execution_time": result_data.get("execution_time", 0.0),
+                            "metadata": result_data.get("metadata", {}),
                         }
 
                         # Notificar monitoramento de conclusão

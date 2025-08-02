@@ -2,7 +2,7 @@
 
 from typing import Any, Dict, Optional
 
-from .interfaces import MonitoringInterface, TaskType
+from .interfaces import MonitoringInterface
 from .simple_monitor import SimpleMonitor
 
 # from .tui_monitor import TUIMonitor  # Temporariamente desabilitado

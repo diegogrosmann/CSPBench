@@ -136,7 +136,7 @@ class SimpleMonitor(MonitoringInterface):
         print(f"📋\tBatch: {self.task_name}")
         if self.start_time:
             print(f"⏰\tIniciado: {self.start_time.strftime('%Y-%m-%d %H:%M:%S')}")
-        print(f"=" * 50)
+        print("=" * 50)
         self.header_printed = True
 
     def update_hierarchy(
@@ -238,7 +238,7 @@ class SimpleMonitor(MonitoringInterface):
                 # Listar todos os algoritmos da configuração
                 for algo_name in algorithm_names:
                     print(f"• {algo_name}")
-                    print(f"[░░░░░░░░░░░░░░░░░░░░] 0%")
+                    print("[░░░░░░░░░░░░░░░░░░░░] 0%")
 
                 # Adicionar informações do tipo de task se for otimização
                 if self.task_type == TaskType.OPTIMIZATION:
@@ -437,7 +437,7 @@ class SimpleMonitor(MonitoringInterface):
     ) -> None:
         """Finaliza monitoramento da tarefa."""
         if success:
-            print(f"\n\n✅ Monitoramento concluído!")
+            print("\n\n✅ Monitoramento concluído!")
         else:
             print(f"❌ Erro: {error_message}")
 

@@ -7,7 +7,7 @@ synthetic and real datasets, following hexagonal architecture.
 
 import re
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Optional
 
 
 class DatasetWizard:
@@ -208,10 +208,10 @@ class DatasetWizard:
         Returns:
             Nome final do arquivo
         """
-        print(f"\n📁 Nome do arquivo de saída:")
+        print("\n📁 Nome do arquivo de saída:")
         print(f"   Padrão sugerido: {default_name}")
 
-        filename = input(f"💾 Nome do arquivo (Enter para usar padrão): ").strip()
+        filename = input("💾 Nome do arquivo (Enter para usar padrão): ").strip()
 
         if not filename:
             filename = default_name

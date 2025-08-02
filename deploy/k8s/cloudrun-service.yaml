@@ -24,16 +24,18 @@ spec:
       containers:
       - image: cspbench-web
         ports:
-        - containerPort: 8000
+        - containerPort: 8080
         env:
         - name: PORT
-          value: "8000"
+          value: "8080"
         - name: HOST
           value: "0.0.0.0"
         - name: WORKERS
           value: "1"
         - name: PYTHONUNBUFFERED
           value: "1"
+        - name: PYTHONPATH
+          value: "/app"
         # Resource requests and limits
         resources:
           requests:

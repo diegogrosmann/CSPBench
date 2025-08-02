@@ -60,8 +60,8 @@ class SensitivityOrchestrator:
             self._logger.info(
                 "Iniciando análise de sensibilidade para %s", algorithm_name
             )
-            
-            print(f"DEBUG: Starting sensitivity analysis")
+
+            print("DEBUG: Starting sensitivity analysis")
             print(f"DEBUG: algorithm_name = {algorithm_name}")
             print(f"DEBUG: dataset = {dataset}")
             print(f"DEBUG: sensitivity_config = {sensitivity_config}")
@@ -72,7 +72,7 @@ class SensitivityOrchestrator:
             parameters = sensitivity_config["parameters"]
             print(f"DEBUG: parameters = {parameters}")
             print(f"DEBUG: parameters type = {type(parameters)}")
-            
+
             n_samples = sensitivity_config.get("n_samples", 1000)
             repetitions = sensitivity_config.get("repetitions_per_sample", 3)
             output_metrics = sensitivity_config.get(
@@ -143,17 +143,17 @@ class SensitivityOrchestrator:
         Returns:
             Dict[str, Any]: Definição do problema SALib
         """
-        print(f"DEBUG: Creating SALib problem")
+        print("DEBUG: Creating SALib problem")
         print(f"DEBUG: parameters = {parameters}")
         print(f"DEBUG: parameters type = {type(parameters)}")
-        
+
         problem_def = {"num_vars": len(parameters), "names": [], "bounds": []}
 
         for param_name, param_config in parameters.items():
             print(f"DEBUG: Processing parameter {param_name}")
             print(f"DEBUG: param_config = {param_config}")
             print(f"DEBUG: param_config type = {type(param_config)}")
-            
+
             problem_def["names"].append(param_name)
 
             param_type = param_config.get("type", "float")
@@ -169,7 +169,9 @@ class SensitivityOrchestrator:
                 print(f"DEBUG: categorical values = {values}")
                 problem_def["bounds"].append([0, len(values) - 1])
             else:
-                print(f"DEBUG: Unknown param_type {param_type}, defaulting to float bounds")
+                print(
+                    f"DEBUG: Unknown param_type {param_type}, defaulting to float bounds"
+                )
                 bounds = param_config.get("bounds", [0.0, 1.0])
                 problem_def["bounds"].append(bounds)
 
@@ -332,10 +334,10 @@ class SensitivityOrchestrator:
             Dict[str, Any]: Parâmetros do algoritmo
         """
         params = {}
-        print(f"DEBUG: Converting sample to params")
+        print("DEBUG: Converting sample to params")
         print(f"DEBUG: problem_def names: {problem_def['names']}")
         print(f"DEBUG: sample values: {sample}")
-        
+
         for name, value in zip(problem_def["names"], sample):
             print(f"DEBUG: Processing parameter {name} = {value}")
             # Converter para tipo apropriado baseado no nome do parâmetro
@@ -379,7 +381,11 @@ class SensitivityOrchestrator:
                 # Parâmetros categóricos - mapear índice para valor real
                 # Definir mapeamentos conhecidos
                 categorical_maps = {
-                    "crossover_method": ["one_point", "uniform", "blend_blocks"],  # Add crossover_method mapping
+                    "crossover_method": [
+                        "one_point",
+                        "uniform",
+                        "blend_blocks",
+                    ],  # Add crossover_method mapping
                     "crossover_type": ["one_point", "uniform", "blend_blocks"],
                     "mutation_type": ["multi", "inversion", "transposition"],
                     "selection_type": ["tournament", "roulette", "ranking"],
