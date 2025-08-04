@@ -1,27 +1,54 @@
 """Simple monitor for terminal."""
 
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, List
+import sys
+import os
+
+# Import do novo monitor hierárquico
+try:
+    # Adicionar path dinâmico para importar do diretório principal
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    workspace_dir = os.path.join(current_dir, '..', '..', '..')
+    sys.path.insert(0, workspace_dir)
+    
+    from hierarchical_simple_monitor import HierarchicalSimpleMonitor
+    HIERARCHICAL_AVAILABLE = True
+except ImportError:
+    HIERARCHICAL_AVAILABLE = False
 
 from .interfaces import (
     ExecutionLevel,
     HierarchicalContext,
     MonitoringInterface,
     TaskType,
+    ExecutionHierarchy,
+    ActiveRun,
+    CallbackEntry,
 )
+from .hierarchy_parser import HierarchyParser
 
 
 class SimpleMonitor(MonitoringInterface):
-    """Simple monitor that displays progress in terminal."""
+    """Simple monitor that displays progress in terminal with hierarchical support."""
 
     def __init__(self):
+        # Tentar usar o monitor hierárquico se disponível
+        if HIERARCHICAL_AVAILABLE:
+            self._hierarchical_monitor = HierarchicalSimpleMonitor()
+            self._use_hierarchical = True
+        else:
+            self._hierarchical_monitor = None
+            self._use_hierarchical = False
+        
+        # Manter campos legados para compatibilidade
         self.task_type: Optional[TaskType] = None
         self.task_name: str = ""
         self.start_time: Optional[datetime] = None
         self.header_printed: bool = False
-        self.last_execution_name: str = ""  # Control duplication
+        self.last_execution_name: str = ""
 
-        # Hierarchical control
+        # Hierarchical control (legado)
         self.current_config_id: Optional[str] = None
         self.current_config_index: int = 0
         self.total_configs: int = 0
@@ -30,12 +57,17 @@ class SimpleMonitor(MonitoringInterface):
         self.current_dataset_index: int = 0
         self.total_datasets: int = 0
 
-        # Current dataset algorithm state
+        # Current dataset algorithm state (legado)
         self.current_algorithms: Dict[str, Dict[str, Any]] = {}
         self.algorithm_order: list[str] = []
 
-        # Repetition mapping for algorithms
+        # Repetition mapping for algorithms (legado)
         self.algorithm_repetitions: Dict[str, Dict[str, Any]] = {}
+
+    def initialize_hierarchy(self, hierarchy: ExecutionHierarchy) -> None:
+        """Inicializa estrutura hierárquica."""
+        if self._use_hierarchical:
+            self._hierarchical_monitor.initialize_hierarchy(hierarchy)
 
     def start_task(
         self, task_type: TaskType, task_name: str, config: Dict[str, Any]
@@ -45,6 +77,19 @@ class SimpleMonitor(MonitoringInterface):
         self.task_name = task_name
         self.start_time = datetime.now()
         self.header_printed = False
+        
+        if self._use_hierarchical:
+            # Tentar extrair hierarquia da configuração
+            try:
+                hierarchy = HierarchyParser.parse_yaml_hierarchy(config)
+                self._hierarchical_monitor.initialize_hierarchy(hierarchy)
+                self._hierarchical_monitor.start_task(task_type, task_name, config)
+                return
+            except Exception:
+                # Fallback para método legado
+                self._use_hierarchical = False
+        
+        # Método legado
         self._print_header()
 
     def start_item(
@@ -124,7 +169,7 @@ class SimpleMonitor(MonitoringInterface):
     def _print_header(self) -> None:
         """Imprime cabeçalho do monitor."""
         if self.task_type == TaskType.EXECUTION:
-            print("CSPBench - Monitoramento de Execução")
+            print("CSPBench - Execution Monitoring")
         elif self.task_type == TaskType.OPTIMIZATION:
             print("CSPBench - Monitoramento de Otimização")
         elif self.task_type == TaskType.SENSITIVITY:
@@ -177,7 +222,7 @@ class SimpleMonitor(MonitoringInterface):
                     total_algorithms = data.get("total_algorithms", 0)
 
                     # Extrair dados de execução e dataset
-                    execution_name = data.get("execution_name", "Execução")
+                    execution_name = data.get("execution_name", "Execution")
                     config_index = data.get("config_index", 1)
                     total_configs = data.get("total_configs", 1)
 
@@ -210,7 +255,7 @@ class SimpleMonitor(MonitoringInterface):
 
                     if exec_name_display != self.last_execution_name:
                         print(
-                            f"\n\n⚡ Execução: {exec_name_display} ({display_config_index}/{display_total_configs})"
+                            f"\n\n⚡ Execution: {exec_name_display} ({display_config_index}/{display_total_configs})"
                         )
                         self.last_execution_name = exec_name_display
 
@@ -228,7 +273,7 @@ class SimpleMonitor(MonitoringInterface):
                 self.algorithm_repetitions = {}
 
                 # Exibir informações do dataset
-                print(f"📊 Configuração do Algoritmo: {algorithm_config_name}")
+                print(f"📊 Algorithm Configuration: {algorithm_config_name}")
                 print(f"🗂️ Dataset: {dataset_name}")
 
                 # Obter lista de algoritmos da configuração

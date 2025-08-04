@@ -7,15 +7,16 @@ Modular design with proper separation of concerns.
 
 import logging
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
 from .core.config import web_config
-from .routes import algorithms, batch_execution, datasets, execution, health, pages, results
+from .routes import algorithms, batch_execution, datasets, health, pages, results
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -26,6 +27,8 @@ app = FastAPI(
     title="CSPBench - Closest String Problem Benchmark",
     description="Web interface for running and comparing CSP algorithms",
     version="1.0.0",
+    docs_url=None,  # Disable API docs
+    redoc_url=None,  # Disable ReDoc
 )
 
 # Middleware
@@ -56,9 +59,12 @@ app.include_router(health.router)
 app.include_router(pages.router)
 app.include_router(algorithms.router)
 app.include_router(datasets.router)
-app.include_router(execution.router)
 app.include_router(batch_execution.router)
 app.include_router(results.router)
+
+# Include hierarchical monitoring routes
+from .routes import hierarchical_monitoring
+app.include_router(hierarchical_monitoring.router)
 
 # Include simple datasets router for testing
 from .routes import datasets_simple
@@ -69,6 +75,17 @@ app.include_router(datasets_simple.router)
 from .routes import test_debug
 
 app.include_router(test_debug.router)
+
+
+@app.get("/test-progress")
+async def test_progress_page():
+    """Serve test progress page for debugging."""
+    try:
+        with open("/workspaces/CSPBench/test_progress.html", "r") as f:
+            html_content = f.read()
+        return HTMLResponse(content=html_content)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error loading test page: {e}")
 
 
 @app.on_event("startup")

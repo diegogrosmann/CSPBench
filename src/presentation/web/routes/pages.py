@@ -22,11 +22,8 @@ async def execution_page(request: Request, execution_type: str):
     """Execution pages for different types."""
     # Map short names to full template names
     type_mapping = {
-        "single": "single_execution",
-        "single_execution": "single_execution",
         "batch": "batch_execution",
         "comparison": "algorithm_comparison",
-        "optimization": "parameter_optimization",
         "benchmark": "benchmark_suite",
         "custom": "custom_workflow",
         "generator": "dataset_generator",
@@ -40,9 +37,9 @@ async def execution_page(request: Request, execution_type: str):
             template_file, {"request": request, "execution_type": execution_type}
         )
     except Exception:
-        # Fallback to single execution if template not found
+        # Fallback to batch execution if template not found
         return templates.TemplateResponse(
-            "single_execution.html",
+            "batch_execution.html",
             {"request": request, "execution_type": execution_type},
         )
 

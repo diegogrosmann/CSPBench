@@ -41,27 +41,6 @@
             "subProcess": true
         },
         {
-            "name": "Debug Web Interface Direct (FastAPI)",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/src/presentation/web/run_web.py",
-            "console": "integratedTerminal",
-            "cwd": "${workspaceFolder}",
-            "python": "${workspaceFolder}/.venv/bin/python",
-            "env": {
-                "PYTHONPATH": "${workspaceFolder}",
-                "PYTHONDONTWRITEBYTECODE": "1",
-                "DEBUG": "true",
-                "WEB_HOST": "0.0.0.0",
-                "WEB_PORT": "8000"
-            },
-            "args": [],
-            "justMyCode": false,
-            "stopOnEntry": false,
-            "showReturnValue": true,
-            "subProcess": true
-        },
-        {
             "name": "Debug CSPBench Test",
             "type": "debugpy",
             "request": "launch",
@@ -81,69 +60,5 @@
             "showReturnValue": true,
             "subProcess": true
         },
-        {
-            "name": "Debug Algorithm Execution",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/main.py",
-            "console": "integratedTerminal",
-            "cwd": "${workspaceFolder}",
-            "python": "${workspaceFolder}/.venv/bin/python",
-            "env": {
-                "PYTHONPATH": "${workspaceFolder}",
-                "PYTHONDONTWRITEBYTECODE": "1"
-            },
-            "args": [
-                "run",
-                "Baseline",
-                "example.fasta"
-            ],
-            "justMyCode": false,
-            "stopOnEntry": false,
-            "showReturnValue": true,
-            "subProcess": true
-        },
-        {
-            "name": "Debug Batch Execution",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/main.py",
-            "console": "integratedTerminal",
-            "cwd": "${workspaceFolder}",
-            "python": "${workspaceFolder}/.venv/bin/python",
-            "env": {
-                "PYTHONPATH": "${workspaceFolder}",
-                "PYTHONDONTWRITEBYTECODE": "1"
-            },
-            "args": [
-                "batch",
-                "batches/TEMPLATE.yaml"
-            ],
-            "justMyCode": false,
-            "stopOnEntry": false,
-            "showReturnValue": true,
-            "subProcess": true
-        },
-        {
-            "name": "Debug Pytest Tests",
-            "type": "debugpy",
-            "request": "launch",
-            "module": "pytest",
-            "console": "integratedTerminal",
-            "cwd": "${workspaceFolder}",
-            "python": "${workspaceFolder}/.venv/bin/python",
-            "env": {
-                "PYTHONPATH": "${workspaceFolder}",
-                "PYTHONDONTWRITEBYTECODE": "1"
-            },
-            "args": [
-                "tests/",
-                "-v",
-                "--tb=short"
-            ],
-            "justMyCode": false,
-            "stopOnEntry": false,
-            "showReturnValue": true
-        }
     ]
 }

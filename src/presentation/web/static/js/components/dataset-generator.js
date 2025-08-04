@@ -616,8 +616,8 @@ class DatasetGenerator {
                 session_id: this.currentSession
             }));
             
-            // Navigate to single execution page
-            window.location.href = '/execution/single';
+            // Navigate to batch execution page
+            window.location.href = '/execution/batch';
         }
     }
     

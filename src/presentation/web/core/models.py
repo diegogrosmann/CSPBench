@@ -7,8 +7,6 @@ from typing import Dict, List, Optional
 
 from pydantic import BaseModel, validator
 
-from .security import SecurityValidator
-
 
 class AlgorithmInfo(BaseModel):
     """Information about an available algorithm."""
@@ -19,44 +17,6 @@ class AlgorithmInfo(BaseModel):
     is_deterministic: bool
     supports_internal_parallel: bool
     category: Optional[str] = None
-
-
-class ExecutionRequest(BaseModel):
-    """Request for algorithm execution."""
-
-    algorithm: str
-    dataset_content: Optional[str] = None
-    dataset_name: Optional[str] = "uploaded_dataset.fasta"
-    parameters: Dict = {}
-    save_history: bool = False
-    timeout: int = 300
-
-    @validator("algorithm")
-    def validate_algorithm(cls, v):
-        if not v or not isinstance(v, str):
-            raise ValueError("Algorithm name is required")
-        return v
-
-    @validator("dataset_name")
-    def validate_dataset_name(cls, v):
-        return SecurityValidator.sanitize_filename(v) if v else "uploaded_dataset.fasta"
-
-    @validator("timeout")
-    def validate_timeout(cls, v):
-        if v < 10 or v > 3600:
-            raise ValueError("Timeout must be between 10 and 3600 seconds")
-        return v
-
-
-class ExecutionResult(BaseModel):
-    """Result of algorithm execution."""
-
-    session_id: str
-    status: str
-    result: Optional[Dict] = None
-    error: Optional[str] = None
-    download_url: Optional[str] = None
-    timestamp: str = datetime.now().isoformat()
 
 
 class HealthCheck(BaseModel):

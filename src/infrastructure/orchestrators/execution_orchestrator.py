@@ -140,6 +140,7 @@ class ExecutionOrchestrator(BaseOrchestrator):
         dataset_repository,
         monitoring_service=None,
         entrez_repository=None,
+        session_manager=None,
     ):
         """
         Initialize execution orchestrator.
@@ -149,11 +150,13 @@ class ExecutionOrchestrator(BaseOrchestrator):
             dataset_repository: Dataset repository
             monitoring_service: Optional monitoring service
             entrez_repository: Optional Entrez dataset repository
+            session_manager: Optional session manager for paths and sessions
         """
         super().__init__(monitoring_service)
         self._algorithm_registry = algorithm_registry
         self._dataset_repository = dataset_repository
         self._entrez_repository = entrez_repository
+        self._session_manager = session_manager
         self._executions: Dict[str, Dict[str, Any]] = {}
         self._current_batch_config: Optional[Dict[str, Any]] = None
         self._partial_results_file: Optional[str] = None
@@ -277,12 +280,53 @@ class ExecutionOrchestrator(BaseOrchestrator):
 
             # Configurar callback de progresso se fornecido
             if monitoring_service:
-
+                import re
+                import time
+                start_time = time.time()
+                
                 def progress_callback(message: str):
+                    # Tentar extrair progresso da mensagem
+                    progress = 0.0
+                    
+                    # Padrão 1: "Geração X/Y" (BLF-GA)
+                    gen_match = re.search(r'Geração (\d+)/(\d+)', message)
+                    if gen_match:
+                        current_gen = int(gen_match.group(1))
+                        max_gen = int(gen_match.group(2))
+                        progress = (current_gen / max_gen) * 100.0
+                    
+                    # Padrão 2: "iteração X" (H3-CSP)
+                    elif "iteração" in message:
+                        iter_match = re.search(r'iteração (\d+)', message)
+                        if iter_match:
+                            # Estimar progresso baseado no tempo (máximo 100% em 60s)
+                            elapsed = time.time() - start_time
+                            progress = min(elapsed / 60.0 * 100.0, 95.0)
+                    
+                    # Padrão 3: Mensagens de fase
+                    elif "Analisando blocos" in message:
+                        progress = 10.0
+                    elif "Fusão de blocos" in message:
+                        progress = 30.0
+                    elif "Refinamento" in message:
+                        progress = 60.0
+                    elif "ótima encontrada" in message or "Convergiu" in message:
+                        progress = 100.0
+                    elif "Timeout" in message:
+                        progress = 100.0
+                    
+                    # Usar progresso baseado no tempo se não conseguir extrair
+                    if progress == 0.0:
+                        elapsed = time.time() - start_time
+                        progress = min(elapsed / 30.0 * 100.0, 90.0)  # Máximo 90% por tempo
+                    
+                    # Garantir que progresso está no range 0-100
+                    progress = max(0.0, min(100.0, progress))
+                    
                     # Usando algorithm_callback da MonitoringInterface
                     monitoring_service.algorithm_callback(
                         algorithm_name=algorithm_name,
-                        progress=0.5,  # Progresso genérico, algoritmo pode não informar progresso específico
+                        progress=progress,
                         message=message,
                         item_id=execution_id,
                     )
@@ -408,7 +452,9 @@ class ExecutionOrchestrator(BaseOrchestrator):
             from src.presentation.monitoring.interfaces import TaskType
 
             task_type = getattr(TaskType, task_type_str.upper(), TaskType.EXECUTION)
-            monitoring_service.start_monitoring(task_type, batch_config)
+            # Extrair nome do batch da metadata
+            batch_name = batch_config.get("metadata", {}).get("name", "Batch")
+            monitoring_service.start_monitoring(task_type, batch_name, batch_config)
 
         results = []
 
@@ -535,24 +581,26 @@ class ExecutionOrchestrator(BaseOrchestrator):
                             "name", "Algorithms"
                         )
 
-                        monitoring_service.monitor.update_hierarchy(
-                            level=ExecutionLevel.DATASET,
-                            level_id=f"{dataset_id}_{algorithm_id}",
-                            progress=0.0,
-                            message=f"Processando dataset {dataset_name}",
-                            data={
-                                "execution_name": execution_name,
-                                "config_index": execution_index,
-                                "total_configs": len(executions),
-                                "dataset_name": dataset_name,
-                                "dataset_index": dataset_idx,
-                                "total_datasets": len(dataset_ids),
-                                "algorithm_config_name": algorithm_config_name,
-                                "algorithm_config_index": algo_config_idx,
-                                "total_algorithm_configs": len(algorithm_ids),
-                                "total_algorithms": len(unique_algorithms),
-                            },
-                        )
+                        # Use monitoring service method that handles None monitor
+                        if monitoring_service:
+                            monitoring_service.update_hierarchy(
+                                level=ExecutionLevel.DATASET,
+                                level_id=f"{dataset_id}_{algorithm_id}",
+                                progress=0.0,
+                                message=f"Processando dataset {dataset_name}",
+                                data={
+                                    "execution_name": execution_name,
+                                    "config_index": execution_index,
+                                    "total_configs": len(executions),
+                                    "dataset_name": dataset_name,
+                                    "dataset_index": dataset_idx,
+                                    "total_datasets": len(dataset_ids),
+                                    "algorithm_config_name": algorithm_config_name,
+                                    "algorithm_config_index": algo_config_idx,
+                                    "total_algorithm_configs": len(algorithm_ids),
+                                    "total_algorithms": len(unique_algorithms),
+                                },
+                            )
 
                     # Carregar dataset e executar algoritmos desta configuração
                     dataset_results = self._execute_dataset_algorithms_for_config(
@@ -626,24 +674,26 @@ class ExecutionOrchestrator(BaseOrchestrator):
 
     def _setup_partial_results_file(self) -> None:
         """Configure file for partial results saving."""
-        from src.infrastructure import SessionManager
-
         try:
-            session_manager = SessionManager(self._current_batch_config or {})
-            session_folder = session_manager.create_session()
-            results_dir = Path(session_manager.get_result_dir())
-            print(f"📁 Sessão criada: {session_folder}")
-            print(f"📁 Salvando resultados parciais em: {results_dir}")
-        except Exception as e:
-            # Fallback para diretório padrão - use outputs from config
-            output_config = self._config.get("output", {})
-            base_directory = output_config.get("base_directory", "outputs/{session}")
-            if "{session}" in base_directory:
-                base_dir = Path(base_directory.replace("{session}", ""))
+            # Use the session manager passed in constructor if available
+            if self._session_manager:
+                session_folder = self._session_manager.create_session()
+                results_dir = Path(self._session_manager.get_result_dir())
+                print(f"📁 Sessão criada: {session_folder}")
+                print(f"📁 Salvando resultados parciais em: {results_dir}")
             else:
-                base_dir = Path(base_directory)
+                # Create a local SessionManager as fallback
+                from src.infrastructure import SessionManager
+                session_manager = SessionManager(self._current_batch_config or {})
+                session_folder = session_manager.create_session()
+                results_dir = Path(session_manager.get_result_dir())
+                print(f"📁 Sessão criada: {session_folder}")
+                print(f"📁 Salvando resultados parciais em: {results_dir}")
+        except Exception as e:
+            # Fallback para diretório padrão
+            import time
             timestamp = time.strftime("%Y%m%d_%H%M%S")
-            results_dir = base_dir / timestamp
+            results_dir = Path("outputs") / timestamp
             print(f"📁 Usando diretório fallback: {results_dir}, erro: {e}")
 
         results_dir.mkdir(parents=True, exist_ok=True)
@@ -740,17 +790,19 @@ class ExecutionOrchestrator(BaseOrchestrator):
         # Por enquanto, usando o index como fallback
         total_executions = execution_index  # Isso será melhorado no orchestrator
 
-        monitoring_service.monitor.update_hierarchy(
-            level=ExecutionLevel.EXECUTION,
-            level_id=execution_name,
-            progress=0.0,
-            message=f"Iniciando execução {execution_name}",
-            data={
-                "execution_name": execution_name,
-                "config_index": execution_index,
-                "total_configs": total_executions,
-            },
-        )
+        # Use monitoring service method that handles None monitor
+        if monitoring_service:
+            monitoring_service.update_hierarchy(
+                level=ExecutionLevel.EXECUTION,
+                level_id=execution_name,
+                progress=0.0,
+                message=f"Iniciando execução {execution_name}",
+                data={
+                    "execution_name": execution_name,
+                    "config_index": execution_index,
+                    "total_configs": total_executions,
+                },
+            )
 
     def _execute_dataset_algorithms_for_config(
         self,
@@ -864,8 +916,10 @@ class ExecutionOrchestrator(BaseOrchestrator):
                     repetitions=repetitions,
                     execution_context={
                         "execution_name": execution.get("name", "unknown"),
+                        "execution_id": execution.get("name", "unknown"),
                         "dataset_id": dataset_id,
                         "algorithm_id": algorithm_config["id"],
+                        "config_id": algorithm_config["id"],
                     },
                     monitoring_service=monitoring_service,
                 )
@@ -1146,8 +1200,10 @@ class ExecutionOrchestrator(BaseOrchestrator):
                         repetitions=repetitions,
                         execution_context={
                             "execution_name": execution.get("name", "unknown"),
+                            "execution_id": execution.get("name", "unknown"),
                             "dataset_id": dataset_id,
                             "algorithm_id": algorithm_id,
+                            "config_id": algorithm_id,
                         },
                         monitoring_service=monitoring_service,
                     )
@@ -1325,7 +1381,9 @@ class ExecutionOrchestrator(BaseOrchestrator):
                         )
 
                         context = HierarchicalContext(
+                            execution_id=execution_context.get("execution_id", "unknown"),
                             dataset_id=execution_context.get("dataset_id", "unknown"),
+                            config_id=execution_context.get("config_id", "unknown"),
                             algorithm_id=algorithm_name,
                             repetition_id=f"{rep_number}/{repetitions}",
                         )
@@ -1469,7 +1527,9 @@ class ExecutionOrchestrator(BaseOrchestrator):
                     )
 
                     context = HierarchicalContext(
+                        execution_id=execution_context.get("execution_id", "unknown"),
                         dataset_id=execution_context.get("dataset_id", "unknown"),
+                        config_id=execution_context.get("config_id", "unknown"),
                         algorithm_id=algorithm_name,
                         repetition_id=f"{rep+1}/{repetitions}",
                     )

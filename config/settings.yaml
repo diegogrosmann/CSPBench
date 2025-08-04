@@ -1,18 +1,18 @@
 # ===================================================================
 # STANDARDIZED SETTINGS CSPBench - v0.8
 # ===================================================================
-# EXECUTION CONFIGURATION - "Como executa por padrão"
+# CONFIGURAÇÕES PADRÃO DE EXECUÇÃO - "Como executa por padrão"
 # This file stores execution configurations for CSPBench.
 # Infrastructure settings (paths, directories, cleanup) are in .env
 # 
-# CONFIGURATION HIERARCHY:
-# 1. Infrastructure (.env) - paths, directories, infrastructure settings
-# 2. Default execution (this file) - execution behavior defaults
-# 3. Template/Batch configurations - override execution defaults
-# 4. Runtime parameters - override all previous configurations
+# HIERARQUIA DE CONFIGURAÇÕES (ordem de precedência):
+# 1. .env                          ← MAIOR PRIORIDADE (configurações de sistema)
+# 2. batch/*.yaml                  ← Sobrepõe ESTE ARQUIVO e config.py
+# 3. ESTE ARQUIVO (settings.yaml)  ← Sobrepõe apenas algorithms/*/config.py  
+# 4. algorithms/*/config.py        ← MENOR PRIORIDADE
 #
-# This file only contains SECTIONS 7-10 with execution defaults
-# Infrastructure settings are now in .env file
+# Este arquivo contém APENAS configurações padrão de execução.
+# Configurações de infraestrutura estão no arquivo .env
 #
 # =====================================================================
 # SECTION 7: OUTPUT SETTINGS (REQUIRED) - DEFAULT VALUES
@@ -111,12 +111,13 @@ output:
 # SECTION 8: MONITORING SETTINGS (OPTIONAL)
 # =====================================================================
 # Settings for real-time execution monitoring
+# Note: For terminal execution, simple monitoring shows progress
+# Web interface accesses monitoring data directly via HTTP endpoints
 monitoring:
   # General monitoring
-  enabled: true                       # bool: Enable monitoring
-  interface: "simple"                 # string: Interface type
-                                      # "simple" = simple terminal interface (default)
-                                      # "tui" = advanced interface with curses
+  enabled: true                       # bool: Enable simple progress monitoring in terminal
+  interface: "hierarchical"           # string: Interface type (always "simple" for terminal)
+                                      # Web interface bypasses this setting  
   update_interval: 3                  # int: Update interval in seconds (1-10)
    
 # =====================================================================

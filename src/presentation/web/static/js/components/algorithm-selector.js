@@ -393,7 +393,7 @@ class AlgorithmSelector {
                     show = card.dataset.parallel === 'true';
                     break;
                 case 'fast':
-                    // Considera algoritmos simples como rápidos
+                    // Consider simple algorithms as fast
                     const algorithmName = card.dataset.algorithm;
                     show = ['Baseline', 'CSC'].includes(algorithmName);
                     break;

@@ -101,9 +101,16 @@ class SessionManager:
         if session_name:
             self._session_folder = session_name
         else:
-            # Generate automatic name with timestamp
-            timestamp = datetime.now().strftime(self._session_folder_format)
-            self._session_folder = timestamp
+            # Check if format contains {session_id} placeholder
+            if "{session_id}" in self._session_folder_format:
+                import uuid
+                session_id = str(uuid.uuid4())
+                session_folder = self._session_folder_format.replace("{session_id}", session_id)
+                self._session_folder = session_folder
+            else:
+                # Generate automatic name with timestamp
+                timestamp = datetime.now().strftime(self._session_folder_format)
+                self._session_folder = timestamp
 
         # Create directories if they don't exist
         log_dir = self.get_log_dir()

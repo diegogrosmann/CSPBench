@@ -3,8 +3,21 @@
 {% block title %}CSPBench - Home{% endblock %}
 
 {% block breadcrumb_items %}
-<!-- Empty for home page -->
-{% endblock %}
+<!-- Empty for home page --                    <div class="card-hover-details">
+                    <div class="hover-title">📊 View Results</div>
+                    <ul class="hover-features">
+                        <li><i class="bi bi-check2-circle text-success"></i> Session navigation</li>
+                        <li><i class="bi bi-check2-circle text-success"></i> Advanced filters</li>
+                        <li><i class="bi bi-check2-circle text-success"></i> CSV, JSON, charts</li>
+                        <li><i class="bi bi-check2-circle text-success"></i> Batch downloads</li>
+                    </ul>
+                </div>       <div class="hover-title">📊 View Results</div>
+                    <ul class="hover-features">
+                        <li><i class="bi bi-check2-circle text-success"></i> Session navigation</li>
+                        <li><i class="bi bi-check2-circle text-success"></i> Advanced filters</li>
+                        <li><i class="bi bi-check2-circle text-success"></i> CSV, JSON, charts</li>
+                        <li><i class="bi bi-check2-circle text-success"></i> Batch downloads</li>
+                    </ul>dblock %}
 
 {% block content %}
 <!-- Hero Section with Welcome Message -->
@@ -129,12 +142,12 @@
                     analysis and interactive visualizations.
                 </p>
                 <div class="card-hover-details">
-                    <div class="hover-title">📊 View Results</div>
+                    <div class="hover-title">� Visualizar Resultados</div>
                     <ul class="hover-features">
-                        <li><i class="bi bi-check2-circle text-success"></i> Session navigation</li>
-                        <li><i class="bi bi-check2-circle text-success"></i> Advanced filters</li>
-                        <li><i class="bi bi-check2-circle text-success"></i> CSV, JSON, charts</li>
-                        <li><i class="bi bi-check2-circle text-success"></i> Batch downloads</li>
+                        <li><i class="bi bi-check2-circle text-success"></i> Navegação por sessões</li>
+                        <li><i class="bi bi-check2-circle text-success"></i> Filtros avançados</li>
+                        <li><i class="bi bi-check2-circle text-success"></i> CSV, JSON, gráficos</li>
+                        <li><i class="bi bi-check2-circle text-success"></i> Downloads em lote</li>
                     </ul>
                 </div>
                 <a href="/results" class="btn btn-primary btn-lg w-100">
@@ -310,12 +323,10 @@
     overflow-y: auto;
     max-height: 130px;
 }
-
 .compact-card:hover .card-hover-details {
     display: block;
     animation: fadeInUp 0.3s ease-out;
 }
-
 @keyframes fadeInUp {
     from {
         opacity: 0;
@@ -326,7 +337,6 @@
         transform: translateY(0);
     }
 }
-
 .hover-title {
     font-size: 0.85rem;
     font-weight: 600;
@@ -337,14 +347,12 @@
     text-align: center;
     line-height: 1.2;
 }
-
 .hover-features {
     list-style: none;
     padding: 0;
     margin: 0;
     font-size: 0.8rem;
 }
-
 .hover-features li {
     margin-bottom: 2px;
     padding: 1px 0;
@@ -353,40 +361,32 @@
     align-items: flex-start;
     line-height: 1.2;
 }
-
 .hover-features li i {
     margin-right: 4px;
     font-size: 0.75rem;
     flex-shrink: 0;
     margin-top: 1px;
 }
-
 .compact-card .card-title {
     font-size: 1.05rem;
     font-weight: 600;
 }
-
 .compact-card .btn {
     font-size: 0.95rem;
 }
-
 .fs-1 {
     font-size: 2.1rem !important;
 }
-
 .fs-3 {
     font-size: 1.2rem !important;
 }
-
 /* Custom scrollbar for hover details */
 .card-hover-details::-webkit-scrollbar {
     width: 3px;
 }
-
 .card-hover-details::-webkit-scrollbar-track {
     background: transparent;
 }
-
 .card-hover-details::-webkit-scrollbar-thumb {
     background: rgba(0,0,0,0.2);
     border-radius: 2px;

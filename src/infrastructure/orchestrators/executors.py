@@ -27,7 +27,7 @@ class Executor(ExecutorInterface):
         self._logger.debug(f"Batch configuration set: {type(batch_config)}")
 
     def execute_batch(
-        self, batch_config: Dict[str, Any], monitoring_service=None
+        self, batch_config: Dict[str, Any], monitoring_service=None, session_manager=None
     ) -> List[Dict[str, Any]]:
         """
         Execute algorithm batch delegating to ExecutionOrchestrator.
@@ -71,6 +71,7 @@ class Executor(ExecutorInterface):
                 dataset_repository=dataset_repository,
                 monitoring_service=monitoring_service,
                 entrez_repository=entrez_repository,
+                session_manager=session_manager,
             )
 
             # Delegate execution
@@ -221,6 +222,7 @@ class Executor(ExecutorInterface):
         params: Optional[Dict[str, Any]] = None,
         timeout: Optional[int] = None,
         monitoring_service=None,
+        session_manager=None,
     ) -> Dict[str, Any]:
         """
         Execute a single algorithm delegating to ExecutionOrchestrator.
@@ -267,6 +269,7 @@ class Executor(ExecutorInterface):
                 dataset_repository=dataset_repository,
                 monitoring_service=monitoring_service,
                 entrez_repository=entrez_repository,
+                session_manager=session_manager,
             )
 
             # Set batch config if available

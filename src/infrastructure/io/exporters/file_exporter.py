@@ -23,28 +23,40 @@ class FileExporter(ExportPort):
 
     def export_results(
         self,
-        results: Dict[str, Any],
+        results: Any,
         format_type: str,
-        destination: str,
+        destination: Optional[str] = None,
         options: Optional[Dict[str, Any]] = None,
+        session_id: Optional[str] = None,
     ) -> str:
-        """Export results in specific format."""
-        dest_path = self.output_path / destination
-
-        # If destination is a directory, generate filename
-        if dest_path.is_dir() or not dest_path.suffix:
+        """Export optimization results to the specified format."""
+        if session_id:
+            filename = f"results_{session_id}.{format_type.lower()}"
+        else:
             from datetime import datetime
-
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             filename = f"results_{timestamp}.{format_type.lower()}"
-            dest_path = dest_path / filename
-
+            
+        # Determine output path
+        if destination:
+            dest_path = self.output_path / destination
+            if dest_path.is_dir() or not dest_path.suffix:
+                dest_path = dest_path / filename
+        else:
+            dest_path = self.output_path / filename
+            
         dest_path.parent.mkdir(parents=True, exist_ok=True)
-
+        
+        # Export based on format
         if format_type.lower() == "json":
             self._write_json(results, dest_path, options)
         elif format_type.lower() == "csv":
-            self._write_csv(results, dest_path, options)
+            # For CSV, handle both single results and batch results
+            if isinstance(results, list):
+                self._write_csv(results, dest_path, options)
+            else:
+                # Convert single result to list for CSV export
+                self._write_csv([results], dest_path, options)
         elif format_type.lower() == "parquet":
             self._write_parquet(results, dest_path)
         elif format_type.lower() == "pickle":
@@ -52,9 +64,8 @@ class FileExporter(ExportPort):
         elif format_type.lower() == "txt":
             self._write_txt(results, dest_path)
         else:
-            # Default to JSON
             self._write_json(results, dest_path, options)
-
+            
         return str(dest_path)
 
     def export_batch_results(
@@ -63,14 +74,17 @@ class FileExporter(ExportPort):
         format_type: str,
         destination: str,
         options: Optional[Dict[str, Any]] = None,
+        session_id: Optional[str] = None,
     ) -> str:
         """Export batch results."""
         dest_path = self.output_path / destination
 
-        # If destination is a directory, use fixed filename
+        # If destination is a directory, use session_id or timestamp for filename
         if dest_path.is_dir() or not dest_path.suffix:
-            # Use fixed name for main result
-            filename = f"results.{format_type.lower()}"
+            if session_id:
+                filename = f"results_{session_id}.{format_type.lower()}"
+            else:
+                filename = f"results.{format_type.lower()}"
             dest_path = dest_path / filename
 
         dest_path.parent.mkdir(parents=True, exist_ok=True)
@@ -106,10 +120,10 @@ class FileExporter(ExportPort):
         return ["json", "csv", "parquet", "pickle", "txt"]
 
     def export_optimization_results(
-        self, optimization_data: Dict[str, Any], destination: str
+        self, optimization_data: Dict[str, Any], destination: str, session_id: Optional[str] = None
     ) -> str:
         """Export optimization results."""
-        return self.export_results(optimization_data, "json", destination)
+        return self.export_results(optimization_data, "json", destination, session_id=session_id)
 
     def export(self, data: Any, filename: Optional[str] = None) -> None:
         """Export data to file (legacy method)."""

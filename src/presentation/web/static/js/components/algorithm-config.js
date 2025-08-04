@@ -1,5 +1,5 @@
 /**
- * AlgorithmConfig - Componente para configuração de parâmetros de algoritmos
+ * AlgorithmConfig - Component for algorithm parameter configuration
  */
 class AlgorithmConfig {
     constructor(containerId, apiClient) {

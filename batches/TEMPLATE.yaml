@@ -492,8 +492,8 @@ output:
     formats:
       csv: true                       # bool: Export results in CSV
       json: true                      # bool: Export results in JSON
-      parquet: false                  # bool: Export in Parquet format (for large volumes)
-      pickle: false                   # bool: Export in Pickle format (Python native)
+      parquet: true                   # bool: Export in Parquet format (for large volumes)
+      pickle: true                    # bool: Export in Pickle format (Python native)
     
     # Format-specific options
     format_options:
@@ -561,12 +561,13 @@ output:
 # SECTION 8: MONITORING SETTINGS (OPTIONAL)
 # =====================================================================
 # Settings for real-time execution monitoring
+# Note: For terminal execution, interface is always "simple" (progress monitoring)
+# Web interface accesses monitoring data directly via HTTP endpoints
 monitoring:
   # General monitoring
-  enabled: true                       # bool: Enable monitoring
-  interface: "simple"                 # string: Interface type
-                                      # "simple" = simple terminal interface (default)
-                                      # "tui" = advanced interface with curses
+  enabled: true                       # bool: Enable simple progress monitoring in terminal
+  interface: "hierarchical"           # string: Interface type ("simple", "hierarchical")
+                                      # Web interface bypasses this setting
   update_interval: 3                  # int: Update interval in seconds (1-10)
    
 # =====================================================================
@@ -576,7 +577,7 @@ monitoring:
 resources:
   # CPU limitations
   cpu:
-    max_cores: null                   # int|null: Maximum cores to use (null = all)
+    max_cores: 1                      # int|null: Maximum cores to use (null = all)
     affinity: null                    # list|null: Specific cores to use [0,1,2,3]
     
   # Memory limitations
@@ -587,7 +588,7 @@ resources:
   parallel:
     enabled: true                     # bool: Enable parallelization when possible
     max_workers: null                 # int|null: Maximum parallel workers (null = auto)
-    internal_jobs: 4                  # int: Maximum internal parallel jobs per algorithm
+    internal_jobs: 1                  # int: Maximum internal parallel jobs per algorithm
                                       # Controls internal algorithm parallelism (threads/processes)
                                       # Suggested value: 4 for CPUs with 8+ cores
                                       # Relation: max_workers × internal_jobs ≤ CPU_cores

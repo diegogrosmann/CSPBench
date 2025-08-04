@@ -41,6 +41,7 @@ class ExecutionLevel(Enum):
 
     EXECUTION = "execution"
     DATASET = "dataset"
+    CONFIG = "config"  # Added config level
     ALGORITHM = "algorithm"
     REPETITION = "repetition"
     TRIAL = "trial"
@@ -53,6 +54,7 @@ class HierarchicalContext:
 
     execution_id: Optional[str] = None
     dataset_id: Optional[str] = None
+    config_id: Optional[str] = None  # Added config level
     algorithm_id: Optional[str] = None
     repetition_id: Optional[str] = None
     trial_id: Optional[str] = None
@@ -65,6 +67,8 @@ class HierarchicalContext:
             parts.append(f"exec:{self.execution_id}")
         if self.dataset_id:
             parts.append(f"dataset:{self.dataset_id}")
+        if self.config_id:
+            parts.append(f"config:{self.config_id}")
         if self.algorithm_id:
             parts.append(f"algo:{self.algorithm_id}")
         if self.repetition_id:
@@ -80,6 +84,7 @@ class HierarchicalContext:
         level_map = {
             ExecutionLevel.EXECUTION: self.execution_id,
             ExecutionLevel.DATASET: self.dataset_id,
+            ExecutionLevel.CONFIG: self.config_id,
             ExecutionLevel.ALGORITHM: self.algorithm_id,
             ExecutionLevel.REPETITION: self.repetition_id,
             ExecutionLevel.TRIAL: self.trial_id,
@@ -87,25 +92,223 @@ class HierarchicalContext:
         }
         return level_map.get(level)
 
+    def to_dict(self) -> Dict[str, Any]:
+        """Converte para dicionário (para API/serialização)."""
+        return {
+            "execution_id": self.execution_id,
+            "dataset_id": self.dataset_id,
+            "config_id": self.config_id,
+            "algorithm_id": self.algorithm_id,
+            "repetition_id": self.repetition_id,
+            "trial_id": self.trial_id,
+            "sample_id": self.sample_id,
+            "path": self.get_path()
+        }
+
+
+@dataclass
+class HierarchyLevel:
+    """Representa um nível na hierarquia de execução."""
+    
+    current: int = 0
+    total: int = 0
+    name: str = ""
+    
+    @property
+    def progress(self) -> float:
+        """Calcula progresso percentual do nível."""
+        if self.total == 0:
+            return 0.0
+        return (self.current / self.total) * 100.0
+    
+    @property
+    def is_completed(self) -> bool:
+        """Verifica se o nível está completo."""
+        return self.current >= self.total > 0
+
+
+@dataclass
+class ExecutionHierarchy:
+    """Estrutura hierárquica completa da execução."""
+    
+    # Níveis hierárquicos
+    execution: HierarchyLevel = field(default_factory=HierarchyLevel)
+    dataset: HierarchyLevel = field(default_factory=HierarchyLevel)
+    config: HierarchyLevel = field(default_factory=HierarchyLevel)
+    algorithm: HierarchyLevel = field(default_factory=HierarchyLevel)
+    
+    # Mapeamento completo da estrutura (para navegação)
+    structure: Dict[str, Any] = field(default_factory=dict)
+    
+    # Lock para thread-safety
+    _lock: RLock = field(default_factory=RLock, init=False, repr=False)
+    
+    def update_level(self, level: ExecutionLevel, current: int, total: int, name: str = "") -> None:
+        """Atualiza um nível específico da hierarquia."""
+        with self._lock:
+            level_obj = self._get_level_object(level)
+            level_obj.current = current
+            level_obj.total = total
+            if name:
+                level_obj.name = name
+    
+    def get_level(self, level: ExecutionLevel) -> HierarchyLevel:
+        """Retorna objeto do nível especificado."""
+        with self._lock:
+            return self._get_level_object(level)
+    
+    def _get_level_object(self, level: ExecutionLevel) -> HierarchyLevel:
+        """Retorna objeto do nível (método interno)."""
+        level_map = {
+            ExecutionLevel.EXECUTION: self.execution,
+            ExecutionLevel.DATASET: self.dataset,
+            ExecutionLevel.CONFIG: self.config,
+            ExecutionLevel.ALGORITHM: self.algorithm,
+        }
+        return level_map.get(level, HierarchyLevel())
+    
+    def get_overall_progress(self) -> float:
+        """Calcula progresso geral considerando todos os níveis."""
+        with self._lock:
+            # Peso dos níveis na hierarquia
+            execution_weight = 0.1
+            dataset_weight = 0.2
+            config_weight = 0.2
+            algorithm_weight = 0.5
+            
+            total_progress = (
+                self.execution.progress * execution_weight +
+                self.dataset.progress * dataset_weight +
+                self.config.progress * config_weight +
+                self.algorithm.progress * algorithm_weight
+            )
+            
+            return min(total_progress, 100.0)
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Converte para dicionário (para API/serialização)."""
+        with self._lock:
+            return {
+                "execution": {
+                    "current": self.execution.current,
+                    "total": self.execution.total,
+                    "name": self.execution.name,
+                    "progress": self.execution.progress
+                },
+                "dataset": {
+                    "current": self.dataset.current,
+                    "total": self.dataset.total,
+                    "name": self.dataset.name,
+                    "progress": self.dataset.progress
+                },
+                "config": {
+                    "current": self.config.current,
+                    "total": self.config.total,
+                    "name": self.config.name,
+                    "progress": self.config.progress
+                },
+                "algorithm": {
+                    "current": self.algorithm.current,
+                    "total": self.algorithm.total,
+                    "name": self.algorithm.name,
+                    "progress": self.algorithm.progress
+                },
+                "overall_progress": self.get_overall_progress()
+            }
+
+
+@dataclass
+class ActiveRun:
+    """Representa uma run ativa em execução."""
+    
+    run_id: str
+    algorithm_name: str
+    run_info: str  # e.g., "1/3", "2/5"
+    progress: float = 0.0
+    status: ItemStatus = ItemStatus.RUNNING
+    start_time: datetime = field(default_factory=datetime.now)
+    last_update: datetime = field(default_factory=datetime.now)
+    context: Optional[HierarchicalContext] = None
+    metadata: Dict[str, Any] = field(default_factory=dict)
+    
+    # Dados específicos da run
+    current_generation: int = 0
+    total_generations: int = 0
+    current_message: str = ""
+    
+    @property
+    def elapsed_time(self) -> timedelta:
+        """Tempo decorrido desde o início."""
+        return datetime.now() - self.start_time
+    
+    @property
+    def time_since_update(self) -> timedelta:
+        """Tempo desde a última atualização."""
+        return datetime.now() - self.last_update
+    
+    def update_progress(self, progress: float, message: str = "") -> None:
+        """Atualiza progresso da run."""
+        self.progress = max(0.0, min(100.0, progress))
+        self.last_update = datetime.now()
+        if message:
+            self.current_message = message
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Converte para dicionário (para API/serialização)."""
+        return {
+            "run_id": self.run_id,
+            "algorithm_name": self.algorithm_name,
+            "run_info": self.run_info,
+            "progress": self.progress,
+            "status": self.status.value,
+            "start_time": self.start_time.isoformat(),
+            "elapsed_time": str(self.elapsed_time),
+            "current_message": self.current_message,
+            "context": self.context.get_path() if self.context else None,
+            "metadata": self.metadata
+        }
+
+
+@dataclass
+class CallbackEntry:
+    """Entrada de callback de algoritmo."""
+    
+    timestamp: datetime = field(default_factory=datetime.now)
+    algorithm_name: str = ""
+    run_id: Optional[str] = None
+    progress: float = 0.0
+    message: str = ""
+    generation: Optional[int] = None
+    context: Optional[HierarchicalContext] = None
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Converte para dicionário (para API/serialização)."""
+        return {
+            "timestamp": self.timestamp.isoformat(),
+            "algorithm_name": self.algorithm_name,
+            "run_id": self.run_id,
+            "progress": self.progress,
+            "message": self.message,
+            "generation": self.generation,
+            "context": self.context.get_path() if self.context else None
+        }
+
 
 @dataclass
 class TaskSpecificData:
-    """Dados específicos por tipo de tarefa - thread-safe e simplificado."""
+    """Dados específicos por tipo de tarefa - refatorado para hierarquia completa."""
 
-    # Progresso hierárquico simplificado
-    total_executions: int = 0
-    current_execution_index: int = 0
-    current_execution_name: str = ""
-
-    total_datasets: int = 0
-    current_dataset_index: int = 0
-    current_dataset_name: str = ""
-
-    total_algorithms: int = 0
-    current_algorithm_index: int = 0
-    current_algorithm_name: str = ""
-
-    # Estado consolidado por algoritmo
+    # Nova estrutura hierárquica
+    hierarchy: ExecutionHierarchy = field(default_factory=ExecutionHierarchy)
+    
+    # Runs ativas
+    active_runs: Dict[str, ActiveRun] = field(default_factory=dict)
+    
+    # Callbacks recentes (limitado para performance)
+    callbacks: List[CallbackEntry] = field(default_factory=list)
+    max_callbacks: int = 100  # Limite de callbacks armazenados
+    
+    # Estado consolidado por algoritmo (mantido para compatibilidade)
     algorithm_data: Dict[str, Dict[str, Any]] = field(default_factory=dict)
 
     # Resultados consolidados
@@ -119,26 +322,87 @@ class TaskSpecificData:
     # Lock para thread-safety
     _lock: RLock = field(default_factory=RLock, init=False, repr=False)
 
-    def get_execution_progress(self) -> float:
-        """Calcula progresso geral da execução - thread-safe."""
+    # Métodos de hierarquia
+    def update_hierarchy_level(self, level: ExecutionLevel, current: int, total: int, name: str = "") -> None:
+        """Atualiza nível hierárquico específico."""
         with self._lock:
-            if self.total_executions == 0:
-                return 0.0
-            return self.current_execution_index / self.total_executions
+            self.hierarchy.update_level(level, current, total, name)
+    
+    def get_hierarchy_level(self, level: ExecutionLevel) -> HierarchyLevel:
+        """Obtém nível hierárquico específico."""
+        with self._lock:
+            return self.hierarchy.get_level(level)
+    
+    def get_overall_progress(self) -> float:
+        """Calcula progresso geral da hierarquia."""
+        with self._lock:
+            return self.hierarchy.get_overall_progress()
+    
+    # Métodos de runs ativas
+    def add_active_run(self, run: ActiveRun) -> None:
+        """Adiciona run ativa."""
+        with self._lock:
+            self.active_runs[run.run_id] = run
+    
+    def update_active_run(self, run_id: str, progress: float, message: str = "") -> None:
+        """Atualiza progresso de run ativa."""
+        with self._lock:
+            if run_id in self.active_runs:
+                self.active_runs[run_id].update_progress(progress, message)
+    
+    def remove_active_run(self, run_id: str) -> Optional[ActiveRun]:
+        """Remove run ativa."""
+        with self._lock:
+            return self.active_runs.pop(run_id, None)
+    
+    def get_active_runs(self) -> List[ActiveRun]:
+        """Retorna lista de runs ativas."""
+        with self._lock:
+            return list(self.active_runs.values())
+    
+    # Métodos de callbacks
+    def add_callback(self, algorithm_name: str, message: str, progress: float = 0.0, 
+                    run_id: Optional[str] = None, generation: Optional[int] = None,
+                    context: Optional[HierarchicalContext] = None) -> None:
+        """Adiciona callback de algoritmo."""
+        with self._lock:
+            callback = CallbackEntry(
+                algorithm_name=algorithm_name,
+                message=message,
+                progress=progress,
+                run_id=run_id,
+                generation=generation,
+                context=context
+            )
+            self.callbacks.append(callback)
+            
+            # Limitar número de callbacks para performance
+            if len(self.callbacks) > self.max_callbacks:
+                self.callbacks = self.callbacks[-self.max_callbacks:]
+    
+    def get_recent_callbacks(self, limit: int = 10) -> List[CallbackEntry]:
+        """Retorna callbacks recentes."""
+        with self._lock:
+            return self.callbacks[-limit:] if self.callbacks else []
+    
+    def get_callbacks_for_algorithm(self, algorithm_name: str, limit: int = 10) -> List[CallbackEntry]:
+        """Retorna callbacks de algoritmo específico."""
+        with self._lock:
+            algo_callbacks = [cb for cb in self.callbacks if cb.algorithm_name == algorithm_name]
+            return algo_callbacks[-limit:] if algo_callbacks else []
+
+    # Métodos legados (mantidos para compatibilidade)
+    def get_execution_progress(self) -> float:
+        """Calcula progresso geral da execução - método legado."""
+        return self.get_hierarchy_level(ExecutionLevel.EXECUTION).progress
 
     def get_dataset_progress(self) -> float:
-        """Calcula progresso dos datasets - thread-safe."""
-        with self._lock:
-            if self.total_datasets == 0:
-                return 0.0
-            return self.current_dataset_index / self.total_datasets
+        """Calcula progresso dos datasets - método legado."""
+        return self.get_hierarchy_level(ExecutionLevel.DATASET).progress
 
     def get_algorithm_progress(self) -> float:
-        """Calcula progresso dos algoritmos - thread-safe."""
-        with self._lock:
-            if self.total_algorithms == 0:
-                return 0.0
-            return self.current_algorithm_index / self.total_algorithms
+        """Calcula progresso dos algoritmos - método legado."""
+        return self.get_hierarchy_level(ExecutionLevel.ALGORITHM).progress
 
     def update_algorithm_data(self, algorithm_name: str, **data) -> None:
         """Atualiza dados de algoritmo de forma thread-safe."""
@@ -171,6 +435,22 @@ class TaskSpecificData:
         """Obtém valor específico da tarefa - thread-safe."""
         with self._lock:
             return self.task_specific.get(key, default)
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Converte para dicionário (para API/serialização)."""
+        with self._lock:
+            return {
+                "hierarchy": self.hierarchy.to_dict(),
+                "active_runs": [run.to_dict() for run in self.active_runs.values()],
+                "recent_callbacks": [cb.to_dict() for cb in self.get_recent_callbacks()],
+                "algorithm_data": dict(self.algorithm_data),
+                "best_result": {
+                    "distance": self.best_distance,
+                    "algorithm": self.best_algorithm,
+                    "result": self.current_best_result
+                },
+                "task_specific": dict(self.task_specific)
+            }
 
 
 @dataclass
@@ -418,7 +698,18 @@ class TaskProgress:
 
 
 class MonitoringInterface(ABC):
-    """Interface simplificada e thread-safe para sistemas de monitoramento."""
+    """Interface expandida e thread-safe para sistemas de monitoramento hierárquico."""
+
+    # Métodos de inicialização
+    @abstractmethod
+    def initialize_hierarchy(self, hierarchy: ExecutionHierarchy) -> None:
+        """
+        Inicializa estrutura hierárquica do monitoramento.
+        
+        Args:
+            hierarchy: Estrutura hierárquica completa da execução
+        """
+        ...
 
     @abstractmethod
     def start_task(
@@ -434,6 +725,117 @@ class MonitoringInterface(ABC):
         """
         ...
 
+    # Métodos hierárquicos expandidos
+    @abstractmethod
+    def update_hierarchy_level(
+        self, 
+        level: ExecutionLevel, 
+        current: int, 
+        total: int, 
+        name: str = "",
+        metadata: Optional[Dict[str, Any]] = None
+    ) -> None:
+        """
+        Atualiza nível específico da hierarquia.
+
+        Args:
+            level: Nível hierárquico (execution, dataset, config, algorithm)
+            current: Índice atual (1-based)
+            total: Total de itens no nível
+            name: Nome do item atual
+            metadata: Metadados opcionais
+        """
+        ...
+
+    # Métodos de runs ativas
+    @abstractmethod
+    def start_run(self, run: ActiveRun) -> None:
+        """
+        Inicia uma run individual.
+
+        Args:
+            run: Objeto ActiveRun com informações da run
+        """
+        ...
+
+    @abstractmethod
+    def update_run_progress(
+        self, 
+        run_id: str, 
+        progress: float, 
+        message: str = "",
+        generation: Optional[int] = None
+    ) -> None:
+        """
+        Atualiza progresso de uma run específica.
+
+        Args:
+            run_id: ID único da run
+            progress: Progresso (0.0 a 100.0)
+            message: Mensagem de callback
+            generation: Geração atual (para algoritmos genéticos)
+        """
+        ...
+
+    @abstractmethod
+    def finish_run(
+        self, 
+        run_id: str, 
+        success: bool = True, 
+        result: Optional[Dict[str, Any]] = None,
+        error: Optional[str] = None
+    ) -> None:
+        """
+        Finaliza uma run específica.
+
+        Args:
+            run_id: ID único da run
+            success: Se foi executada com sucesso
+            result: Resultado da execução
+            error: Mensagem de erro se falhou
+        """
+        ...
+
+    @abstractmethod
+    def get_active_runs(self) -> List[ActiveRun]:
+        """Retorna lista de runs ativas."""
+        ...
+
+    # Métodos de callback
+    @abstractmethod
+    def algorithm_callback(
+        self,
+        algorithm_name: str,
+        progress: float,
+        message: str,
+        run_id: Optional[str] = None,
+        generation: Optional[int] = None,
+        context: Optional[HierarchicalContext] = None
+    ) -> None:
+        """
+        Callback direto do algoritmo durante execução.
+
+        Args:
+            algorithm_name: Nome do algoritmo
+            progress: Progresso do algoritmo (0.0 a 100.0)
+            message: Mensagem do algoritmo
+            run_id: ID da run (se aplicável)
+            generation: Geração atual (para algoritmos genéticos)
+            context: Contexto hierárquico
+        """
+        ...
+
+    @abstractmethod
+    def get_recent_callbacks(self, limit: int = 10) -> List[CallbackEntry]:
+        """
+        Retorna callbacks recentes.
+
+        Args:
+            limit: Número máximo de callbacks a retornar
+        """
+        ...
+
+    # Métodos legados (mantidos para compatibilidade)
     @abstractmethod
     def start_item(
         self,
@@ -443,7 +845,7 @@ class MonitoringInterface(ABC):
         metadata: Optional[Dict[str, Any]] = None,
     ) -> None:
         """
-        Inicia um item individual (repetição, trial, amostra).
+        Inicia um item individual (método legado - use start_run).
 
         Args:
             item_id: ID único do item
@@ -462,11 +864,11 @@ class MonitoringInterface(ABC):
         context: Optional[HierarchicalContext] = None,
     ) -> None:
         """
-        Atualiza um item individual (repetição, trial, amostra).
+        Atualiza um item individual (método legado - use update_run_progress).
 
         Args:
             item_id: ID único do item
-            progress: Progresso (0.0 a 1.0)
+            progress: Progresso (0.0 a 100.0)
             message: Mensagem de status
             context: Contexto hierárquico
         """
@@ -481,7 +883,7 @@ class MonitoringInterface(ABC):
         error: Optional[str] = None,
     ) -> None:
         """
-        Finaliza um item individual.
+        Finaliza um item individual (método legado - use finish_run).
 
         Args:
             item_id: ID único do item
@@ -501,36 +903,18 @@ class MonitoringInterface(ABC):
         data: Optional[Dict[str, Any]] = None,
     ) -> None:
         """
-        Atualiza progresso hierárquico (execução, dataset, algoritmo).
+        Atualiza progresso hierárquico (método legado - use update_hierarchy_level).
 
         Args:
             level: Nível hierárquico
             level_id: ID do nível
-            progress: Progresso (0.0 a 1.0)
+            progress: Progresso (0.0 a 100.0)
             message: Mensagem de status
             data: Dados adicionais específicos do nível
         """
         ...
 
-    @abstractmethod
-    def algorithm_callback(
-        self,
-        algorithm_name: str,
-        progress: float,
-        message: str,
-        item_id: Optional[str] = None,
-    ) -> None:
-        """
-        Callback direto do algoritmo durante execução.
-
-        Args:
-            algorithm_name: Nome do algoritmo
-            progress: Progresso do algoritmo (0.0 a 1.0)
-            message: Mensagem do algoritmo
-            item_id: ID do item sendo executado (se aplicável)
-        """
-        ...
-
+    # Métodos de finalização e estado
     @abstractmethod
     def finish_task(
         self,
@@ -551,6 +935,16 @@ class MonitoringInterface(ABC):
     @abstractmethod
     def get_summary(self) -> Dict[str, Any]:
         """Retorna resumo consolidado da execução atual."""
+        ...
+
+    @abstractmethod
+    def get_hierarchy_status(self) -> Dict[str, Any]:
+        """Retorna status detalhado da hierarquia."""
+        ...
+
+    @abstractmethod
+    def get_full_status(self) -> Dict[str, Any]:
+        """Retorna status completo (hierarquia + runs + callbacks)."""
         ...
 
     @abstractmethod
@@ -583,15 +977,16 @@ class TaskConfiguration:
 
 
 def create_task_progress(
-    task_type: TaskType, task_name: str, total_items: int = 0, **task_data
+    task_type: TaskType, task_name: str, total_items: int = 0, hierarchy: Optional[ExecutionHierarchy] = None, **task_data
 ) -> TaskProgress:
     """
-    Factory function para criar TaskProgress com validação.
+    Factory function para criar TaskProgress com validação e hierarquia.
 
     Args:
         task_type: Tipo da tarefa
         task_name: Nome da tarefa
         total_items: Total de itens a processar
+        hierarchy: Estrutura hierárquica (opcional)
         **task_data: Dados específicos da tarefa
 
     Returns:
@@ -606,8 +1001,10 @@ def create_task_progress(
     if total_items < 0:
         raise ValueError("total_items deve ser >= 0")
 
-    # Criar TaskSpecificData com dados fornecidos
+    # Criar TaskSpecificData com dados fornecidos e hierarquia
     specific_data = TaskSpecificData(**task_data)
+    if hierarchy:
+        specific_data.hierarchy = hierarchy
 
     return TaskProgress(
         task_type=task_type,
@@ -616,6 +1013,98 @@ def create_task_progress(
         task_data=specific_data,
         start_time=datetime.now(),
         status=TaskStatus.PENDING,
+    )
+
+
+def create_execution_hierarchy() -> ExecutionHierarchy:
+    """
+    Factory function para criar ExecutionHierarchy vazia.
+
+    Returns:
+        ExecutionHierarchy: Estrutura hierárquica inicializada
+    """
+    return ExecutionHierarchy()
+
+
+def create_active_run(
+    run_id: str,
+    algorithm_name: str,
+    run_info: str,
+    context: Optional[HierarchicalContext] = None,
+    total_generations: int = 0
+) -> ActiveRun:
+    """
+    Factory function para criar ActiveRun com validação.
+
+    Args:
+        run_id: ID único da run
+        algorithm_name: Nome do algoritmo
+        run_info: Informação da run (e.g., "1/3")
+        context: Contexto hierárquico
+        total_generations: Total de gerações (para algoritmos genéticos)
+
+    Returns:
+        ActiveRun: Objeto de run ativa inicializada
+
+    Raises:
+        ValueError: Se parâmetros obrigatórios estão ausentes
+    """
+    if not run_id:
+        raise ValueError("run_id é obrigatório")
+
+    if not algorithm_name:
+        raise ValueError("algorithm_name é obrigatório")
+
+    if not run_info:
+        raise ValueError("run_info é obrigatório")
+
+    return ActiveRun(
+        run_id=run_id,
+        algorithm_name=algorithm_name,
+        run_info=run_info,
+        context=context,
+        total_generations=total_generations
+    )
+
+
+def create_callback_entry(
+    algorithm_name: str,
+    message: str,
+    progress: float = 0.0,
+    run_id: Optional[str] = None,
+    generation: Optional[int] = None,
+    context: Optional[HierarchicalContext] = None
+) -> CallbackEntry:
+    """
+    Factory function para criar CallbackEntry.
+
+    Args:
+        algorithm_name: Nome do algoritmo
+        message: Mensagem do callback
+        progress: Progresso (0.0 a 100.0)
+        run_id: ID da run (opcional)
+        generation: Geração atual (opcional)
+        context: Contexto hierárquico (opcional)
+
+    Returns:
+        CallbackEntry: Entrada de callback inicializada
+
+    Raises:
+        ValueError: Se parâmetros obrigatórios estão ausentes
+    """
+    if not algorithm_name:
+        raise ValueError("algorithm_name é obrigatório")
+
+    if not message:
+        raise ValueError("message é obrigatório")
+
+    return CallbackEntry(
+        algorithm_name=algorithm_name,
+        message=message,
+        progress=progress,
+        run_id=run_id,
+        generation=generation,
+        context=context
     )
 
 
@@ -658,6 +1147,7 @@ def create_task_item(
 def create_hierarchical_context(
     execution_id: Optional[str] = None,
     dataset_id: Optional[str] = None,
+    config_id: Optional[str] = None,
     algorithm_id: Optional[str] = None,
     repetition_id: Optional[str] = None,
     trial_id: Optional[str] = None,
@@ -669,6 +1159,7 @@ def create_hierarchical_context(
     Args:
         execution_id: ID da execução
         dataset_id: ID do dataset
+        config_id: ID da configuração de algoritmos
         algorithm_id: ID do algoritmo
         repetition_id: ID da repetição
         trial_id: ID do trial (otimização)
@@ -680,6 +1171,7 @@ def create_hierarchical_context(
     return HierarchicalContext(
         execution_id=execution_id,
         dataset_id=dataset_id,
+        config_id=config_id,
         algorithm_id=algorithm_id,
         repetition_id=repetition_id,
         trial_id=trial_id,

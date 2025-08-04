@@ -29,7 +29,7 @@
             <div class="card-body py-4">
                 <i class="bi bi-files fs-1 text-primary mb-3 stats-icon"></i>
                 <h4 class="card-title text-primary fw-bold" id="total-batches">-</h4>
-                <p class="card-text text-muted mb-0">Total Batches</p>
+                <p class="card-text text-muted mb-0">Batch Files</p>
             </div>
         </div>
     </div>
@@ -37,7 +37,7 @@
         <div class="card text-center shadow-sm border-0 bg-info bg-opacity-10 stats-card">
             <div class="card-body py-4">
                 <i class="bi bi-play-circle fs-1 text-info mb-3 stats-icon"></i>
-                <h4 class="card-title text-info fw-bold" id="running-batches">-</h4>
+                <h4 class="card-title text-info fw-bold" id="running-executions">-</h4>
                 <p class="card-text text-muted mb-0">Running</p>
             </div>
         </div>
@@ -46,7 +46,7 @@
         <div class="card text-center shadow-sm border-0 bg-success bg-opacity-10 stats-card">
             <div class="card-body py-4">
                 <i class="bi bi-check-circle fs-1 text-success mb-3 stats-icon"></i>
-                <h4 class="card-title text-success fw-bold" id="completed-batches">-</h4>
+                <h4 class="card-title text-success fw-bold" id="completed-executions">-</h4>
                 <p class="card-text text-muted mb-0">Completed</p>
             </div>
         </div>
@@ -55,122 +55,247 @@
         <div class="card text-center shadow-sm border-0 bg-danger bg-opacity-10 stats-card">
             <div class="card-body py-4">
                 <i class="bi bi-x-circle fs-1 text-danger mb-3 stats-icon"></i>
-                <h4 class="card-title text-danger fw-bold" id="failed-batches">-</h4>
+                <h4 class="card-title text-danger fw-bold" id="failed-executions">-</h4>
                 <p class="card-text text-muted mb-0">Failed</p>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Batch Files Management -->
+<!-- Main Content with Tabs -->
 <div class="card shadow-sm">
-    <div class="card-header bg-light d-flex justify-content-between align-items-center">
-        <h5 class="card-title mb-0">
-            <i class="bi bi-files me-2"></i>Batch Files
-        </h5>
-        <div class="d-flex align-items-center gap-3">
-            <span class="badge bg-secondary text-nowrap" id="selected-count">0 selected</span>
-            <div class="btn-group btn-group-sm" role="group" id="batch-actions" style="display: none;">
-                <button class="btn btn-outline-success" id="run-selected" disabled>
-                    <i class="bi bi-play me-1"></i>Run
+    <div class="card-header bg-light">
+        <!-- Navigation Tabs -->
+        <ul class="nav nav-tabs card-header-tabs" id="batchTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="batch-files-tab" data-bs-toggle="tab" data-bs-target="#batch-files" type="button" role="tab" aria-controls="batch-files" aria-selected="true">
+                    <i class="bi bi-files me-2"></i>Batch Files
                 </button>
-                <button class="btn btn-outline-danger" id="delete-selected" disabled>
-                    <i class="bi bi-trash me-1"></i>Delete
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="executions-tab" data-bs-toggle="tab" data-bs-target="#executions" type="button" role="tab" aria-controls="executions" aria-selected="false">
+                    <i class="bi bi-cpu me-2"></i>Executions
                 </button>
-            </div>
-            <div class="d-flex gap-2">
-                <button class="btn btn-outline-secondary btn-sm" id="toggle-filters" data-bs-toggle="collapse" data-bs-target="#filters-section" aria-expanded="false">
-                    <i class="bi bi-funnel me-1"></i>Filters
-                </button>
-                <button class="btn btn-outline-primary btn-sm" id="upload-batch" data-bs-toggle="modal" data-bs-target="#uploadModal">
-                    <i class="bi bi-upload me-1"></i>Upload
-                </button>
-                <button class="btn btn-outline-secondary btn-sm" id="refresh-batches">
-                    <i class="bi bi-arrow-clockwise me-1"></i>Refresh
-                </button>
-            </div>
-        </div>
-    </div>
-    
-    <!-- Collapsible Filters Section -->
-    <div class="collapse" id="filters-section">
-        <div class="card-body border-bottom bg-light">
-            <div class="row g-3">
-                <div class="col-md-6">
-                    <label for="search-query" class="form-label">Search</label>
-                    <input type="text" class="form-control" id="search-query" placeholder="Batch name, description...">
-                </div>
-                <div class="col-md-2">
-                    <label for="filter-status" class="form-label">Status</label>
-                    <select class="form-select" id="filter-status">
-                        <option value="">All Status</option>
-                        <option value="pending">Pending</option>
-                        <option value="running">Running</option>
-                        <option value="completed">Completed</option>
-                        <option value="failed">Failed</option>
-                    </select>
-                </div>
-                <div class="col-md-2">
-                    <label for="filter-date-from" class="form-label">From Date</label>
-                    <input type="date" class="form-control" id="filter-date-from">
-                </div>
-                <div class="col-md-2 d-flex align-items-end">
-                    <button type="button" class="btn btn-primary w-100" id="apply-filters">
-                        <i class="bi bi-search me-1"></i>Apply Filters
-                    </button>
-                </div>
-            </div>
-        </div>
+            </li>
+        </ul>
     </div>
     
     <div class="card-body p-0">
-        <!-- Loading indicator -->
-        <div id="loading-indicator" class="text-center p-4">
-            <div class="spinner-border text-primary" role="status">
-                <span class="visually-hidden">Loading...</span>
+        <div class="tab-content" id="batchTabsContent">
+            <!-- Batch Files Tab -->
+            <div class="tab-pane fade show active" id="batch-files" role="tabpanel" aria-labelledby="batch-files-tab">
+                <!-- Batch Files Header -->
+                <div class="p-3 border-bottom bg-light d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0 fw-bold">
+                        <i class="bi bi-files me-2"></i>Batch Configuration Files
+                    </h6>
+                    <div class="d-flex align-items-center gap-3">
+                        <span class="badge bg-secondary text-nowrap" id="selected-batch-count">0 selected</span>
+                        <div class="btn-group btn-group-sm" role="group" id="batch-actions" style="display: none;">
+                            <button class="btn btn-outline-success" id="run-selected" disabled>
+                                <i class="bi bi-play me-1"></i>Run
+                            </button>
+                            <button class="btn btn-outline-danger" id="delete-selected-batches" disabled>
+                                <i class="bi bi-trash me-1"></i>Delete
+                            </button>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-outline-secondary btn-sm" id="toggle-batch-filters" data-bs-toggle="collapse" data-bs-target="#batch-filters-section" aria-expanded="false">
+                                <i class="bi bi-funnel me-1"></i>Filters
+                            </button>
+                            <button class="btn btn-outline-primary btn-sm" id="upload-batch" data-bs-toggle="modal" data-bs-target="#uploadModal">
+                                <i class="bi bi-upload me-1"></i>Upload
+                            </button>
+                            <button class="btn btn-outline-secondary btn-sm" id="refresh-batches">
+                                <i class="bi bi-arrow-clockwise me-1"></i>Refresh
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Collapsible Filters Section for Batch Files -->
+                <div class="collapse" id="batch-filters-section">
+                    <div class="p-3 border-bottom bg-light">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label for="batch-search-query" class="form-label">Search</label>
+                                <input type="text" class="form-control" id="batch-search-query" placeholder="Batch name, description...">
+                            </div>
+                            <div class="col-md-2">
+                                <label for="batch-filter-date-from" class="form-label">From Date</label>
+                                <input type="date" class="form-control" id="batch-filter-date-from">
+                            </div>
+                            <div class="col-md-2">
+                                <label for="batch-filter-date-to" class="form-label">To Date</label>
+                                <input type="date" class="form-control" id="batch-filter-date-to">
+                            </div>
+                            <div class="col-md-2 d-flex align-items-end">
+                                <button type="button" class="btn btn-primary w-100" id="apply-batch-filters">
+                                    <i class="bi bi-search me-1"></i>Apply Filters
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Loading indicator for batch files -->
+                <div id="batch-loading-indicator" class="text-center p-4">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-2 text-muted">Loading batch files...</p>
+                </div>
+
+                <!-- Batch files table -->
+                <div class="table-responsive" id="batch-table-container" style="display: none;">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th width="50">
+                                    <input type="checkbox" class="form-check-input" id="select-all-batches">
+                                </th>
+                                <th>Batch Name</th>
+                                <th>Description</th>
+                                <th>Created</th>
+                                <th>Size</th>
+                                <th width="200">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="batch-table-body">
+                            <!-- Dynamic content -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Empty state for batch files -->
+                <div id="batch-empty-state" class="text-center p-5" style="display: none;">
+                    <i class="bi bi-inbox fs-1 text-muted mb-3"></i>
+                    <h5 class="text-muted">No batch files found</h5>
+                    <p class="text-muted">Upload a batch configuration file to get started.</p>
+                    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#uploadModal">
+                        <i class="bi bi-upload me-1"></i>Upload Batch File
+                    </button>
+                </div>
+
+                <!-- Error state for batch files -->
+                <div id="batch-error-state" class="text-center p-5" style="display: none;">
+                    <i class="bi bi-exclamation-triangle fs-1 text-warning mb-3"></i>
+                    <h5 class="text-warning">Error loading batch files</h5>
+                    <p class="text-muted" id="batch-error-message">An unexpected error occurred.</p>
+                    <button class="btn btn-outline-primary" id="retry-batch-load">
+                        <i class="bi bi-arrow-clockwise me-1"></i>Retry
+                    </button>
+                </div>
             </div>
-            <p class="mt-2 text-muted">Loading batch files...</p>
-        </div>
+            
+            <!-- Executions Tab -->
+            <div class="tab-pane fade" id="executions" role="tabpanel" aria-labelledby="executions-tab">
+                <!-- Executions Header -->
+                <div class="p-3 border-bottom bg-light d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0 fw-bold">
+                        <i class="bi bi-cpu me-2"></i>Batch Executions
+                    </h6>
+                    <div class="d-flex align-items-center gap-3">
+                        <span class="badge bg-secondary text-nowrap" id="selected-execution-count">0 selected</span>
+                        <div class="btn-group btn-group-sm" role="group" id="execution-actions" style="display: none;">
+                            <button class="btn btn-outline-danger" id="stop-selected" disabled>
+                                <i class="bi bi-stop me-1"></i>Stop
+                            </button>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-outline-secondary btn-sm" id="toggle-execution-filters" data-bs-toggle="collapse" data-bs-target="#execution-filters-section" aria-expanded="false">
+                                <i class="bi bi-funnel me-1"></i>Filters
+                            </button>
+                            <button class="btn btn-outline-secondary btn-sm" id="refresh-executions">
+                                <i class="bi bi-arrow-clockwise me-1"></i>Refresh
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Collapsible Filters Section for Executions -->
+                <div class="collapse" id="execution-filters-section">
+                    <div class="p-3 border-bottom bg-light">
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <label for="execution-search-query" class="form-label">Search</label>
+                                <input type="text" class="form-control" id="execution-search-query" placeholder="Execution ID, batch name...">
+                            </div>
+                            <div class="col-md-2">
+                                <label for="execution-filter-status" class="form-label">Status</label>
+                                <select class="form-select" id="execution-filter-status">
+                                    <option value="">All Status</option>
+                                    <option value="running">Running</option>
+                                    <option value="completed">Completed</option>
+                                    <option value="failed">Failed</option>
+                                    <option value="stopped">Stopped</option>
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <label for="execution-filter-date-from" class="form-label">From Date</label>
+                                <input type="date" class="form-control" id="execution-filter-date-from">
+                            </div>
+                            <div class="col-md-2">
+                                <label for="execution-filter-date-to" class="form-label">To Date</label>
+                                <input type="date" class="form-control" id="execution-filter-date-to">
+                            </div>
+                            <div class="col-md-2 d-flex align-items-end">
+                                <button type="button" class="btn btn-primary w-100" id="apply-execution-filters">
+                                    <i class="bi bi-search me-1"></i>Apply Filters
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Loading indicator for executions -->
+                <div id="execution-loading-indicator" class="text-center p-4">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-2 text-muted">Loading executions...</p>
+                </div>
 
-        <!-- Batch files table -->
-        <div class="table-responsive" id="batch-table-container" style="display: none;">
-            <table class="table table-hover mb-0">
-                <thead class="table-light">
-                    <tr>
-                        <th width="50">
-                            <input type="checkbox" class="form-check-input" id="select-all-checkbox">
-                        </th>
-                        <th>Batch Name</th>
-                        <th>Created</th>
-                        <th>Status</th>
-                        <th>Progress</th>
-                        <th width="200">Actions</th>
-                    </tr>
-                </thead>
-                <tbody id="batch-table-body">
-                    <!-- Dynamic content -->
-                </tbody>
-            </table>
-        </div>
+                <!-- Executions table -->
+                <div class="table-responsive" id="execution-table-container" style="display: none;">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th width="50">
+                                    <input type="checkbox" class="form-check-input" id="select-all-executions">
+                                </th>
+                                <th>Execution ID</th>
+                                <th>Batch File</th>
+                                <th>Started</th>
+                                <th>Status</th>
+                                <th>Progress</th>
+                                <th>Duration</th>
+                                <th width="80">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="execution-table-body">
+                            <!-- Dynamic content -->
+                        </tbody>
+                    </table>
+                </div>
 
-        <!-- Empty state -->
-        <div id="empty-state" class="text-center p-5" style="display: none;">
-            <i class="bi bi-inbox fs-1 text-muted mb-3"></i>
-            <h5 class="text-muted">No batch files found</h5>
-            <p class="text-muted">Upload a batch configuration file to get started.</p>
-            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#uploadModal">
-                <i class="bi bi-upload me-1"></i>Upload Batch File
-            </button>
-        </div>
+                <!-- Empty state for executions -->
+                <div id="execution-empty-state" class="text-center p-5" style="display: none;">
+                    <i class="bi bi-inbox fs-1 text-muted mb-3"></i>
+                    <h5 class="text-muted">No executions found</h5>
+                    <p class="text-muted">Run a batch file to see executions here.</p>
+                </div>
 
-        <!-- Error state -->
-        <div id="error-state" class="text-center p-5" style="display: none;">
-            <i class="bi bi-exclamation-triangle fs-1 text-warning mb-3"></i>
-            <h5 class="text-warning">Error loading batch files</h5>
-            <p class="text-muted" id="error-message">An unexpected error occurred.</p>
-            <button class="btn btn-outline-primary" id="retry-load">
-                <i class="bi bi-arrow-clockwise me-1"></i>Retry
-            </button>
+                <!-- Error state for executions -->
+                <div id="execution-error-state" class="text-center p-5" style="display: none;">
+                    <i class="bi bi-exclamation-triangle fs-1 text-warning mb-3"></i>
+                    <h5 class="text-warning">Error loading executions</h5>
+                    <p class="text-muted" id="execution-error-message">An unexpected error occurred.</p>
+                    <button class="btn btn-outline-primary" id="retry-execution-load">
+                        <i class="bi bi-arrow-clockwise me-1"></i>Retry
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
 </div>
@@ -198,8 +323,9 @@
                         <div class="form-text">Upload a YAML file containing batch execution configuration.</div>
                     </div>
                     <div class="mb-3">
-                        <label for="batch-description" class="form-label">Description (optional)</label>
-                        <textarea class="form-control" id="batch-description" rows="3" placeholder="Enter a description for this batch..."></textarea>
+                        <label for="batch-name" class="form-label">Batch Name (optional)</label>
+                        <input type="text" class="form-control" id="batch-name" placeholder="Enter a custom name for this batch...">
+                        <div class="form-text">If not provided, the original filename will be used.</div>
                     </div>
                 </form>
             </div>
@@ -408,21 +534,49 @@
     0% { transform: translateX(-100%); }
     100% { transform: translateX(100%); }
 }
+
+/* Execution ID link styling */
+.execution-link {
+    display: inline-block;
+    transition: all 0.2s ease;
+}
+
+.execution-link:hover {
+    transform: scale(1.05);
+    text-decoration: none !important;
+}
+
+.execution-link code {
+    cursor: pointer;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    background-color: rgba(13, 110, 253, 0.1);
+    transition: all 0.2s ease;
+}
+
+.execution-link:hover code {
+    background-color: rgba(13, 110, 253, 0.2);
+    color: #0a58ca !important;
+}
 </style>
 {% endblock %}
 
 {% block extra_js %}
-<script src="/static/js/components/batch-manager.js"></script>
+<script src="/static/js/components/batch-manager-tabbed.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', () => {
-    // Initialize batch manager if the component is available
-    if (typeof BatchManager !== 'undefined') {
-        const batchManager = new BatchManager();
+    // Initialize tabbed batch manager if the component is available
+    if (typeof BatchManagerTabbed !== 'undefined') {
+        const batchManager = new BatchManagerTabbed();
         batchManager.initialize();
+        window.batchManager = batchManager; // Make available globally for debugging
     } else {
-        console.warn('BatchManager component not available');
+        console.warn('BatchManagerTabbed component not available');
         // Basic fallback functionality
         document.getElementById('refresh-batches')?.addEventListener('click', () => {
+            location.reload();
+        });
+        document.getElementById('refresh-executions')?.addEventListener('click', () => {
             location.reload();
         });
     }

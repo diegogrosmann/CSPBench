@@ -623,7 +623,7 @@ class ConfigParser:
         monitoring_section = config.get("monitoring", {})
 
         interface = monitoring_section.get("interface", "simple")
-        if interface not in ["simple", "tui"]:
+        if interface not in ["simple", "tui", "hierarchical"]:
             raise BatchConfigurationError(f"Invalid monitoring interface: {interface}")
 
         return MonitoringConfig(

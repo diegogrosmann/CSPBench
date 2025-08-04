@@ -16,6 +16,7 @@
             "problemMatcher": [],
             "options": {
                 "cwd": "${workspaceFolder}",
+                "envFile": "${workspaceFolder}/.env",
                 "env": {
                     "PYTHONPATH": "${workspaceFolder}",
                     "PYTHONDONTWRITEBYTECODE": "1"
@@ -37,6 +38,30 @@
             "problemMatcher": [],
             "options": {
                 "cwd": "${workspaceFolder}",
+                "envFile": "${workspaceFolder}/.env",
+                "env": {
+                    "PYTHONPATH": "${workspaceFolder}",
+                    "PYTHONDONTWRITEBYTECODE": "1"
+                }
+            }
+        },
+        {
+            "label": "Start Web Interface",
+            "type": "shell",
+            "command": "${workspaceFolder}/.venv/bin/python", 
+            "args": ["-m", "uvicorn", "src.presentation.web.app:app", "--reload", "--host", "0.0.0.0", "--port", "8000"],
+            "group": "build",
+            "isBackground": true,
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": [],
+            "options": {
+                "cwd": "${workspaceFolder}",
+                "envFile": "${workspaceFolder}/.env",
                 "env": {
                     "PYTHONPATH": "${workspaceFolder}",
                     "PYTHONDONTWRITEBYTECODE": "1"
@@ -86,197 +111,6 @@
             }
         },
         {
-            "label": "Type Check",
-            "type": "shell",
-            "command": "${workspaceFolder}/.venv/bin/python",
-            "args": ["-m", "mypy", "src/"],
-            "group": "build",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": false,
-                "panel": "shared"
-            },
-            "problemMatcher": [],
-            "options": {
-                "cwd": "${workspaceFolder}",
-                "env": {
-                    "PYTHONPATH": "${workspaceFolder}",
-                    "PYTHONDONTWRITEBYTECODE": "1"
-                }
-            }
-        },
-        {
-            "label": "Run Coverage",
-            "type": "shell",
-            "command": "${workspaceFolder}/.venv/bin/python",
-            "args": ["-m", "pytest", "--cov=src", "--cov-report=html", "tests/"],
-            "group": "test",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": false,
-                "panel": "shared"
-            },
-            "problemMatcher": [],
-            "options": {
-                "cwd": "${workspaceFolder}",
-                "env": {
-                    "PYTHONPATH": "${workspaceFolder}",
-                    "PYTHONDONTWRITEBYTECODE": "1"
-                }
-            }
-        },
-        {
-            "label": "Build Docker",
-            "type": "shell",
-            "command": "docker",
-            "args": ["build", "-t", "cspbench:latest", "."],
-            "group": "build",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": false,
-                "panel": "shared"
-            },
-            "problemMatcher": []
-        },
-        {
-            "label": "Start Web Interface",
-            "type": "shell",
-            "command": "${workspaceFolder}/.venv/bin/python", 
-            "args": ["-m", "uvicorn", "src.presentation.web.app:app", "--reload", "--host", "0.0.0.0", "--port", "8000"],
-            "group": "build",
-            "isBackground": true,
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": false,
-                "panel": "shared"
-            },
-            "problemMatcher": [],
-            "options": {
-                "cwd": "${workspaceFolder}",
-                "env": {
-                    "PYTHONPATH": "${workspaceFolder}",
-                    "PYTHONDONTWRITEBYTECODE": "1"
-                }
-            }
-        },
-        {
-            "label": "Build Docker Web",
-            "type": "shell",
-            "command": "docker",
-            "args": ["build", "-f", "Dockerfile.web", "-t", "cspbench-web:latest", "."],
-            "group": "build",
-            "presentation": {
-                "echo": true,
-                "reveal": "always", 
-                "focus": false,
-                "panel": "shared"
-            },
-            "problemMatcher": []
-        },
-        {
-            "label": "Run Docker Web",
-            "type": "shell",
-            "command": "docker-compose",
-            "args": ["-f", "docker-compose.web.yml", "up", "-d"],
-            "group": "build",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": false, 
-                "panel": "shared"
-            },
-            "problemMatcher": []
-        },
-        {
-            "label": "Run Docker",
-            "type": "shell",
-            "command": "docker",
-            "args": ["run", "--rm", "-it", "--env-file", ".env", "cspbench:latest"],
-            "group": "build",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": false,
-                "panel": "shared"
-            },
-            "problemMatcher": []
-        },
-        {
-            "label": "Build Cloud Image",
-            "type": "shell",
-            "command": "docker",
-            "args": [
-                "build",
-                "-t",
-                "cspbench-web:latest",
-                "."
-            ],
-            "group": "build",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": false,
-                "panel": "shared"
-            },
-            "problemMatcher": []
-        },
-        {
-            "label": "Test Cloud Image",
-            "type": "shell",
-            "command": "docker",
-            "args": [
-                "run",
-                "--rm",
-                "-p",
-                "8000:8000",
-                "cspbench-web:latest"
-            ],
-            "group": "test",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": false,
-                "panel": "shared"
-            },
-            "problemMatcher": [],
-            "dependsOn": "Build Cloud Image"
-        },
-        {
-            "label": "Deploy to Cloud Run (gcloud)",
-            "type": "shell",
-            "command": "gcloud",
-            "args": [
-                "run",
-                "deploy",
-                "cspbench-web",
-                "--source",
-                ".",
-                "--region",
-                "us-central1",
-                "--allow-unauthenticated",
-                "--memory",
-                "2Gi",
-                "--cpu",
-                "1",
-                "--max-instances",
-                "10",
-                "--port",
-                "8000"
-            ],
-            "group": "build",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": false,
-                "panel": "shared"
-            },
-            "problemMatcher": []
-        },
-        {
             "label": "Setup Environment",
             "type": "shell",
             "command": "${workspaceFolder}/.venv/bin/pip",
@@ -291,68 +125,6 @@
             "problemMatcher": [],
             "options": {
                 "cwd": "${workspaceFolder}"
-            }
-        },
-        {
-            "label": "Start Web Interface (Direct)",
-            "type": "shell",
-            "command": "${workspaceFolder}/.venv/bin/python",
-            "args": ["src/presentation/web/run_web.py"],
-            "group": "build",
-            "isBackground": true,
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": false,
-                "panel": "shared"
-            },
-            "problemMatcher": [],
-            "options": {
-                "cwd": "${workspaceFolder}",
-                "env": {
-                    "PYTHONPATH": "${workspaceFolder}",
-                    "PYTHONDONTWRITEBYTECODE": "1",
-                    "WEB_HOST": "0.0.0.0",
-                    "WEB_PORT": "8000"
-                }
-            }
-        },
-        {
-            "label": "Check Dependencies",
-            "type": "shell",
-            "command": "${workspaceFolder}/.venv/bin/pip",
-            "args": ["list"],
-            "group": "build",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": false,
-                "panel": "shared"
-            },
-            "problemMatcher": [],
-            "options": {
-                "cwd": "${workspaceFolder}"
-            }
-        },
-        {
-            "label": "Test Algorithm",
-            "type": "shell",
-            "command": "${workspaceFolder}/.venv/bin/python",
-            "args": ["main.py", "run", "Baseline", "example.fasta"],
-            "group": "test",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": false,
-                "panel": "shared"
-            },
-            "problemMatcher": [],
-            "options": {
-                "cwd": "${workspaceFolder}",
-                "env": {
-                    "PYTHONPATH": "${workspaceFolder}",
-                    "PYTHONDONTWRITEBYTECODE": "1"
-                }
             }
         }
     ]

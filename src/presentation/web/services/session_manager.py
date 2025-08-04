@@ -22,10 +22,16 @@ class ExecutionSession:
     created_at: float
     updated_at: float
     completed_at: Optional[float] = None
-    config: Dict[str, Any] = None
+    config: Optional[Dict[str, Any]] = None
     message: Optional[str] = None
     error: Optional[str] = None
     progress: Optional[Dict[str, Any]] = None
+    logs: Optional[List[Dict[str, Any]]] = None
+    current_execution: Optional[Dict[str, Any]] = None
+
+    def __post_init__(self):
+        if self.logs is None:
+            self.logs = []
 
 
 class ExecutionSessionManager:
@@ -36,7 +42,7 @@ class ExecutionSessionManager:
         self._lock = threading.Lock()
 
     def create_session(
-        self, session_type: str, config: Dict[str, Any] = None, status: str = "pending"
+        self, session_type: str, config: Optional[Dict[str, Any]] = None, status: str = "pending"
     ) -> str:
         """Create a new execution session."""
         with self._lock:
@@ -79,6 +85,8 @@ class ExecutionSessionManager:
                 "progress",
                 "completed_at",
                 "config",
+                "logs",
+                "current_execution",
             }
 
             for key, value in updates.items():
@@ -88,8 +96,57 @@ class ExecutionSessionManager:
             session.updated_at = time.time()
             return True
 
+    def add_log(self, session_id: str, level: str, message: str, source: Optional[str] = None) -> bool:
+        """Add a log entry to a session."""
+        with self._lock:
+            session = self._sessions.get(session_id)
+            if not session:
+                return False
+
+            if session.logs is None:
+                session.logs = []
+
+            # Gerar ID único para o log
+            log_id = len(session.logs) + 1
+            
+            # Gerar timestamp legível
+            timestamp = time.strftime("%H:%M:%S", time.localtime())
+
+            log_entry = {
+                "id": log_id,
+                "timestamp": timestamp,
+                "level": level.upper(),
+                "message": message,
+            }
+
+            if source:
+                log_entry["source"] = source
+
+            session.logs.append(log_entry)
+            session.updated_at = time.time()
+            return True
+
+    def get_session_logs(self, session_id: str) -> List[Dict[str, Any]]:
+        """Get logs for a specific session."""
+        with self._lock:
+            session = self._sessions.get(session_id)
+            if session and session.logs:
+                return session.logs.copy()
+            return []
+
+    def clear_session_logs(self, session_id: str) -> bool:
+        """Clear all logs for a session."""
+        with self._lock:
+            session = self._sessions.get(session_id)
+            if not session:
+                return False
+
+            session.logs = []
+            session.updated_at = time.time()
+            return True
+
     def complete_session(
-        self, session_id: str, status: str = "completed", message: str = None
+        self, session_id: str, status: str = "completed", message: Optional[str] = None
     ) -> bool:
         """Mark session as completed."""
         updates = {"status": status, "completed_at": time.time()}
@@ -98,7 +155,7 @@ class ExecutionSessionManager:
 
         return self.update_session(session_id, updates)
 
-    def fail_session(self, session_id: str, error: str, message: str = None) -> bool:
+    def fail_session(self, session_id: str, error: str, message: Optional[str] = None) -> bool:
         """Mark session as failed."""
         updates = {"status": "failed", "error": error, "completed_at": time.time()}
         if message:

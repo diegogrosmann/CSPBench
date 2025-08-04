@@ -74,7 +74,7 @@ import yaml
 # Load environment variables from .env file
 try:
     from dotenv import load_dotenv
-    load_dotenv()
+    load_dotenv(override=True)
 except ImportError:
     # If python-dotenv is not installed, continue without it
     pass
@@ -178,6 +178,72 @@ def create_executor(config: Dict[str, Any]) -> Executor:
         return Executor()
 
 
+def create_exporter_with_session(config: Dict[str, Any], session_manager: SessionManager):
+    """Create exporter with centralized session management."""
+    # Priority: Environment variable > settings.yaml fallback
+    default_format = "json"
+    if "output" in config and "results" in config["output"]:
+        export_formats = config["output"]["results"].get("export_formats", [default_format])
+        default_format = export_formats[0] if export_formats else default_format
+    
+    export_fmt = os.getenv("EXPORT_FORMAT", default_format)
+    output_path = session_manager.get_result_dir()
+
+    if export_fmt.lower() == "json":
+        return JsonExporter(str(output_path), config)
+    elif export_fmt.lower() == "csv":
+        return CsvExporter(str(output_path))
+    elif export_fmt.lower() == "txt":
+        return TxtExporter(str(output_path))
+    else:
+        typer.echo(f"⚠️  Format '{export_fmt}' not supported, using JSON")
+        return JsonExporter(str(output_path), config)
+
+
+def _initialize_logging_with_session(config: Dict[str, Any], session_manager: SessionManager) -> None:
+    """Initialize logging system with centralized session management."""
+    default_level = "INFO"
+
+    try:
+        # Try to extract new unified output configuration
+        output_config = config.get("output", {})
+        log_config = output_config.get("logging", {})
+
+        # Check if logs are enabled
+        if not log_config.get("enabled", True):
+            return
+
+        # Extract configurations
+        log_level = log_config.get("level", default_level)
+
+        # Use session path for logs from session manager
+        log_file_path = session_manager.get_log_path()
+
+        # Initialize LoggerConfig with specific session path
+        LoggerConfig.initialize(
+            level=log_level,
+            log_file_path=log_file_path,
+            base_name="cspbench",
+        )
+
+        # Create logger and register initialization
+        logger = get_logger(__name__)
+        logger.info("=" * 60)
+        logger.info("CSPBench - Logging system initialized")
+        logger.info(f"Log level: {log_level}")
+        logger.info(f"Session: {session_manager.get_session_folder()}")
+        logger.info(f"Log file: {log_file_path}")
+        logger.info(f"Timestamp: {__import__('datetime').datetime.now()}")
+        logger.info("=" * 60)
+
+    except Exception as e:
+        # Fallback to basic configuration in case of error
+        default_log_dir = "outputs/logs"
+        LoggerConfig.initialize(level=default_level, log_dir=default_log_dir)
+        logger = get_logger(__name__)
+        logger.warning(f"Error configuring logging, using defaults: {e}")
+
+
 def create_exporter(config: Dict[str, Any]):
     """Create exporter based on configuration."""
     global session_manager
@@ -209,139 +275,91 @@ def create_exporter(config: Dict[str, Any]):
         return JsonExporter(str(output_path), config)  # Pass complete configuration
 
 
-def create_monitoring_service(config: Dict[str, Any]):
+def create_monitoring_service(config: Dict[str, Any], web_session_manager=None):
     """Create monitoring service based on configuration."""
     from src.application.services.basic_monitoring_service import BasicMonitoringService
 
-    return BasicMonitoringService(config)
+    return BasicMonitoringService(config, web_session_manager)
 
 
-def _initialize_logging(config: Dict[str, Any]) -> None:
-    """Initialize logging system based on configuration."""
-    global session_manager
+def initialize_service(session_id: Optional[str] = None, batch_config: Optional[Dict[str, Any]] = None, web_session_manager=None) -> ExperimentService:
+    """
+    Unified initialization for experiment service with dependency injection.
+    
+    Args:
+        session_id: Optional specific session ID for web interface
+        batch_config: Optional batch-specific configuration
+    
+    Returns:
+        ExperimentService: Configured service instance
+    """
+    global config
 
-    # Default configurations
-    default_level = "INFO"
-    default_log_dir = "outputs/logs"
+    if config is None:
+        config = load_config()
 
-    try:
-        # Create SessionManager if it doesn't exist
-        if session_manager is None:
-            session_manager = SessionManager(config)
+    # IMPORTANT: Ensure algorithms are imported and registered
+    import algorithms  # This triggers auto-discovery
+    
+    # Force algorithm registration by importing the registry
+    from src.domain import global_registry
+    
+    # Check if algorithms are loaded (silent check)
+    algo_count = len(global_registry.keys())
+    
+    if algo_count == 0:
+        # Force reload algorithms module if empty
+        import importlib
+        importlib.reload(algorithms)
 
-        # Create new session
+    # Merge configuration if batch config is provided
+    merged_config = config.copy()
+    if batch_config:
+        if 'output' in batch_config:
+            merged_config['output'] = batch_config['output']
+        if 'monitoring' in batch_config:
+            # Merge monitoring configuration from batch
+            merged_config['monitoring'] = batch_config['monitoring']
+
+    # Create centralized session manager
+    session_format = os.getenv("OUTPUT_SESSION_FOLDER_FORMAT", "%Y%m%d_%H%M%S")
+    base_output_dir = os.getenv("OUTPUT_BASE_DIRECTORY", "outputs")
+    session_manager = SessionManager(merged_config, base_output_dir=base_output_dir, session_format=session_format)
+    
+    # Create session with specific ID if provided, otherwise auto-generate
+    if session_id:
+        session_folder = session_manager.create_session(session_id)
+    else:
         session_folder = session_manager.create_session()
 
-        # Try to extract new unified output configuration
-        output_config = config.get("output", {})
-        log_config = output_config.get("logging", {})
+    # Initialize logging system with session context
+    _initialize_logging_with_session(merged_config, session_manager)
 
-        # Check if logs are enabled
-        if not log_config.get("enabled", True):
-            return
+    # Create infrastructure components
+    dataset_repo = create_dataset_repository(merged_config)
+    algo_registry = create_algorithm_registry(merged_config)
+    executor = create_executor(merged_config)
+    exporter = create_exporter_with_session(merged_config, session_manager)
+    entrez_repo = create_entrez_repository(merged_config)
+    monitoring_service = create_monitoring_service(merged_config, web_session_manager)
+    
+    # Set web session ID if provided
+    if session_id and web_session_manager and monitoring_service:
+        monitoring_service.set_web_session(session_id)
 
-        # Extract configurations
-        log_level = log_config.get("level", default_level)
+    # Create service with centralized session management
+    service = ExperimentService(
+        dataset_repo=dataset_repo,
+        exporter=exporter,
+        executor=executor,
+        algo_registry=algo_registry,
+        entrez_repo=entrez_repo,
+        monitoring_service=monitoring_service,
+        session_manager=session_manager,
+    )
 
-        # Use session path for logs
-        log_file_path = session_manager.get_log_path()
-
-        # Initialize LoggerConfig with specific session path
-        LoggerConfig.initialize(
-            level=log_level,
-            log_file_path=log_file_path,
-            base_name="cspbench",
-        )
-
-        # Create logger and register initialization
-        logger = get_logger(__name__)
-        logger.info("=" * 60)
-        logger.info("CSPBench - Logging system initialized")
-        logger.info(f"Log level: {log_level}")
-        logger.info(f"Session: {session_folder}")
-        logger.info(f"Log file: {log_file_path}")
-        logger.info(f"Timestamp: {__import__('datetime').datetime.now()}")
-        logger.info("=" * 60)
-
-    except Exception as e:
-        # Fallback to basic configuration in case of error
-        LoggerConfig.initialize(level=default_level, log_dir=default_log_dir)
-        logger = get_logger(__name__)
-        logger.warning(f"Error configuring logging, using defaults: {e}")
-
-
-def _update_logging_from_batch_config(batch_config: Dict[str, Any]) -> None:
-    """Update logging configuration based on specific batch file."""
-    try:
-        # Try new unified output configuration
-        output_config = batch_config.get("output", {})
-        log_config = output_config.get("logging", {})
-
-        # Check if logs are enabled
-        if not log_config.get("enabled", True):
-            return
-
-        # Update level if specified
-        if "level" in log_config:
-            new_level = log_config["level"]
-            LoggerConfig.set_level(new_level)
-            logger = get_logger(__name__)
-            logger.info(f"Log level updated to: {new_level}")
-    except Exception as e:
-        logger = get_logger(__name__)
-        logger.warning(f"Error updating logging configuration from batch: {e}")
-
-
-def initialize_service() -> ExperimentService:
-    """Initialize experiment service with dependency injection."""
-    global config, experiment_service
-
-    if experiment_service is None:
-        if config is None:
-            config = load_config()
-
-        # IMPORTANT: Ensure algorithms are imported and registered
-        import algorithms  # This triggers auto-discovery
-        
-        # Force algorithm registration by importing the registry
-        from src.domain import global_registry
-        
-        # Debug: Check if algorithms are loaded
-        algo_count = len(global_registry.keys())
-        print(f"DEBUG: {algo_count} algorithms in registry: {list(global_registry.keys())}")
-        
-        if algo_count == 0:
-            print("WARNING: No algorithms found in registry! Forcing reload...")
-            # Force reload algorithms module
-            import importlib
-            importlib.reload(algorithms)
-            print(f"DEBUG: After reload: {len(global_registry.keys())} algorithms: {list(global_registry.keys())}")
-
-        # Initialize logging system
-        _initialize_logging(config)
-
-        # Create infrastructure components
-        dataset_repo = create_dataset_repository(config)
-        algo_registry = create_algorithm_registry(config)
-        executor = create_executor(config)
-        exporter = create_exporter(config)
-        entrez_repo = create_entrez_repository(config)
-        monitoring_service = create_monitoring_service(config)
-
-        # Create service with DI
-        experiment_service = ExperimentService(
-            dataset_repo=dataset_repo,
-            exporter=exporter,
-            executor=executor,
-            algo_registry=algo_registry,
-            entrez_repo=entrez_repo,
-            monitoring_service=monitoring_service,
-            session_manager=session_manager,
-        )
-
-        typer.echo("✅ CSPBench initialized successfully!")
-
-    return experiment_service
+    typer.echo("✅ CSPBench initialized successfully!")
+    return service
 
 
 def show_interactive_menu() -> None:
@@ -487,33 +505,19 @@ def show_algorithms_and_exit():
     sys.exit(0)
 
 
-def show_datasetsave_and_exit():
-    """Execute interactive dataset generation wizard and exit."""
-    try:
-        from src.infrastructure.orchestrators.dataset_generation_orchestrator import (
-            DatasetGenerationOrchestrator,
-        )
-
-        # Create and execute orchestrator
-        orchestrator = DatasetGenerationOrchestrator()
-        result_path = orchestrator.run_interactive_generation()
-
-        if result_path:
-            print(f"\n🎉 Dataset saved successfully!")
-        else:
-            print("\n❌ Operation cancelled.")
-
-    except Exception as e:
-        print(f"❌ Error: {e}")
-
 
 def start_web_interface():
-    """Start the web interface with default settings and exit."""
+    """Start the web interface with settings from .env and exit."""
     try:
+        # Read configuration from environment variables
+        host = os.getenv("WEB_HOST", "0.0.0.0")
+        port = int(os.getenv("WEB_PORT", "8000"))
+        debug = os.getenv("DEBUG", "false").lower() == "true"
+        
         print("🌐 Starting CSPBench Web Interface...")
-        print("🖥️  Host: 0.0.0.0")
-        print("🔌 Port: 8000")
-        print("🛠️  Mode: Production")
+        print(f"🖥️  Host: {host}")
+        print(f"🔌 Port: {port}")
+        print(f"🛠️  Mode: {'Debug' if debug else 'Production'}")
         
         # Check if web dependencies are available
         try:
@@ -524,16 +528,16 @@ def start_web_interface():
             print("💡 Install with: pip install -r requirements.web.txt")
             sys.exit(1)
         
-        print(f"\n🚀 Web interface starting at http://localhost:8000")
+        print(f"\n🚀 Web interface starting at http://localhost:{port}")
         print("🔗 Click the link above or paste it into your browser")
         print("⏹️  Press Ctrl+C to stop the server")
         
-        # Start uvicorn server with default settings
+        # Start uvicorn server with environment settings
         uvicorn.run(
             "src.presentation.web.app:app",
-            host="0.0.0.0",
-            port=8000,
-            reload=False,
+            host=host,
+            port=port,
+            reload=debug,
             log_level="info",
             access_log=False
         )
@@ -626,8 +630,12 @@ def show_datasetsave_and_exit():
             DatasetGenerationOrchestrator,
         )
 
+        # Get dataset path from environment
+        dataset_path = os.getenv("DATASET_PATH", "datasets")
+        print(f"📁 Using dataset path: {dataset_path}")
+
         # Create and execute orchestrator
-        orchestrator = DatasetGenerationOrchestrator()
+        orchestrator = DatasetGenerationOrchestrator(base_path=dataset_path)
         result_path = orchestrator.run_interactive_generation()
 
         if result_path:
@@ -640,44 +648,6 @@ def show_datasetsave_and_exit():
         sys.exit(1)
 
     sys.exit(0)
-
-
-def initialize_service_with_batch_config(batch_config: Dict[str, Any]) -> ExperimentService:
-    """Initialize experiment service with batch-specific configuration."""
-    global config, experiment_service, session_manager
-
-    if config is None:
-        config = load_config()
-
-    # Merge batch output configuration with system config for session management
-    merged_config = config.copy()
-    if 'output' in batch_config:
-        merged_config['output'] = batch_config['output']
-
-    # Initialize logging system with batch configuration
-    _initialize_logging(merged_config)
-
-    # Create infrastructure components
-    dataset_repo = create_dataset_repository(config)
-    algo_registry = create_algorithm_registry(config)
-    executor = create_executor(config)
-    exporter = create_exporter(config)
-    entrez_repo = create_entrez_repository(config)
-    monitoring_service = create_monitoring_service(config)
-
-    # Create service with DI
-    experiment_service = ExperimentService(
-        dataset_repo=dataset_repo,
-        exporter=exporter,
-        executor=executor,
-        algo_registry=algo_registry,
-        entrez_repo=entrez_repo,
-        monitoring_service=monitoring_service,
-        session_manager=session_manager,
-    )
-
-    typer.echo("✅ CSPBench initialized successfully!")
-    return experiment_service
 
 
 def execute_batch_file(batch_file: str):
@@ -698,6 +668,12 @@ def execute_batch_file(batch_file: str):
         
         # Load batch configuration to extract output config for proper session management
         from src.application.services.config_parser import ConfigParser
+        import yaml
+        
+        # Load the full YAML configuration
+        with open(batch_path, 'r') as f:
+            full_batch_config = yaml.safe_load(f)
+        
         batch_config = ConfigParser.parse_config(str(batch_path))
         batch_dict = {
             'output': {
@@ -709,11 +685,15 @@ def execute_batch_file(batch_file: str):
             }
         }
         
+        # Add monitoring configuration from YAML if present
+        if 'monitoring' in full_batch_config:
+            batch_dict['monitoring'] = full_batch_config['monitoring']
+        
         # Initialize service with batch-specific configuration for session management
-        service = initialize_service_with_batch_config(batch_dict)
+        service = initialize_service(batch_config=batch_dict)
 
         result = service.run_batch(str(batch_path))
-        print(f"✅ Batch completed: {result.get('summary', 'Completed')}")
+        # Resultado já exibido pelo monitoramento hierárquico, não duplicar
 
     except KeyboardInterrupt:
         print("\n🚫 Operation cancelled by user (Ctrl+C)")
