@@ -1,0 +1,95 @@
+"""Progress events for the monitoring system."""
+
+from dataclasses import dataclass, field
+from datetime import datetime
+from enum import Enum
+from typing import Any, Dict, Optional
+
+
+class TaskType(Enum):
+    """Supported task types."""
+    EXECUTION = "execution"
+    OPTIMIZATION = "optimization"
+    SENSITIVITY = "sensitivity"
+
+
+class ExecutionPhase(Enum):
+    """Execution phases."""
+    STARTING = "starting"
+    RUNNING = "running"
+    FINISHING = "finishing"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+
+@dataclass
+class ProgressEvent:
+    """Base class for all progress events."""
+    session_id: Optional[str] = None
+    timestamp: Optional[datetime] = field(default_factory=datetime.now)
+
+
+@dataclass
+class TaskStartedEvent(ProgressEvent):
+    """Event fired when a task starts."""
+    task_type: TaskType = TaskType.EXECUTION
+    task_name: str = ""
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class TaskFinishedEvent(ProgressEvent):
+    """Event fired when a task finishes."""
+    task_type: TaskType = TaskType.EXECUTION
+    task_name: str = ""
+    success: bool = True
+    results: Dict[str, Any] = field(default_factory=dict)
+    error_message: Optional[str] = None
+
+
+@dataclass
+class ExecutionStartedEvent(ProgressEvent):
+    """Event fired when an execution block starts."""
+    execution_name: str = ""
+    total_items: int = 0
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class ExecutionProgressEvent(ProgressEvent):
+    """Event fired during execution progress."""
+    execution_name: str = ""
+    current_item: int = 0
+    total_items: int = 0
+    item_name: str = ""
+    progress_percent: float = 0.0
+    message: str = ""
+    context: Dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass  
+class ExecutionFinishedEvent(ProgressEvent):
+    """Event fired when an execution block finishes."""
+    execution_name: str = ""
+    success: bool = True
+    total_processed: int = 0
+    results: Dict[str, Any] = field(default_factory=dict)
+    error_message: Optional[str] = None
+
+
+@dataclass
+class AlgorithmProgressEvent(ProgressEvent):
+    """Event fired during algorithm execution."""
+    algorithm_name: str = ""
+    progress_percent: float = 0.0
+    message: str = ""
+    item_id: Optional[str] = None
+    context: Dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class ErrorEvent(ProgressEvent):
+    """Event fired when an error occurs."""
+    error_message: str = ""
+    error_type: str = "generic"
+    context: Dict[str, Any] = field(default_factory=dict)

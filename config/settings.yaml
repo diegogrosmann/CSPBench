@@ -108,19 +108,6 @@ output:
     include_plots: true               # bool: Generate history-specific plots
 
 # =====================================================================
-# SECTION 8: MONITORING SETTINGS (OPTIONAL)
-# =====================================================================
-# Settings for real-time execution monitoring
-# Note: For terminal execution, simple monitoring shows progress
-# Web interface accesses monitoring data directly via HTTP endpoints
-monitoring:
-  # General monitoring
-  enabled: true                       # bool: Enable simple progress monitoring in terminal
-  interface: "hierarchical"           # string: Interface type (always "simple" for terminal)
-                                      # Web interface bypasses this setting  
-  update_interval: 3                  # int: Update interval in seconds (1-10)
-   
-# =====================================================================
 # SECTION 9: RESOURCE SETTINGS (OPTIONAL)
 # =====================================================================
 # Control of computational resource usage

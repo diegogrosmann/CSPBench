@@ -530,6 +530,18 @@ class ExecutionOrchestrator(BaseOrchestrator):
         for execution in executions:
             execution_index += 1
             execution_name = execution.get("name", f"Execution {execution_index}")
+            
+            # Notificar início da execução
+            if monitoring_service:
+                monitoring_service.notify_execution_started(
+                    execution_name=execution_name,
+                    metadata={
+                        "index": execution_index,
+                        "total_executions": len(executions),
+                        "datasets": execution.get("datasets", []),
+                        "algorithms": execution.get("algorithms", [])
+                    }
+                )
 
             # Iterar sobre configurações de algoritmo
             algorithm_ids = execution["algorithms"]
@@ -1454,8 +1466,15 @@ class ExecutionOrchestrator(BaseOrchestrator):
                             "metadata": result_data.get("metadata", {}),
                         }
 
-                        # Notificar monitoramento de conclusão
+                        # Notificar monitoramento de conclusão com progresso 100%
                         if monitoring_service:
+                            # Enviar progresso 100% para o algoritmo
+                            monitoring_service.algorithm_callback(
+                                algorithm_name=algorithm_name,
+                                progress=100.0,
+                                message=f"Completed run {returned_rep_num}/{repetitions}",
+                                item_id=rep_id,
+                            )
                             monitoring_service.finish_item(rep_id, True, success_result)
 
                         results.append(success_result)

@@ -275,11 +275,23 @@ def create_exporter(config: Dict[str, Any]):
         return JsonExporter(str(output_path), config)  # Pass complete configuration
 
 
-def create_monitoring_service(config: Dict[str, Any], web_session_manager=None):
+def create_monitoring_service(config: Dict[str, Any], web_session_manager=None, session_id: Optional[str] = None):
     """Create monitoring service based on configuration."""
-    from src.application.services.basic_monitoring_service import BasicMonitoringService
-
-    return BasicMonitoringService(config, web_session_manager)
+    from src.application.monitoring.monitoring_factory import MonitoringFactory
+    
+    # Create monitoring system based on context
+    if web_session_manager and session_id:
+        # Web execution - create web-only system
+        monitoring_service, broker = MonitoringFactory.create_web_only_system(
+            session_id=session_id,
+            web_session_manager=web_session_manager
+        )
+    else:
+        # Terminal execution - create terminal-only system
+        verbose = config.get("monitoring", {}).get("verbose", True)
+        monitoring_service, broker = MonitoringFactory.create_terminal_only_system(verbose=verbose)
+    
+    return monitoring_service
 
 
 def initialize_service(session_id: Optional[str] = None, batch_config: Optional[Dict[str, Any]] = None, web_session_manager=None) -> ExperimentService:
@@ -341,11 +353,9 @@ def initialize_service(session_id: Optional[str] = None, batch_config: Optional[
     executor = create_executor(merged_config)
     exporter = create_exporter_with_session(merged_config, session_manager)
     entrez_repo = create_entrez_repository(merged_config)
-    monitoring_service = create_monitoring_service(merged_config, web_session_manager)
+    monitoring_service = create_monitoring_service(merged_config, web_session_manager, session_id)
     
-    # Set web session ID if provided
-    if session_id and web_session_manager and monitoring_service:
-        monitoring_service.set_web_session(session_id)
+    # Note: Web session is now handled during monitoring service creation
 
     # Create service with centralized session management
     service = ExperimentService(

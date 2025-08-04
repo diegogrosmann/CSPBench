@@ -240,13 +240,26 @@ class ExperimentService:
             task_type = parsed_config.task.type
             self._logger.info(f"Task type detected: {task_type}")
 
-            # Configure monitoring if enabled
-            if (
-                monitoring_config
-                and monitoring_config.enabled
-                and self._monitoring_service
-            ):
-                self._configure_monitoring(monitoring_config)
+            # Start monitoring if enabled
+            if self._monitoring_service:
+                from src.application.monitoring import TaskType
+                
+                # Map string task type to enum
+                task_type_enum = TaskType.EXECUTION
+                if task_type == "optimization":
+                    task_type_enum = TaskType.OPTIMIZATION
+                elif task_type == "sensitivity":
+                    task_type_enum = TaskType.SENSITIVITY
+                
+                self._monitoring_service.start_task(
+                    task_type=task_type_enum,
+                    task_name=metadata.name,
+                    metadata={
+                        "description": metadata.description,
+                        "author": metadata.author,
+                        "version": metadata.version
+                    }
+                )
 
             # Process according to task type
             if task_type == "execution":
@@ -301,10 +314,29 @@ class ExperimentService:
             # if plots_config.enabled:
             #     self._generate_plots_with_config(results, plots_config, task_type)
 
+            # Finish monitoring
+            if self._monitoring_service:
+                self._monitoring_service.finish_task(
+                    success=successful > 0,
+                    results=consolidated_results
+                )
+
             return consolidated_results
 
         except Exception as e:
             self._logger.error(f"Erro durante execução de batch: {e}")
+            
+            # Report error to monitoring
+            if self._monitoring_service:
+                self._monitoring_service.report_error(
+                    error_message=str(e),
+                    error_type=type(e).__name__
+                )
+                self._monitoring_service.finish_task(
+                    success=False,
+                    error_message=str(e)
+                )
+            
             if isinstance(
                 e,
                 (BatchConfigurationError, DatasetNotFoundError, AlgorithmNotFoundError),

@@ -558,26 +558,13 @@ output:
     include_plots: true               # bool: Generate history-specific plots
 
 # =====================================================================
-# SECTION 8: MONITORING SETTINGS (OPTIONAL)
-# =====================================================================
-# Settings for real-time execution monitoring
-# Note: For terminal execution, interface is always "simple" (progress monitoring)
-# Web interface accesses monitoring data directly via HTTP endpoints
-monitoring:
-  # General monitoring
-  enabled: true                       # bool: Enable simple progress monitoring in terminal
-  interface: "hierarchical"           # string: Interface type ("simple", "hierarchical")
-                                      # Web interface bypasses this setting
-  update_interval: 3                  # int: Update interval in seconds (1-10)
-   
-# =====================================================================
-# SECTION 9: RESOURCE SETTINGS (OPTIONAL)
+# SECTION 8: RESOURCE SETTINGS (OPTIONAL)
 # =====================================================================
 # Control of computational resource usage
 resources:
   # CPU limitations
   cpu:
-    max_cores: 1                      # int|null: Maximum cores to use (null = all)
+    max_cores: null                   # int|null: Maximum cores to use (null = all)
     affinity: null                    # list|null: Specific cores to use [0,1,2,3]
     
   # Memory limitations
@@ -603,7 +590,7 @@ resources:
                                       # Common values: 21600 (6h), 43200 (12h), 86400 (24h)
     
 # =====================================================================
-# SECTION 10: SYSTEM SETTINGS (OPTIONAL)
+# SECTION 9: SYSTEM SETTINGS (OPTIONAL)
 # =====================================================================
 # General system configurations and behavior
 system:
