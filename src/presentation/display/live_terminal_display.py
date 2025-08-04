@@ -219,14 +219,36 @@ class LiveTerminalDisplay:
         current_run = context.get('current_repetition', context.get('current_run', current_run))
         total_runs = context.get('total_repetitions', context.get('total_runs', total_runs))
         
-        config['algorithms'][event.algorithm_name] = {
-            'name': event.algorithm_name,
-            'progress': event.progress_percent,
-            'current_run': current_run,
-            'total_runs': total_runs,
-            'status': 'running' if event.progress_percent < 100 else 'completed',
-            'message': event.message
-        }
+        # Update or create algorithm entry (aggregated)
+        if event.algorithm_name not in config['algorithms']:
+            config['algorithms'][event.algorithm_name] = {
+                'name': event.algorithm_name,
+                'progress': 0,
+                'current_run': 0,
+                'total_runs': total_runs,
+                'status': 'running',
+                'message': event.message
+            }
+        
+        # Update algorithm progress - only track the highest completed run
+        algo_info = config['algorithms'][event.algorithm_name]
+        
+        # If this run is completed (100%), update current_run
+        if event.progress_percent >= 100 and current_run > algo_info['current_run']:
+            algo_info['current_run'] = current_run
+        
+        # Update total_runs if we have better info
+        if total_runs > algo_info['total_runs']:
+            algo_info['total_runs'] = total_runs
+        
+        # Update status based on completion
+        if algo_info['current_run'] >= algo_info['total_runs']:
+            algo_info['status'] = 'completed'
+        else:
+            algo_info['status'] = 'running'
+        
+        # Update message
+        algo_info['message'] = event.message
         
         self._refresh_display()
     
@@ -311,20 +333,37 @@ class LiveTerminalDisplay:
                             
                             if config.get('algorithms'):
                                 for algo_name, algo in config['algorithms'].items():
-                                    algo_key = f"{algo_name}_{algo['current_run']}_{algo['total_runs']}"
+                                    # Calculate aggregated progress
+                                    completed_runs = algo['current_run'] if algo['status'] == 'completed' else algo['current_run'] - 1
+                                    total_runs = algo['total_runs']
+                                    progress_percent = (completed_runs / total_runs) * 100 if total_runs > 0 else 0
                                     
-                                    if algo_key not in config_state['algorithms'] or config_state['algorithms'][algo_key] != algo['progress']:
-                                        # New algorithm or progress change
-                                        status_icon = self._get_algorithm_status_icon(algo['status'])
-                                        progress_bar = self._create_progress_bar(algo['progress'])
-                                        run_info = f"(Run {algo['current_run']}/{algo['total_runs']})"
+                                    # Create unique key for tracking
+                                    algo_key = f"{algo_name}_{total_runs}"
+                                    
+                                    # Check if this is new or progress changed
+                                    last_progress = config_state['algorithms'].get(algo_key, -1)
+                                    
+                                    if algo_key not in config_state['algorithms']:
+                                        # First time showing this algorithm - print new line
+                                        status_icon = self._get_algorithm_status_icon_by_progress(progress_percent)
+                                        progress_bar = self._create_progress_bar(progress_percent)
+                                        run_info = f"({completed_runs}/{total_runs})"
                                         
-                                        print(f"      {status_icon} {algo_name} {run_info}: [{progress_bar}] {algo['progress']:5.1f}%")
+                                        print(f"      {status_icon} {algo_name} {run_info}: [{progress_bar}] {progress_percent:5.1f}%", end="")
+                                        config_state['algorithms'][algo_key] = progress_percent
+                                    elif last_progress != progress_percent:
+                                        # Update existing line using carriage return
+                                        status_icon = self._get_algorithm_status_icon_by_progress(progress_percent)
+                                        progress_bar = self._create_progress_bar(progress_percent)
+                                        run_info = f"({completed_runs}/{total_runs})"
                                         
-                                        if algo.get('message'):
-                                            print(f"        💬 {algo['message']}")
+                                        print(f"\r      {status_icon} {algo_name} {run_info}: [{progress_bar}] {progress_percent:5.1f}%", end="")
+                                        config_state['algorithms'][algo_key] = progress_percent
                                         
-                                        config_state['algorithms'][algo_key] = algo['progress']
+                                        # Add newline only when algorithm is completed
+                                        if progress_percent >= 100:
+                                            print()  # Move to next line when completed
     
     def _get_algorithm_status_icon(self, status: str) -> str:
         """Get status icon for algorithm."""
@@ -336,9 +375,18 @@ class LiveTerminalDisplay:
         }
         return icons.get(status, '❓')
     
-    def _create_progress_bar(self, progress: float, width: int = 20) -> str:
+    def _get_algorithm_status_icon_by_progress(self, progress_percent: float) -> str:
+        """Get status icon based on progress percentage."""
+        if progress_percent >= 100:
+            return "✅"
+        elif progress_percent > 0:
+            return "🔄"
+        else:
+            return "⏳"
+    
+    def _create_progress_bar(self, percentage: float, width: int = 20) -> str:
         """Create a progress bar string."""
-        filled = int(progress / 100 * width)
+        filled = int(percentage / 100 * width)
         bar = "█" * filled + "░" * (width - filled)
         return bar
     
