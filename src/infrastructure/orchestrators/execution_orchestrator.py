@@ -543,35 +543,36 @@ class ExecutionOrchestrator(BaseOrchestrator):
                     }
                 )
 
-            # Iterar sobre configurações de algoritmo
+            # Iterar sobre datasets primeiro
+            dataset_ids = execution["datasets"]
             algorithm_ids = execution["algorithms"]
-            for algo_config_idx, algorithm_id in enumerate(algorithm_ids, 1):
+            
+            for dataset_idx, dataset_id in enumerate(dataset_ids, 1):
 
-                # Resolver configuração do algoritmo
-                algorithm_config = next(
-                    (a for a in algorithms_config if a["id"] == algorithm_id), None
+                dataset_config = next(
+                    (d for d in datasets_config if d["id"] == dataset_id), None
                 )
-                if not algorithm_config:
-                    self._logger.error(
-                        f"Algoritmo com ID '{algorithm_id}' não encontrado"
+                if not dataset_config:
+                    results.append(
+                        {
+                            "execution_name": execution.get("name", "unknown"),
+                            "dataset_id": dataset_id,
+                            "status": "error",
+                            "error": f"Dataset com ID '{dataset_id}' não encontrado",
+                        }
                     )
                     continue
 
-                # Resolver datasets para esta configuração
-                dataset_ids = execution["datasets"]
-                for dataset_idx, dataset_id in enumerate(dataset_ids, 1):
+                # Iterar sobre configurações de algoritmo para este dataset
+                for algo_config_idx, algorithm_id in enumerate(algorithm_ids, 1):
 
-                    dataset_config = next(
-                        (d for d in datasets_config if d["id"] == dataset_id), None
+                    # Resolver configuração do algoritmo
+                    algorithm_config = next(
+                        (a for a in algorithms_config if a["id"] == algorithm_id), None
                     )
-                    if not dataset_config:
-                        results.append(
-                            {
-                                "execution_name": execution.get("name", "unknown"),
-                                "dataset_id": dataset_id,
-                                "status": "error",
-                                "error": f"Dataset com ID '{dataset_id}' não encontrado",
-                            }
+                    if not algorithm_config:
+                        self._logger.error(
+                            f"Algoritmo com ID '{algorithm_id}' não encontrado"
                         )
                         continue
 

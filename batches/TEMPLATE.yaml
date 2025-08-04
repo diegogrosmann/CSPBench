@@ -238,7 +238,7 @@ execution:
       algorithms:
         - "default_config"
         - "aggressive_csc"
-      repetitions: 3                  # int: Number of repetitions per combination (1-10 recommended)
+      repetitions: 30                  # int: Number of repetitions per combination (1-10 recommended)
                                       # Each dataset+algorithm combination will be executed N times
     # You can add multiple executions:
     - name: "Complete Execution"
@@ -246,7 +246,7 @@ execution:
         - "dataset_ncbi"
       algorithms: 
         - "aggressive_csc"
-      repetitions: 2
+      repetitions: 20
 
 # =====================================================================
 # SECTION 5B: SPECIFIC CONFIGURATION - OPTIMIZATION

@@ -114,7 +114,10 @@ class LiveTerminalDisplay:
                 'datasets': {},
                 'metadata': metadata,
                 'current_dataset': None,
-                'current_config': None
+                'current_config': None,
+                # Extract counter information from metadata
+                'index': metadata.get('index', 1),
+                'total_executions': metadata.get('total_executions', 1)
             }
         
         self._refresh_display()
@@ -130,6 +133,12 @@ class LiveTerminalDisplay:
         dataset_name = context.get('dataset_name', event.item_name)
         config_name = context.get('algorithm_config_name', 'Default')
         
+        # Extract counter information from context
+        dataset_index = context.get('dataset_index', 1)
+        total_datasets = context.get('total_datasets', 1)
+        config_index = context.get('algorithm_config_index', 1)
+        total_configs = context.get('total_algorithm_configs', 1)
+        
         # Update current tracking
         self._current_dataset = dataset_name
         self._current_config = config_name
@@ -140,7 +149,9 @@ class LiveTerminalDisplay:
             execution['datasets'][dataset_name] = {
                 'name': dataset_name,
                 'configs': {},
-                'current_config': None
+                'current_config': None,
+                'index': dataset_index,
+                'total_datasets': total_datasets
             }
         
         dataset = execution['datasets'][dataset_name]
@@ -148,7 +159,9 @@ class LiveTerminalDisplay:
             dataset['configs'][config_name] = {
                 'name': config_name,
                 'algorithms': {},
-                'progress': 0
+                'progress': 0,
+                'index': config_index,
+                'total_configs': total_configs
             }
         
         # Update progress
@@ -306,9 +319,11 @@ class LiveTerminalDisplay:
         """Print only the changes since last update."""
         for exec_name, execution in self._executions.items():
             if exec_name not in self._last_display_state:
-                # New execution
+                # New execution - include counter information
                 exec_status = "🔄" if execution.get('status') == 'running' else "✅"
-                print(f"\n{exec_status} Execution: {exec_name}")
+                exec_index = execution.get('index', 1)
+                total_executions = execution.get('total_executions', 1)
+                print(f"\n{exec_status} Execution: {exec_name} ({exec_index}/{total_executions})")
                 self._last_display_state[exec_name] = {'datasets': {}}
             
             exec_state = self._last_display_state[exec_name]
@@ -316,8 +331,10 @@ class LiveTerminalDisplay:
             if execution.get('datasets'):
                 for dataset_name, dataset in execution['datasets'].items():
                     if dataset_name not in exec_state['datasets']:
-                        # New dataset
-                        print(f"  📊 Dataset: {dataset_name}")
+                        # New dataset - include counter information
+                        dataset_index = dataset.get('index', 1)
+                        total_datasets = dataset.get('total_datasets', 1)
+                        print(f"  📊 Dataset: {dataset_name} ({dataset_index}/{total_datasets})")
                         exec_state['datasets'][dataset_name] = {'configs': {}}
                     
                     dataset_state = exec_state['datasets'][dataset_name]
@@ -325,8 +342,10 @@ class LiveTerminalDisplay:
                     if dataset.get('configs'):
                         for config_name, config in dataset['configs'].items():
                             if config_name not in dataset_state['configs']:
-                                # New configuration
-                                print(f"    ⚙️  Configuration: {config_name}")
+                                # New configuration - include counter information
+                                config_index = config.get('index', 1)
+                                total_configs = config.get('total_configs', 1)
+                                print(f"    ⚙️  Configuration: {config_name} ({config_index}/{total_configs})")
                                 dataset_state['configs'][config_name] = {'algorithms': {}}
                             
                             config_state = dataset_state['configs'][config_name]
@@ -345,20 +364,33 @@ class LiveTerminalDisplay:
                                     last_progress = config_state['algorithms'].get(algo_key, -1)
                                     
                                     if algo_key not in config_state['algorithms']:
-                                        # First time showing this algorithm - print new line
-                                        status_icon = self._get_algorithm_status_icon_by_progress(progress_percent)
-                                        progress_bar = self._create_progress_bar(progress_percent)
-                                        run_info = f"({completed_runs}/{total_runs})"
+                                        # First time showing this algorithm - show as (0/N) initially
+                                        status_icon = "⏳"
+                                        progress_bar = self._create_progress_bar(0)
+                                        run_info = f"(0/{total_runs})"
                                         
-                                        print(f"      {status_icon} {algo_name} {run_info}: [{progress_bar}] {progress_percent:5.1f}%", end="")
-                                        config_state['algorithms'][algo_key] = progress_percent
+                                        print(f"      {status_icon} {algo_name} {run_info}: [{progress_bar}]   0.0%", end="", flush=True)
+                                        config_state['algorithms'][algo_key] = 0
+                                        
+                                        # If the algorithm actually has progress already, update it on the same line
+                                        if progress_percent > 0:
+                                            status_icon = self._get_algorithm_status_icon_by_progress(progress_percent)
+                                            progress_bar = self._create_progress_bar(progress_percent)
+                                            run_info = f"({completed_runs}/{total_runs})"
+                                            
+                                            print(f"\r      {status_icon} {algo_name} {run_info}: [{progress_bar}] {progress_percent:5.1f}%", end="", flush=True)
+                                            config_state['algorithms'][algo_key] = progress_percent
+                                            
+                                            # Add newline only when algorithm is completed
+                                            if progress_percent >= 100:
+                                                print()  # Move to next line when completed
                                     elif last_progress != progress_percent:
                                         # Update existing line using carriage return
                                         status_icon = self._get_algorithm_status_icon_by_progress(progress_percent)
                                         progress_bar = self._create_progress_bar(progress_percent)
                                         run_info = f"({completed_runs}/{total_runs})"
                                         
-                                        print(f"\r      {status_icon} {algo_name} {run_info}: [{progress_bar}] {progress_percent:5.1f}%", end="")
+                                        print(f"\r      {status_icon} {algo_name} {run_info}: [{progress_bar}] {progress_percent:5.1f}%", end="", flush=True)
                                         config_state['algorithms'][algo_key] = progress_percent
                                         
                                         # Add newline only when algorithm is completed
@@ -392,7 +424,7 @@ class LiveTerminalDisplay:
     
     def _print_final_summary(self, event) -> None:
         """Print final execution summary."""
-        print("\\n✅ Task completed successfully!")
+        print("✅ Task completed successfully!")
         
         if self._start_time:
             duration = datetime.now() - self._start_time
