@@ -34,7 +34,12 @@ class BaseOrchestrator(ABC):
         """
         pass
 
-    def _emit_execution_started(self, execution_name: str, total_items: int, metadata: Optional[Dict[str, Any]] = None) -> None:
+    def _emit_execution_started(
+        self,
+        execution_name: str,
+        total_items: int,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> None:
         """
         Emit execution started event.
 
@@ -45,13 +50,21 @@ class BaseOrchestrator(ABC):
         """
         if self.monitoring_service:
             try:
-                self.monitoring_service.start_execution(execution_name, total_items, metadata)
+                self.monitoring_service.start_execution(
+                    execution_name, total_items, metadata
+                )
             except Exception as e:
                 self._logger.warning(f"Error starting execution in monitoring: {e}")
 
-    def _emit_execution_progress(self, current_item: int, total_items: int, item_name: str, 
-                                progress_percent: float, message: str = "", 
-                                context: Optional[Dict[str, Any]] = None) -> None:
+    def _emit_execution_progress(
+        self,
+        current_item: int,
+        total_items: int,
+        item_name: str,
+        progress_percent: float,
+        message: str = "",
+        context: Optional[Dict[str, Any]] = None,
+    ) -> None:
         """
         Emit execution progress event.
 
@@ -71,14 +84,20 @@ class BaseOrchestrator(ABC):
                     item_name=item_name,
                     progress_percent=progress_percent,
                     message=message,
-                    context=context
+                    context=context,
                 )
             except Exception as e:
-                self._logger.warning(f"Error updating execution progress in monitoring: {e}")
+                self._logger.warning(
+                    f"Error updating execution progress in monitoring: {e}"
+                )
 
-    def _emit_execution_finished(self, success: bool, total_processed: int, 
-                                results: Optional[Dict[str, Any]] = None, 
-                                error_message: Optional[str] = None) -> None:
+    def _emit_execution_finished(
+        self,
+        success: bool,
+        total_processed: int,
+        results: Optional[Dict[str, Any]] = None,
+        error_message: Optional[str] = None,
+    ) -> None:
         """
         Emit execution finished event.
 
@@ -90,13 +109,20 @@ class BaseOrchestrator(ABC):
         """
         if self.monitoring_service:
             try:
-                self.monitoring_service.finish_execution(success, total_processed, results, error_message)
+                self.monitoring_service.finish_execution(
+                    success, total_processed, results, error_message
+                )
             except Exception as e:
                 self._logger.warning(f"Error finishing execution in monitoring: {e}")
 
-    def _emit_algorithm_progress(self, algorithm_name: str, progress_percent: float, 
-                                message: str = "", item_id: Optional[str] = None, 
-                                context: Optional[Dict[str, Any]] = None) -> None:
+    def _emit_algorithm_progress(
+        self,
+        algorithm_name: str,
+        progress_percent: float,
+        message: str = "",
+        item_id: Optional[str] = None,
+        context: Optional[Dict[str, Any]] = None,
+    ) -> None:
         """
         Emit algorithm progress event.
 
@@ -114,13 +140,19 @@ class BaseOrchestrator(ABC):
                     progress_percent=progress_percent,
                     message=message,
                     item_id=item_id,
-                    context=context
+                    context=context,
                 )
             except Exception as e:
-                self._logger.warning(f"Error reporting algorithm progress in monitoring: {e}")
+                self._logger.warning(
+                    f"Error reporting algorithm progress in monitoring: {e}"
+                )
 
-    def _emit_error(self, error_message: str, error_type: str = "generic", 
-                   context: Optional[Dict[str, Any]] = None) -> None:
+    def _emit_error(
+        self,
+        error_message: str,
+        error_type: str = "generic",
+        context: Optional[Dict[str, Any]] = None,
+    ) -> None:
         """
         Emit error event.
 
@@ -134,21 +166,3 @@ class BaseOrchestrator(ABC):
                 self.monitoring_service.report_error(error_message, error_type, context)
             except Exception as e:
                 self._logger.warning(f"Error reporting error in monitoring: {e}")
-
-    # Backward compatibility
-    def _report_progress(self, progress: float, message: str) -> None:
-        """
-        Legacy method for backward compatibility.
-
-        Args:
-            progress: Progress percentage (0-100)
-            message: Progress message
-        """
-        # Map to new execution progress system if possible
-        self._emit_execution_progress(
-            current_item=int(progress),
-            total_items=100,
-            item_name="Processing",
-            progress_percent=progress,
-            message=message
-        )

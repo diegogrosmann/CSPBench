@@ -26,8 +26,10 @@ class ExecutionSession:
     message: Optional[str] = None
     error: Optional[str] = None
     progress: Optional[Dict[str, Any]] = None
+    progress_state: Optional[Dict[str, Any]] = None  # For WebDisplay compatibility
     logs: Optional[List[Dict[str, Any]]] = None
     current_execution: Optional[Dict[str, Any]] = None
+    last_updated: Optional[str] = None  # For WebDisplay compatibility
 
     def __post_init__(self):
         if self.logs is None:
@@ -42,7 +44,10 @@ class ExecutionSessionManager:
         self._lock = threading.Lock()
 
     def create_session(
-        self, session_type: str, config: Optional[Dict[str, Any]] = None, status: str = "pending"
+        self,
+        session_type: str,
+        config: Optional[Dict[str, Any]] = None,
+        status: str = "pending",
     ) -> str:
         """Create a new execution session."""
         with self._lock:
@@ -83,10 +88,12 @@ class ExecutionSessionManager:
                 "message",
                 "error",
                 "progress",
+                "progress_state",  # Added for WebDisplay compatibility
                 "completed_at",
                 "config",
                 "logs",
                 "current_execution",
+                "last_updated",  # Added for WebDisplay compatibility
             }
 
             for key, value in updates.items():
@@ -96,7 +103,9 @@ class ExecutionSessionManager:
             session.updated_at = time.time()
             return True
 
-    def add_log(self, session_id: str, level: str, message: str, source: Optional[str] = None) -> bool:
+    def add_log(
+        self, session_id: str, level: str, message: str, source: Optional[str] = None
+    ) -> bool:
         """Add a log entry to a session."""
         with self._lock:
             session = self._sessions.get(session_id)
@@ -108,7 +117,7 @@ class ExecutionSessionManager:
 
             # Gerar ID único para o log
             log_id = len(session.logs) + 1
-            
+
             # Gerar timestamp legível
             timestamp = time.strftime("%H:%M:%S", time.localtime())
 
@@ -155,7 +164,9 @@ class ExecutionSessionManager:
 
         return self.update_session(session_id, updates)
 
-    def fail_session(self, session_id: str, error: str, message: Optional[str] = None) -> bool:
+    def fail_session(
+        self, session_id: str, error: str, message: Optional[str] = None
+    ) -> bool:
         """Mark session as failed."""
         updates = {"status": "failed", "error": error, "completed_at": time.time()}
         if message:

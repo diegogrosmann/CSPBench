@@ -74,6 +74,7 @@ import yaml
 # Load environment variables from .env file
 try:
     from dotenv import load_dotenv
+
     load_dotenv(override=True)
 except ImportError:
     # If python-dotenv is not installed, continue without it
@@ -143,25 +144,32 @@ def create_algorithm_registry(config: Dict[str, Any]) -> DomainAlgorithmRegistry
 def create_entrez_repository(config: Dict[str, Any]) -> Optional[Any]:
     """Create Entrez dataset repository based on configuration."""
     try:
-        from src.infrastructure.persistence.entrez_dataset_repository import NCBIEntrezDatasetRepository
-        
+        from src.infrastructure.persistence.entrez_dataset_repository import (
+            NCBIEntrezDatasetRepository,
+        )
+
         # Check if required environment variables are set
         email = os.getenv("NCBI_EMAIL")
         if not email:
-            typer.echo("⚠️  NCBI_EMAIL not set. Entrez datasets will not be available.", err=True)
+            typer.echo(
+                "⚠️  NCBI_EMAIL not set. Entrez datasets will not be available.",
+                err=True,
+            )
             return None
-        
+
         # Create repository
         entrez_repo = NCBIEntrezDatasetRepository()
-        
+
         # Test availability
         if entrez_repo.is_available():
             typer.echo("✅ Entrez datasets enabled")
             return entrez_repo
         else:
-            typer.echo("⚠️  Entrez service not available. Check network connection.", err=True)
+            typer.echo(
+                "⚠️  Entrez service not available. Check network connection.", err=True
+            )
             return None
-            
+
     except Exception as e:
         typer.echo(f"⚠️  Failed to initialize Entrez repository: {str(e)}", err=True)
         return None
@@ -178,14 +186,18 @@ def create_executor(config: Dict[str, Any]) -> Executor:
         return Executor()
 
 
-def create_exporter_with_session(config: Dict[str, Any], session_manager: SessionManager):
+def create_exporter_with_session(
+    config: Dict[str, Any], session_manager: SessionManager
+):
     """Create exporter with centralized session management."""
     # Priority: Environment variable > settings.yaml fallback
     default_format = "json"
     if "output" in config and "results" in config["output"]:
-        export_formats = config["output"]["results"].get("export_formats", [default_format])
+        export_formats = config["output"]["results"].get(
+            "export_formats", [default_format]
+        )
         default_format = export_formats[0] if export_formats else default_format
-    
+
     export_fmt = os.getenv("EXPORT_FORMAT", default_format)
     output_path = session_manager.get_result_dir()
 
@@ -200,7 +212,9 @@ def create_exporter_with_session(config: Dict[str, Any], session_manager: Sessio
         return JsonExporter(str(output_path), config)
 
 
-def _initialize_logging_with_session(config: Dict[str, Any], session_manager: SessionManager) -> None:
+def _initialize_logging_with_session(
+    config: Dict[str, Any], session_manager: SessionManager
+) -> None:
     """Initialize logging system with centralized session management."""
     default_level = "INFO"
 
@@ -213,8 +227,9 @@ def _initialize_logging_with_session(config: Dict[str, Any], session_manager: Se
         if not log_config.get("enabled", True):
             return
 
-        # Extract configurations
-        log_level = log_config.get("level", default_level)
+        # Extract configurations with environment variable priority
+        config_level = log_config.get("level", default_level)
+        log_level = os.getenv("LOG_LEVEL", config_level)
 
         # Use session path for logs from session manager
         log_file_path = session_manager.get_log_path()
@@ -251,9 +266,11 @@ def create_exporter(config: Dict[str, Any]):
     # Priority: Environment variable > settings.yaml fallback
     default_format = "json"
     if "output" in config and "results" in config["output"]:
-        export_formats = config["output"]["results"].get("export_formats", [default_format])
+        export_formats = config["output"]["results"].get(
+            "export_formats", [default_format]
+        )
         default_format = export_formats[0] if export_formats else default_format
-    
+
     export_fmt = os.getenv("EXPORT_FORMAT", default_format)
 
     # Use session directory if SessionManager exists
@@ -275,33 +292,40 @@ def create_exporter(config: Dict[str, Any]):
         return JsonExporter(str(output_path), config)  # Pass complete configuration
 
 
-def create_monitoring_service(config: Dict[str, Any], web_session_manager=None, session_id: Optional[str] = None):
+def create_monitoring_service(
+    config: Dict[str, Any], web_session_manager=None, session_id: Optional[str] = None
+):
     """Create monitoring service based on configuration."""
     from src.application.monitoring.monitoring_factory import MonitoringFactory
-    
+
     # Create monitoring system based on context
     if web_session_manager and session_id:
         # Web execution - create web-only system
         monitoring_service, broker = MonitoringFactory.create_web_only_system(
-            session_id=session_id,
-            web_session_manager=web_session_manager
+            session_id=session_id, web_session_manager=web_session_manager
         )
     else:
         # Terminal execution - create terminal-only system
         verbose = config.get("monitoring", {}).get("verbose", True)
-        monitoring_service, broker = MonitoringFactory.create_terminal_only_system(verbose=verbose)
-    
+        monitoring_service, broker = MonitoringFactory.create_terminal_only_system(
+            verbose=verbose
+        )
+
     return monitoring_service
 
 
-def initialize_service(session_id: Optional[str] = None, batch_config: Optional[Dict[str, Any]] = None, web_session_manager=None) -> ExperimentService:
+def initialize_service(
+    session_id: Optional[str] = None,
+    batch_config: Optional[Dict[str, Any]] = None,
+    web_session_manager=None,
+) -> ExperimentService:
     """
     Unified initialization for experiment service with dependency injection.
-    
+
     Args:
         session_id: Optional specific session ID for web interface
         batch_config: Optional batch-specific configuration
-    
+
     Returns:
         ExperimentService: Configured service instance
     """
@@ -312,32 +336,35 @@ def initialize_service(session_id: Optional[str] = None, batch_config: Optional[
 
     # IMPORTANT: Ensure algorithms are imported and registered
     import algorithms  # This triggers auto-discovery
-    
+
     # Force algorithm registration by importing the registry
     from src.domain import global_registry
-    
+
     # Check if algorithms are loaded (silent check)
     algo_count = len(global_registry.keys())
-    
+
     if algo_count == 0:
         # Force reload algorithms module if empty
         import importlib
+
         importlib.reload(algorithms)
 
     # Merge configuration if batch config is provided
     merged_config = config.copy()
     if batch_config:
-        if 'output' in batch_config:
-            merged_config['output'] = batch_config['output']
-        if 'monitoring' in batch_config:
+        if "output" in batch_config:
+            merged_config["output"] = batch_config["output"]
+        if "monitoring" in batch_config:
             # Merge monitoring configuration from batch
-            merged_config['monitoring'] = batch_config['monitoring']
+            merged_config["monitoring"] = batch_config["monitoring"]
 
     # Create centralized session manager
     session_format = os.getenv("OUTPUT_SESSION_FOLDER_FORMAT", "%Y%m%d_%H%M%S")
     base_output_dir = os.getenv("OUTPUT_BASE_DIRECTORY", "outputs")
-    session_manager = SessionManager(merged_config, base_output_dir=base_output_dir, session_format=session_format)
-    
+    session_manager = SessionManager(
+        merged_config, base_output_dir=base_output_dir, session_format=session_format
+    )
+
     # Create session with specific ID if provided, otherwise auto-generate
     if session_id:
         session_folder = session_manager.create_session(session_id)
@@ -353,8 +380,10 @@ def initialize_service(session_id: Optional[str] = None, batch_config: Optional[
     executor = create_executor(merged_config)
     exporter = create_exporter_with_session(merged_config, session_manager)
     entrez_repo = create_entrez_repository(merged_config)
-    monitoring_service = create_monitoring_service(merged_config, web_session_manager, session_id)
-    
+    monitoring_service = create_monitoring_service(
+        merged_config, web_session_manager, session_id
+    )
+
     # Note: Web session is now handled during monitoring service creation
 
     # Create service with centralized session management
@@ -455,9 +484,7 @@ def _display_manual_commands() -> None:
 def _get_user_selection(batch_files: list) -> Optional[Path]:
     """Get user selection and validate."""
     try:
-        choice = input(
-            "💡 Select a file (number) or press Enter to exit: "
-        ).strip()
+        choice = input("💡 Select a file (number) or press Enter to exit: ").strip()
 
         if choice == "":
             print("👋 Goodbye!")
@@ -515,7 +542,6 @@ def show_algorithms_and_exit():
     sys.exit(0)
 
 
-
 def start_web_interface():
     """Start the web interface with settings from .env and exit."""
     try:
@@ -523,12 +549,12 @@ def start_web_interface():
         host = os.getenv("WEB_HOST", "0.0.0.0")
         port = int(os.getenv("WEB_PORT", "8000"))
         debug = os.getenv("DEBUG", "false").lower() == "true"
-        
+
         print("🌐 Starting CSPBench Web Interface...")
         print(f"🖥️  Host: {host}")
         print(f"🔌 Port: {port}")
         print(f"🛠️  Mode: {'Debug' if debug else 'Production'}")
-        
+
         # Check if web dependencies are available
         try:
             import uvicorn
@@ -537,11 +563,11 @@ def start_web_interface():
             print(f"❌ Web dependencies not installed: {e}")
             print("💡 Install with: pip install -r requirements.web.txt")
             sys.exit(1)
-        
+
         print(f"\n🚀 Web interface starting at http://localhost:{port}")
         print("🔗 Click the link above or paste it into your browser")
         print("⏹️  Press Ctrl+C to stop the server")
-        
+
         # Start uvicorn server with environment settings
         uvicorn.run(
             "src.presentation.web.app:app",
@@ -549,88 +575,15 @@ def start_web_interface():
             port=port,
             reload=debug,
             log_level="info",
-            access_log=False
+            access_log=False,
         )
-        
+
     except KeyboardInterrupt:
         print("\n🛑 Web server stopped")
         sys.exit(0)
     except Exception as e:
         print(f"❌ Error starting web server: {e}")
         sys.exit(1)
-
-
-def _display_manual_commands() -> None:
-    """Display list of available manual commands."""
-    print("📋 Available manual commands:")
-    print("  test         - Basic system test")
-    print("  algorithms   - List available algorithms")
-    print("  config-info  - Show configuration")
-    print("  run          - Execute single algorithm")
-    print()
-
-
-def _get_user_selection(batch_files: list) -> Optional[Path]:
-    """Get user selection and validate."""
-    try:
-        choice = input(
-            "💡 Select a file (number) or press Enter to exit: "
-        ).strip()
-
-        if choice == "":
-            print("👋 Goodbye!")
-            return None
-
-        if choice.isdigit():
-            choice_num = int(choice)
-            if 1 <= choice_num <= len(batch_files):
-                return batch_files[choice_num - 1]
-            else:
-                print("❌ Invalid number!")
-                return None
-        else:
-            print("❌ Invalid input!")
-            return None
-
-    except KeyboardInterrupt:
-        print("\n👋 Goodbye!")
-        return None
-    except EOFError:
-        print("\n👋 Goodbye!")
-        return None
-
-
-def _execute_selected_batch(selected_file: Path) -> None:
-    """Execute the selected batch file."""
-    print(f"\n🚀 Executing: {selected_file.name}")
-    print("-" * 40)
-
-    # Execute the selected batch
-    import sys
-
-    sys.argv = ["main.py", "batch", str(selected_file)]
-    app()
-
-
-def show_algorithms_and_exit():
-    """Show available algorithms and exit."""
-    try:
-        # Import from algorithms module to activate auto-discovery
-        import algorithms
-        from src.domain.algorithms import global_registry
-
-        print("🧠 Available algorithms:")
-        for name, cls in global_registry.items():
-            print(f"  • {name}: {cls.__doc__ or 'No description'}")
-
-        if not global_registry:
-            print("  (No algorithms registered)")
-
-    except Exception as e:
-        print(f"❌ Error: {e}")
-        sys.exit(1)
-
-    sys.exit(0)
 
 
 def show_datasetsave_and_exit():
@@ -675,30 +628,36 @@ def execute_batch_file(batch_file: str):
 
         # Load batch configuration FIRST to use its output configuration for logging
         print(f"📋 Executing batch: {batch_file}...")
-        
+
         # Load batch configuration to extract output config for proper session management
         from src.application.services.config_parser import ConfigParser
         import yaml
-        
+
         # Load the full YAML configuration
-        with open(batch_path, 'r') as f:
+        with open(batch_path, "r") as f:
             full_batch_config = yaml.safe_load(f)
-        
+
         batch_config = ConfigParser.parse_config(str(batch_path))
         batch_dict = {
-            'output': {
-                'base_directory': batch_config.export.destination if batch_config.export else "outputs/{session}",
-                'logging': {
-                    'enabled': True,  # Default to enabled
-                    'level': batch_config.logging.level if batch_config.logging else "INFO"
-                }
+            "output": {
+                "base_directory": (
+                    batch_config.export.destination
+                    if batch_config.export
+                    else "outputs/{session}"
+                ),
+                "logging": {
+                    "enabled": True,  # Default to enabled
+                    "level": (
+                        batch_config.logging.level if batch_config.logging else "INFO"
+                    ),
+                },
             }
         }
-        
+
         # Add monitoring configuration from YAML if present
-        if 'monitoring' in full_batch_config:
-            batch_dict['monitoring'] = full_batch_config['monitoring']
-        
+        if "monitoring" in full_batch_config:
+            batch_dict["monitoring"] = full_batch_config["monitoring"]
+
         # Initialize service with batch-specific configuration for session management
         service = initialize_service(batch_config=batch_dict)
 

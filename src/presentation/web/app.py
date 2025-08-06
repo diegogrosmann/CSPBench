@@ -62,19 +62,10 @@ app.include_router(datasets.router)
 app.include_router(batch_execution.router)
 app.include_router(results.router)
 
-# Include hierarchical monitoring routes
-from .routes import hierarchical_monitoring
-app.include_router(hierarchical_monitoring.router)
-
 # Include simple datasets router for testing
 from .routes import datasets_simple
 
 app.include_router(datasets_simple.router)
-
-# Include debug router for testing
-from .routes import test_debug
-
-app.include_router(test_debug.router)
 
 
 @app.get("/test-progress")

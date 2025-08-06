@@ -20,13 +20,19 @@ class JsonExporter(FileExporter):
         self.config = config or {}
 
     def export_batch_results(
-        self, batch_results: List[Dict[str, Any]], format_type: str, destination: str, session_id: Optional[str] = None
+        self,
+        batch_results: List[Dict[str, Any]],
+        format_type: str,
+        destination: str,
+        session_id: Optional[str] = None,
     ) -> str:
         """Export batch results with advanced reports."""
-        print(f"🔍 DEBUG JsonExporter: export_batch_results chamado com {len(batch_results)} resultados")
+        print(
+            f"🔍 DEBUG JsonExporter: export_batch_results chamado com {len(batch_results)} resultados"
+        )
         print(f"🔍 DEBUG JsonExporter: destination = {destination}")
         print(f"🔍 DEBUG JsonExporter: session_id = {session_id}")
-        
+
         # Export basic JSON data
         json_path = super().export_batch_results(
             batch_results, format_type, destination, session_id=session_id

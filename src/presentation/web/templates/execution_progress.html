@@ -1,615 +1,1055 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Execution Progress - CSPBench</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-    <style>
-        .header-section {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 2rem 0;
-        }
-        
-        .progress-card {
-            border: none;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            margin-bottom: 1.5rem;
-            border-radius: 10px;
-        }
-        
-        .progress-card .card-header {
-            background: linear-gradient(45deg, #f8f9fa, #e9ecef);
-            border-bottom: 2px solid #dee2e6;
-            font-weight: 600;
-            border-radius: 10px 10px 0 0 !important;
-        }
-        
-        .counter-badge {
-            font-size: 1.2rem;
-            padding: 0.5rem 1rem;
-            border-radius: 20px;
-        }
-        
-        .execution-log {
-            background: #f8f9fa;
-            border: 1px solid #dee2e6;
-            border-radius: 8px;
-            padding: 1rem;
-            max-height: 400px;
-            overflow-y: auto;
-            font-family: 'Courier New', monospace;
-            font-size: 0.9rem;
-        }
-        
-        .log-entry {
-            margin-bottom: 0.5rem;
-            padding: 0.25rem 0;
-        }
-        
-        .log-success { color: #28a745; }
-        .log-error { color: #dc3545; }
-        .log-warning { color: #ffc107; }
-        .log-info { color: #17a2b8; }
-        
-        .status-icon {
-            font-size: 1.5rem;
-            margin-right: 0.5rem;
-        }
-        
-        .status-running { color: #007bff; animation: spin 2s linear infinite; }
-        .status-completed { color: #28a745; }
-        .status-error { color: #dc3545; }
-        .status-pending { color: #6c757d; }
-        
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        
-        .progress-overview {
-            background: linear-gradient(45deg, #f8f9fa, #ffffff);
-            border-radius: 10px;
-            padding: 1.5rem;
-            border: 1px solid #dee2e6;
-        }
-        
-        .metric-card {
-            text-align: center;
-            padding: 1rem;
-            border-radius: 8px;
-            background: white;
-            border: 1px solid #e9ecef;
-        }
-        
-        .metric-value {
-            font-size: 2rem;
-            font-weight: bold;
-            color: #495057;
-        }
-        
-        .metric-label {
-            color: #6c757d;
-            font-size: 0.9rem;
-            margin-top: 0.5rem;
-        }
-    </style>
-</head>
-<body>
-    <!-- Navigation -->
-    <nav class="navbar navbar-expand-lg navbar-dark" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
-        <div class="container">
-            <a class="navbar-brand" href="/">
-                <i class="fas fa-dna me-2"></i>CSPBench
-            </a>
-            <div class="navbar-nav ms-auto">
-                <a class="nav-link" href="/execution/batch">
-                    <i class="fas fa-arrow-left"></i> Back to Batch Execution
-                </a>
-                <a class="nav-link" href="/">
-                    <i class="fas fa-home"></i> Home
-                </a>
-            </div>
-        </div>
-    </nav>
+{% extends "base.html" %}
 
-    <!-- Header Section -->
-    <div class="header-section">
-        <div class="container">
-            <div class="row align-items-center">
-                <div class="col-md-8">
-                    <h1 class="mb-2">
-                        <i class="fas fa-chart-line me-3"></i>Execution Progress
+{% block title %}Monitoramento de Execução - CSPBench{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Variáveis CSS */
+    :root {
+        --primary-color: #007bff;
+        --success-color: #28a745;
+        --warning-color: #ffc107;
+        --danger-color: #dc3545;
+        --info-color: #17a2b8;
+        --light-color: #f8f9fa;
+        --dark-color: #343a40;
+        --border-radius: 8px;
+        --shadow: 0 2px 10px rgba(0,0,0,0.1);
+        --transition: all 0.3s ease;
+    }
+
+    /* Layout principal */
+    .monitoring-dashboard {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        padding: 2rem 0;
+    }
+
+    .dashboard-container {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 0 1rem;
+    }
+
+    /* Cards principais */
+    .dashboard-card {
+        background: white;
+        border-radius: var(--border-radius);
+        box-shadow: var(--shadow);
+        margin-bottom: 2rem;
+        overflow: hidden;
+        transition: var(--transition);
+    }
+
+    .dashboard-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+    }
+
+    .card-header {
+        background: var(--light-color);
+        border-bottom: 1px solid #dee2e6;
+        padding: 1.5rem;
+        position: relative;
+    }
+
+    .card-header h5 {
+        margin: 0;
+        color: var(--dark-color);
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .card-body {
+        padding: 1.5rem;
+    }
+
+    /* Status badges */
+    .status-badge {
+        padding: 0.4rem 0.8rem;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+    }
+
+    .status-running {
+        background: #e3f2fd;
+        color: #1976d2;
+        border: 1px solid #bbdefb;
+    }
+
+    .status-completed {
+        background: #e8f5e8;
+        color: #2e7d32;
+        border: 1px solid #c8e6c9;
+    }
+
+    .status-failed {
+        background: #ffebee;
+        color: #c62828;
+        border: 1px solid #ffcdd2;
+    }
+
+    .status-pending {
+        background: #f3e5f5;
+        color: #7b1fa2;
+        border: 1px solid #e1bee7;
+    }
+
+    /* Progress bars modernos */
+    .modern-progress {
+        background: #e9ecef;
+        border-radius: 10px;
+        height: 12px;
+        overflow: hidden;
+        position: relative;
+        margin: 0.5rem 0;
+    }
+
+    .modern-progress-bar {
+        height: 100%;
+        border-radius: 10px;
+        transition: width 0.6s ease;
+        position: relative;
+        background: linear-gradient(90deg, var(--primary-color), lighten(var(--primary-color), 10%));
+    }
+
+    .modern-progress-bar::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: linear-gradient(45deg, 
+            transparent 25%, 
+            rgba(255,255,255,0.3) 25%, 
+            rgba(255,255,255,0.3) 50%, 
+            transparent 50%, 
+            transparent 75%, 
+            rgba(255,255,255,0.3) 75%
+        );
+        background-size: 20px 20px;
+        animation: progress-animation 1s linear infinite;
+    }
+
+    @keyframes progress-animation {
+        0% { background-position: 0 0; }
+        100% { background-position: 20px 0; }
+    }
+
+    /* Grid de estatísticas */
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+        margin-top: 1rem;
+    }
+
+    .stat-item {
+        text-align: center;
+        padding: 1rem;
+        background: var(--light-color);
+        border-radius: var(--border-radius);
+        border: 1px solid #dee2e6;
+    }
+
+    .stat-number {
+        font-size: 2rem;
+        font-weight: bold;
+        color: var(--primary-color);
+        display: block;
+    }
+
+    .stat-label {
+        color: #6c757d;
+        font-size: 0.9rem;
+        margin-top: 0.25rem;
+    }
+
+    /* Tabela de execuções */
+    .executions-table {
+        background: white;
+        border-radius: var(--border-radius);
+        overflow: hidden;
+    }
+
+    .table-responsive {
+        max-height: 400px;
+        overflow-y: auto;
+    }
+
+    .table {
+        margin-bottom: 0;
+    }
+
+    .table th {
+        background: var(--light-color);
+        border: none;
+        font-weight: 600;
+        color: var(--dark-color);
+        text-transform: uppercase;
+        font-size: 0.85rem;
+        letter-spacing: 0.5px;
+        padding: 1rem 0.75rem;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+    }
+
+    .table td {
+        padding: 0.75rem;
+        border-color: #f1f3f4;
+        vertical-align: middle;
+    }
+
+    .table tbody tr:hover {
+        background-color: #f8f9fa;
+    }
+
+    /* Expandable rows */
+    .expandable-row {
+        cursor: pointer;
+        transition: var(--transition);
+    }
+
+    .expanded-content {
+        background: #f8f9fa;
+        border-left: 4px solid var(--primary-color);
+    }
+
+    .callbacks-container {
+        padding: 1rem;
+        max-height: 300px;
+        overflow-y: auto;
+    }
+
+    .callback-item {
+        background: white;
+        border-radius: 6px;
+        padding: 0.75rem;
+        margin-bottom: 0.5rem;
+        border-left: 4px solid #dee2e6;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+
+    .callback-type {
+        font-weight: 600;
+        text-transform: uppercase;
+        font-size: 0.75rem;
+        color: #6c757d;
+        margin-bottom: 0.25rem;
+    }
+
+    .callback-message {
+        font-size: 0.9rem;
+        color: var(--dark-color);
+    }
+
+    .callback-time {
+        font-size: 0.8rem;
+        color: #6c757d;
+        margin-top: 0.25rem;
+    }
+
+    /* Callbacks por tipo */
+    .callback-info { border-left-color: var(--info-color); }
+    .callback-warning { border-left-color: var(--warning-color); }
+    .callback-error { border-left-color: var(--danger-color); }
+    .callback-success { border-left-color: var(--success-color); }
+
+    /* Controles */
+    .control-panel {
+        background: white;
+        border-radius: var(--border-radius);
+        padding: 1rem;
+        margin-bottom: 2rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 1rem;
+    }
+
+    .refresh-controls {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+
+    .connection-indicator {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.5rem 1rem;
+        border-radius: 20px;
+        font-size: 0.9rem;
+        font-weight: 600;
+    }
+
+    .connected {
+        background: #e8f5e8;
+        color: #2e7d32;
+    }
+
+    .disconnected {
+        background: #ffebee;
+        color: #c62828;
+    }
+
+    .connection-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: currentColor;
+        animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
+    }
+
+    /* Loading states */
+    .loading-skeleton {
+        background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+        background-size: 200% 100%;
+        animation: loading 1.5s infinite;
+        border-radius: 4px;
+        height: 1rem;
+    }
+
+    @keyframes loading {
+        0% { background-position: 200% 0; }
+        100% { background-position: -200% 0; }
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+        .dashboard-container {
+            padding: 0 0.5rem;
+        }
+        
+        .stats-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+        
+        .control-panel {
+            flex-direction: column;
+            align-items: stretch;
+        }
+    }
+
+    /* Utilitários */
+    .text-monospace {
+        font-family: 'Monaco', 'Consolas', 'Courier New', monospace;
+    }
+
+    .fade-in {
+        animation: fadeIn 0.5s ease-in;
+    }
+
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="h3 mb-1">
+                        <i class="bi bi-graph-up me-2"></i>
+                        Progresso Detalhado
                     </h1>
-                    <p class="mb-0 opacity-75" id="batchFileName">
-                        Monitoring batch execution...
+                    <p class="text-muted mb-0">
+                        Monitoramento em tempo real da execução
+                        {% if session_id %}
+                        <span class="badge bg-secondary ms-2">{{ session_id[:8] }}...</span>
+                        {% endif %}
                     </p>
                 </div>
-                <div class="col-md-4 text-end">
-                    <div class="d-flex gap-2 justify-content-end">
-                        <button class="btn btn-light" onclick="toggleAutoRefresh()" id="autoRefreshBtn">
-                            <i class="fas fa-pause"></i> Auto Refresh
-                        </button>
-                        <button class="btn btn-outline-light" onclick="refreshStatus()">
-                            <i class="fas fa-sync-alt"></i> Refresh
-                        </button>
+                <div class="refresh-controls">
+                    <span id="connectionStatus" class="connection-status disconnected">
+                        <i class="bi bi-wifi-off me-1"></i>
+                        Desconectado
+                    </span>
+                    <button id="refreshBtn" class="btn btn-outline-primary">
+                        <i class="bi bi-arrow-clockwise me-1"></i>
+                        Atualizar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Progress Section -->
+    <div class="row">
+        <div class="col-12">
+            <div class="progress-section">
+                <h5 class="mb-4">
+                    <i class="bi bi-speedometer2 me-2"></i>
+                    Progresso da Execução
+                </h5>
+
+                <!-- Batch Information -->
+                <div id="batchInfoSection" class="progress-item mb-4" style="display: none;">
+                    <div class="card">
+                        <div class="card-header bg-light">
+                            <h6 class="mb-0">
+                                <i class="bi bi-info-circle me-2"></i>
+                                Informações do Batch
+                            </h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <strong>Nome:</strong> <span id="batchName">-</span><br>
+                                    <strong>Descrição:</strong> <span id="batchDescription">-</span><br>
+                                    <strong>Versão:</strong> <span id="batchVersion">-</span>
+                                </div>
+                                <div class="col-md-6">
+                                    <strong>Autor:</strong> <span id="batchAuthor">-</span><br>
+                                    <strong>Email:</strong> <span id="batchEmail">-</span><br>
+                                    <strong>Criado em:</strong> <span id="batchCreated">-</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Execution Progress -->
+                <div class="progress-item">
+                    <div class="progress-label">
+                        <span class="progress-title">
+                            <i class="bi bi-play-circle me-2"></i>
+                            Execução: <span id="currentExecutionName">Aguardando...</span>
+                        </span>
+                        <span id="executionCounter" class="progress-counter">0 / 1</span>
+                    </div>
+                    <div class="progress" style="height: 8px;">
+                        <div id="executionProgressBar" class="progress-bar bg-primary" 
+                             style="width: 0%" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+                    </div>
+                </div>
+
+                <!-- Dataset Progress -->
+                <div class="progress-item">
+                    <div class="progress-label">
+                        <span class="progress-title">
+                            <i class="bi bi-database me-2"></i>
+                            Dataset: <span id="currentDatasetName">Aguardando...</span>
+                        </span>
+                        <span id="datasetCounter" class="progress-counter">0 / 1</span>
+                    </div>
+                    <div class="progress" style="height: 8px;">
+                        <div id="datasetProgressBar" class="progress-bar bg-info" 
+                             style="width: 0%" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+                    </div>
+                </div>
+
+                <!-- Algorithm Config Progress -->
+                <div class="progress-item">
+                    <div class="progress-label">
+                        <span class="progress-title">
+                            <i class="bi bi-gear me-2"></i>
+                            Config Algorithm: <span id="currentConfigName">Aguardando...</span>
+                        </span>
+                        <span id="configCounter" class="progress-counter">0 / 1</span>
+                    </div>
+                    <div class="progress" style="height: 8px;">
+                        <div id="configProgressBar" class="progress-bar bg-warning" 
+                             style="width: 0%" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+                    </div>
+                </div>
+
+                <!-- Runs Progress (Repetições) -->
+                <div class="progress-item">
+                    <div class="progress-label">
+                        <span class="progress-title">
+                            <i class="bi bi-repeat me-2"></i>
+                            Repetições
+                        </span>
+                        <span id="repetitionCounter" class="progress-counter">0 / 1</span>
+                    </div>
+                    <div class="progress" style="height: 8px;">
+                        <div id="repetitionProgressBar" class="progress-bar bg-success" 
+                             style="width: 0%" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+                    </div>
+                </div>
+
+                <!-- Completed Runs Progress -->
+                <div class="progress-item">
+                    <div class="progress-label">
+                        <span class="progress-title">
+                            <i class="bi bi-check-circle me-2"></i>
+                            Runs Concluídas
+                        </span>
+                        <span id="runCounter" class="progress-counter">0 / 0</span>
+                    </div>
+                    <div class="progress" style="height: 8px;">
+                        <div id="runProgressBar" class="progress-bar bg-primary" 
+                             style="width: 0%" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+                    </div>
+                </div>
+
+                <!-- Summary Statistics -->
+                <div class="progress-item">
+                    <div class="row text-center">
+                        <div class="col-md-3">
+                            <div class="text-muted small">Total Execuções</div>
+                            <div id="summaryExecutions" class="h6 mb-0 text-primary">-</div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-muted small">Total Datasets</div>
+                            <div id="summaryDatasets" class="h6 mb-0 text-info">-</div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-muted small">Total Configs</div>
+                            <div id="summaryConfigs" class="h6 mb-0 text-warning">-</div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-muted small">Total Runs</div>
+                            <div id="summaryRuns" class="h6 mb-0 text-success">-</div>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Main Content -->
-    <div class="container mt-4">
-        <!-- Overall Progress -->
-        <div class="progress-overview mb-4">
-            <h4 class="mb-3">
-                <i class="fas fa-tachometer-alt me-2"></i>Overall Progress
-                <span class="badge bg-primary ms-2" id="overallStatus">Running</span>
-            </h4>
-            <div class="row g-3 mb-3">
-                <div class="col-md-3">
-                    <div class="metric-card">
-                        <div class="metric-value" id="executionProgress">0/0</div>
-                        <div class="metric-label">Executions</div>
-                    </div>
+    <!-- Current Runs Table -->
+    <div class="row">
+        <div class="col-12">
+            <div class="progress-section">
+                <h5 class="mb-4">
+                    <i class="bi bi-list-task me-2"></i>
+                    Lista de Runs
+                </h5>
+                
+                <!-- Filter Controls -->
+                <div class="filter-controls">
+                    <label for="statusFilter" class="form-label">Filtrar por Status:</label>
+                    <select id="statusFilter" class="form-select" style="width: auto;">
+                        <option value="">Todos</option>
+                        <option value="running" selected>Em Execução</option>
+                        <option value="completed">Concluído</option>
+                        <option value="failed">Falhou</option>
+                        <option value="pending">Pendente</option>
+                    </select>
                 </div>
-                <div class="col-md-3">
-                    <div class="metric-card">
-                        <div class="metric-value" id="datasetProgress">0/0</div>
-                        <div class="metric-label">Datasets</div>
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <div class="metric-card">
-                        <div class="metric-value" id="algorithmProgress">0/0</div>
-                        <div class="metric-label">Algorithms</div>
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <div class="metric-card">
-                        <div class="metric-value" id="runProgress">0/0</div>
-                        <div class="metric-label">Total Runs</div>
-                    </div>
-                </div>
-            </div>
-            <div class="progress mb-2" style="height: 8px;">
-                <div class="progress-bar" id="overallProgressBar" role="progressbar" style="width: 0%"></div>
-            </div>
-            <div class="text-center">
-                <small class="text-muted">
-                    Started: <span id="startTime">-</span> | 
-                    Elapsed: <span id="elapsedTime">-</span> | 
-                    ETA: <span id="estimatedTime">-</span>
-                </small>
-            </div>
-        </div>
-
-        <!-- Progress Cards -->
-        <div class="row">
-            <!-- Current Execution -->
-            <div class="col-md-6">
-                <div class="card progress-card">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <span><i class="fas fa-play-circle me-2"></i>Current Execution</span>
-                        <span class="counter-badge badge bg-primary" id="currentExecutionBadge">1/1</span>
-                    </div>
-                    <div class="card-body">
-                        <h6 id="currentExecutionName">Loading...</h6>
-                        <div class="progress mb-2">
-                            <div class="progress-bar" id="currentExecutionProgress" role="progressbar" style="width: 0%"></div>
-                        </div>
-                        <div class="row g-2">
-                            <div class="col-4">
-                                <small class="text-muted">Dataset:</small><br>
-                                <span id="currentDataset">-</span>
-                            </div>
-                            <div class="col-4">
-                                <small class="text-muted">Algorithm:</small><br>
-                                <span id="currentAlgorithm">-</span>
-                            </div>
-                            <div class="col-4">
-                                <small class="text-muted">Run:</small><br>
-                                <span id="currentRun">-</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Status & Controls -->
-            <div class="col-md-6">
-                <div class="card progress-card">
-                    <div class="card-header">
-                        <i class="fas fa-info-circle me-2"></i>Status & Controls
-                    </div>
-                    <div class="card-body">
-                        <div class="mb-3">
-                            <div class="d-flex align-items-center mb-2">
-                                <i class="status-icon fas fa-spinner status-running" id="statusIcon"></i>
-                                <span id="statusText">Running...</span>
-                            </div>
-                            <small class="text-muted" id="statusDetails">Executing batch file...</small>
-                        </div>
-                        <div class="d-grid gap-2">
-                            <button class="btn btn-danger" onclick="cancelExecution()" id="cancelBtn">
-                                <i class="fas fa-stop"></i> Cancel Execution
-                            </button>
-                            <button class="btn btn-outline-primary" onclick="viewResults()" id="viewResultsBtn" disabled>
-                                <i class="fas fa-chart-bar"></i> View Results
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Execution Log -->
-        <div class="card progress-card">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <span><i class="fas fa-terminal me-2"></i>Execution Log</span>
-                <div>
-                    <button class="btn btn-sm btn-outline-secondary" onclick="clearLog()">
-                        <i class="fas fa-trash"></i> Clear
-                    </button>
-                    <button class="btn btn-sm btn-outline-secondary" onclick="downloadLog()">
-                        <i class="fas fa-download"></i> Download
-                    </button>
-                </div>
-            </div>
-            <div class="card-body">
-                <div class="execution-log" id="executionLog">
-                    <div class="log-entry log-info">
-                        <span class="text-muted">[INFO]</span> Execution monitoring started...
-                    </div>
+                
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>Status</th>
+                                <th>Execução</th>
+                                <th>Dataset</th>
+                                <th>Config Algorithm</th>
+                                <th>Algoritmo</th>
+                                <th>Repetição</th>
+                                <th>Progresso</th>
+                                <th>Erro</th>
+                            </tr>
+                        </thead>
+                        <tbody id="runsTableBody">
+                            <tr>
+                                <td colspan="8" class="text-center text-muted">
+                                    <i class="bi bi-hourglass-split me-2"></i>
+                                    Aguardando dados de execução...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script>
-        let sessionId = '{{ session_id }}';
-        let autoRefresh = true;
-        let refreshInterval = null;
-        let startTime = null;
+    <!-- Logs Section -->
+    <div class="row">
+        <div class="col-12">
+            <div class="progress-section">
+                <div class="collapsible-header" onclick="toggleLogsSection()">
+                    <h5 class="mb-0">
+                        <i class="bi bi-terminal me-2"></i>
+                        Logs de Execução
+                    </h5>
+                    <i id="logsCollapseIcon" class="bi bi-chevron-down collapse-icon"></i>
+                </div>
+                <div id="logsSection" class="collapse">
+                    <div id="logsContainer" class="logs-container">
+                        <div class="text-muted">
+                            <i class="bi bi-info-circle me-2"></i>
+                            Aguardando logs de execução...
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
 
-        // Initialize page
-        document.addEventListener('DOMContentLoaded', function() {
-            if (!sessionId) {
-                showError('No session ID provided');
-                return;
-            }
+{% block extra_js %}
+<script>
+    // Global variables
+    let sessionId = "{{ session_id }}"; // Pass session_id directly from backend
+    let isConnected = false;
+    let refreshInterval = null;
+    let allRuns = []; // Store all runs for filtering
+    let currentStatusFilter = 'running'; // Default filter
 
-            // Start monitoring
-            startMonitoring();
+    // Initialize page
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('Page loaded, initializing...');
+        initializePage();
+        setupEventListeners();
+        startAutoRefresh();
+    });
+
+    function initializePage() {
+        // Session ID is now passed directly from the backend
+        if (!sessionId) {
+            console.error('No session ID provided from backend');
+            showError('ID da sessão não foi fornecido pelo backend');
+            return;
+        }
+        
+        console.log('Initializing with session ID:', sessionId);
+        
+        // Initial data load
+        refreshProgressData();
+    }
+
+    function setupEventListeners() {
+        // Refresh button
+        document.getElementById('refreshBtn').addEventListener('click', function() {
+            console.log('Manual refresh triggered');
+            refreshProgressData();
         });
+        
+        // Status filter
+        document.getElementById('statusFilter').addEventListener('change', function() {
+            currentStatusFilter = this.value;
+            console.log('Filter changed to:', currentStatusFilter);
+            updateRunsTable(allRuns, true); // Force re-render with filter
+        });
+    }
 
-        function startMonitoring() {
-            refreshStatus();
-            
-            // Set up auto-refresh
-            if (autoRefresh) {
-                refreshInterval = setInterval(refreshStatus, 3000); // Refresh every 3 seconds
-            }
-        }
-
-        async function refreshStatus() {
-            try {
-                const response = await fetch(`/execution/api/execution/sessions/${sessionId}/status`);
-                const data = await response.json();
-                
-                if (response.ok) {
-                    updateUI(data);
-                } else {
-                    showError(data.detail || 'Error fetching status');
-                }
-                
-            } catch (error) {
-                console.error('Error refreshing status:', error);
-                showError('Connection error');
-            }
-        }
-
-        function updateUI(data) {
-            // Update batch file name
-            document.getElementById('batchFileName').textContent = `Monitoring: ${data.batch_file || 'Unknown batch'}`;
-            
-            // Update overall status
-            updateOverallStatus(data);
-            
-            // Update current execution details
-            updateCurrentExecution(data);
-            
-            // Update progress counters
-            updateProgressCounters(data);
-            
-            // Update execution log
-            updateExecutionLog(data.logs || []);
-            
-            // Update status icon and text
-            updateStatusIndicator(data.status);
-            
-            // Update timing information
-            updateTimingInfo(data);
-        }
-
-        function updateOverallStatus(data) {
-            const status = data.status || 'running';
-            const statusBadge = document.getElementById('overallStatus');
-            const progressBar = document.getElementById('overallProgressBar');
-            
-            // Update status badge
-            statusBadge.className = 'badge ms-2';
-            switch(status) {
-                case 'completed':
-                    statusBadge.classList.add('bg-success');
-                    statusBadge.textContent = 'Completed';
-                    progressBar.style.width = '100%';
-                    progressBar.classList.add('bg-success');
-                    break;
-                case 'error':
-                case 'failed':
-                    statusBadge.classList.add('bg-danger');
-                    statusBadge.textContent = 'Error';
-                    progressBar.classList.add('bg-danger');
-                    break;
-                case 'cancelled':
-                    statusBadge.classList.add('bg-warning');
-                    statusBadge.textContent = 'Cancelled';
-                    progressBar.classList.add('bg-warning');
-                    break;
-                default:
-                    statusBadge.classList.add('bg-primary');
-                    statusBadge.textContent = 'Running';
-                    progressBar.classList.add('bg-primary');
-            }
-            
-            // Update progress bar
-            const progress = data.progress || 0;
-            progressBar.style.width = `${progress}%`;
-        }
-
-        function updateCurrentExecution(data) {
-            const current = data.current_execution || {};
-            
-            document.getElementById('currentExecutionName').textContent = current.name || 'Loading...';
-            document.getElementById('currentDataset').textContent = current.dataset || '-';
-            document.getElementById('currentAlgorithm').textContent = current.algorithm || '-';
-            document.getElementById('currentRun').textContent = current.run || '-';
-            
-            const progress = current.progress || 0;
-            document.getElementById('currentExecutionProgress').style.width = `${progress}%`;
-        }
-
-        function updateProgressCounters(data) {
-            const progress = data.progress_details || {};
-            
-            document.getElementById('executionProgress').textContent = 
-                `${progress.current_execution || 0}/${progress.total_executions || 0}`;
-            document.getElementById('datasetProgress').textContent = 
-                `${progress.current_dataset || 0}/${progress.total_datasets || 0}`;
-            document.getElementById('algorithmProgress').textContent = 
-                `${progress.current_algorithm || 0}/${progress.total_algorithms || 0}`;
-            document.getElementById('runProgress').textContent = 
-                `${progress.current_run || 0}/${progress.total_runs || 0}`;
-            
-            // Update execution badge
-            document.getElementById('currentExecutionBadge').textContent = 
-                `${progress.current_execution || 0}/${progress.total_executions || 0}`;
-        }
-
-        function updateExecutionLog(logs) {
-            const logContainer = document.getElementById('executionLog');
-            
-            // Add new log entries (assuming logs are appended)
-            logs.forEach(log => {
-                if (!document.querySelector(`[data-log-id="${log.id}"]`)) {
-                    const logEntry = document.createElement('div');
-                    logEntry.className = 'log-entry';
-                    logEntry.setAttribute('data-log-id', log.id);
-                    
-                    let logClass = 'log-info';
-                    if (log.level === 'ERROR') logClass = 'log-error';
-                    else if (log.level === 'WARNING') logClass = 'log-warning';
-                    else if (log.level === 'SUCCESS') logClass = 'log-success';
-                    
-                    logEntry.innerHTML = `
-                        <span class="text-muted">[${log.timestamp}]</span>
-                        <span class="${logClass}">[${log.level}]</span>
-                        ${log.message}
-                    `;
-                    
-                    logContainer.appendChild(logEntry);
-                }
-            });
-            
-            // Auto-scroll to bottom
-            logContainer.scrollTop = logContainer.scrollHeight;
-        }
-
-        function updateStatusIndicator(status) {
-            const statusIcon = document.getElementById('statusIcon');
-            const statusText = document.getElementById('statusText');
-            const statusDetails = document.getElementById('statusDetails');
-            const cancelBtn = document.getElementById('cancelBtn');
-            const viewResultsBtn = document.getElementById('viewResultsBtn');
-            
-            // Reset classes
-            statusIcon.className = 'status-icon fas';
-            
-            switch(status) {
-                case 'completed':
-                    statusIcon.classList.add('fa-check-circle', 'status-completed');
-                    statusText.textContent = 'Completed Successfully';
-                    statusDetails.textContent = 'Batch execution finished successfully';
-                    cancelBtn.disabled = true;
-                    viewResultsBtn.disabled = false;
-                    stopAutoRefresh();
-                    break;
-                case 'error':
-                case 'failed':
-                    statusIcon.classList.add('fa-exclamation-circle', 'status-error');
-                    statusText.textContent = 'Execution Failed';
-                    statusDetails.textContent = 'An error occurred during execution';
-                    cancelBtn.disabled = true;
-                    viewResultsBtn.disabled = true;
-                    stopAutoRefresh();
-                    break;
-                case 'cancelled':
-                    statusIcon.classList.add('fa-times-circle', 'status-error');
-                    statusText.textContent = 'Execution Cancelled';
-                    statusDetails.textContent = 'Execution was cancelled by user';
-                    cancelBtn.disabled = true;
-                    viewResultsBtn.disabled = true;
-                    stopAutoRefresh();
-                    break;
-                default:
-                    statusIcon.classList.add('fa-spinner', 'status-running');
-                    statusText.textContent = 'Running...';
-                    statusDetails.textContent = 'Batch execution in progress';
-                    cancelBtn.disabled = false;
-                    viewResultsBtn.disabled = true;
-            }
-        }
-
-        function updateTimingInfo(data) {
-            const timing = data.timing || {};
-            
-            // Update start time
-            if (timing.start_time) {
-                startTime = new Date(timing.start_time);
-                document.getElementById('startTime').textContent = startTime.toLocaleTimeString();
-            }
-            
-            // Update elapsed time
-            if (startTime) {
-                const elapsed = new Date() - startTime;
-                document.getElementById('elapsedTime').textContent = formatDuration(elapsed);
-            }
-            
-            // Update estimated time
-            if (timing.estimated_completion) {
-                document.getElementById('estimatedTime').textContent = timing.estimated_completion;
-            }
-        }
-
-        function formatDuration(ms) {
-            const seconds = Math.floor(ms / 1000);
-            const minutes = Math.floor(seconds / 60);
-            const hours = Math.floor(minutes / 60);
-            
-            if (hours > 0) {
-                return `${hours}h ${minutes % 60}m ${seconds % 60}s`;
-            } else if (minutes > 0) {
-                return `${minutes}m ${seconds % 60}s`;
-            } else {
-                return `${seconds}s`;
-            }
-        }
-
-        function toggleAutoRefresh() {
-            autoRefresh = !autoRefresh;
-            const btn = document.getElementById('autoRefreshBtn');
-            
-            if (autoRefresh) {
-                btn.innerHTML = '<i class="fas fa-pause"></i> Auto Refresh';
-                refreshInterval = setInterval(refreshStatus, 3000);
-            } else {
-                btn.innerHTML = '<i class="fas fa-play"></i> Auto Refresh';
-                clearInterval(refreshInterval);
-            }
-        }
-
-        function stopAutoRefresh() {
-            autoRefresh = false;
-            const btn = document.getElementById('autoRefreshBtn');
-            btn.innerHTML = '<i class="fas fa-play"></i> Auto Refresh';
+    function startAutoRefresh() {
+        // Refresh every 3 seconds
+        if (refreshInterval) {
             clearInterval(refreshInterval);
         }
+        refreshInterval = setInterval(() => {
+            console.log('Auto refresh triggered');
+            refreshProgressData();
+        }, 3000);
+        console.log('Auto refresh started (3s interval)');
+    }
 
-        async function cancelExecution() {
-            if (!confirm('Are you sure you want to cancel this execution?')) {
-                return;
-            }
+    function stopAutoRefresh() {
+        if (refreshInterval) {
+            clearInterval(refreshInterval);
+            refreshInterval = null;
+            console.log('Auto refresh stopped');
+        }
+    }
+
+    async function refreshProgressData() {
+        try {
+            console.log(`Fetching progress for session: ${sessionId}`);
+            const response = await fetch(`/execution/api/progress/${sessionId}`);
             
-            try {
-                const response = await fetch(`/execution/api/execution/sessions/${sessionId}/cancel`, {
-                    method: 'POST'
-                });
-                
-                const result = await response.json();
-                
-                if (response.ok) {
-                    showSuccess('Execution cancelled successfully');
-                    refreshStatus();
-                } else {
-                    showError(result.detail || 'Error cancelling execution');
-                }
-                
-            } catch (error) {
-                console.error('Error cancelling execution:', error);
-                showError('Error cancelling execution');
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            const result = await response.json();
+            console.log('API Response:', result);
+
+            if (result.success && result.data) {
+                updateProgressUI(result.data);
+                updateConnectionStatus(true);
+            } else {
+                throw new Error('Invalid response format');
+            }
+
+        } catch (error) {
+            console.error('Error fetching progress data:', error);
+            updateConnectionStatus(false);
+            showError(`Erro ao carregar dados: ${error.message}`);
+        }
+    }
+
+    function updateProgressUI(data) {
+        console.log('[UI] Updating UI with data:', data);
+        
+        if (!data.progress_state) {
+            console.warn('[UI] No progress_state in data');
+            return;
+        }
+
+        const progressState = data.progress_state;
+        console.log('[UI] Progress state:', progressState);
+
+        // Update batch information if available
+        if (progressState.batch_structure) {
+            updateBatchInfo(progressState.batch_structure);
+        }
+
+        // Convert execution_status to progress_state format for UI
+        const convertedProgress = convertExecutionStatusToProgressState(progressState);
+
+        // Update progress bars and info
+        updateProgressSection(convertedProgress);
+        
+        // Update runs table from callbacks_history
+        if (progressState.callbacks_history) {
+            updateRunsTableFromCallbacks(progressState.callbacks_history);
+        }
+        
+        // Update logs
+        if (data.logs && data.logs.length > 0) {
+            updateLogs(data.logs);
+        }
+
+        console.log('[UI] UI updated successfully');
+    }
+
+    function updateProgressSection(progressState) {
+        console.log('[UI] Updating progress section with:', progressState);
+        
+        // Execution Progress
+        const execution = progressState.current_execution || {};
+        console.log('[UI] Execution data:', execution);
+        document.getElementById('currentExecutionName').textContent = execution.name || 'N/A';
+        updateProgressBar('execution', execution.position || 0, execution.total || 1);
+
+        // Dataset Progress  
+        const dataset = progressState.current_dataset || {};
+        console.log('[UI] Dataset data:', dataset);
+        document.getElementById('currentDatasetName').textContent = dataset.name || 'N/A';
+        updateProgressBar('dataset', dataset.position || 0, dataset.total || 1);
+
+        // Algorithm Config Progress
+        const config = progressState.current_algorithm_config || {};
+        console.log('[UI] Config data:', config);
+        document.getElementById('currentConfigName').textContent = config.name || 'N/A';
+        updateProgressBar('config', config.position || 0, config.total || 1);
+
+        // Repetitions Progress 
+        const repetition = progressState.current_repetition || {};
+        console.log('[UI] Repetition data:', repetition);
+        updateProgressBar('repetition', repetition.current || 0, repetition.total || 1);
+
+        // Completed Runs Progress
+        const completed = progressState.completed_runs || {};
+        console.log('[UI] Completed runs data:', completed);
+        updateProgressBar('run', completed.completed || 0, completed.total || 0);
+
+        // Update Summary Statistics
+        const summary = progressState.summary || {};
+        document.getElementById('summaryExecutions').textContent = summary.total_executions || '-';
+        document.getElementById('summaryDatasets').textContent = summary.total_datasets || '-';
+        document.getElementById('summaryConfigs').textContent = summary.total_algorithm_configs || '-';
+        document.getElementById('summaryRuns').textContent = summary.total_runs || '-';
+    }
+
+    function updateBatchInfo(batchStructure) {
+        console.log('[UI] Updating batch info with:', batchStructure);
+        
+        const batchInfoSection = document.getElementById('batchInfoSection');
+        if (!batchStructure || Object.keys(batchStructure).length === 0) {
+            batchInfoSection.style.display = 'none';
+            return;
+        }
+
+        // Show the section
+        batchInfoSection.style.display = 'block';
+
+        // Update batch metadata
+        const metadata = batchStructure.metadata || {};
+        document.getElementById('batchName').textContent = metadata.name || '-';
+        document.getElementById('batchDescription').textContent = metadata.description || '-';
+        document.getElementById('batchVersion').textContent = metadata.version || '-';
+        document.getElementById('batchAuthor').textContent = metadata.author || '-';
+        document.getElementById('batchEmail').textContent = metadata.email || '-';
+        
+        // Format creation date
+        const created = metadata.created_at || batchStructure.created_at;
+        if (created) {
+            const date = new Date(created);
+            document.getElementById('batchCreated').textContent = date.toLocaleString();
+        } else {
+            document.getElementById('batchCreated').textContent = '-';
+        }
+    }
+
+    function updateProgressBar(type, current, total) {
+        const percentage = total > 0 ? (current / total) * 100 : 0;
+        
+        // Update counter
+        document.getElementById(type + 'Counter').textContent = `${current} / ${total}`;
+        
+        // Update progress bar
+        const progressBar = document.getElementById(type + 'ProgressBar');
+        if (progressBar) {
+            progressBar.style.width = percentage + '%';
+            progressBar.setAttribute('aria-valuenow', percentage);
+        }
+    }
+
+    function updateRunsTable(runs, forceUpdate = false) {
+        const tbody = document.getElementById('runsTableBody');
+        
+        if (!runs || runs.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="8" class="text-center text-muted">
+                        <i class="bi bi-inbox me-2"></i>
+                        Nenhuma run encontrada
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        // Store all runs for filtering
+        if (forceUpdate || !allRuns.length) {
+            allRuns = runs;
+        }
+
+        // Filter runs based on current filter
+        let filteredRuns = allRuns;
+        if (currentStatusFilter) {
+            filteredRuns = allRuns.filter(run => run.status === currentStatusFilter);
+        }
+
+        if (filteredRuns.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="8" class="text-center text-muted">
+                        <i class="bi bi-filter me-2"></i>
+                        Nenhuma run encontrada com o filtro aplicado
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        tbody.innerHTML = filteredRuns.map((run, index) => `
+            <tr class="expandable-row" onclick="toggleRunDetails('${run.run_id}', ${index})">
+                <td>
+                    <span class="status-badge status-${run.status}">
+                        ${getStatusIcon(run.status)} ${getStatusText(run.status)}
+                    </span>
+                </td>
+                <td>${run.execution_name || '-'}</td>
+                <td>${run.dataset_name || '-'}</td>
+                <td>${run.algorithm_config || '-'}</td>
+                <td>${run.algorithm_name || '-'}</td>
+                <td class="text-center">
+                    <span class="badge bg-secondary">#${run.repetition_number || 1}</span>
+                </td>
+                <td>
+                    <div class="progress" style="height: 6px;">
+                        <div class="progress-bar bg-primary" 
+                             style="width: ${run.progress || 0}%"></div>
+                    </div>
+                    <small class="text-muted">${Math.round(run.progress || 0)}%</small>
+                </td>
+                <td>
+                    ${run.error_message ? 
+                        `<small class="text-danger">${run.error_message}</small>` : 
+                        '-'}
+                </td>
+            </tr>
+            <tr id="details-${run.run_id}" class="expanded-content" style="display: none;">
+                <td colspan="8">
+                    <div class="p-3">
+                        <h6><i class="bi bi-info-circle me-2"></i>Callbacks (${(run.callbacks || []).length})</h6>
+                        <div id="callbacks-${run.run_id}">
+                            ${renderCallbacks(run.callbacks || [])}
+                        </div>
+                        ${run.start_time ? `
+                        <hr>
+                        <h6><i class="bi bi-clock me-2"></i>Timing</h6>
+                        <div class="row">
+                            <div class="col-md-4">
+                                <strong>Início:</strong> ${run.start_time}
+                            </div>
+                            <div class="col-md-4">
+                                <strong>Duração:</strong> ${run.duration || 'Calculando...'}
+                            </div>
+                            <div class="col-md-4">
+                                <strong>Status:</strong> ${getStatusText(run.status)}
+                            </div>
+                        </div>
+                        ` : ''}
+                    </div>
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    function updateLogs(logs) {
+        const container = document.getElementById('logsContainer');
+        
+        if (!logs || logs.length === 0) {
+            container.innerHTML = '<div class="text-muted">Nenhum log disponível</div>';
+            return;
+        }
+
+        container.innerHTML = logs.map(log => `
+            <div class="log-entry log-${log.level.toLowerCase()}">
+                <span class="text-muted">[${log.timestamp}]</span>
+                <span class="fw-bold">${log.level}:</span>
+                ${log.source ? `<span class="text-info">[${log.source}]</span>` : ''}
+                ${log.message}
+            </div>
+        `).join('');
+        
+        // Auto scroll to bottom
+        container.scrollTop = container.scrollHeight;
+    }
+
+    function updateConnectionStatus(connected) {
+        const statusElement = document.getElementById('connectionStatus');
+        isConnected = connected;
+        
+        if (connected) {
+            statusElement.className = 'connection-status connected';
+            statusElement.innerHTML = '<i class="bi bi-wifi me-1"></i>Conectado';
+        } else {
+            statusElement.className = 'connection-status disconnected';
+            statusElement.innerHTML = '<i class="bi bi-wifi-off me-1"></i>Desconectado';
+        }
+    }
+
+    function getStatusIcon(status) {
+        switch (status) {
+            case 'completed': return '<i class="bi bi-check-circle"></i>';
+            case 'running': return '<i class="bi bi-play-circle"></i>';
+            case 'failed': return '<i class="bi bi-x-circle"></i>';
+            case 'pending': return '<i class="bi bi-clock"></i>';
+            default: return '<i class="bi bi-question-circle"></i>';
+        }
+    }
+
+    function getStatusText(status) {
+        switch (status) {
+            case 'completed': return 'Concluído';
+            case 'running': return 'Executando';
+            case 'failed': return 'Falhou';
+            case 'pending': return 'Pendente';
+            default: return 'Desconhecido';
+        }
+    }
+
+    function showError(message) {
+        const container = document.getElementById('logsContainer');
+        container.innerHTML = `
+            <div class="log-entry log-error">
+                <i class="bi bi-exclamation-triangle me-2"></i>
+                ${message}
+            </div>
+        `;
+    }
+
+    // Toggle run details (callbacks)
+    function toggleRunDetails(runId, index) {
+        const detailsRow = document.getElementById(`details-${runId}`);
+        if (detailsRow) {
+            if (detailsRow.style.display === 'none') {
+                detailsRow.style.display = 'table-row';
+            } else {
+                detailsRow.style.display = 'none';
             }
         }
+    }
 
-        function viewResults() {
-            // Redirect to result details page
-            window.location.href = `/results/${sessionId}`;
+    // Render callbacks
+    function renderCallbacks(callbacks) {
+        if (!callbacks || callbacks.length === 0) {
+            return '<div class="text-muted"><i class="bi bi-info-circle me-2"></i>Nenhum callback registrado</div>';
         }
 
-        function clearLog() {
-            document.getElementById('executionLog').innerHTML = `
-                <div class="log-entry log-info">
-                    <span class="text-muted">[INFO]</span> Log cleared by user...
+        return callbacks.map(callback => {
+            // Handle different callback structures from WebDisplay
+            const type = callback.type || callback.level || 'info';
+            const message = callback.message || callback.content || '';
+            const algorithm = callback.algorithm || callback.algorithm_name || '-';
+            const timestamp = callback.timestamp || callback.time || 'N/A';
+            
+            return `
+                <div class="callback-item callback-${type}">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <span class="callback-type text-${getCallbackColor(type)}">${type.toUpperCase()}</span>
+                        <small class="text-muted">${timestamp}</small>
+                    </div>
+                    <div class="mb-1">
+                        <strong>Algoritmo:</strong> ${algorithm}
+                    </div>
+                    <div>${message}</div>
+                    ${callback.details ? `
+                        <div class="mt-2">
+                            <small class="text-muted">
+                                <strong>Detalhes:</strong> ${callback.details}
+                            </small>
+                        </div>
+                    ` : ''}
                 </div>
             `;
-        }
+        }).join('');
+    }
 
-        function downloadLog() {
-            const logContainer = document.getElementById('executionLog');
-            const logText = logContainer.innerText;
-            
-            const blob = new Blob([logText], { type: 'text/plain' });
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `execution_log_${sessionId}.txt`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            window.URL.revokeObjectURL(url);
+    // Get callback color
+    function getCallbackColor(type) {
+        switch (type) {
+            case 'warning': return 'warning';
+            case 'error': return 'danger';
+            case 'info': return 'info';
+            default: return 'secondary';
         }
+    }
 
-        function showError(message) {
-            // Simple error display - could be enhanced with toast notifications
-            console.error(message);
-            const logContainer = document.getElementById('executionLog');
-            const logEntry = document.createElement('div');
-            logEntry.className = 'log-entry log-error';
-            logEntry.innerHTML = `
-                <span class="text-muted">[${new Date().toLocaleTimeString()}]</span>
-                <span class="log-error">[ERROR]</span>
-                ${message}
-            `;
-            logContainer.appendChild(logEntry);
-            logContainer.scrollTop = logContainer.scrollHeight;
+    // Toggle logs section
+    function toggleLogsSection() {
+        const logsSection = document.getElementById('logsSection');
+        const icon = document.getElementById('logsCollapseIcon');
+        const header = logsSection.previousElementSibling;
+        
+        if (logsSection.classList.contains('show')) {
+            logsSection.classList.remove('show');
+            header.classList.add('collapsed');
+            icon.classList.remove('bi-chevron-up');
+            icon.classList.add('bi-chevron-down');
+        } else {
+            logsSection.classList.add('show');
+            header.classList.remove('collapsed');
+            icon.classList.remove('bi-chevron-down');
+            icon.classList.add('bi-chevron-up');
         }
+    }
 
-        function showSuccess(message) {
-            const logContainer = document.getElementById('executionLog');
-            const logEntry = document.createElement('div');
-            logEntry.className = 'log-entry log-success';
-            logEntry.innerHTML = `
-                <span class="text-muted">[${new Date().toLocaleTimeString()}]</span>
-                <span class="log-success">[SUCCESS]</span>
-                ${message}
-            `;
-            logContainer.appendChild(logEntry);
-            logContainer.scrollTop = logContainer.scrollHeight;
-        }
-    </script>
-</body>
-</html>
+    // Clean up on page unload
+    window.addEventListener('beforeunload', function() {
+        stopAutoRefresh();
+    });
+</script>
+{% endblock %}

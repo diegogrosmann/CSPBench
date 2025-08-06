@@ -36,7 +36,7 @@ from src.domain import (
 from src.domain.dataset import SyntheticDatasetGenerator
 from src.infrastructure.logging_config import LoggerConfig, get_logger
 from src.infrastructure.session_manager import SessionManager
-from src.presentation.monitoring.interfaces import TaskType
+from src.application.monitoring.progress_events import TaskType
 
 
 class ExperimentService:
@@ -226,7 +226,9 @@ class ExperimentService:
             # Session management is now handled during service initialization
             # The SessionManager is already configured with the correct session_id
             if self._session_manager:
-                self._logger.info(f"Using session: {self._session_manager.get_session_folder()}")
+                self._logger.info(
+                    f"Using session: {self._session_manager.get_session_folder()}"
+                )
             else:
                 self._logger.warning("No session manager configured")
 
@@ -243,22 +245,22 @@ class ExperimentService:
             # Start monitoring if enabled
             if self._monitoring_service:
                 from src.application.monitoring import TaskType
-                
+
                 # Map string task type to enum
                 task_type_enum = TaskType.EXECUTION
                 if task_type == "optimization":
                     task_type_enum = TaskType.OPTIMIZATION
                 elif task_type == "sensitivity":
                     task_type_enum = TaskType.SENSITIVITY
-                
+
                 self._monitoring_service.start_task(
                     task_type=task_type_enum,
                     task_name=metadata.name,
                     metadata={
                         "description": metadata.description,
                         "author": metadata.author,
-                        "version": metadata.version
-                    }
+                        "version": metadata.version,
+                    },
                 )
 
             # Process according to task type
@@ -317,26 +319,23 @@ class ExperimentService:
             # Finish monitoring
             if self._monitoring_service:
                 self._monitoring_service.finish_task(
-                    success=successful > 0,
-                    results=consolidated_results
+                    success=successful > 0, results=consolidated_results
                 )
 
             return consolidated_results
 
         except Exception as e:
             self._logger.error(f"Erro durante execução de batch: {e}")
-            
+
             # Report error to monitoring
             if self._monitoring_service:
                 self._monitoring_service.report_error(
-                    error_message=str(e),
-                    error_type=type(e).__name__
+                    error_message=str(e), error_type=type(e).__name__
                 )
                 self._monitoring_service.finish_task(
-                    success=False,
-                    error_message=str(e)
+                    success=False, error_message=str(e)
                 )
-            
+
             if isinstance(
                 e,
                 (BatchConfigurationError, DatasetNotFoundError, AlgorithmNotFoundError),
@@ -530,7 +529,9 @@ class ExperimentService:
             batch_config["experiments"][0]["timeout"] = timeout
 
         # Execute as batch and return first result
-        results = self._executor.execute_batch(batch_config, monitoring_service=None, session_manager=self._session_manager)
+        results = self._executor.execute_batch(
+            batch_config, monitoring_service=None, session_manager=self._session_manager
+        )
         if results:
             result = results[0]
             # Garantir que timeout está nos metadados se foi fornecido
@@ -580,7 +581,9 @@ class ExperimentService:
             batch_config_with_resources["resources"] = resources_config
 
             results = self._executor.execute_batch(
-                batch_config_with_resources, self._monitoring_service, session_manager=self._session_manager
+                batch_config_with_resources,
+                self._monitoring_service,
+                session_manager=self._session_manager,
             )
 
             # Finalizar monitoramento
@@ -591,8 +594,7 @@ class ExperimentService:
         except Exception as e:
             # Mostrar erro no monitoramento
             if self._monitoring_service:
-                self._monitoring_service.show_error(str(e))
-                self._monitoring_service.finish_monitoring({})
+                self._monitoring_service.report_error(str(e))
             raise
 
     def _process_optimization_batch(
@@ -612,7 +614,9 @@ class ExperimentService:
         # Iniciar monitoramento se disponível
         if self._monitoring_service:
             batch_name = batch_config.get("metadata", {}).get("name", "Optimization")
-            self._monitoring_service.start_monitoring(TaskType.OPTIMIZATION, batch_name)
+            self._monitoring_service.start_task(
+                TaskType.OPTIMIZATION, batch_name, batch_config
+            )
 
         try:
             # Use o método de compatibilidade do backup
@@ -802,8 +806,7 @@ class ExperimentService:
         except Exception as e:
             # Mostrar erro no monitoramento
             if self._monitoring_service:
-                self._monitoring_service.show_error(str(e))
-                self._monitoring_service.finish_monitoring({})
+                self._monitoring_service.report_error(str(e))
             raise
 
     def _process_sensitivity_batch(
@@ -825,7 +828,9 @@ class ExperimentService:
             batch_name = batch_config.get("metadata", {}).get(
                 "name", "Sensitivity Analysis"
             )
-            self._monitoring_service.start_monitoring(TaskType.SENSITIVITY, batch_name)
+            self._monitoring_service.start_task(
+                TaskType.SENSITIVITY, batch_name, batch_config
+            )
 
         try:
             # Use o método de compatibilidade do backup
@@ -1002,8 +1007,7 @@ class ExperimentService:
         except Exception as e:
             # Mostrar erro no monitoramento
             if self._monitoring_service:
-                self._monitoring_service.show_error(str(e))
-                self._monitoring_service.finish_monitoring({})
+                self._monitoring_service.report_error(str(e))
             raise
 
         # Finalizar monitoramento
@@ -1468,7 +1472,11 @@ class ExperimentService:
         }
 
     def _export_batch_results(
-        self, results: Dict[str, Any], format_type: str, destination: str, session_id: Optional[str] = None
+        self,
+        results: Dict[str, Any],
+        format_type: str,
+        destination: str,
+        session_id: Optional[str] = None,
     ) -> str:
         """Exporta resultados de batch."""
         # Se results já é uma lista de resultados, usar diretamente
@@ -1506,7 +1514,11 @@ class ExperimentService:
                 self._logger.warning(f"Error configuring monitoring: {e}")
 
     def _export_batch_results_with_config(
-        self, results: Dict[str, Any], export_config, task_type: str, session_id: Optional[str] = None
+        self,
+        results: Dict[str, Any],
+        export_config,
+        task_type: str,
+        session_id: Optional[str] = None,
     ) -> str:
         """Export batch results using new export configuration."""
         try:
@@ -1628,7 +1640,9 @@ class ExperimentService:
                 from datetime import datetime
 
                 # Get infrastructure configuration from environment variables
-                session_format = os.getenv("OUTPUT_SESSION_FOLDER_FORMAT", "%Y%m%d_%H%M%S")
+                session_format = os.getenv(
+                    "OUTPUT_SESSION_FOLDER_FORMAT", "%Y%m%d_%H%M%S"
+                )
                 current_session = datetime.now().strftime(session_format)
                 base_output_dir = os.getenv("OUTPUT_BASE_DIRECTORY", "outputs")
                 session_base_path = Path(base_output_dir) / "results" / current_session
@@ -1795,6 +1809,7 @@ class ExperimentService:
         # Apply other system configurations
         # Check force_cleanup from .env (infrastructure setting)
         import os
+
         force_cleanup = os.getenv("FORCE_CLEANUP", "false").lower() == "true"
         if force_cleanup:
             self._logger.info("Force cleanup enabled (from .env)")

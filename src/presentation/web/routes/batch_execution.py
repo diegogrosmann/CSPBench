@@ -391,7 +391,7 @@ def _extract_batch_description(file_path: Path) -> str:
 async def _execute_batch_background(session_id: str, batch_path: str):
     """Execute batch file in background."""
     import asyncio
-    
+
     def _run_batch_sync():
         """Synchronous batch execution wrapper."""
         try:
@@ -402,8 +402,10 @@ async def _execute_batch_background(session_id: str, batch_path: str):
 
             # Get the experiment service specifically for this session_id from main module
             from main import initialize_service
-            
-            service = initialize_service(session_id=session_id, web_session_manager=session_manager)
+
+            service = initialize_service(
+                session_id=session_id, web_session_manager=session_manager
+            )
             if service is None:
                 raise Exception("ExperimentService not initialized")
 
@@ -422,7 +424,9 @@ async def _execute_batch_background(session_id: str, batch_path: str):
             )
 
         except Exception as e:
-            logger.error(f"Background batch execution failed for session {session_id}: {e}")
+            logger.error(
+                f"Background batch execution failed for session {session_id}: {e}"
+            )
             session_manager.update_session(
                 session_id,
                 {
@@ -456,14 +460,15 @@ async def get_execution_status(session_id: str):
     """Get the current status of an execution session."""
     try:
         session = session_manager.get_session(session_id)
-        
+
         # Se não encontrar a sessão e for a sessão de teste, criar uma sessão simulada
         if not session and session_id == "3e949d84-b9e4-4425-b197-5c3637f1cefe":
             import time
+
             # Criar sessão simulada para teste
             created_time = time.time() - 120  # Criada há 2 minutos
             session_manager.create_session("batch_execution", {"test": True})
-            
+
             # Atualizar com ID específico (hack para teste)
             session_manager._sessions[session_id] = session_manager._sessions.pop(
                 list(session_manager._sessions.keys())[-1]
@@ -471,7 +476,7 @@ async def get_execution_status(session_id: str):
             session_manager._sessions[session_id].session_id = session_id
             session_manager._sessions[session_id].created_at = created_time
             session_manager._sessions[session_id].status = "running"
-            
+
             session = session_manager.get_session(session_id)
             logger.info(f"Created simulated session: {session_id}")
 
@@ -489,6 +494,7 @@ async def get_execution_status(session_id: str):
             "timing": {},
             "created_at": session.get("created_at"),
             "updated_at": session.get("updated_at"),
+            "batch_file": session.get("config", {}).get("batch_file", "Unknown batch"),
         }
 
         # Try to calculate progress details safely
@@ -516,6 +522,12 @@ async def get_execution_status(session_id: str):
             response_data["timing"] = _calculate_timing_info(session)
         except Exception as e:
             logger.warning(f"Error calculating timing info: {str(e)}")
+
+        # Try to get run details if available
+        try:
+            response_data["run_details"] = session.get("run_details", {})
+        except Exception as e:
+            logger.warning(f"Error getting run details: {str(e)}")
 
         return response_data
 
@@ -587,50 +599,66 @@ def _calculate_progress_details(session: Dict[str, Any]) -> Dict[str, Any]:
         "total_datasets": 1,
         "current_algorithm": 1,
         "total_algorithms": 1,
+        "current_config": 1,
+        "total_configs": 1,
         "current_run": 1,
         "total_runs": 1,
         "overall_progress": 0,
     }
-    
+
     # Dados de teste simulados para debug baseados na configuração real do TEMPLATE.yaml
     if session.get("session_id") == "3e949d84-b9e4-4425-b197-5c3637f1cefe":
         import time
+        import logging
+
+        logger = logging.getLogger(__name__)
+
         # Simular progresso baseado no tempo
         start_time = session.get("created_at", time.time())
         elapsed = time.time() - start_time
-        simulated_progress = min(int((elapsed / 60) * 25), 75)  # 25% por minuto, max 75%
-        
+        simulated_progress = min(
+            int((elapsed / 60) * 25), 75
+        )  # 25% por minuto, max 75%
+
         # Estrutura hierárquica correta baseada no TEMPLATE.yaml:
         # Executions: 2 (Test Execution, Complete Execution)
         # Test Execution: 2 datasets (dataset_test, dataset_file) × 2 configs (default_config, aggressive_csc) × 3 repetitions
         # Complete Execution: 1 dataset (dataset_ncbi) × 1 config (aggressive_csc) × 2 repetitions
-        # 
+        #
         # Para primeira execução seria:
         # Executions 1/2 (Test Execution)
-        # Datasets 1/2 (dataset_test) 
+        # Datasets 1/2 (dataset_test)
         # Config 1/2 (default_config)
         # Algorithms 1/5 (Baseline) - default_config tem 5 algoritmos
-        # Run 1/3
-        
-        progress_details.update({
-            "current_execution": 1,
-            "total_executions": 2,   # Test Execution + Complete Execution
-            "current_dataset": 1,
-            "total_datasets": 2,     # dataset_test, dataset_file (dentro do Test Execution atual)
-            "current_algorithm": 1,
-            "total_algorithms": 5,   # Baseline, BLF-GA, CSC, H³-CSP, DP-CSP (dentro do default_config)
-            "current_run": 1,
-            "total_runs": 3,         # Repetitions do Test Execution
-            "overall_progress": simulated_progress,
-        })
+        # Run 1/30 (total de todas as combinações)
+
+        progress_details.update(
+            {
+                "current_execution": 1,
+                "total_executions": 2,  # Test Execution + Complete Execution
+                "current_dataset": 1,
+                "total_datasets": 2,  # dataset_test, dataset_file (dentro do Test Execution atual)
+                "current_algorithm": 1,
+                "total_algorithms": 5,  # Baseline, BLF-GA, CSC, H³-CSP, DP-CSP (dentro do default_config)
+                "current_config": 1,
+                "total_configs": 2,  # default_config, aggressive_csc
+                "current_run": 1,
+                "total_runs": 30,  # Total de runs considerando todas as combinações
+                "overall_progress": simulated_progress,
+            }
+        )
         logger.info(f"Simulated progress for session: {progress_details}")
         return progress_details
 
     # Get progress from session data if available and valid
-    if "progress" in session and session["progress"] and isinstance(session["progress"], dict):
+    if (
+        "progress" in session
+        and session["progress"]
+        and isinstance(session["progress"], dict)
+    ):
         # Use the data from monitoring service which has the correct values
         progress_from_monitoring = session["progress"]
-        
+
         # Update all values from monitoring service
         for key, value in progress_from_monitoring.items():
             if key in progress_details:
@@ -642,7 +670,11 @@ def _calculate_progress_details(session: Dict[str, Any]) -> Dict[str, Any]:
         progress_details["overall_progress"] = 100
     elif status == "running":
         # Use the overall_progress calculated by monitoring service if available
-        if "progress" in session and session["progress"] and isinstance(session["progress"], dict):
+        if (
+            "progress" in session
+            and session["progress"]
+            and isinstance(session["progress"], dict)
+        ):
             monitoring_progress = session["progress"].get("overall_progress", 0)
             if monitoring_progress > 0:
                 progress_details["overall_progress"] = monitoring_progress
@@ -670,36 +702,10 @@ def _get_current_execution_details(session: Dict[str, Any]) -> Dict[str, Any]:
         "dataset": "-",
         "algorithm": "-",
         "run": "-",
-        "progress": 0
+        "config": "-",
+        "execution": "-",
+        "progress": 0,
     }
-    
-    # Dados de teste simulados para debug
-    if session.get("session_id") == "3e949d84-b9e4-4425-b197-5c3637f1cefe":
-        import time
-        import logging
-        logger_debug = logging.getLogger(__name__)
-        
-        start_time = session.get("created_at", time.time())
-        elapsed = time.time() - start_time
-        simulated_progress = min(int((elapsed / 60) * 25), 75)  # 25% por minuto, max 75%
-        
-        # Simular estrutura hierárquica: Test Execution > dataset_test > default_config > Baseline
-        execution_name = "Test Execution"
-        dataset_name = "dataset_test"
-        config_name = "default_config"
-        algorithm_name = "Baseline"
-        run_number = "1"
-        
-        current.update({
-            "name": f"{algorithm_name} on {dataset_name}",
-            "algorithm": algorithm_name,
-            "dataset": dataset_name,
-            "run": run_number,
-            "progress": simulated_progress
-        })
-        
-        logger_debug.info(f"Simulated current execution: {current}")
-        return current
 
     # Get current execution data from session if available
     session_current = session.get("current_execution", {})
@@ -709,10 +715,63 @@ def _get_current_execution_details(session: Dict[str, Any]) -> Dict[str, Any]:
             if key in current and value and value != "-":
                 current[key] = value
 
+        # Try to extract config from algorithm name or other sources
+        if "algorithm" in session_current and "config" not in session_current:
+            # Try to extract config from context or algorithm name
+            algorithm_name = session_current.get("algorithm", "")
+            # Look for patterns like "Algorithm (config_name)" or try to infer
+            if "(" in algorithm_name and ")" in algorithm_name:
+                config_part = algorithm_name.split("(")[-1].split(")")[0]
+                current["config"] = config_part
+            else:
+                # Use session config if available
+                session_config = session.get("config", {})
+                batch_path = session_config.get("batch_path", "")
+                if batch_path:
+                    current["config"] = "batch_config"
+
+    # Dados de teste simulados para debug
+    if session.get("session_id") == "3e949d84-b9e4-4425-b197-5c3637f1cefe":
+        import time
+        import logging
+
+        logger_debug = logging.getLogger(__name__)
+
+        start_time = session.get("created_at", time.time())
+        elapsed = time.time() - start_time
+        simulated_progress = min(
+            int((elapsed / 60) * 25), 75
+        )  # 25% por minuto, max 75%
+
+        # Simular estrutura hierárquica: Test Execution > dataset_test > default_config > Baseline
+        execution_name = "Test Execution"
+        dataset_name = "dataset_test"
+        config_name = "default_config"
+        algorithm_name = "Baseline"
+        run_number = "1"
+
+        current.update(
+            {
+                "name": f"{execution_name}: {algorithm_name} on {dataset_name}",
+                "algorithm": algorithm_name,
+                "dataset": dataset_name,
+                "run": f"{run_number}/3",
+                "config": config_name,
+                "execution": execution_name,
+                "progress": simulated_progress,
+            }
+        )
+
+        logger_debug.info(f"Simulated current execution: {current}")
+        return current
+
     # Debug logging
     import logging
+
     logger = logging.getLogger(__name__)
-    logger.info(f"Current execution details: session_current={session_current}, result={current}")
+    logger.info(
+        f"Current execution details: session_current={session_current}, result={current}"
+    )
 
     return current
 
@@ -737,14 +796,14 @@ def _get_execution_logs(session_id: str) -> List[Dict[str, Any]]:
         },
         {
             "id": 2,
-            "timestamp": "10:30:01", 
+            "timestamp": "10:30:01",
             "level": "INFO",
             "message": "Loading batch configuration...",
         },
         {
             "id": 3,
             "timestamp": "10:30:02",
-            "level": "INFO", 
+            "level": "INFO",
             "message": "Initializing algorithms and datasets...",
         },
     ]
@@ -763,7 +822,129 @@ def _calculate_timing_info(session: Dict[str, Any]) -> Dict[str, Any]:
         "estimated_completion": "Calculating...",
     }
 
-    # Add more sophisticated timing calculations here
-    # based on current progress and historical data
+    # Calculate elapsed time properly
+    start_time = session.get("created_at")
+    if start_time:
+        try:
+            import datetime
+
+            if isinstance(start_time, (int, float)):
+                # It's a timestamp
+                start_dt = datetime.datetime.fromtimestamp(start_time)
+                elapsed_seconds = (datetime.datetime.now() - start_dt).total_seconds()
+
+                # Format elapsed time properly
+                hours = int(elapsed_seconds // 3600)
+                minutes = int((elapsed_seconds % 3600) // 60)
+                seconds = int(elapsed_seconds % 60)
+
+                if hours > 0:
+                    elapsed_str = f"{hours}h {minutes}m {seconds}s"
+                elif minutes > 0:
+                    elapsed_str = f"{minutes}m {seconds}s"
+                else:
+                    elapsed_str = f"{seconds}s"
+
+                timing["elapsed_time"] = elapsed_str
+                timing["start_time"] = start_dt.isoformat()
+            else:
+                timing["start_time"] = str(start_time)
+        except Exception as e:
+            import logging
+
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Error calculating timing: {e}")
 
     return timing
+
+
+@router.get("/api/progress/{session_id}")
+async def get_execution_progress(session_id: str):
+    """
+    Get detailed execution progress data for the web interface.
+
+    Returns structured progress data that matches the WebDisplay output format.
+    """
+    try:
+        session = session_manager.get_session(session_id)
+        if not session:
+            raise HTTPException(
+                status_code=404, detail=f"Session '{session_id}' not found"
+            )
+
+        # Check if we have progress_state from WebDisplay
+        if "progress_state" in session and session["progress_state"]:
+            # Build complete response with all WebDisplay data structures
+            response_data = {
+                "progress_state": session["progress_state"],
+                "logs": session.get("logs", []),
+                "status": session.get("status", "unknown"),
+                "last_updated": session.get("last_updated"),
+                "session_id": session_id,
+            }
+            
+            # Include batch_structure if available
+            if "batch_structure" in session:
+                response_data["batch_structure"] = session["batch_structure"]
+                
+            # Include callbacks_history if available  
+            if "callbacks_history" in session:
+                response_data["callbacks_history"] = session["callbacks_history"]
+
+            return {
+                "success": True,
+                "data": response_data,
+            }
+
+        # Fallback: create basic progress structure if no WebDisplay data
+        logs = session.get("logs", [])
+
+        # Extract session status and try to provide meaningful defaults
+        session_status = session.get("status", "pending")
+
+        # Create basic progress structure
+        basic_progress = {
+            "current_execution": {
+                "name": "Inicializando..." if session_status == "running" else "N/A",
+                "position": 1 if session_status == "running" else 0,
+                "total": 1,
+            },
+            "current_dataset": {
+                "name": "Aguardando..." if session_status == "running" else "N/A",
+                "position": 0,
+                "total": 1,
+            },
+            "current_algorithm_config": {
+                "name": "Aguardando..." if session_status == "running" else "N/A",
+                "position": 0,
+                "total": 1,
+            },
+            "completed_runs": {"completed": 0, "total": 0},
+            "all_runs": [],
+            "summary": {
+                "total_executions": 1,
+                "total_datasets": 0,
+                "total_algorithm_configs": 0,
+                "total_runs": 0,
+                "completed_runs": 0,
+                "running_runs": 1 if session_status == "running" else 0,
+                "failed_runs": 1 if session_status == "failed" else 0,
+            },
+        }
+
+        return {
+            "success": True,
+            "data": {
+                "progress_state": basic_progress,
+                "logs": logs,
+                "status": session_status,
+                "last_updated": session.get("last_updated"),
+                "session_id": session_id,
+            },
+        }
+
+    except Exception as e:
+        logger.error(f"Error getting execution progress for session {session_id}: {e}")
+        raise HTTPException(
+            status_code=500, detail=f"Error retrieving progress data: {str(e)}"
+        )

@@ -66,6 +66,11 @@ async def results_page(request: Request):
 async def result_details_page(request: Request, session_id: str):
     """Result details page for a specific session."""
     return templates.TemplateResponse(
-        "result_details.html", 
-        {"request": request, "session_id": session_id}
+        "result_details.html", {"request": request, "session_id": session_id}
     )
+
+
+@router.get("/debug", response_class=HTMLResponse)
+async def debug_execution_page(request: Request):
+    """Debug execution page for testing batch execution with detailed logs."""
+    return templates.TemplateResponse("debug_execution.html", {"request": request})

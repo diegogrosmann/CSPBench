@@ -21,6 +21,7 @@ router = APIRouter(prefix="/api/results", tags=["results"])
 
 class ResultSession(BaseModel):
     """Session result model."""
+
     session_id: str
     timestamp: datetime
     algorithm: Optional[str] = None
@@ -36,6 +37,7 @@ class ResultSession(BaseModel):
 
 class ResultsListResponse(BaseModel):
     """Response model for results listing."""
+
     sessions: List[ResultSession]
     total_count: int
     total_size_mb: float
@@ -60,25 +62,27 @@ async def list_results(
         if outputs_dir.exists():
             # Get all session directories
             session_dirs = [d for d in outputs_dir.iterdir() if d.is_dir()]
-            
+
             # Sort by timestamp (newest first)
             session_dirs.sort(reverse=True)
 
             for session_dir in session_dirs:
                 try:
                     session_info = await _extract_session_info(session_dir)
-                    
+
                     # Apply filters
                     if algorithm and session_info.algorithm != algorithm:
                         continue
                     if status and session_info.status != status:
                         continue
                     if date_from:
-                        from_date = datetime.fromisoformat(date_from.replace('Z', '+00:00'))
+                        from_date = datetime.fromisoformat(
+                            date_from.replace("Z", "+00:00")
+                        )
                         if session_info.timestamp < from_date:
                             continue
                     if date_to:
-                        to_date = datetime.fromisoformat(date_to.replace('Z', '+00:00'))
+                        to_date = datetime.fromisoformat(date_to.replace("Z", "+00:00"))
                         if session_info.timestamp > to_date:
                             continue
 
@@ -90,12 +94,12 @@ async def list_results(
                     continue
 
         # Apply pagination
-        paginated_sessions = sessions[offset:offset + limit]
+        paginated_sessions = sessions[offset : offset + limit]
 
         return ResultsListResponse(
             sessions=paginated_sessions,
             total_count=len(sessions),
-            total_size_mb=round(total_size, 2)
+            total_size_mb=round(total_size, 2),
         )
 
     except Exception as e:
@@ -112,14 +116,14 @@ async def get_result_details(session_id: str):
             raise HTTPException(status_code=404, detail="Session not found")
 
         session_info = await _extract_session_info(session_dir)
-        
+
         # Load detailed results if available
         results_files = list(session_dir.glob("results_*.json"))
         if results_files:
-            with open(results_files[0], 'r') as f:
+            with open(results_files[0], "r") as f:
                 detailed_results = json.load(f)
             session_info_dict = session_info.dict()
-            session_info_dict['detailed_results'] = detailed_results
+            session_info_dict["detailed_results"] = detailed_results
             return session_info_dict
 
         return session_info
@@ -141,19 +145,23 @@ async def download_session_results(session_id: str):
 
         # Create ZIP file with all session results
         zip_path = await _create_session_zip(session_id, session_dir)
-        
+
         return FileResponse(
             path=zip_path,
             filename=f"cspbench_results_{session_id}.zip",
             media_type="application/zip",
-            headers={"Content-Disposition": f"attachment; filename=cspbench_results_{session_id}.zip"}
+            headers={
+                "Content-Disposition": f"attachment; filename=cspbench_results_{session_id}.zip"
+            },
         )
 
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error downloading session {session_id}: {e}")
-        raise HTTPException(status_code=500, detail="Failed to download session results")
+        raise HTTPException(
+            status_code=500, detail="Failed to download session results"
+        )
 
 
 @router.get("/{session_id}/files/{file_type}")
@@ -167,14 +175,16 @@ async def download_session_file(session_id: str, file_type: str):
         # Map file types to patterns
         file_patterns = {
             "json": "results_*.json",
-            "csv": "results_*.csv", 
+            "csv": "results_*.csv",
             "log": "cspbench.log",
             "report": "report/*",
-            "plots": "plots/*"
+            "plots": "plots/*",
         }
 
         if file_type not in file_patterns:
-            raise HTTPException(status_code=400, detail=f"Unsupported file type: {file_type}")
+            raise HTTPException(
+                status_code=400, detail=f"Unsupported file type: {file_type}"
+            )
 
         # Find files matching the pattern
         files = list(session_dir.glob(file_patterns[file_type]))
@@ -186,7 +196,9 @@ async def download_session_file(session_id: str, file_type: str):
             return FileResponse(
                 path=files[0],
                 filename=files[0].name,
-                headers={"Content-Disposition": f"attachment; filename={files[0].name}"}
+                headers={
+                    "Content-Disposition": f"attachment; filename={files[0].name}"
+                },
             )
 
         # If multiple files or directory, create ZIP
@@ -195,7 +207,9 @@ async def download_session_file(session_id: str, file_type: str):
             path=zip_path,
             filename=f"cspbench_{session_id}_{file_type}.zip",
             media_type="application/zip",
-            headers={"Content-Disposition": f"attachment; filename=cspbench_{session_id}_{file_type}.zip"}
+            headers={
+                "Content-Disposition": f"attachment; filename=cspbench_{session_id}_{file_type}.zip"
+            },
         )
 
     except HTTPException:
@@ -210,7 +224,9 @@ async def download_batch_results(session_ids: List[str]):
     """Download results for multiple sessions as a single ZIP."""
     try:
         if len(session_ids) > 20:  # Limit batch size
-            raise HTTPException(status_code=400, detail="Batch size limited to 20 sessions")
+            raise HTTPException(
+                status_code=400, detail="Batch size limited to 20 sessions"
+            )
 
         # Find all session directories
         valid_sessions = []
@@ -224,15 +240,15 @@ async def download_batch_results(session_ids: List[str]):
 
         # Create batch ZIP
         batch_zip_path = await _create_batch_zip(valid_sessions)
-        
+
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"cspbench_batch_results_{timestamp}.zip"
-        
+
         return FileResponse(
             path=batch_zip_path,
             filename=filename,
             media_type="application/zip",
-            headers={"Content-Disposition": f"attachment; filename={filename}"}
+            headers={"Content-Disposition": f"attachment; filename={filename}"},
         )
 
     except HTTPException:
@@ -252,8 +268,9 @@ async def delete_session_results(session_id: str):
 
         # Remove session directory
         import shutil
+
         shutil.rmtree(session_dir)
-        
+
         return {"message": f"Session {session_id} deleted successfully"}
 
     except HTTPException:
@@ -264,6 +281,7 @@ async def delete_session_results(session_id: str):
 
 
 # Helper functions
+
 
 async def _find_session_directory(session_id: str) -> Optional[Path]:
     """Find the directory for a given session ID."""
@@ -282,9 +300,9 @@ async def _find_session_directory(session_id: str) -> Optional[Path]:
             # Check if any result file contains this session ID
             for file_path in session_dir.glob("results_*.json"):
                 try:
-                    with open(file_path, 'r') as f:
+                    with open(file_path, "r") as f:
                         data = json.load(f)
-                        if data.get('session_id') == session_id:
+                        if data.get("session_id") == session_id:
                             return session_dir
                 except Exception:
                     continue
@@ -295,7 +313,7 @@ async def _find_session_directory(session_id: str) -> Optional[Path]:
 async def _extract_session_info(session_dir: Path) -> ResultSession:
     """Extract session information from directory."""
     session_id = session_dir.name
-    
+
     # Try to parse timestamp from directory name
     try:
         timestamp = datetime.strptime(session_id, "%Y%m%d_%H%M%S")
@@ -309,7 +327,7 @@ async def _extract_session_info(session_dir: Path) -> ResultSession:
         "timestamp": timestamp,
         "status": "completed",
         "download_url": f"/api/results/{session_id}/download",
-        "files": []
+        "files": [],
     }
 
     # Get file list and calculate size
@@ -325,16 +343,18 @@ async def _extract_session_info(session_dir: Path) -> ResultSession:
     results_files = list(session_dir.glob("results_*.json"))
     if results_files:
         try:
-            with open(results_files[0], 'r') as f:
+            with open(results_files[0], "r") as f:
                 results_data = json.load(f)
-                
-            session_info.update({
-                "algorithm": results_data.get("algorithm"),
-                "dataset_name": results_data.get("dataset_name"),
-                "execution_time": results_data.get("execution_time"),
-                "best_string": results_data.get("best_string"),
-                "max_distance": results_data.get("max_distance")
-            })
+
+            session_info.update(
+                {
+                    "algorithm": results_data.get("algorithm"),
+                    "dataset_name": results_data.get("dataset_name"),
+                    "execution_time": results_data.get("execution_time"),
+                    "best_string": results_data.get("best_string"),
+                    "max_distance": results_data.get("max_distance"),
+                }
+            )
         except Exception as e:
             logger.warning(f"Failed to parse results file: {e}")
 
@@ -344,9 +364,12 @@ async def _extract_session_info(session_dir: Path) -> ResultSession:
 async def _create_session_zip(session_id: str, session_dir: Path) -> Path:
     """Create ZIP file containing all files from a session directory."""
     temp_dir = Path(tempfile.gettempdir())
-    zip_path = temp_dir / f"session_{session_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip"
+    zip_path = (
+        temp_dir
+        / f"session_{session_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip"
+    )
 
-    with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zipf:
         for file_path in session_dir.rglob("*"):
             if file_path.is_file():
                 arc_name = str(file_path.relative_to(session_dir))
@@ -358,9 +381,12 @@ async def _create_session_zip(session_id: str, session_dir: Path) -> Path:
 async def _create_files_zip(session_id: str, files: List[Path], file_type: str) -> Path:
     """Create ZIP file containing specific files."""
     temp_dir = Path(tempfile.gettempdir())
-    zip_path = temp_dir / f"files_{session_id}_{file_type}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip"
+    zip_path = (
+        temp_dir
+        / f"files_{session_id}_{file_type}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip"
+    )
 
-    with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zipf:
         for file_path in files:
             if file_path.is_file():
                 zipf.write(file_path, file_path.name)
@@ -376,10 +402,10 @@ async def _create_files_zip(session_id: str, files: List[Path], file_type: str) 
 async def _create_batch_zip(sessions: List[tuple]) -> Path:
     """Create ZIP file containing multiple sessions."""
     temp_dir = Path(tempfile.gettempdir())
-    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     zip_path = temp_dir / f"batch_results_{timestamp}.zip"
 
-    with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zipf:
         for session_id, session_dir in sessions:
             for file_path in session_dir.rglob("*"):
                 if file_path.is_file():

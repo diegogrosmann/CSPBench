@@ -29,10 +29,12 @@ class SessionManager:
             config: System configuration (used for execution settings, infrastructure from .env)
         """
         self.config = config
-        
+
         # Get infrastructure settings from environment variables
         self.session_format = os.getenv("SESSION_FOLDER_FORMAT", "%Y%m%d_%H%M%S")
-        self.create_session_folders = os.getenv("CREATE_SESSION_FOLDERS", "true").lower() == "true"
+        self.create_session_folders = (
+            os.getenv("CREATE_SESSION_FOLDERS", "true").lower() == "true"
+        )
 
         # Base directories from environment variables
         self.logs_base_dir = Path(os.getenv("OUTPUT_BASE_DIRECTORY", "outputs"))

@@ -189,7 +189,7 @@ class OptimizationOrchestrator:
                 dataset_name = self.config.get("dataset", "dataset")
 
                 # Configurar monitoramento hierárquico
-                from src.presentation.monitoring.interfaces import ExecutionLevel
+                from src.application.monitoring.progress_events import ExecutionLevel
 
                 # Atualizar informações de execução
                 self.monitoring_service.update_hierarchy(
@@ -505,18 +505,8 @@ class OptimizationOrchestrator:
                 if trial.value is not None:
                     message += f" - Valor: {trial.value:.2f}"
 
-                # Criar contexto hierárquico para otimização
-                from src.presentation.monitoring.interfaces import (
-                    create_hierarchical_context,
-                )
-
-                context = create_hierarchical_context(
-                    algorithm_id=algorithm_name,
-                    dataset_id=dataset_name,
-                    trial_id=f"{trial.number + 1}/{self.n_trials}",
-                )
-
-                self.monitoring_service.update_item(item_id, progress, message, context)
+                # Atualizar progresso sem contexto hierárquico legado
+                self.monitoring_service.update_item(item_id, progress, message)
 
         callbacks.append(progress_callback)
 

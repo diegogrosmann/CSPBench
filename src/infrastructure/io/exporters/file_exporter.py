@@ -34,9 +34,10 @@ class FileExporter(ExportPort):
             filename = f"results_{session_id}.{format_type.lower()}"
         else:
             from datetime import datetime
+
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             filename = f"results_{timestamp}.{format_type.lower()}"
-            
+
         # Determine output path
         if destination:
             dest_path = self.output_path / destination
@@ -44,9 +45,9 @@ class FileExporter(ExportPort):
                 dest_path = dest_path / filename
         else:
             dest_path = self.output_path / filename
-            
+
         dest_path.parent.mkdir(parents=True, exist_ok=True)
-        
+
         # Export based on format
         if format_type.lower() == "json":
             self._write_json(results, dest_path, options)
@@ -65,7 +66,7 @@ class FileExporter(ExportPort):
             self._write_txt(results, dest_path)
         else:
             self._write_json(results, dest_path, options)
-            
+
         return str(dest_path)
 
     def export_batch_results(
@@ -120,10 +121,15 @@ class FileExporter(ExportPort):
         return ["json", "csv", "parquet", "pickle", "txt"]
 
     def export_optimization_results(
-        self, optimization_data: Dict[str, Any], destination: str, session_id: Optional[str] = None
+        self,
+        optimization_data: Dict[str, Any],
+        destination: str,
+        session_id: Optional[str] = None,
     ) -> str:
         """Export optimization results."""
-        return self.export_results(optimization_data, "json", destination, session_id=session_id)
+        return self.export_results(
+            optimization_data, "json", destination, session_id=session_id
+        )
 
     def export(self, data: Any, filename: Optional[str] = None) -> None:
         """Export data to file (legacy method)."""

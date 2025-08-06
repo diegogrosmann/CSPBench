@@ -7,7 +7,11 @@ for both single executions and batches.
 
 import json
 import os
+import pickle
+import random
+import re
 import time
+import types
 import uuid
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from multiprocessing import cpu_count
@@ -48,6 +52,7 @@ def _execute_algorithm_static(
         tuple: (rep_num, repetition_results) or (rep_num, exception_info)
     """
     try:
+        import time as time_module
         from src.domain.algorithms import global_registry
         from src.domain.dataset import Dataset
 
@@ -74,13 +79,44 @@ def _execute_algorithm_static(
             strings=dataset.sequences, alphabet=dataset.alphabet, **params
         )
 
+        # Coletar warnings durante execução paralela
+        collected_warnings = []
+        collected_progress = []
+
+        def warning_callback(message: str):
+            """Callback para coletar warnings durante execução paralela."""
+            warning_data = {
+                "timestamp": time_module.time(),
+                "message": message,
+                "repetition": rep_num,
+                "algorithm": algorithm_name,
+            }
+            collected_warnings.append(warning_data)
+            logger.warning(f"Algorithm warning (rep {rep_num}): {message}")
+
+        def progress_callback(message: str, progress: float = 0.0):
+            """Callback para coletar progresso durante execução paralela."""
+            progress_data = {
+                "timestamp": time_module.time(),
+                "message": message,
+                "progress": progress,
+                "repetition": rep_num,
+                "algorithm": algorithm_name,
+            }
+            collected_progress.append(progress_data)
+            logger.debug(f"Algorithm progress (rep {rep_num}): {message} - {progress}%")
+
+        # Configurar callbacks
+        algorithm_instance.set_warning_callback(warning_callback)
+        algorithm_instance.set_progress_callback(progress_callback)
+
         # Execute algorithm using STANDARD INTERFACE (no parameters)
         logger.info(f"Starting repetition {rep_num} of {algorithm_name}")
-        start_time = time.time()
+        start_time = time_module.time()
 
         result = algorithm_instance.run()  # Standard interface - uses constructor data
 
-        execution_time = time.time() - start_time
+        execution_time = time_module.time() - start_time
 
         # Build result data with only serializable components
         if isinstance(result, tuple) and len(result) >= 3:
@@ -110,6 +146,9 @@ def _execute_algorithm_static(
             "metadata": clean_metadata,
             "algorithm": algorithm_name,
             "dataset": dataset_name,
+            # Adicionar dados coletados durante execução
+            "warnings": collected_warnings,
+            "progress_history": collected_progress,
         }
 
         logger.info(
@@ -210,6 +249,7 @@ class ExecutionOrchestrator(BaseOrchestrator):
         params: Optional[Dict[str, Any]] = None,
         timeout: Optional[int] = None,
         monitoring_service=None,
+        repetition_number: Optional[int] = None,
     ) -> Dict[str, Any]:
         """
         Execute a single algorithm.
@@ -280,29 +320,27 @@ class ExecutionOrchestrator(BaseOrchestrator):
 
             # Configurar callback de progresso se fornecido
             if monitoring_service:
-                import re
-                import time
                 start_time = time.time()
-                
+
                 def progress_callback(message: str):
                     # Tentar extrair progresso da mensagem
                     progress = 0.0
-                    
+
                     # Padrão 1: "Geração X/Y" (BLF-GA)
-                    gen_match = re.search(r'Geração (\d+)/(\d+)', message)
+                    gen_match = re.search(r"Geração (\d+)/(\d+)", message)
                     if gen_match:
                         current_gen = int(gen_match.group(1))
                         max_gen = int(gen_match.group(2))
                         progress = (current_gen / max_gen) * 100.0
-                    
+
                     # Padrão 2: "iteração X" (H3-CSP)
                     elif "iteração" in message:
-                        iter_match = re.search(r'iteração (\d+)', message)
+                        iter_match = re.search(r"iteração (\d+)", message)
                         if iter_match:
                             # Estimar progresso baseado no tempo (máximo 100% em 60s)
                             elapsed = time.time() - start_time
                             progress = min(elapsed / 60.0 * 100.0, 95.0)
-                    
+
                     # Padrão 3: Mensagens de fase
                     elif "Analisando blocos" in message:
                         progress = 10.0
@@ -314,24 +352,45 @@ class ExecutionOrchestrator(BaseOrchestrator):
                         progress = 100.0
                     elif "Timeout" in message:
                         progress = 100.0
-                    
+
                     # Usar progresso baseado no tempo se não conseguir extrair
                     if progress == 0.0:
                         elapsed = time.time() - start_time
-                        progress = min(elapsed / 30.0 * 100.0, 90.0)  # Máximo 90% por tempo
-                    
+                        progress = min(
+                            elapsed / 30.0 * 100.0, 90.0
+                        )  # Máximo 90% por tempo
+
                     # Garantir que progresso está no range 0-100
                     progress = max(0.0, min(100.0, progress))
-                    
-                    # Usando algorithm_callback da MonitoringInterface
-                    monitoring_service.algorithm_callback(
+
+                    # Usando report_algorithm_progress
+                    monitoring_service.report_algorithm_progress(
                         algorithm_name=algorithm_name,
-                        progress=progress,
+                        progress_percent=progress,
                         message=message,
                         item_id=execution_id,
                     )
 
                 algorithm.set_progress_callback(progress_callback)
+
+                # Configurar callback de warning se fornecido
+                def warning_callback(message: str):
+                    # Reportar warning com contexto de execução única
+                    monitoring_service.report_warning(
+                        algorithm_name=algorithm_name,
+                        warning_message=message,
+                        item_id=execution_id,
+                        execution_context={
+                            "execution_type": "single",
+                            "dataset_size": len(dataset.sequences),
+                            "dataset_length": (
+                                len(dataset.sequences[0]) if dataset.sequences else 0
+                            ),
+                            "algorithm_params": params,
+                        },
+                    )
+
+                algorithm.set_warning_callback(warning_callback)
 
             # Apply resource controls and execute algorithm
             try:
@@ -351,7 +410,7 @@ class ExecutionOrchestrator(BaseOrchestrator):
                 )
                 # Return timeout result
                 end_time = time.time()
-                return {
+                result = {
                     "algorithm": algorithm_name,
                     "best_string": "",
                     "max_distance": -1,
@@ -366,6 +425,20 @@ class ExecutionOrchestrator(BaseOrchestrator):
                     },
                     "status": "timeout",
                 }
+                
+                # Emit algorithm finished event for timeout
+                if monitoring_service:
+                    monitoring_service.report_algorithm_finished(
+                        algorithm_name=algorithm_name,
+                        success=False,
+                        best_string="",
+                        max_distance=-1,
+                        execution_time=end_time - start_time,
+                        metadata={"error": str(e), "timeout": True},
+                        repetition_number=repetition_number,
+                    )
+                
+                return result
             except Exception as e:
                 if "Resource limit" in str(e) or "Memory limit" in str(e):
                     self._logger.error(
@@ -373,7 +446,7 @@ class ExecutionOrchestrator(BaseOrchestrator):
                     )
                     # Return resource limit result
                     end_time = time.time()
-                    return {
+                    result = {
                         "algorithm": algorithm_name,
                         "best_string": "",
                         "max_distance": -1,
@@ -390,6 +463,20 @@ class ExecutionOrchestrator(BaseOrchestrator):
                         },
                         "status": "resource_limit",
                     }
+                    
+                    # Emit algorithm finished event for resource limit
+                    if monitoring_service:
+                        monitoring_service.report_algorithm_finished(
+                            algorithm_name=algorithm_name,
+                            success=False,
+                            best_string="",
+                            max_distance=-1,
+                            execution_time=end_time - start_time,
+                            metadata={"error": str(e), "resource_limit_exceeded": True},
+                            repetition_number=repetition_number,
+                        )
+                    
+                    return result
                 else:
                     # Re-raise other exceptions
                     raise
@@ -418,13 +505,39 @@ class ExecutionOrchestrator(BaseOrchestrator):
                 {"status": "completed", "result": result, "end_time": end_time}
             )
 
+            # Emit algorithm finished event if monitoring service available
+            if monitoring_service:
+                monitoring_service.report_algorithm_finished(
+                    algorithm_name=algorithm_name,
+                    success=True,
+                    best_string=best_string,
+                    max_distance=max_distance,
+                    execution_time=end_time - start_time,
+                    metadata=metadata,
+                    repetition_number=repetition_number,
+                )
+
             return result
 
         except Exception as e:
             # Registra erro
+            end_time = time.time()
             self._executions[execution_id].update(
-                {"status": "failed", "error": str(e), "end_time": time.time()}
+                {"status": "failed", "error": str(e), "end_time": end_time}
             )
+            
+            # Emit algorithm finished event for error
+            if monitoring_service:
+                monitoring_service.report_algorithm_finished(
+                    algorithm_name=algorithm_name,
+                    success=False,
+                    best_string="",
+                    max_distance=-1,
+                    execution_time=end_time - start_time,
+                    metadata={"error": str(e)},
+                    repetition_number=repetition_number,
+                )
+            
             raise AlgorithmExecutionError(
                 f"Erro na execução de '{algorithm_name}': {e}"
             )
@@ -449,12 +562,12 @@ class ExecutionOrchestrator(BaseOrchestrator):
 
         # Determinar tipo de monitoramento
         if monitoring_service:
-            from src.presentation.monitoring.interfaces import TaskType
+            from src.application.monitoring.progress_events import TaskType
 
             task_type = getattr(TaskType, task_type_str.upper(), TaskType.EXECUTION)
             # Extrair nome do batch da metadata
             batch_name = batch_config.get("metadata", {}).get("name", "Batch")
-            monitoring_service.start_monitoring(task_type, batch_name, batch_config)
+            monitoring_service.start_task(task_type, batch_name, batch_config)
 
         results = []
 
@@ -530,7 +643,7 @@ class ExecutionOrchestrator(BaseOrchestrator):
         for execution in executions:
             execution_index += 1
             execution_name = execution.get("name", f"Execution {execution_index}")
-            
+
             # Notificar início da execução
             if monitoring_service:
                 monitoring_service.notify_execution_started(
@@ -539,14 +652,14 @@ class ExecutionOrchestrator(BaseOrchestrator):
                         "index": execution_index,
                         "total_executions": len(executions),
                         "datasets": execution.get("datasets", []),
-                        "algorithms": execution.get("algorithms", [])
-                    }
+                        "algorithms": execution.get("algorithms", []),
+                    },
                 )
 
             # Iterar sobre datasets primeiro
             dataset_ids = execution["datasets"]
             algorithm_ids = execution["algorithms"]
-            
+
             for dataset_idx, dataset_id in enumerate(dataset_ids, 1):
 
                 dataset_config = next(
@@ -582,7 +695,7 @@ class ExecutionOrchestrator(BaseOrchestrator):
                         unique_algorithms = set(algorithm_config["algorithms"])
 
                         # Atualizar hierarquia de dataset (que já inclui execução)
-                        from src.presentation.monitoring.interfaces import (
+                        from src.application.monitoring.progress_events import (
                             ExecutionLevel,
                         )
 
@@ -697,6 +810,7 @@ class ExecutionOrchestrator(BaseOrchestrator):
             else:
                 # Create a local SessionManager as fallback
                 from src.infrastructure import SessionManager
+
                 session_manager = SessionManager(self._current_batch_config or {})
                 session_folder = session_manager.create_session()
                 results_dir = Path(session_manager.get_result_dir())
@@ -705,6 +819,7 @@ class ExecutionOrchestrator(BaseOrchestrator):
         except Exception as e:
             # Fallback para diretório padrão
             import time
+
             timestamp = time.strftime("%Y%m%d_%H%M%S")
             results_dir = Path("outputs") / timestamp
             print(f"📁 Usando diretório fallback: {results_dir}, erro: {e}")
@@ -797,7 +912,7 @@ class ExecutionOrchestrator(BaseOrchestrator):
                 execution_algorithms.update(algo_config["algorithms"])
 
         # Atualizar hierarquia de execução
-        from src.presentation.monitoring.interfaces import ExecutionLevel
+        from src.application.monitoring.progress_events import ExecutionLevel
 
         # Obter total de execuções do contexto (será passado pelo orchestrator)
         # Por enquanto, usando o index como fallback
@@ -1389,22 +1504,45 @@ class ExecutionOrchestrator(BaseOrchestrator):
                 try:
                     # Inicializar monitoramento se disponível
                     if monitoring_service:
-                        from src.presentation.monitoring.interfaces import (
-                            HierarchicalContext,
-                        )
-
-                        context = HierarchicalContext(
-                            execution_id=execution_context.get("execution_id", "unknown"),
-                            dataset_id=execution_context.get("dataset_id", "unknown"),
-                            config_id=execution_context.get("config_id", "unknown"),
-                            algorithm_id=algorithm_name,
-                            repetition_id=f"{rep_number}/{repetitions}",
-                        )
                         # Iniciar item antes da execução
-                        monitoring_service.start_item(rep_id, "repetition", context)
+                        monitoring_service.start_item(rep_id, "repetition")
 
                     # Obter resultado da função estática
                     returned_rep_num, result_data = future.result()
+
+                    # Processar warnings coletados durante execução paralela
+                    if monitoring_service and isinstance(result_data, dict):
+                        # Emitir warnings individuais
+                        warnings = result_data.get("warnings", [])
+                        for warning_data in warnings:
+                            monitoring_service.report_warning(
+                                algorithm_name=warning_data.get(
+                                    "algorithm", algorithm_name
+                                ),
+                                warning_message=warning_data.get("message", ""),
+                                item_id=rep_id,
+                                repetition_number=warning_data.get(
+                                    "repetition", returned_rep_num
+                                ),
+                                execution_context={
+                                    "execution_type": "batch_parallel",
+                                    "timestamp": warning_data.get("timestamp"),
+                                    "dataset_id": execution_context.get(
+                                        "dataset_id", "unknown"
+                                    ),
+                                    "algorithm_params": execution_context.get(
+                                        "algorithm_params", {}
+                                    ),
+                                },
+                            )
+
+                        # Log progresso histórico se disponível
+                        progress_history = result_data.get("progress_history", [])
+                        if progress_history:
+                            self._logger.debug(
+                                f"Collected {len(progress_history)} progress entries for rep {returned_rep_num}"
+                            )
+                            # Os dados de progresso são mantidos no resultado para análise posterior
 
                     # Verificar se houve erro (result_data contém 'error')
                     if isinstance(result_data, dict) and "error" in result_data:
@@ -1439,6 +1577,17 @@ class ExecutionOrchestrator(BaseOrchestrator):
                                 error_result,
                                 result_data.get("error", "Unknown error"),
                             )
+                            
+                            # Emit algorithm finished event for error in parallel execution
+                            monitoring_service.report_algorithm_finished(
+                                algorithm_name=algorithm_name,
+                                success=False,
+                                best_string="",
+                                max_distance=-1,
+                                execution_time=0.0,
+                                metadata={"error": result_data.get("error", "Unknown error")},
+                                repetition_number=returned_rep_num,
+                            )
 
                         results.append(error_result)
                     else:
@@ -1465,6 +1614,9 @@ class ExecutionOrchestrator(BaseOrchestrator):
                             "distance": result_data.get("distance", 0),
                             "execution_time": result_data.get("execution_time", 0.0),
                             "metadata": result_data.get("metadata", {}),
+                            # Adicionar dados coletados de monitoramento
+                            "warnings": result_data.get("warnings", []),
+                            "progress_history": result_data.get("progress_history", []),
                         }
 
                         # Notificar monitoramento de conclusão com progresso 100%
@@ -1477,6 +1629,17 @@ class ExecutionOrchestrator(BaseOrchestrator):
                                 item_id=rep_id,
                             )
                             monitoring_service.finish_item(rep_id, True, success_result)
+                            
+                            # Emit algorithm finished event for success in parallel execution
+                            monitoring_service.report_algorithm_finished(
+                                algorithm_name=algorithm_name,
+                                success=True,
+                                best_string=result_data.get("best_string", ""),
+                                max_distance=result_data.get("distance", 0),
+                                execution_time=result_data.get("execution_time", 0.0),
+                                metadata=result_data.get("metadata", {}),
+                                repetition_number=returned_rep_num,
+                            )
 
                         results.append(success_result)
 
@@ -1542,24 +1705,13 @@ class ExecutionOrchestrator(BaseOrchestrator):
             try:
                 # Notificar monitoramento de novo item
                 if monitoring_service:
-                    from src.presentation.monitoring.interfaces import (
-                        HierarchicalContext,
-                    )
-
-                    context = HierarchicalContext(
-                        execution_id=execution_context.get("execution_id", "unknown"),
-                        dataset_id=execution_context.get("dataset_id", "unknown"),
-                        config_id=execution_context.get("config_id", "unknown"),
-                        algorithm_id=algorithm_name,
-                        repetition_id=f"{rep+1}/{repetitions}",
-                    )
                     # Iniciar item antes da execução
-                    monitoring_service.start_item(rep_id, "repetition", context)
-                    monitoring_service.update_item(rep_id, 0.0, "Iniciando", context)
+                    monitoring_service.start_item(rep_id, "repetition")
+                    monitoring_service.update_item(rep_id, 0.0, "Iniciando")
 
                 # Executar algoritmo
                 result = self.execute_single(
-                    algorithm_name, dataset, params, monitoring_service
+                    algorithm_name, dataset, params, monitoring_service, repetition_number=rep+1
                 )
 
                 # Adicionar informações de contexto

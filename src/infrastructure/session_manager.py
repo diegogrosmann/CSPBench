@@ -16,11 +16,11 @@ class SessionManager:
     """Manages execution sessions with folders organized by datetime."""
 
     def __init__(
-        self, 
-        config: Dict[str, Any], 
+        self,
+        config: Dict[str, Any],
         base_output_dir: Optional[str] = None,
         session_format: Optional[str] = None,
-        force_cleanup: Optional[bool] = None
+        force_cleanup: Optional[bool] = None,
     ):
         """
         Initialize the session manager.
@@ -62,17 +62,19 @@ class SessionManager:
                 self._base_output_dir = base_directory
 
         self._session_folder_format = (
-            session_format 
-            if session_format 
-            else output_config.get("structure", {}).get("session_folder_format", "%Y%m%d_%H%M%S")
+            session_format
+            if session_format
+            else output_config.get("structure", {}).get(
+                "session_folder_format", "%Y%m%d_%H%M%S"
+            )
         )
-        
+
         self._force_cleanup = (
-            force_cleanup 
-            if force_cleanup is not None 
+            force_cleanup
+            if force_cleanup is not None
             else config.get("system", {}).get("force_cleanup", False)
         )
-        
+
         logging_config = output_config.get("logging", {})
         self._log_filename = logging_config.get("filename", "cspbench.log")
 
@@ -104,8 +106,11 @@ class SessionManager:
             # Check if format contains {session_id} placeholder
             if "{session_id}" in self._session_folder_format:
                 import uuid
+
                 session_id = str(uuid.uuid4())
-                session_folder = self._session_folder_format.replace("{session_id}", session_id)
+                session_folder = self._session_folder_format.replace(
+                    "{session_id}", session_id
+                )
                 self._session_folder = session_folder
             else:
                 # Generate automatic name with timestamp
@@ -133,26 +138,36 @@ class SessionManager:
         """Return the complete directory for current session logs."""
         if not self._session_folder:
             return self._base_log_dir
-        
+
         # Use template if available from .env
-        if hasattr(self, '_base_output_dir_template') and self._base_output_dir_template:
+        if (
+            hasattr(self, "_base_output_dir_template")
+            and self._base_output_dir_template
+        ):
             if "{session}" in self._base_output_dir_template:
-                base_dir = self._base_output_dir_template.replace("{session}", self._session_folder)
+                base_dir = self._base_output_dir_template.replace(
+                    "{session}", self._session_folder
+                )
                 return base_dir
-        
+
         return os.path.join(self._base_log_dir, self._session_folder)
 
     def get_result_dir(self) -> str:
         """Return the complete directory for current session results."""
         if not self._session_folder:
             return self._base_result_dir
-        
+
         # Use template if available from .env
-        if hasattr(self, '_base_output_dir_template') and self._base_output_dir_template:
+        if (
+            hasattr(self, "_base_output_dir_template")
+            and self._base_output_dir_template
+        ):
             if "{session}" in self._base_output_dir_template:
-                base_dir = self._base_output_dir_template.replace("{session}", self._session_folder)
+                base_dir = self._base_output_dir_template.replace(
+                    "{session}", self._session_folder
+                )
                 return base_dir
-                
+
         return os.path.join(self._base_result_dir, self._session_folder)
 
     def get_session_log_path(self) -> str:

@@ -248,9 +248,15 @@ def register_commands(app: typer.Typer, experiment_service_getter) -> None:
             typer.echo(f"  • WEB_HOST: {os.getenv('WEB_HOST', 'not defined')}")
             typer.echo(f"  • WEB_PORT: {os.getenv('WEB_PORT', 'not defined')}")
             typer.echo(f"  • DATASET_PATH: {os.getenv('DATASET_PATH', 'not defined')}")
-            typer.echo(f"  • OUTPUT_BASE_DIRECTORY: {os.getenv('OUTPUT_BASE_DIRECTORY', 'not defined')}")
-            typer.echo(f"  • OUTPUT_BASE_DIRECTORY: {os.getenv('OUTPUT_BASE_DIRECTORY', 'not defined')}")
-            typer.echo(f"  • FORCE_CLEANUP: {os.getenv('FORCE_CLEANUP', 'not defined')}")
+            typer.echo(
+                f"  • OUTPUT_BASE_DIRECTORY: {os.getenv('OUTPUT_BASE_DIRECTORY', 'not defined')}"
+            )
+            typer.echo(
+                f"  • OUTPUT_BASE_DIRECTORY: {os.getenv('OUTPUT_BASE_DIRECTORY', 'not defined')}"
+            )
+            typer.echo(
+                f"  • FORCE_CLEANUP: {os.getenv('FORCE_CLEANUP', 'not defined')}"
+            )
 
         except Exception as e:
             typer.echo(f"❌ Error: {e}")

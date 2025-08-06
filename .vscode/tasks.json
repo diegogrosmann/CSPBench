@@ -48,8 +48,8 @@
         {
             "label": "Start Web Interface",
             "type": "shell",
-            "command": "${workspaceFolder}/.venv/bin/python", 
-            "args": ["-m", "uvicorn", "src.presentation.web.app:app", "--reload", "--host", "0.0.0.0", "--port", "8000"],
+            "command": "${workspaceFolder}/.venv/bin/python",
+            "args": ["main.py", "--web"],
             "group": "build",
             "isBackground": true,
             "presentation": {
