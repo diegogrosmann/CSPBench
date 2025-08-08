@@ -8,8 +8,8 @@
 # HIERARQUIA DE CONFIGURAÇÕES (ordem de precedência):
 # 1. .env                          ← MAIOR PRIORIDADE (configurações de sistema)
 # 2. batch/*.yaml                  ← Sobrepõe ESTE ARQUIVO e config.py
-# 3. ESTE ARQUIVO (settings.yaml)  ← Sobrepõe apenas algorithms/*/config.py  
-# 4. algorithms/*/config.py        ← MENOR PRIORIDADE
+# 3. ESTE ARQUIVO (settings.yaml)  ← Sobrepõe apenas algorithm_configs/*/config.py
+# 4. algorithm_configs/*/config.py ← MENOR PRIORIDADE
 #
 # Este arquivo contém APENAS configurações padrão de execução.
 # Configurações de infraestrutura estão no arquivo .env

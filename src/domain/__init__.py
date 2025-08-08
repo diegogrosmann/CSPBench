@@ -42,6 +42,47 @@ from .metrics import (
     median_distance,
     solution_quality,
 )
+from .models import (
+    # Enums
+    BatchType,
+    DatasetType,
+    Status,
+    ExportFormat,
+    
+    # Configuration Models
+    BatchMetadata,
+    DatasetConfig,
+    AlgorithmConfig,
+    AlgorithmParamsConfig,
+    TaskConfig,
+    ExecutionConfig,
+    OptimizationConfig,
+    OptimizationTaskConfig,
+    SensitivityConfig,
+    SensitivityTaskConfig,
+    ResourceConfig,
+    ExportConfig,
+    LoggingConfig,
+    ReproducibilityConfig,
+    BatchConfig,
+    
+    # Event Models
+    BaseEvent,
+    BatchStartedEvent,
+    BatchFinishedEvent,
+    RepetitionEvent,
+    RepetitionStartedEvent,
+    RepetitionProgressEvent,
+    RepetitionCallbackEvent,
+    RepetitionFinishedEvent,
+    ErrorEvent,
+    
+    # Result Models
+    AlgorithmResult,
+    OptimizationResult,
+    SensitivityResult,
+    BatchResults,
+)
 
 __all__ = [
     # Algorithms
@@ -63,6 +104,42 @@ __all__ = [
     # Dataset
     "Dataset",
     "SyntheticDatasetGenerator",
+    # Enums
+    "BatchType",
+    "DatasetType",
+    "Status",
+    "ExportFormat",
+    # Configuration Models
+    "BatchMetadata",
+    "DatasetConfig",
+    "AlgorithmConfig",
+    "AlgorithmParamsConfig",
+    "TaskConfig",
+    "ExecutionConfig",
+    "OptimizationConfig",
+    "OptimizationTaskConfig",
+    "SensitivityConfig",
+    "SensitivityTaskConfig",
+    "ResourceConfig",
+    "ExportConfig",
+    "LoggingConfig",
+    "ReproducibilityConfig",
+    "BatchConfig",
+    # Event Models
+    "BaseEvent",
+    "BatchStartedEvent",
+    "BatchFinishedEvent",
+    "RepetitionEvent",
+    "RepetitionStartedEvent",
+    "RepetitionProgressEvent",
+    "RepetitionCallbackEvent",
+    "RepetitionFinishedEvent",
+    "ErrorEvent",
+    # Result Models
+    "AlgorithmResult",
+    "OptimizationResult",
+    "SensitivityResult",
+    "BatchResults",
     # Errors
     "CSPBenchError",
     "DomainError",

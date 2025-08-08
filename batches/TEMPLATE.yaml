@@ -20,7 +20,7 @@ metadata:
   version: "1.0"                      # Batch version (string)
   creation_date: "2025-07-13"         # Creation date in YYYY-MM-DD format
   tags: ["tag1", "tag2"]              # Tags for categorization (list)
-
+ 
 # =====================================================================
 # SECTION 2: DATASETS (STANDARDIZED FOR ALL)
 # =====================================================================
@@ -69,20 +69,20 @@ datasets:
                                       # System will handle length filtering automatically
 
 # =====================================================================
-# SECTION 3: ALGORITHMS (STANDARDIZED FOR ALL)
+# SECTION 3: ALGORITHM CONFIGURATIONS (STANDARDIZED FOR ALL)
 # =====================================================================
 # Defines algorithm configurations that can be reused.
 # Allows creating parameter "presets" for different scenarios.
-algorithms:
+algorithm_configs:
   - id: "default_config"              # string: Unique configuration ID
     name: "Default Configuration"     # string: Descriptive name
     description: "Algorithms with default parameters"           # string: Detailed description
     algorithms:                       # list: List of algorithms included in this configuration
       - "Baseline"                    # Baseline algorithm (simplest)
-      - "BLF-GA"                      # Block-based Genetic Algorithm (main)
-      - "CSC"                         # Closest String with Constraints
-      - "H³-CSP"                      # Heuristic Closest String Problem
-      - "DP-CSP"                      # Dynamic Programming CSP
+ #     - "BLF-GA"                      # Block-based Genetic Algorithm (main)
+ #     - "CSC"                         # Closest String with Constraints
+ #     - "H³-CSP"                      # Heuristic Closest String Problem
+ #     - "DP-CSP"                      # Dynamic Programming CSP
     
     # Algorithm-specific parameters
     # For execution: fixed values used directly
@@ -229,24 +229,26 @@ task:
 # Use this section when task.type = "execution"
 # Runs algorithms on datasets with pre-defined parameters
 execution:
-  # List of executions to perform
-  executions:
-    - name: "Test Execution"          # string: Descriptive execution name
-      datasets:                       # list: Dataset IDs to use (reference to section 3)
+  # List of execution tasks to perform
+  tasks:
+    - id: "task_test"                 # string: Unique task ID
+      name: "Test Execution"          # string: Descriptive execution name
+      datasets:                       # list: Dataset IDs to use (reference to section 2)
         - "dataset_test"
-        - "dataset_file"
-      algorithms:
+#        - "dataset_file"
+      algorithm_configs:              # list: Algorithm configuration IDs to use (reference to section 3)
         - "default_config"
-        - "aggressive_csc"
-      repetitions: 30                  # int: Number of repetitions per combination (1-10 recommended)
+#        - "aggressive_csc"
+      repetitions: 1                  # int: Number of repetitions per combination (1-10 recommended)
                                       # Each dataset+algorithm combination will be executed N times
-    # You can add multiple executions:
-    - name: "Complete Execution"
-      datasets: 
-        - "dataset_ncbi"
-      algorithms: 
-        - "aggressive_csc"
-      repetitions: 20
+    # You can add multiple tasks:
+#    - id: "task_complete"             # string: Unique task ID
+#      name: "Complete Execution"
+#      datasets: 
+#        - "dataset_ncbi"
+#      algorithm_configs: 
+#        - "aggressive_csc"
+#      repetitions: 3
 
 # =====================================================================
 # SECTION 5B: SPECIFIC CONFIGURATION - OPTIMIZATION
@@ -273,9 +275,10 @@ optimization:
     ei_candidates: 24                 # int: Candidates for Expected Improvement
     storage: null                     # string|null: Database URL (null = in memory)
   
-  # List of optimizations to perform
-  optimizations:
-    - name: "BLF-GA Optimization"     # string: Descriptive optimization name
+  # List of optimization tasks to perform
+  tasks:
+    - id: "opt_blfga"                 # string: Unique task ID
+      name: "BLF-GA Optimization"     # string: Descriptive optimization name
       study_name: "blfga_study"       # string: Study name for identification
       direction: "minimize"           # string: Optimization direction
                                       # "minimize" = minimize objective (for distance)
@@ -285,11 +288,11 @@ optimization:
       repetitions: 1                  # int: Repetitions per trial (1-5 recommended)
                                       # Each trial will be repeated N times for statistical robustness
       
-      # Specific datasets and algorithm to optimize
+      # Specific datasets and algorithm configuration to optimize
       datasets: 
         - "dataset_test"
-        - "dataset_file"              # list: Dataset IDs to use (reference to section 3)
-      algorithm: "default_config"     # string: Algorithm configuration ID (reference to section 4)
+        - "dataset_file"              # list: Dataset IDs to use (reference to section 2)
+      algorithm_config: "default_config"     # string: Algorithm configuration ID (reference to section 3)
       
       # Parameters to optimize (override algorithm_params from section 4)
       # Supported types: int, uniform (float), categorical
@@ -331,7 +334,8 @@ optimization:
         storage: null                 # string|null: Specific database URL
     
     # Example of second optimization (you can add as many as needed)
-    - name: "CSC Optimization"
+    - id: "opt_csc"                   # string: Unique task ID
+      name: "CSC Optimization"
       study_name: "csc_study"
       direction: "minimize"
       trials: 50                      # int: Number of trials
@@ -339,7 +343,7 @@ optimization:
       repetitions: 2                  # int: Repetitions per trial
       datasets: 
         - "dataset_ncbi"
-      algorithm: "aggressive_csc"     # Reference configuration ID
+      algorithm_config: "aggressive_csc"     # Reference configuration ID
       parameters:
          "CSC":                       # Algorithm name in configuration
            min_d:
@@ -367,20 +371,21 @@ sensitivity:
     seed: 42                          # int: Global seed for reproducibility
     parallel: true                    # bool: Use parallel processing
   
-  # List of sensitivity analyses to perform
-  analyses:
-    - name: "Morris Analysis BLF-GA"  # string: Descriptive analysis name
+  # List of sensitivity analysis tasks to perform
+  tasks:
+    - id: "sens_morris_blfga"         # string: Unique task ID
+      name: "Morris Analysis BLF-GA"  # string: Descriptive analysis name
       method: "morris"                # string: Sensitivity analysis method
                                       # "morris" = Morris analysis (elementary effects) - recommended for screening
                                       # "sobol" = Sobol analysis (first order and total indices)
                                       # "fast" = FAST analysis (Fourier Amplitude Sensitivity)
                                       # "delta" = Delta method
       
-      # Specific datasets and algorithm to analyze
+      # Specific datasets and algorithm configuration to analyze
       datasets: 
-        - "dataset_test"              # list: Dataset IDs to use (reference to section 3)
+        - "dataset_test"              # list: Dataset IDs to use (reference to section 2)
         - "dataset_file"
-      algorithm: "default_config"     # string: Algorithm name to analyze
+      algorithm_config: "default_config"     # string: Algorithm configuration name to analyze
       
       # Specific analysis configurations (optional - overrides salib_defaults)
       samples: 1000                   # int: Specific number of samples
@@ -439,11 +444,12 @@ sensitivity:
         # Other options: "convergence_rate", "fitness_calls", "diversity"
     
     # Example of second analysis (you can add as many as needed)
-    - name: "Sobol Analysis CSC"
+    - id: "sens_sobol_csc"            # string: Unique task ID
+      name: "Sobol Analysis CSC"
       method: "sobol"
       datasets: 
         - "dataset_ncbi"
-      algorithm: "aggressive_csc"     # Reference configuration ID
+      algorithm_config: "aggressive_csc"     # Reference configuration ID
       samples: 2000                   # int: Number of samples
       repetitions: 5                  # int: Repetitions per sample
       parameters:

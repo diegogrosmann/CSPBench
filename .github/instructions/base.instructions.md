@@ -1,4 +1,3 @@
-````instructions
 ---
 applyTo: '**'
 ---
@@ -148,4 +147,3 @@ CONSTANT_VALUE = 42         # UPPER_SNAKE_CASE
 **Versão:** 0.1.0 | **Data:** Julho 2025 | **Status:** Ativo
 
 > Para detalhes completos, consulte os arquivos específicos mencionados em cada seção.
-````

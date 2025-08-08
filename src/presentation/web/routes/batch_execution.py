@@ -882,12 +882,12 @@ async def get_execution_progress(session_id: str):
                 "last_updated": session.get("last_updated"),
                 "session_id": session_id,
             }
-            
+
             # Include batch_structure if available
             if "batch_structure" in session:
                 response_data["batch_structure"] = session["batch_structure"]
-                
-            # Include callbacks_history if available  
+
+            # Include callbacks_history if available
             if "callbacks_history" in session:
                 response_data["callbacks_history"] = session["callbacks_history"]
 

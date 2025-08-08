@@ -253,9 +253,7 @@ class MonitoringService:
             repetition_number=repetition_number,
             session_id=self._session_id,
         )
-        self._logger.debug(
-            f"Algorithm finished: {algorithm_name} (success: {success})"
-        )
+        self._logger.debug(f"Algorithm finished: {algorithm_name} (success: {success})")
 
     def report_warning(
         self,

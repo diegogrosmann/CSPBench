@@ -425,7 +425,7 @@ class ExecutionOrchestrator(BaseOrchestrator):
                     },
                     "status": "timeout",
                 }
-                
+
                 # Emit algorithm finished event for timeout
                 if monitoring_service:
                     monitoring_service.report_algorithm_finished(
@@ -437,7 +437,7 @@ class ExecutionOrchestrator(BaseOrchestrator):
                         metadata={"error": str(e), "timeout": True},
                         repetition_number=repetition_number,
                     )
-                
+
                 return result
             except Exception as e:
                 if "Resource limit" in str(e) or "Memory limit" in str(e):
@@ -463,7 +463,7 @@ class ExecutionOrchestrator(BaseOrchestrator):
                         },
                         "status": "resource_limit",
                     }
-                    
+
                     # Emit algorithm finished event for resource limit
                     if monitoring_service:
                         monitoring_service.report_algorithm_finished(
@@ -475,7 +475,7 @@ class ExecutionOrchestrator(BaseOrchestrator):
                             metadata={"error": str(e), "resource_limit_exceeded": True},
                             repetition_number=repetition_number,
                         )
-                    
+
                     return result
                 else:
                     # Re-raise other exceptions
@@ -525,7 +525,7 @@ class ExecutionOrchestrator(BaseOrchestrator):
             self._executions[execution_id].update(
                 {"status": "failed", "error": str(e), "end_time": end_time}
             )
-            
+
             # Emit algorithm finished event for error
             if monitoring_service:
                 monitoring_service.report_algorithm_finished(
@@ -537,7 +537,7 @@ class ExecutionOrchestrator(BaseOrchestrator):
                     metadata={"error": str(e)},
                     repetition_number=repetition_number,
                 )
-            
+
             raise AlgorithmExecutionError(
                 f"Erro na execução de '{algorithm_name}': {e}"
             )
@@ -560,15 +560,8 @@ class ExecutionOrchestrator(BaseOrchestrator):
         # Detectar tipo de batch
         task_type_str = batch_config.get("task", {}).get("type", "execution")
 
-        # Determinar tipo de monitoramento
-        if monitoring_service:
-            from src.application.monitoring.progress_events import TaskType
-
-            task_type = getattr(TaskType, task_type_str.upper(), TaskType.EXECUTION)
-            # Extrair nome do batch da metadata
-            batch_name = batch_config.get("metadata", {}).get("name", "Batch")
-            monitoring_service.start_task(task_type, batch_name, batch_config)
-
+        # Monitoramento será iniciado pela camada de aplicação para evitar duplicação
+        
         results = []
 
         self._logger.debug(f"Task type detectado: {task_type_str}")
@@ -620,17 +613,17 @@ class ExecutionOrchestrator(BaseOrchestrator):
 
         # Nova estrutura com datasets e algoritmos por ID
         datasets_config = batch_config.get("datasets", [])
-        algorithms_config = batch_config.get("algorithms", [])
-        executions = batch_config["execution"]["executions"]
+        algorithm_configs = batch_config.get("algorithm_configs", [])
+        tasks = batch_config["execution"]["tasks"]
 
         self._logger.debug(f"Datasets: {len(datasets_config)}")
-        self._logger.debug(f"Algorithms: {len(algorithms_config)}")
-        self._logger.debug(f"Executions: {len(executions)}")
+        self._logger.debug(f"Algorithm configs: {len(algorithm_configs)}")
+        self._logger.debug(f"Tasks: {len(tasks)}")
 
         # Inicializar dados de monitoramento
         if monitoring_service:
             self._setup_monitoring_data(
-                executions, datasets_config, algorithms_config, monitoring_service
+                tasks, datasets_config, algorithm_configs, monitoring_service
             )
 
         from src.infrastructure import FileDatasetRepository
@@ -638,27 +631,27 @@ class ExecutionOrchestrator(BaseOrchestrator):
         dataset_repo = FileDatasetRepository("./datasets")
 
         results = []
-        execution_index = 0
+        task_index = 0
 
-        for execution in executions:
-            execution_index += 1
-            execution_name = execution.get("name", f"Execution {execution_index}")
+        for task in tasks:
+            task_index += 1
+            task_id = task.get("id", f"task_{task_index}")
 
             # Notificar início da execução
             if monitoring_service:
                 monitoring_service.notify_execution_started(
-                    execution_name=execution_name,
+                    execution_name=task_id,
                     metadata={
-                        "index": execution_index,
-                        "total_executions": len(executions),
-                        "datasets": execution.get("datasets", []),
-                        "algorithms": execution.get("algorithms", []),
+                        "index": task_index,
+                        "total_tasks": len(tasks),
+                        "datasets": task.get("datasets", []),
+                        "algorithm_configs": task.get("algorithm_configs", []),
                     },
                 )
 
             # Iterar sobre datasets primeiro
-            dataset_ids = execution["datasets"]
-            algorithm_ids = execution["algorithms"]
+            dataset_ids = task["datasets"]
+            algorithm_config_ids = task["algorithm_configs"]
 
             for dataset_idx, dataset_id in enumerate(dataset_ids, 1):
 
@@ -668,7 +661,7 @@ class ExecutionOrchestrator(BaseOrchestrator):
                 if not dataset_config:
                     results.append(
                         {
-                            "execution_name": execution.get("name", "unknown"),
+                            "task_id": task.get("id", "unknown"),
                             "dataset_id": dataset_id,
                             "status": "error",
                             "error": f"Dataset com ID '{dataset_id}' não encontrado",
@@ -677,15 +670,15 @@ class ExecutionOrchestrator(BaseOrchestrator):
                     continue
 
                 # Iterar sobre configurações de algoritmo para este dataset
-                for algo_config_idx, algorithm_id in enumerate(algorithm_ids, 1):
+                for algo_config_idx, algorithm_config_id in enumerate(algorithm_config_ids, 1):
 
                     # Resolver configuração do algoritmo
                     algorithm_config = next(
-                        (a for a in algorithms_config if a["id"] == algorithm_id), None
+                        (a for a in algorithm_configs if a["id"] == algorithm_config_id), None
                     )
                     if not algorithm_config:
                         self._logger.error(
-                            f"Algoritmo com ID '{algorithm_id}' não encontrado"
+                            f"Algoritmo com ID '{algorithm_config_id}' não encontrado"
                         )
                         continue
 
@@ -711,26 +704,26 @@ class ExecutionOrchestrator(BaseOrchestrator):
                         if monitoring_service:
                             monitoring_service.update_hierarchy(
                                 level=ExecutionLevel.DATASET,
-                                level_id=f"{dataset_id}_{algorithm_id}",
+                                level_id=f"{dataset_id}_{algorithm_config_id}",
                                 progress=0.0,
                                 message=f"Processando dataset {dataset_name}",
                                 data={
-                                    "execution_name": execution_name,
-                                    "config_index": execution_index,
-                                    "total_configs": len(executions),
+                                    "task_id": task_id,
+                                    "config_index": task_index,
+                                    "total_configs": len(tasks),
                                     "dataset_name": dataset_name,
                                     "dataset_index": dataset_idx,
                                     "total_datasets": len(dataset_ids),
                                     "algorithm_config_name": algorithm_config_name,
                                     "algorithm_config_index": algo_config_idx,
-                                    "total_algorithm_configs": len(algorithm_ids),
+                                    "total_algorithm_configs": len(algorithm_config_ids),
                                     "total_algorithms": len(unique_algorithms),
                                 },
                             )
 
                     # Carregar dataset e executar algoritmos desta configuração
                     dataset_results = self._execute_dataset_algorithms_for_config(
-                        execution,
+                        task,
                         dataset_config,
                         dataset_id,
                         dataset_repo,
@@ -864,21 +857,21 @@ class ExecutionOrchestrator(BaseOrchestrator):
 
     # Métodos auxiliares para organização do código...
     def _setup_monitoring_data(
-        self, executions, datasets_config, algorithms_config, monitoring_service
+        self, tasks, datasets_config, algorithm_configs, monitoring_service
     ):
         """Configura dados iniciais de monitoramento."""
-        # Calcular totais de datasets considerando todas as execuções
+        # Calcular totais de datasets considerando todas as tasks
         total_dataset_executions = 0
-        for execution in executions:
-            total_dataset_executions += len(execution.get("datasets", []))
+        for task in tasks:
+            total_dataset_executions += len(task.get("datasets", []))
 
         # Contar total de algoritmos únicos
         unique_algorithms = set()
-        for execution in executions:
-            algorithm_ids = execution["algorithms"]
-            for algorithm_id in algorithm_ids:
+        for task in tasks:
+            algorithm_config_ids = task["algorithm_configs"]
+            for algorithm_config_id in algorithm_config_ids:
                 algorithm_config = next(
-                    (a for a in algorithms_config if a["id"] == algorithm_id), None
+                    (a for a in algorithm_configs if a["id"] == algorithm_config_id), None
                 )
                 if algorithm_config:
                     algorithms_list = algorithm_config["algorithms"]
@@ -896,7 +889,7 @@ class ExecutionOrchestrator(BaseOrchestrator):
         self,
         execution,
         execution_index,
-        execution_name,
+        task_id,
         datasets_config,
         algorithms_config,
         monitoring_service,
@@ -922,11 +915,11 @@ class ExecutionOrchestrator(BaseOrchestrator):
         if monitoring_service:
             monitoring_service.update_hierarchy(
                 level=ExecutionLevel.EXECUTION,
-                level_id=execution_name,
+                level_id=task_id,
                 progress=0.0,
-                message=f"Iniciando execução {execution_name}",
+                message=f"Iniciando execução {task_id}",
                 data={
-                    "execution_name": execution_name,
+                    "task_id": task_id,
                     "config_index": execution_index,
                     "total_configs": total_executions,
                 },
@@ -934,7 +927,7 @@ class ExecutionOrchestrator(BaseOrchestrator):
 
     def _execute_dataset_algorithms_for_config(
         self,
-        execution,
+        task,
         dataset_config,
         dataset_id,
         dataset_repo,
@@ -951,7 +944,7 @@ class ExecutionOrchestrator(BaseOrchestrator):
                 self._logger.error(error_msg)
                 return [
                     {
-                        "execution_name": execution.get("name", "unknown"),
+                        "task_id": task.get("id", "unknown"),
                         "dataset_id": dataset_id,
                         "status": "error",
                         "error": error_msg,
@@ -1030,7 +1023,7 @@ class ExecutionOrchestrator(BaseOrchestrator):
             # Execute algorithms for this configuration
             algorithm_names = algorithm_config["algorithms"]
             algorithm_params = algorithm_config.get("algorithm_params", {})
-            repetitions = execution.get("repetitions", 1)
+            repetitions = task.get("repetitions", 1)
 
             for algorithm_name in algorithm_names:
                 # Obter parâmetros específicos do algoritmo
@@ -1043,10 +1036,9 @@ class ExecutionOrchestrator(BaseOrchestrator):
                     params=params,
                     repetitions=repetitions,
                     execution_context={
-                        "execution_name": execution.get("name", "unknown"),
-                        "execution_id": execution.get("name", "unknown"),
+                        "task_id": task.get("id", "unknown"),
                         "dataset_id": dataset_id,
-                        "algorithm_id": algorithm_config["id"],
+                        "algorithm_config_id": algorithm_config["id"],
                         "config_id": algorithm_config["id"],
                     },
                     monitoring_service=monitoring_service,
@@ -1060,7 +1052,7 @@ class ExecutionOrchestrator(BaseOrchestrator):
             )
             results.append(
                 {
-                    "execution_name": execution.get("name", "unknown"),
+                    "task_id": task.get("id", "unknown"),
                     "dataset_id": dataset_id,
                     "status": "error",
                     "error": str(e),
@@ -1116,9 +1108,7 @@ class ExecutionOrchestrator(BaseOrchestrator):
             # Adicionar informações de contexto
             result.update(
                 {
-                    "execution_name": execution_context.get(
-                        "execution_name", "unknown"
-                    ),
+                    "task_id": execution_context.get("task_id", "unknown"),
                     "dataset_id": execution_context.get("dataset_id", "unknown"),
                     "algorithm_id": execution_context.get("algorithm_id", "unknown"),
                     "algorithm_name": algorithm_name,
@@ -1159,9 +1149,7 @@ class ExecutionOrchestrator(BaseOrchestrator):
                         "alphabet": dataset_data["alphabet"],
                     },
                     "status": "completed",
-                    "execution_name": execution_context.get(
-                        "execution_name", "unknown"
-                    ),
+                    "task_id": execution_context.get("task_id", "unknown"),
                     "dataset_id": execution_context.get("dataset_id", "unknown"),
                     "algorithm_id": execution_context.get("algorithm_id", "unknown"),
                     "algorithm_name": algorithm_name,
@@ -1174,7 +1162,7 @@ class ExecutionOrchestrator(BaseOrchestrator):
 
         except Exception as e:
             error_result = {
-                "execution_name": execution_context.get("execution_name", "unknown"),
+                "task_id": execution_context.get("task_id", "unknown"),
                 "dataset_id": execution_context.get("dataset_id", "unknown"),
                 "algorithm_id": execution_context.get("algorithm_id", "unknown"),
                 "algorithm_name": algorithm_name,
@@ -1303,7 +1291,7 @@ class ExecutionOrchestrator(BaseOrchestrator):
                     )
                     results.append(
                         {
-                            "execution_name": execution.get("name", "unknown"),
+                            "task_id": execution.get("id", "unknown"),
                             "dataset_id": dataset_id,
                             "algorithm_id": algorithm_id,
                             "status": "error",
@@ -1327,8 +1315,7 @@ class ExecutionOrchestrator(BaseOrchestrator):
                         params=params,
                         repetitions=repetitions,
                         execution_context={
-                            "execution_name": execution.get("name", "unknown"),
-                            "execution_id": execution.get("name", "unknown"),
+                            "task_id": execution.get("id", "unknown"),
                             "dataset_id": dataset_id,
                             "algorithm_id": algorithm_id,
                             "config_id": algorithm_id,
@@ -1344,7 +1331,7 @@ class ExecutionOrchestrator(BaseOrchestrator):
             )
             results.append(
                 {
-                    "execution_name": execution.get("name", "unknown"),
+                    "task_id": execution.get("id", "unknown"),
                     "dataset_id": dataset_id,
                     "status": "error",
                     "error": f"Erro no dataset: {e}",
@@ -1552,9 +1539,7 @@ class ExecutionOrchestrator(BaseOrchestrator):
 
                         # Criar resultado de erro compatível
                         error_result = {
-                            "execution_name": execution_context.get(
-                                "execution_name", "unknown"
-                            ),
+                            "task_id": execution_context.get("task_id", "unknown"),
                             "dataset_id": execution_context.get(
                                 "dataset_id", "unknown"
                             ),
@@ -1577,7 +1562,7 @@ class ExecutionOrchestrator(BaseOrchestrator):
                                 error_result,
                                 result_data.get("error", "Unknown error"),
                             )
-                            
+
                             # Emit algorithm finished event for error in parallel execution
                             monitoring_service.report_algorithm_finished(
                                 algorithm_name=algorithm_name,
@@ -1585,7 +1570,9 @@ class ExecutionOrchestrator(BaseOrchestrator):
                                 best_string="",
                                 max_distance=-1,
                                 execution_time=0.0,
-                                metadata={"error": result_data.get("error", "Unknown error")},
+                                metadata={
+                                    "error": result_data.get("error", "Unknown error")
+                                },
                                 repetition_number=returned_rep_num,
                             )
 
@@ -1597,9 +1584,7 @@ class ExecutionOrchestrator(BaseOrchestrator):
 
                         # Criar resultado de sucesso compatível
                         success_result = {
-                            "execution_name": execution_context.get(
-                                "execution_name", "unknown"
-                            ),
+                            "task_id": execution_context.get("task_id", "unknown"),
                             "dataset_id": execution_context.get(
                                 "dataset_id", "unknown"
                             ),
@@ -1629,7 +1614,7 @@ class ExecutionOrchestrator(BaseOrchestrator):
                                 item_id=rep_id,
                             )
                             monitoring_service.finish_item(rep_id, True, success_result)
-                            
+
                             # Emit algorithm finished event for success in parallel execution
                             monitoring_service.report_algorithm_finished(
                                 algorithm_name=algorithm_name,
@@ -1649,9 +1634,7 @@ class ExecutionOrchestrator(BaseOrchestrator):
                     )
 
                     error_result = {
-                        "execution_name": execution_context.get(
-                            "execution_name", "unknown"
-                        ),
+                        "task_id": execution_context.get("task_id", "unknown"),
                         "dataset_id": execution_context.get("dataset_id", "unknown"),
                         "algorithm_id": execution_context.get(
                             "algorithm_id", "unknown"
@@ -1711,15 +1694,17 @@ class ExecutionOrchestrator(BaseOrchestrator):
 
                 # Executar algoritmo
                 result = self.execute_single(
-                    algorithm_name, dataset, params, monitoring_service, repetition_number=rep+1
+                    algorithm_name,
+                    dataset,
+                    params,
+                    monitoring_service,
+                    repetition_number=rep + 1,
                 )
 
                 # Adicionar informações de contexto
                 result.update(
                     {
-                        "execution_name": execution_context.get(
-                            "execution_name", "unknown"
-                        ),
+                        "task_id": execution_context.get("task_id", "unknown"),
                         "dataset_id": execution_context.get("dataset_id", "unknown"),
                         "algorithm_id": execution_context.get(
                             "algorithm_id", "unknown"
@@ -1747,9 +1732,7 @@ class ExecutionOrchestrator(BaseOrchestrator):
                 )
 
                 error_result = {
-                    "execution_name": execution_context.get(
-                        "execution_name", "unknown"
-                    ),
+                    "task_id": execution_context.get("task_id", "unknown"),
                     "dataset_id": execution_context.get("dataset_id", "unknown"),
                     "algorithm_id": execution_context.get("algorithm_id", "unknown"),
                     "algorithm_name": algorithm_name,

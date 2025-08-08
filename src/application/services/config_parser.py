@@ -52,7 +52,7 @@ class DatasetConfig:
 
 @dataclass
 class AlgorithmConfig:
-    """Algorithm configuration matching TEMPLATE.yaml Section 4."""
+    """Algorithm configuration matching TEMPLATE.yaml Section 3."""
 
     id: str
     name: str
@@ -63,25 +63,27 @@ class AlgorithmConfig:
 
 @dataclass
 class TaskConfig:
-    """Task configuration matching TEMPLATE.yaml Section 5."""
+    """Task configuration matching TEMPLATE.yaml Section 4."""
 
     type: str  # "execution", "optimization", "sensitivity"
 
 
 @dataclass
 class ExecutionConfig:
-    """Execution configuration matching TEMPLATE.yaml Section 6A."""
+    """Execution configuration matching TEMPLATE.yaml Section 5A."""
 
+    id: str
     name: str
     datasets: List[str]
-    algorithms: List[str]
+    algorithm_configs: List[str]
     repetitions: int
 
 
 @dataclass
 class OptimizationConfig:
-    """Optimization configuration matching TEMPLATE.yaml Section 6B."""
+    """Optimization configuration matching TEMPLATE.yaml Section 5B."""
 
+    id: str
     name: str
     study_name: str
     direction: str
@@ -89,19 +91,20 @@ class OptimizationConfig:
     timeout_per_trial: int
     repetitions: int
     datasets: List[str]
-    algorithm: str
+    algorithm_config: str
     parameters: Dict[str, Any]
     optuna_config: Optional[Dict[str, Any]] = None
 
 
 @dataclass
 class SensitivityConfig:
-    """Sensitivity configuration matching TEMPLATE.yaml Section 6C."""
+    """Sensitivity configuration matching TEMPLATE.yaml Section 5C."""
 
+    id: str
     name: str
     method: str  # "morris", "sobol", "fast", "delta"
     datasets: List[str]
-    algorithm: str
+    algorithm_config: str
     samples: int
     repetitions: int
     parameters: Dict[str, Any]
@@ -252,8 +255,8 @@ class BatchConfig:
     metadata: BatchMetadata
     infrastructure: Optional[InfrastructureConfig] = None
     datasets: List[DatasetConfig] = field(default_factory=list)
-    algorithms: List[AlgorithmConfig] = field(default_factory=list)
-    task: TaskConfig = None
+    algorithm_configs: List[AlgorithmConfig] = field(default_factory=list)
+    task: Optional[TaskConfig] = None
     execution: Optional[Dict[str, Any]] = None
     optimization: Optional[Dict[str, Any]] = None
     sensitivity: Optional[Dict[str, Any]] = None
@@ -359,8 +362,8 @@ class ConfigParser:
 
     @staticmethod
     def parse_algorithms(config: Dict[str, Any]) -> List[AlgorithmConfig]:
-        """Parse algorithms section (Section 4)."""
-        algorithms_section = config.get("algorithms", [])
+        """Parse algorithm_configs section (Section 3)."""
+        algorithms_section = config.get("algorithm_configs", [])
 
         algorithms = []
         for alg_data in algorithms_section:
@@ -403,31 +406,32 @@ class ConfigParser:
 
     @staticmethod
     def parse_execution(config: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """Parse execution section (Section 6A)."""
+        """Parse execution section (Section 5A)."""
         execution_section = config.get("execution")
         if not execution_section:
             return None
 
-        executions = []
-        for exec_data in execution_section.get("executions", []):
+        tasks = []
+        for task_data in execution_section.get("tasks", []):
             # Validate required fields
-            required_fields = ["name", "datasets", "algorithms", "repetitions"]
+            required_fields = ["id", "name", "datasets", "algorithm_configs", "repetitions"]
             for field in required_fields:
-                if field not in exec_data:
+                if field not in task_data:
                     raise BatchConfigurationError(
-                        f"Missing required execution field: {field}"
+                        f"Missing required execution task field: {field}"
                     )
 
-            executions.append(
+            tasks.append(
                 ExecutionConfig(
-                    name=exec_data["name"],
-                    datasets=exec_data["datasets"],
-                    algorithms=exec_data["algorithms"],
-                    repetitions=exec_data["repetitions"],
+                    id=task_data["id"],
+                    name=task_data["name"],
+                    datasets=task_data["datasets"],
+                    algorithm_configs=task_data["algorithm_configs"],
+                    repetitions=task_data["repetitions"],
                 )
             )
 
-        return {"executions": executions}
+        return {"tasks": tasks}
 
     @staticmethod
     def parse_optimization(config: Dict[str, Any]) -> Optional[Dict[str, Any]]:
@@ -447,15 +451,16 @@ class ConfigParser:
 
         # Parse individual optimizations
         optimizations = []
-        for opt_data in optimization_section.get("optimizations", []):
+        for opt_data in optimization_section.get("tasks", []):
             # Validate required fields
             required_fields = [
+                "id",
                 "name",
                 "study_name",
                 "direction",
                 "trials",
                 "datasets",
-                "algorithm",
+                "algorithm_config",
                 "parameters",
             ]
             for field in required_fields:
@@ -472,6 +477,7 @@ class ConfigParser:
 
             optimizations.append(
                 OptimizationConfig(
+                    id=opt_data["id"],
                     name=opt_data["name"],
                     study_name=opt_data["study_name"],
                     direction=opt_data["direction"],
@@ -479,7 +485,7 @@ class ConfigParser:
                     timeout_per_trial=opt_data.get("timeout_per_trial", 300),
                     repetitions=opt_data.get("repetitions", 1),
                     datasets=opt_data["datasets"],
-                    algorithm=opt_data["algorithm"],
+                    algorithm_config=opt_data["algorithm_config"],
                     parameters=opt_data["parameters"],
                     optuna_config=opt_data.get("optuna_config"),
                 )
@@ -488,7 +494,7 @@ class ConfigParser:
         return {
             "method": method,
             "optuna_defaults": optuna_defaults,
-            "optimizations": optimizations,
+            "tasks": optimizations,
         }
 
     @staticmethod
@@ -509,13 +515,14 @@ class ConfigParser:
 
         # Parse individual analyses
         analyses = []
-        for analysis_data in sensitivity_section.get("analyses", []):
+        for analysis_data in sensitivity_section.get("tasks", []):
             # Validate required fields
             required_fields = [
+                "id",
                 "name",
                 "method",
                 "datasets",
-                "algorithm",
+                "algorithm_config",
                 "parameters",
                 "output_metrics",
             ]
@@ -534,10 +541,11 @@ class ConfigParser:
 
             analyses.append(
                 SensitivityConfig(
+                    id=analysis_data["id"],
                     name=analysis_data["name"],
                     method=analysis_data["method"],
                     datasets=analysis_data["datasets"],
-                    algorithm=analysis_data["algorithm"],
+                    algorithm_config=analysis_data["algorithm_config"],
                     samples=analysis_data.get(
                         "samples", salib_defaults.get("samples", 1000)
                     ),
@@ -553,7 +561,7 @@ class ConfigParser:
         return {
             "method": method,
             "salib_defaults": salib_defaults,
-            "analyses": analyses,
+            "tasks": analyses,
         }
 
     @staticmethod
@@ -718,7 +726,7 @@ class ConfigParser:
             metadata=metadata,
             infrastructure=infrastructure,
             datasets=datasets,
-            algorithms=algorithms,
+            algorithm_configs=algorithms,
             task=task,
             execution=execution,
             optimization=optimization,
@@ -771,9 +779,9 @@ def save_batch_config(config: BatchConfig, output_path: Union[str, Path]) -> Non
             for ds in config.datasets
         ]
 
-    # Add algorithms
-    if config.algorithms:
-        config_dict["algorithms"] = [
+    # Add algorithm_configs
+    if config.algorithm_configs:
+        config_dict["algorithm_configs"] = [
             {
                 "id": alg.id,
                 "name": alg.name,
@@ -781,11 +789,12 @@ def save_batch_config(config: BatchConfig, output_path: Union[str, Path]) -> Non
                 "algorithms": alg.algorithms,
                 "algorithm_params": alg.algorithm_params,
             }
-            for alg in config.algorithms
+            for alg in config.algorithm_configs
         ]
 
     # Add task
-    config_dict["task"] = {"type": config.task.type}
+    if config.task:
+        config_dict["task"] = {"type": config.task.type}
 
     # Add task-specific configurations
     if config.execution:
@@ -849,168 +858,8 @@ def save_batch_config(config: BatchConfig, output_path: Union[str, Path]) -> Non
         )
 
     @staticmethod
-    def parse_optimization_configs(
-        config: Dict[str, Any],
-    ) -> List["OptimizationConfig"]:
-        """Extract optimization configurations for legacy compatibility."""
-        optimization_section = config.get("optimization", {})
-        if not optimization_section:
-            raise OptimizationConfigurationError("optimization section not found")
-
-        # Support new structure (optimizations) and legacy (direct fields)
-        optimizations_list = optimization_section.get("optimizations")
-
-        if optimizations_list is not None:
-            # New structure: list of optimizations
-            return [
-                ConfigParser._parse_single_optimization(opt_config)
-                for opt_config in optimizations_list
-            ]
-        else:
-            # Legacy structure: single configuration
-            legacy_config = optimization_section.copy()
-
-            # Ensure required fields for legacy structure
-            if "target_dataset" in legacy_config:
-                legacy_config["datasets"] = [legacy_config.pop("target_dataset")]
-            if "target_datasets" in legacy_config:
-                legacy_config["datasets"] = legacy_config.pop("target_datasets")
-
-            if "nome" not in legacy_config and "name" not in legacy_config:
-                legacy_config["name"] = (
-                    f"Optimization {legacy_config.get('target_algorithm', legacy_config.get('algorithm', 'Unknown'))}"
-                )
-
-            return [ConfigParser._parse_single_optimization(legacy_config)]
-
-    @staticmethod
-    def _parse_single_optimization(opt_config: Dict[str, Any]) -> "OptimizationConfig":
-        """Parse a single optimization configuration."""
-        required_fields = ["algorithm", "parameters"]
-        for field in required_fields:
-            if field not in opt_config and f"target_{field}" not in opt_config:
-                raise OptimizationConfigurationError(
-                    f"Required field missing: {field} or target_{field}"
-                )
-
-        return OptimizationConfig(
-            name=opt_config.get("name", opt_config.get("nome", "Unnamed optimization")),
-            study_name=opt_config.get("study_name", "default_study"),
-            direction=opt_config.get("direction", "minimize"),
-            trials=opt_config.get("trials", opt_config.get("n_trials", 100)),
-            timeout_per_trial=opt_config.get("timeout_per_trial", 300),
-            repetitions=opt_config.get("repetitions", 1),
-            target_datasets=opt_config.get(
-                "datasets", opt_config.get("target_datasets", [])
-            ),
-            target_algorithm=opt_config.get(
-                "algorithm", opt_config.get("target_algorithm", "")
-            ),
-            parameters=opt_config["parameters"],
-            optuna_config=opt_config.get("optuna_config"),
-        )
-
-    @staticmethod
-    def parse_sensitivity_configs(config: Dict[str, Any]) -> List["SensitivityConfig"]:
-        """Extract sensitivity analysis configurations for legacy compatibility."""
-        sensitivity_section = config.get("sensitivity", {})
-        if not sensitivity_section:
-            raise SensitivityConfigurationError("sensitivity section not found")
-
-        # Extract global configurations
-        global_config = sensitivity_section.get(
-            "salib_defaults", sensitivity_section.get("global_salib_config", {})
-        )
-        global_samples = global_config.get(
-            "samples", global_config.get("n_samples", 1000)
-        )
-        global_repetitions = global_config.get(
-            "repetitions", global_config.get("repetitions_per_sample", 3)
-        )
-
-        # Support new structure (analyses) and legacy (direct fields)
-        analyses_list = sensitivity_section.get("analyses")
-
-        if analyses_list is not None:
-            return [
-                ConfigParser._parse_single_sensitivity(
-                    sens_config, global_samples, global_repetitions
-                )
-                for sens_config in analyses_list
-            ]
-        else:
-            # Legacy structure: single configuration
-            legacy_config = sensitivity_section.copy()
-
-            if "target_dataset" in legacy_config:
-                legacy_config["datasets"] = [legacy_config.pop("target_dataset")]
-            if "target_datasets" in legacy_config:
-                legacy_config["datasets"] = legacy_config.pop("target_datasets")
-
-            if "nome" not in legacy_config and "name" not in legacy_config:
-                legacy_config["name"] = (
-                    f"Analysis {legacy_config.get('target_algorithm', legacy_config.get('algorithm', 'Unknown'))}"
-                )
-
-            return [
-                ConfigParser._parse_single_sensitivity(
-                    legacy_config, global_samples, global_repetitions
-                )
-            ]
-
-    @staticmethod
-    def _parse_single_sensitivity(
-        sens_config: Dict[str, Any],
-        global_samples: int = 1000,
-        global_repetitions: int = 3,
-    ) -> "SensitivityConfig":
-        """Parse a single sensitivity analysis configuration."""
-        required_fields = ["algorithm", "parameters"]
-        for field in required_fields:
-            if field not in sens_config and f"target_{field}" not in sens_config:
-                raise SensitivityConfigurationError(
-                    f"Required field missing: {field} or target_{field}"
-                )
-
-        # Collect method-specific configuration
-        analysis_method = sens_config.get(
-            "method", sens_config.get("analysis_method", "morris")
-        )
-        method_config = None
-
-        if analysis_method == "morris" and "morris" in sens_config:
-            method_config = sens_config["morris"]
-        elif analysis_method == "sobol" and "sobol" in sens_config:
-            method_config = sens_config["sobol"]
-        elif analysis_method == "fast" and "fast" in sens_config:
-            method_config = sens_config["fast"]
-
-        return SensitivityConfig(
-            name=sens_config.get("name", sens_config.get("nome", "Unnamed analysis")),
-            method=analysis_method,
-            target_datasets=sens_config.get(
-                "datasets", sens_config.get("target_datasets", [])
-            ),
-            target_algorithm=sens_config.get(
-                "algorithm", sens_config.get("target_algorithm", "")
-            ),
-            samples=sens_config.get(
-                "samples", sens_config.get("n_samples", global_samples)
-            ),
-            repetitions=sens_config.get(
-                "repetitions",
-                sens_config.get("repetitions_per_sample", global_repetitions),
-            ),
-            parameters=sens_config["parameters"],
-            output_metrics=sens_config.get(
-                "output_metrics", ["distance", "execution_time"]
-            ),
-            method_config=method_config,
-        )
-
-    @staticmethod
     def parse_resources_config(config: Dict[str, Any]) -> Dict[str, Any]:
-        """Parse batch resource configurations for legacy compatibility."""
+        """Parse batch resource configurations."""
         resources_section = config.get("resources", {})
         parallel_config = resources_section.get("parallel", {})
         timeouts_config = resources_section.get("timeouts", {})
@@ -1027,7 +876,6 @@ def save_batch_config(config: BatchConfig, output_path: Union[str, Path]) -> Non
             "timeouts": {
                 "timeout_per_algorithm": timeout_per_algorithm,
                 "timeout_total_batch": timeout_total_batch,
-                # Legacy support
                 "global_timeout": timeouts_config.get(
                     "global_timeout", timeout_per_algorithm
                 ),
