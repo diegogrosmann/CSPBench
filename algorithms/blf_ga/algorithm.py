@@ -52,11 +52,11 @@ class BLFGAAlgorithm(CSPAlgorithm):
         # Map TEMPLATE.yaml parameter names to BLF-GA implementation names
         param_mapping = {
             "crossover_method": "crossover_type",
-            "mutation_method": "mutation_type", 
+            "mutation_method": "mutation_type",
             "refinement_method": "refinement_type",
             # selection_method is not directly supported, ignore it
         }
-        
+
         # Filter and map parameters to pass only those that BLFGA implementation knows
         blfga_params = {}
         for k, v in self.params.items():

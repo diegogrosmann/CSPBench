@@ -14,5 +14,5 @@ keywords:
   - "computational biology"
   - "algorithm benchmarking"
   - "genetic algorithms"
-license: "MIT"
+license: "CC-BY-NC-SA-4.0"
 abstract: "CSPBench is a comprehensive framework for implementing, testing, and benchmarking algorithms for the Closest String Problem, a fundamental challenge in computational biology and bioinformatics." 

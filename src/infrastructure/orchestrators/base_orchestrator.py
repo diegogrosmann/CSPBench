@@ -2,7 +2,7 @@
 Base for Orchestrators
 
 Provides common functionality for all orchestrators,
-including standardized integration with monitoring system.
+including standardized integration with the new monitoring system.
 """
 
 from abc import ABC, abstractmethod
@@ -19,7 +19,7 @@ class BaseOrchestrator(ABC):
         Initialize base orchestrator.
 
         Args:
-            monitoring_service: Optional monitoring service
+            monitoring_service: Optional monitoring service (using new system)
         """
         self.monitoring_service = monitoring_service
         self._logger = get_logger(__name__)
@@ -34,72 +34,135 @@ class BaseOrchestrator(ABC):
         """
         pass
 
-    def _report_progress(self, progress: float, message: str) -> None:
+    def _emit_execution_started(
+        self,
+        execution_name: str,
+        total_items: int,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> None:
         """
-        Report progress to monitoring system.
+        Emit execution started event.
 
         Args:
-            progress: Progress percentage (0-100)
-            message: Descriptive progress message
+            execution_name: Name of the execution
+            total_items: Total items to process
+            metadata: Optional metadata
         """
         if self.monitoring_service:
             try:
-                self.monitoring_service.report_progress(progress, message)
+                self.monitoring_service.start_execution(
+                    execution_name, total_items, metadata
+                )
             except Exception as e:
-                self._logger.warning(f"Error reporting progress: {e}")
+                self._logger.warning(f"Error starting execution in monitoring: {e}")
 
-    def _update_task_data(self, task_type: str, **data) -> None:
+    def _emit_execution_progress(
+        self,
+        current_item: int,
+        total_items: int,
+        item_name: str,
+        progress_percent: float,
+        message: str = "",
+        context: Optional[Dict[str, Any]] = None,
+    ) -> None:
         """
-        Update task-specific data in monitoring.
+        Emit execution progress event.
 
         Args:
-            task_type: Task type (execution, optimization, sensitivity)
-            **data: Task-specific data
+            current_item: Current item number
+            total_items: Total items
+            item_name: Name of current item
+            progress_percent: Progress percentage (0-100)
+            message: Optional progress message
+            context: Optional context data
         """
-        if not self.monitoring_service:
-            return
+        if self.monitoring_service:
+            try:
+                self.monitoring_service.update_execution_progress(
+                    current_item=current_item,
+                    total_items=total_items,
+                    item_name=item_name,
+                    progress_percent=progress_percent,
+                    message=message,
+                    context=context,
+                )
+            except Exception as e:
+                self._logger.warning(
+                    f"Error updating execution progress in monitoring: {e}"
+                )
 
-        try:
-            if task_type == "execution":
-                self.monitoring_service.update_execution_data(**data)
-            elif task_type == "optimization":
-                self.monitoring_service.update_optimization_data(**data)
-            elif task_type == "sensitivity":
-                self.monitoring_service.update_sensitivity_data(**data)
-            else:
-                self._logger.warning(f"Unknown task type: {task_type}")
-        except Exception as e:
-            self._logger.warning(f"Error updating task data: {e}")
-
-    def _log_error(self, error: Exception, context: str = "") -> None:
+    def _emit_execution_finished(
+        self,
+        success: bool,
+        total_processed: int,
+        results: Optional[Dict[str, Any]] = None,
+        error_message: Optional[str] = None,
+    ) -> None:
         """
-        Log error with appropriate context.
+        Emit execution finished event.
 
         Args:
-            error: Exception that occurred
-            context: Additional error context
+            success: Whether execution was successful
+            total_processed: Total items processed
+            results: Optional results data
+            error_message: Optional error message if failed
         """
-        error_msg = f"Error in orchestration"
-        if context:
-            error_msg += f" ({context})"
-        error_msg += f": {error}"
+        if self.monitoring_service:
+            try:
+                self.monitoring_service.finish_execution(
+                    success, total_processed, results, error_message
+                )
+            except Exception as e:
+                self._logger.warning(f"Error finishing execution in monitoring: {e}")
 
-        self._logger.error(error_msg)
-
-    def _log_info(self, message: str) -> None:
+    def _emit_algorithm_progress(
+        self,
+        algorithm_name: str,
+        progress_percent: float,
+        message: str = "",
+        item_id: Optional[str] = None,
+        context: Optional[Dict[str, Any]] = None,
+    ) -> None:
         """
-        Log information message.
+        Emit algorithm progress event.
 
         Args:
-            message: Message to log
+            algorithm_name: Name of the algorithm
+            progress_percent: Progress percentage (0-100)
+            message: Optional progress message
+            item_id: Optional item ID
+            context: Optional context data
         """
-        self._logger.info(message)
+        if self.monitoring_service:
+            try:
+                self.monitoring_service.report_algorithm_progress(
+                    algorithm_name=algorithm_name,
+                    progress_percent=progress_percent,
+                    message=message,
+                    item_id=item_id,
+                    context=context,
+                )
+            except Exception as e:
+                self._logger.warning(
+                    f"Error reporting algorithm progress in monitoring: {e}"
+                )
 
-    def _log_debug(self, message: str) -> None:
+    def _emit_error(
+        self,
+        error_message: str,
+        error_type: str = "generic",
+        context: Optional[Dict[str, Any]] = None,
+    ) -> None:
         """
-        Log debug information message.
+        Emit error event.
 
         Args:
-            message: Message to log
+            error_message: Error message
+            error_type: Type of error
+            context: Optional context data
         """
-        self._logger.debug(message)
+        if self.monitoring_service:
+            try:
+                self.monitoring_service.report_error(error_message, error_type, context)
+            except Exception as e:
+                self._logger.warning(f"Error reporting error in monitoring: {e}")

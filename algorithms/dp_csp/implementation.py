@@ -386,7 +386,7 @@ def exact_dp_closest_string(
                             kb = int(line.split()[1])
                             mem_mb = kb / 1024.0
                             break
-        except (OSError, IOError, ValueError):
+        except (OSError, ValueError):
             pass  # Continue even if cannot measure memory
 
         elapsed = time.time() - t0
@@ -456,8 +456,7 @@ def exact_dp_closest_string(
     # FAILURE: No solution found within limits
     logger.error("[DP_CSP] FAILURE: Could not find center with d ≤ %d", max_d)
     raise RuntimeError(
-        f"Could not find center with d ≤ {max_d}. "
-        "Try increasing the limit."
+        f"Could not find center with d ≤ {max_d}. " "Try increasing the limit."
     )
 
 

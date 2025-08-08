@@ -22,25 +22,42 @@ class FileExporter(ExportPort):
         self.output_path.mkdir(parents=True, exist_ok=True)
 
     def export_results(
-        self, results: Dict[str, Any], format_type: str, destination: str, options: Optional[Dict[str, Any]] = None
+        self,
+        results: Any,
+        format_type: str,
+        destination: Optional[str] = None,
+        options: Optional[Dict[str, Any]] = None,
+        session_id: Optional[str] = None,
     ) -> str:
-        """Export results in specific format."""
-        dest_path = self.output_path / destination
-
-        # If destination is a directory, generate filename
-        if dest_path.is_dir() or not dest_path.suffix:
+        """Export optimization results to the specified format."""
+        if session_id:
+            filename = f"results_{session_id}.{format_type.lower()}"
+        else:
             from datetime import datetime
 
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             filename = f"results_{timestamp}.{format_type.lower()}"
-            dest_path = dest_path / filename
+
+        # Determine output path
+        if destination:
+            dest_path = self.output_path / destination
+            if dest_path.is_dir() or not dest_path.suffix:
+                dest_path = dest_path / filename
+        else:
+            dest_path = self.output_path / filename
 
         dest_path.parent.mkdir(parents=True, exist_ok=True)
 
+        # Export based on format
         if format_type.lower() == "json":
             self._write_json(results, dest_path, options)
         elif format_type.lower() == "csv":
-            self._write_csv(results, dest_path, options)
+            # For CSV, handle both single results and batch results
+            if isinstance(results, list):
+                self._write_csv(results, dest_path, options)
+            else:
+                # Convert single result to list for CSV export
+                self._write_csv([results], dest_path, options)
         elif format_type.lower() == "parquet":
             self._write_parquet(results, dest_path)
         elif format_type.lower() == "pickle":
@@ -48,21 +65,27 @@ class FileExporter(ExportPort):
         elif format_type.lower() == "txt":
             self._write_txt(results, dest_path)
         else:
-            # Default to JSON
             self._write_json(results, dest_path, options)
 
         return str(dest_path)
 
     def export_batch_results(
-        self, batch_results: List[Dict[str, Any]], format_type: str, destination: str, options: Optional[Dict[str, Any]] = None
+        self,
+        batch_results: List[Dict[str, Any]],
+        format_type: str,
+        destination: str,
+        options: Optional[Dict[str, Any]] = None,
+        session_id: Optional[str] = None,
     ) -> str:
         """Export batch results."""
         dest_path = self.output_path / destination
 
-        # If destination is a directory, use fixed filename
+        # If destination is a directory, use session_id or timestamp for filename
         if dest_path.is_dir() or not dest_path.suffix:
-            # Use fixed name for main result
-            filename = f"results.{format_type.lower()}"
+            if session_id:
+                filename = f"results_{session_id}.{format_type.lower()}"
+            else:
+                filename = f"results.{format_type.lower()}"
             dest_path = dest_path / filename
 
         dest_path.parent.mkdir(parents=True, exist_ok=True)
@@ -98,10 +121,15 @@ class FileExporter(ExportPort):
         return ["json", "csv", "parquet", "pickle", "txt"]
 
     def export_optimization_results(
-        self, optimization_data: Dict[str, Any], destination: str
+        self,
+        optimization_data: Dict[str, Any],
+        destination: str,
+        session_id: Optional[str] = None,
     ) -> str:
         """Export optimization results."""
-        return self.export_results(optimization_data, "json", destination)
+        return self.export_results(
+            optimization_data, "json", destination, session_id=session_id
+        )
 
     def export(self, data: Any, filename: Optional[str] = None) -> None:
         """Export data to file (legacy method)."""
@@ -116,24 +144,28 @@ class FileExporter(ExportPort):
         file_path.parent.mkdir(parents=True, exist_ok=True)
         self._write_json(data, file_path)
 
-    def _write_json(self, data: Any, dest_path: Path, options: Optional[Dict[str, Any]] = None) -> None:
+    def _write_json(
+        self, data: Any, dest_path: Path, options: Optional[Dict[str, Any]] = None
+    ) -> None:
         """Write data in JSON format."""
         # Get JSON format options
         json_options = options.get("json", {}) if options else {}
         indent = json_options.get("indent", 2)
         ensure_ascii = json_options.get("ensure_ascii", False)
-        
+
         with open(dest_path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=indent, ensure_ascii=ensure_ascii, default=str)
 
-    def _write_csv(self, data: Any, dest_path: Path, options: Optional[Dict[str, Any]] = None) -> None:
+    def _write_csv(
+        self, data: Any, dest_path: Path, options: Optional[Dict[str, Any]] = None
+    ) -> None:
         """Write data in CSV format."""
         # Get CSV format options
         csv_options = options.get("csv", {}) if options else {}
         separator = csv_options.get("separator", ",")
         encoding = csv_options.get("encoding", "utf-8")
         decimal = csv_options.get("decimal", ".")
-        
+
         if isinstance(data, list) and data:
             # Assume list of dictionaries
             fieldnames = set()
@@ -188,13 +220,23 @@ class FileExporter(ExportPort):
         """Write data in Parquet format."""
         try:
             import pandas as pd
-            
+
             # Convert data to DataFrame
             if isinstance(data, list) and data:
                 df = pd.DataFrame(data)
             elif isinstance(data, dict):
                 # Flatten dict or create single-row DataFrame
-                if all(isinstance(v, (list, tuple)) and len(set(len(v) if hasattr(v, '__len__') else 1 for v in data.values())) == 1 for v in data.values()):
+                if all(
+                    isinstance(v, (list, tuple))
+                    and len(
+                        set(
+                            len(v) if hasattr(v, "__len__") else 1
+                            for v in data.values()
+                        )
+                    )
+                    == 1
+                    for v in data.values()
+                ):
                     # All values are lists of same length
                     df = pd.DataFrame(data)
                 else:
@@ -203,15 +245,15 @@ class FileExporter(ExportPort):
             else:
                 # Convert to single-column DataFrame
                 df = pd.DataFrame({"data": [data]})
-            
+
             df.to_parquet(dest_path, index=False)
-            
+
         except ImportError:
             # Fallback to JSON if pandas/pyarrow not available
-            self._write_json(data, dest_path.with_suffix('.json'))
+            self._write_json(data, dest_path.with_suffix(".json"))
         except Exception:
             # Fallback to JSON on any error
-            self._write_json(data, dest_path.with_suffix('.json'))
+            self._write_json(data, dest_path.with_suffix(".json"))
 
     def _write_pickle(self, data: Any, dest_path: Path) -> None:
         """Write data in Pickle format."""
@@ -231,12 +273,12 @@ class FileExporter(ExportPort):
     def _sanitize_for_pickle(self, data: Any) -> Any:
         """
         Recursively sanitize data for pickle serialization.
-        
+
         Removes or converts non-serializable objects like module references,
         function objects, and other problematic types.
         """
         import types
-        
+
         if isinstance(data, dict):
             sanitized = {}
             for key, value in data.items():
@@ -249,12 +291,14 @@ class FileExporter(ExportPort):
                     if isinstance(value, types.ModuleType):
                         sanitized[key] = f"<module '{value.__name__}'>"
                     elif callable(value):
-                        sanitized[key] = f"<function '{getattr(value, '__name__', str(value))}'>"
-                    elif hasattr(value, '__dict__') and hasattr(value, '__class__'):
+                        sanitized[key] = (
+                            f"<function '{getattr(value, '__name__', str(value))}'>"
+                        )
+                    elif hasattr(value, "__dict__") and hasattr(value, "__class__"):
                         # For complex objects, try to extract serializable attributes
                         sanitized[key] = {
-                            '__class__': value.__class__.__name__,
-                            '__repr__': str(value)
+                            "__class__": value.__class__.__name__,
+                            "__repr__": str(value),
                         }
                     else:
                         sanitized[key] = str(value)

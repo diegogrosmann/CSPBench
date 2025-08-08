@@ -5,12 +5,10 @@ Responsible for generating specific reports for sensitivity analyses,
 including visualizations of Morris, Sobol indices, etc.
 """
 
-import json
 from pathlib import Path
 from typing import Any, Dict, List
 
 import matplotlib.pyplot as plt
-import numpy as np
 import pandas as pd
 import seaborn as sns
 

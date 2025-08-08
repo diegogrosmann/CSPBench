@@ -27,7 +27,10 @@ class Executor(ExecutorInterface):
         self._logger.debug(f"Batch configuration set: {type(batch_config)}")
 
     def execute_batch(
-        self, batch_config: Dict[str, Any], monitoring_service=None
+        self,
+        batch_config: Dict[str, Any],
+        monitoring_service=None,
+        session_manager=None,
     ) -> List[Dict[str, Any]]:
         """
         Execute algorithm batch delegating to ExecutionOrchestrator.
@@ -51,11 +54,14 @@ class Executor(ExecutorInterface):
             # Configure dependencies
             algorithm_registry = DomainAlgorithmRegistry()
             dataset_repository = FileDatasetRepository("./datasets")
-            
+
             # Try to create Entrez repository if available
             entrez_repository = None
             try:
-                from src.infrastructure.persistence.entrez_dataset_repository import NCBIEntrezDatasetRepository
+                from src.infrastructure.persistence.entrez_dataset_repository import (
+                    NCBIEntrezDatasetRepository,
+                )
+
                 entrez_repository = NCBIEntrezDatasetRepository()
                 if not entrez_repository.is_available():
                     entrez_repository = None
@@ -68,6 +74,7 @@ class Executor(ExecutorInterface):
                 dataset_repository=dataset_repository,
                 monitoring_service=monitoring_service,
                 entrez_repository=entrez_repository,
+                session_manager=session_manager,
             )
 
             # Delegate execution
@@ -209,9 +216,7 @@ class Executor(ExecutorInterface):
 
         except Exception as e:
             self._logger.error(f"Error in sensitivity analysis: {e}")
-            raise AlgorithmExecutionError(
-                f"Error in sensitivity analysis: {e}"
-            ) from e
+            raise AlgorithmExecutionError(f"Error in sensitivity analysis: {e}") from e
 
     def execute_single(
         self,
@@ -220,6 +225,7 @@ class Executor(ExecutorInterface):
         params: Optional[Dict[str, Any]] = None,
         timeout: Optional[int] = None,
         monitoring_service=None,
+        session_manager=None,
     ) -> Dict[str, Any]:
         """
         Execute a single algorithm delegating to ExecutionOrchestrator.
@@ -246,11 +252,14 @@ class Executor(ExecutorInterface):
             # Configure dependencies
             algorithm_registry = DomainAlgorithmRegistry()
             dataset_repository = FileDatasetRepository("./datasets")
-            
-            # Try to create Entrez repository if available  
+
+            # Try to create Entrez repository if available
             entrez_repository = None
             try:
-                from src.infrastructure.persistence.entrez_dataset_repository import NCBIEntrezDatasetRepository
+                from src.infrastructure.persistence.entrez_dataset_repository import (
+                    NCBIEntrezDatasetRepository,
+                )
+
                 entrez_repository = NCBIEntrezDatasetRepository()
                 if not entrez_repository.is_available():
                     entrez_repository = None
@@ -263,6 +272,7 @@ class Executor(ExecutorInterface):
                 dataset_repository=dataset_repository,
                 monitoring_service=monitoring_service,
                 entrez_repository=entrez_repository,
+                session_manager=session_manager,
             )
 
             # Set batch config if available
@@ -282,9 +292,7 @@ class Executor(ExecutorInterface):
 
         except Exception as e:
             self._logger.error(f"Error in single execution: {e}")
-            raise AlgorithmExecutionError(
-                f"Error in single execution: {e}"
-            ) from e
+            raise AlgorithmExecutionError(f"Error in single execution: {e}") from e
 
     def get_execution_status(self, execution_id: str) -> str:
         """

@@ -69,6 +69,18 @@ class CSPAlgorithm(ABC):
         )  # Every N iterations
         self.history = []
 
+        # Monitoring integration
+        self._algorithm_monitor = None
+
+    def set_algorithm_monitor(self, monitor) -> None:
+        """Set algorithm monitor for enhanced tracking."""
+        self._algorithm_monitor = monitor
+
+        # Auto-configure callbacks if monitor is available
+        if monitor:
+            self.set_progress_callback(monitor.create_progress_callback())
+            self.set_warning_callback(monitor.create_warning_callback())
+
     def set_progress_callback(self, callback: Callable[[str, float], None]) -> None:
         """Set callback to report algorithm progress."""
         self.progress_callback = callback
@@ -98,6 +110,10 @@ class CSPAlgorithm(ABC):
         if self.save_history and (iteration % self.history_frequency == 0):
             entry = {"iteration": iteration, "timestamp": self._get_timestamp(), **data}
             self.history.append(entry)
+
+            # Report to monitor if available
+            if self._algorithm_monitor:
+                self._algorithm_monitor.report_history_entry(iteration, **data)
 
     def _get_timestamp(self) -> float:
         """Return current timestamp for history."""

@@ -6,7 +6,7 @@ between different generators and repositories.
 """
 
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List
 
 from src.domain import Dataset, SyntheticDatasetGenerator
 from src.infrastructure.persistence.dataset_repository import FileDatasetRepository
@@ -30,17 +30,79 @@ class DatasetGenerationService:
         Generate synthetic dataset based on parameters.
 
         Args:
-            params: Generation parameters (n, length, alphabet, noise, seed)
+            params: Generation parameters including method and method-specific params
 
         Returns:
             Generated dataset
         """
-        return self.synthetic_generator.generate_random(
-            n=params["n"],
-            length=params["length"],
-            alphabet=params["alphabet"],
-            seed=params.get("seed"),
-        )
+        method = params.get("method", "random")
+
+        if method == "random":
+            return self.synthetic_generator.generate_random(
+                n=params["n"],
+                length=params["length"],
+                alphabet=params["alphabet"],
+                seed=params.get("seed"),
+            )
+        elif method == "noise":
+            center_sequence = params.get("center_sequence")
+            if not center_sequence:
+                # Generate random center sequence if not provided
+                import random
+
+                rng = random.Random(params.get("seed"))
+                center_sequence = "".join(
+                    rng.choice(params["alphabet"]) for _ in range(params["length"])
+                )
+
+            return self.synthetic_generator.generate_from_center(
+                center=center_sequence,
+                n=params["n"],
+                noise_rate=params.get("noise_rate", 0.1),
+                alphabet=params["alphabet"],
+                seed=params.get("seed"),
+            )
+        elif method == "clustered":
+            # Calculate sequences per cluster
+            num_clusters = params.get("num_clusters", 3)
+            sequences_per_cluster = max(1, params["n"] // num_clusters)
+
+            return self.synthetic_generator.generate_clustered(
+                n_clusters=num_clusters,
+                sequences_per_cluster=sequences_per_cluster,
+                length=params["length"],
+                alphabet=params["alphabet"],
+                noise_rate=params.get("cluster_noise", 0.1),
+                seed=params.get("seed"),
+            )
+        elif method == "mutations":
+            base_sequence = params.get("base_sequence")
+            if not base_sequence:
+                # Generate random base sequence if not provided
+                import random
+
+                rng = random.Random(params.get("seed"))
+                base_sequence = "".join(
+                    rng.choice(params["alphabet"]) for _ in range(params["length"])
+                )
+
+            # For now, use noise-based generation as mutation approximation
+            # TODO: Implement proper mutation-based generation
+            return self.synthetic_generator.generate_from_center(
+                center=base_sequence,
+                n=params["n"],
+                noise_rate=params.get("mutation_rate", 0.1),
+                alphabet=params["alphabet"],
+                seed=params.get("seed"),
+            )
+        else:
+            # Fallback to random generation
+            return self.synthetic_generator.generate_random(
+                n=params["n"],
+                length=params["length"],
+                alphabet=params["alphabet"],
+                seed=params.get("seed"),
+            )
 
     def download_real_dataset(self, params: Dict[str, Any]) -> Dataset:
         """
@@ -68,7 +130,7 @@ class DatasetGenerationService:
         self, dataset: Dataset, filename: str, base_path: str = "datasets"
     ) -> str:
         """
-        Save dataset to file.
+        Save dataset to file with unique filename.
 
         Args:
             dataset: Dataset to save
@@ -78,14 +140,65 @@ class DatasetGenerationService:
         Returns:
             Complete path of saved file
         """
-        output_path = Path(base_path) / filename
+        base_dir = Path(base_path)
+        base_dir.mkdir(parents=True, exist_ok=True)
 
-        # Create directory if it doesn't exist
-        output_path.parent.mkdir(parents=True, exist_ok=True)
+        # Generate unique filename if file already exists
+        unique_filename = self._generate_unique_filename(filename, base_dir)
+        output_path = base_dir / unique_filename
 
         # Save in FASTA format
         with open(output_path, "w", encoding="utf-8") as f:
             for i, seq in enumerate(dataset.sequences):
+                f.write(f">seq_{i+1}\n{seq}\n")
+
+        return str(output_path.absolute())
+
+    def _generate_unique_filename(self, base_filename: str, directory: Path) -> str:
+        """Generate a unique filename by adding a counter if the file already exists."""
+        filename = base_filename
+        counter = 1
+
+        # Extract name and extension
+        if "." in filename:
+            name_part, ext_part = filename.rsplit(".", 1)
+        else:
+            name_part, ext_part = filename, ""
+
+        # Keep trying until we find a unique name
+        while (directory / filename).exists():
+            if ext_part:
+                filename = f"{name_part}_{counter}.{ext_part}"
+            else:
+                filename = f"{name_part}_{counter}"
+            counter += 1
+
+        return filename
+
+    def save_sequences_as_fasta(
+        self, sequences: List[str], filename: str, base_path: str = "datasets"
+    ) -> str:
+        """
+        Save sequences directly as FASTA file with unique filename.
+
+        Args:
+            sequences: List of sequences to save
+            filename: File name
+            base_path: Base directory
+
+        Returns:
+            Complete path of saved file
+        """
+        base_dir = Path(base_path)
+        base_dir.mkdir(parents=True, exist_ok=True)
+
+        # Generate unique filename if file already exists
+        unique_filename = self._generate_unique_filename(filename, base_dir)
+        output_path = base_dir / unique_filename
+
+        # Save in FASTA format
+        with open(output_path, "w", encoding="utf-8") as f:
+            for i, seq in enumerate(sequences):
                 f.write(f">seq_{i+1}\n{seq}\n")
 
         return str(output_path.absolute())
@@ -103,7 +216,7 @@ class DatasetGenerationService:
         # For now, simulate download with synthetic data
         # Real implementation would use Bio.Entrez or similar
 
-        print(f"🌐 Simulating NCBI download...")
+        print("🌐 Simulating NCBI download...")
         print(f"   Query: {params['query']}")
         print(f"   Max sequences: {params['max_sequences']}")
         print(f"   Length range: {params['min_length']}-{params['max_length']}")

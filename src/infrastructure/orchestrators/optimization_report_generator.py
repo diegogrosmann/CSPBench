@@ -4,12 +4,10 @@ Optimization Report Generator - Gerador de Relatórios Avançados de Otimizaçã
 Gera 7 tipos de gráficos, estatísticas avançadas e relatórios em múltiplos formatos.
 """
 
-import csv
 import json
-import os
 import warnings
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -17,7 +15,6 @@ import optuna
 import pandas as pd
 import seaborn as sns
 from scipy import stats
-from sklearn.preprocessing import StandardScaler
 
 from src.infrastructure.logging_config import get_logger
 
@@ -46,15 +43,15 @@ class OptimizationReportGenerator:
         output_config = config.get("output", {})
         results_config = output_config.get("results", {})
         plots_config = output_config.get("plots", {})
-        
+
         self.export_config = {
             "enabled": results_config.get("enabled", True),
             "formats": results_config.get("formats", {}),
-            "include": results_config.get("content", {})
+            "include": results_config.get("content", {}),
         }
         self.formats = results_config.get("formats", {})
         self.include = list(results_config.get("content", {}).keys())
-        
+
         # Plot configuration
         self.plot_config = plots_config
         plot_formats = plots_config.get("formats", ["png"])

@@ -10,7 +10,7 @@ import pytest
 import yaml
 from typer.testing import CliRunner
 
-from main import app
+from main_old import app
 
 
 def test_cli_batch_minimal():

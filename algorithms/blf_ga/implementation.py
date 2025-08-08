@@ -197,6 +197,7 @@ class BLFGA:
         max_gens: int | None = None,
         max_time: float | None = None,
         seed: int | None = None,
+        internal_workers: int | None = None,  # New parameter for parallelism
         # Novos parâmetros
         immigrant_freq: int | None = None,  # pylint: disable=unused-argument
         immigrant_ratio: float | None = None,  # pylint: disable=unused-argument
@@ -223,8 +224,12 @@ class BLFGA:
         self.L = len(strings[0])
         self.alphabet = alphabet
 
-        # Configurar workers internos a partir da variável de ambiente
-        self.internal_workers = int(os.environ.get("INTERNAL_WORKERS", "1"))
+        # Configurar workers internos - prioridade: parâmetro > variável ambiente > default 1
+        self.internal_workers = (
+            internal_workers
+            if internal_workers is not None
+            else int(os.environ.get("INTERNAL_WORKERS", "1"))
+        )
 
         # Carrega parâmetros do dicionário de defaults, permite sobrescrever via argumentos
         params = {**BLF_GA_DEFAULTS}

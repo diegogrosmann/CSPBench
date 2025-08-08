@@ -1,0 +1,19 @@
+{
+    "cloudRunService": {
+        "name": "csp-bench",
+        "region": "us-central1",
+        "platform": "managed",
+        "memory": "2Gi",
+        "cpu": "1000m",
+        "timeout": "900s",
+        "concurrency": 80,
+        "port": 8080,
+        "allowUnauthenticated": true,
+        "environmentVariables": {
+            "PORT": "8080",
+            "PYTHONPATH": "/app",
+            "PYTHONUNBUFFERED": "1",
+            "PYTHONDONTWRITEBYTECODE": "1"
+        }
+    }
+}

@@ -6,10 +6,8 @@ The web interface has been completely redesigned with a modular, component-based
 ## Key Features
 
 ### 🎯 Execution Type Selection
-- **Single Execution**: Standard one-time algorithm run
 - **Batch Execution**: Run multiple configurations in sequence  
 - **Algorithm Comparison**: Compare multiple algorithms on the same dataset
-- **Parameter Optimization**: Optimize algorithm parameters automatically
 - **Benchmark Suite**: Run comprehensive benchmarks
 - **Custom Workflow**: Create custom execution workflows
 
@@ -26,7 +24,7 @@ The web interface has been completely redesigned with a modular, component-based
 #### Template System
 - **Base Template** (`base.html`): Common layout and navigation
 - **Index Page** (`index.html`): Execution type selection
-- **Single Execution** (`single_execution.html`): Step-by-step workflow
+- **Batch Execution** (`batch_execution.html`): Batch workflow
 
 ### 🎨 Modern Design
 - CSS custom properties for consistent theming

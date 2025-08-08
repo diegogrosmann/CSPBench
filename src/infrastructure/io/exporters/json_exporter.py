@@ -20,22 +20,38 @@ class JsonExporter(FileExporter):
         self.config = config or {}
 
     def export_batch_results(
-        self, batch_results: List[Dict[str, Any]], format_type: str, destination: str
+        self,
+        batch_results: List[Dict[str, Any]],
+        format_type: str,
+        destination: str,
+        session_id: Optional[str] = None,
     ) -> str:
         """Export batch results with advanced reports."""
+        print(
+            f"🔍 DEBUG JsonExporter: export_batch_results chamado com {len(batch_results)} resultados"
+        )
+        print(f"🔍 DEBUG JsonExporter: destination = {destination}")
+        print(f"🔍 DEBUG JsonExporter: session_id = {session_id}")
+
         # Export basic JSON data
         json_path = super().export_batch_results(
-            batch_results, format_type, destination
+            batch_results, format_type, destination, session_id=session_id
         )
+        print(f"🔍 DEBUG JsonExporter: arquivo JSON criado em {json_path}")
 
         # Generate advanced report if configured
         if self.config and self._should_generate_report():
+            print("🔍 DEBUG JsonExporter: gerando relatório avançado")
             try:
                 if self._is_sensitivity_data(batch_results):
-                    print("📊 Sensitivity data detected - generating sensitivity report")
+                    print(
+                        "📊 Sensitivity data detected - generating sensitivity report"
+                    )
                     self._generate_sensitivity_report(batch_results)
                 elif self._is_optimization_data(batch_results):
-                    print("📊 Optimization data detected - generating optimization report")
+                    print(
+                        "📊 Optimization data detected - generating optimization report"
+                    )
                     self._generate_optimization_report(batch_results)
                 else:
                     print("📊 Standard execution data - generating execution report")
@@ -61,9 +77,7 @@ class JsonExporter(FileExporter):
             sensitivity_report_generator.generate_sensitivity_report(sensitivity_data)
 
         except ImportError as e:
-            print(
-                f"⚠️ Could not import sensitivity report generator: {e}"
-            )
+            print(f"⚠️ Could not import sensitivity report generator: {e}")
         except Exception as e:
             print(f"⚠️ Error generating sensitivity report: {e}")
 
@@ -71,9 +85,7 @@ class JsonExporter(FileExporter):
         self, batch_results: List[Dict[str, Any]]
     ) -> None:
         """Generate specific report for optimization."""
-        print(
-            "📊 Optimization data detected - using specific optimization report"
-        )
+        print("📊 Optimization data detected - using specific optimization report")
 
     def _generate_sensitivity_report(self, batch_results: List[Dict[str, Any]]) -> None:
         """Gera relatório específico para análise de sensibilidade."""

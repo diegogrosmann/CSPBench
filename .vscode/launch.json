@@ -3,7 +3,7 @@
     "configurations": [
         {
             "name": "Debug CSPBench Main (Interactive)",
-            "type": "python",
+            "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/main.py",
             "console": "integratedTerminal",
@@ -20,8 +20,8 @@
             "subProcess": true
         },
         {
-            "name": "Debug CSPBench Web Interface",
-            "type": "python",
+            "name": "Debug CSPBench Web Interface (main.py)",
+            "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/main.py",
             "console": "integratedTerminal",
@@ -33,7 +33,7 @@
                 "DEBUG": "true"
             },
             "args": [
-                "--web"
+                "web"
             ],
             "justMyCode": false,
             "stopOnEntry": false,
@@ -42,7 +42,7 @@
         },
         {
             "name": "Debug CSPBench Test",
-            "type": "python",
+            "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/main.py",
             "console": "integratedTerminal",
@@ -59,6 +59,6 @@
             "stopOnEntry": false,
             "showReturnValue": true,
             "subProcess": true
-        }
+        },
     ]
 }

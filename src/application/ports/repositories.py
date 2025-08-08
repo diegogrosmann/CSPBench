@@ -6,7 +6,7 @@ pela camada de infraestrutura seguindo o padrão de arquitetura hexagonal.
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional, Protocol, runtime_checkable, Tuple
+from typing import Any, Dict, List, Protocol, Tuple, runtime_checkable
 
 from src.domain import CSPAlgorithm, Dataset
 

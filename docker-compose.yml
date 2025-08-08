@@ -10,7 +10,7 @@ services:
       - NCBI_EMAIL=${NCBI_EMAIL:-user@example.com}
       - NCBI_API_KEY=${NCBI_API_KEY:-your_key_here}
     volumes:
-      - ./datasets:/app/datasets:ro
+      - ./datasets:/app/datasets:rw
       - ./config:/app/config:ro
       - ./outputs:/app/outputs
       - /tmp:/app/tmp

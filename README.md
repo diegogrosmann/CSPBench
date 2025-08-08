@@ -1,7 +1,7 @@
 # CSPBench: A Framework for Closest String Problem Algorithms
 
 [![Python Version](https://img.shields.io/badge/python-3.8%2B-blue.svg)](https://python.org)
-[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![License](https://img.shields.io/badge/license-CC%20BY--NC--SA%204.0-orange.svg)](LICENSE)
 [![Code Style](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
 CSPBench is a comprehensive framework for implementing, testing, and benchmarking algorithms for the Closest String Problem (CSP), a fundamental challenge in computational biology and bioinformatics.
@@ -255,13 +255,22 @@ If you use CSPBench in your research, please cite:
   title = {CSPBench: A Framework for Closest String Problem Algorithms},
   year = {2025},
   url = {https://github.com/diegogrosmann/CSPBench},
-  version = {0.1.0}
+  version = {0.1.0},
+  license = {CC-BY-NC-SA-4.0}
 }
 ```
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License (CC BY-NC-SA 4.0) - see the [LICENSE](LICENSE) file for details.
+
+**Key license terms:**
+- ✅ **Share and adapt** freely for non-commercial purposes
+- ✅ **Attribution required** - credit the original authors
+- ✅ **ShareAlike** - derivative works must use the same license
+- ❌ **No commercial use** without explicit permission
+
+This license promotes open science while protecting against unauthorized commercial exploitation.
 
 ## 🙏 Acknowledgments
 

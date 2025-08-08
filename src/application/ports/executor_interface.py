@@ -6,7 +6,7 @@ ensuring consistency in execution of different types of tasks.
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from src.domain import Dataset
 
@@ -19,6 +19,7 @@ class ExecutorInterface(ABC):
         self,
         batch_config: Dict[str, Any],
         monitoring_service=None,
+        session_manager=None,
     ) -> List[Dict[str, Any]]:
         """
         Execute batch of algorithms (including single executions).

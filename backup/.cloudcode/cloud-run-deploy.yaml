@@ -1,0 +1,26 @@
+# Cloud Code Configuration for Cloud Run Deploy
+deploy:
+  cloudRunService:
+    name: csp-bench
+    region: us-central1
+    platform: managed
+    memory: 2Gi
+    cpu: 1000m
+    timeout: 900s
+    concurrency: 80
+    port: 8080
+    env:
+      - name: PORT
+        value: "8080"
+      - name: PYTHONPATH
+        value: "/app"
+      - name: PYTHONUNBUFFERED
+        value: "1"
+      - name: PYTHONDONTWRITEBYTECODE
+        value: "1"
+    healthCheck:
+      path: "/health"
+      initialDelaySeconds: 60
+      periodSeconds: 30
+      timeoutSeconds: 10
+      failureThreshold: 3

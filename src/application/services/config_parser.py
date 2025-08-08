@@ -7,7 +7,6 @@ batch, optimization, and sensitivity analysis configurations.
 This module contains ONLY parameters documented in TEMPLATE.yaml.
 """
 
-import json
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
@@ -24,7 +23,7 @@ from src.domain.errors import (
 @dataclass
 class BatchMetadata:
     """Batch metadata matching TEMPLATE.yaml Section 1."""
-    
+
     name: str
     description: str
     author: str
@@ -36,7 +35,7 @@ class BatchMetadata:
 @dataclass
 class InfrastructureConfig:
     """Infrastructure configuration matching TEMPLATE.yaml Section 2."""
-    
+
     history: Optional[Dict[str, Any]] = None
     result: Optional[Dict[str, Any]] = None
 
@@ -44,17 +43,17 @@ class InfrastructureConfig:
 @dataclass
 class DatasetConfig:
     """Dataset configuration matching TEMPLATE.yaml Section 3."""
-    
+
     id: str
     name: str
     type: str  # "synthetic", "file", "entrez"
     parameters: Dict[str, Any]
 
 
-@dataclass 
+@dataclass
 class AlgorithmConfig:
-    """Algorithm configuration matching TEMPLATE.yaml Section 4."""
-    
+    """Algorithm configuration matching TEMPLATE.yaml Section 3."""
+
     id: str
     name: str
     description: str
@@ -64,25 +63,27 @@ class AlgorithmConfig:
 
 @dataclass
 class TaskConfig:
-    """Task configuration matching TEMPLATE.yaml Section 5."""
-    
+    """Task configuration matching TEMPLATE.yaml Section 4."""
+
     type: str  # "execution", "optimization", "sensitivity"
 
 
 @dataclass
 class ExecutionConfig:
-    """Execution configuration matching TEMPLATE.yaml Section 6A."""
-    
+    """Execution configuration matching TEMPLATE.yaml Section 5A."""
+
+    id: str
     name: str
     datasets: List[str]
-    algorithms: List[str]
+    algorithm_configs: List[str]
     repetitions: int
 
 
 @dataclass
 class OptimizationConfig:
-    """Optimization configuration matching TEMPLATE.yaml Section 6B."""
-    
+    """Optimization configuration matching TEMPLATE.yaml Section 5B."""
+
+    id: str
     name: str
     study_name: str
     direction: str
@@ -90,19 +91,20 @@ class OptimizationConfig:
     timeout_per_trial: int
     repetitions: int
     datasets: List[str]
-    algorithm: str
+    algorithm_config: str
     parameters: Dict[str, Any]
     optuna_config: Optional[Dict[str, Any]] = None
 
 
 @dataclass
 class SensitivityConfig:
-    """Sensitivity configuration matching TEMPLATE.yaml Section 6C."""
-    
+    """Sensitivity configuration matching TEMPLATE.yaml Section 5C."""
+
+    id: str
     name: str
     method: str  # "morris", "sobol", "fast", "delta"
     datasets: List[str]
-    algorithm: str
+    algorithm_config: str
     samples: int
     repetitions: int
     parameters: Dict[str, Any]
@@ -115,7 +117,7 @@ class SensitivityConfig:
 @dataclass
 class ExportConfig:
     """Export configuration matching TEMPLATE.yaml Section 7."""
-    
+
     enabled: bool = True
     destination: str = "outputs/{session}"
     formats: Optional[Dict[str, bool]] = None
@@ -128,10 +130,10 @@ class ExportConfig:
 @dataclass
 class PlotsConfig:
     """Plots configuration matching TEMPLATE.yaml Section 8."""
-    
+
     # Output formats (required field)
     formats: List[str] = field(default_factory=lambda: ["png", "pdf"])
-    
+
     # Optional fields with defaults
     enabled: bool = True
     # Common plots
@@ -146,60 +148,60 @@ class PlotsConfig:
     optimization_history: bool = True
     parameter_importance: bool = True
     parallel_coordinate: bool = True
-    # Sensitivity-specific plots  
+    # Sensitivity-specific plots
     sensitivity_indices: bool = True
     morris_trajectories: bool = True
     interaction_effects: bool = True
-    
+
     # Legacy compatibility properties
     @property
     def plot_convergence(self) -> bool:
         return self.convergence
-    
+
     @property
     def plot_comparison(self) -> bool:
         return self.comparison
-    
+
     @property
     def plot_boxplots(self) -> bool:
         return self.boxplots
-    
+
     @property
     def plot_runtime(self) -> bool:
         return self.runtime
-    
+
     @property
     def plot_scatter(self) -> bool:
         return self.scatter
-    
+
     @property
     def plot_heatmap(self) -> bool:
         return self.heatmap
-    
+
     @property
     def plot_success_rate(self) -> bool:
         return self.success_rate
-    
+
     @property
     def plot_optimization_history(self) -> bool:
         return self.optimization_history
-    
+
     @property
     def plot_parameter_importance(self) -> bool:
         return self.parameter_importance
-    
+
     @property
     def plot_parallel_coordinate(self) -> bool:
         return self.parallel_coordinate
-    
+
     @property
     def plot_sensitivity_indices(self) -> bool:
         return self.sensitivity_indices
-    
+
     @property
     def plot_morris_trajectories(self) -> bool:
         return self.morris_trajectories
-    
+
     @property
     def plot_interaction_effects(self) -> bool:
         return self.interaction_effects
@@ -208,7 +210,7 @@ class PlotsConfig:
 @dataclass
 class MonitoringConfig:
     """Monitoring configuration matching TEMPLATE.yaml Section 9."""
-    
+
     enabled: bool = True
     interface: str = "simple"  # "simple", "tui"
     update_interval: int = 3
@@ -217,7 +219,7 @@ class MonitoringConfig:
 @dataclass
 class ResourcesConfig:
     """Resources configuration matching TEMPLATE.yaml Section 10."""
-    
+
     cpu: Optional[Dict[str, Any]] = None
     memory: Optional[Dict[str, Any]] = None
     parallel: Optional[Dict[str, Any]] = None
@@ -227,7 +229,7 @@ class ResourcesConfig:
 @dataclass
 class LoggingConfig:
     """Logging configuration matching TEMPLATE.yaml Section 11."""
-    
+
     level: str = "INFO"  # "DEBUG", "INFO", "WARNING", "ERROR"
     output: Optional[Dict[str, bool]] = None
 
@@ -235,7 +237,7 @@ class LoggingConfig:
 @dataclass
 class SystemConfig:
     """System configuration matching TEMPLATE.yaml Section 12."""
-    
+
     global_seed: Optional[int] = None
     work_directory: Optional[str] = None
     force_cleanup: bool = False
@@ -249,12 +251,12 @@ class SystemConfig:
 @dataclass
 class BatchConfig:
     """Complete batch configuration combining all sections."""
-    
+
     metadata: BatchMetadata
     infrastructure: Optional[InfrastructureConfig] = None
     datasets: List[DatasetConfig] = field(default_factory=list)
-    algorithms: List[AlgorithmConfig] = field(default_factory=list)
-    task: TaskConfig = None
+    algorithm_configs: List[AlgorithmConfig] = field(default_factory=list)
+    task: Optional[TaskConfig] = None
     execution: Optional[Dict[str, Any]] = None
     optimization: Optional[Dict[str, Any]] = None
     sensitivity: Optional[Dict[str, Any]] = None
@@ -269,7 +271,7 @@ class BatchConfig:
 class ConfigParser:
     """
     Configuration parser that handles ONLY parameters from TEMPLATE.yaml.
-    
+
     This class ensures strict adherence to the standardized template structure.
     """
 
@@ -277,13 +279,17 @@ class ConfigParser:
     def load_config(config_path: Union[str, Path]) -> Dict[str, Any]:
         """Load and validate a YAML configuration file."""
         try:
-            with open(config_path, 'r', encoding='utf-8') as file:
+            with open(config_path, encoding="utf-8") as file:
                 config = yaml.safe_load(file)
                 if not config:
-                    raise BatchConfigurationError(f"Empty configuration file: {config_path}")
+                    raise BatchConfigurationError(
+                        f"Empty configuration file: {config_path}"
+                    )
                 return config
         except FileNotFoundError:
-            raise BatchConfigurationError(f"Configuration file not found: {config_path}")
+            raise BatchConfigurationError(
+                f"Configuration file not found: {config_path}"
+            )
         except yaml.YAMLError as e:
             raise BatchConfigurationError(f"Invalid YAML syntax: {e}")
         except Exception as e:
@@ -293,19 +299,21 @@ class ConfigParser:
     def parse_metadata(config: Dict[str, Any]) -> BatchMetadata:
         """Parse metadata section (Section 1)."""
         metadata_section = config.get("metadata", {})
-        
+
         required_fields = ["name", "description", "author", "version", "creation_date"]
         for field in required_fields:
             if field not in metadata_section:
-                raise BatchConfigurationError(f"Missing required metadata field: {field}")
-        
+                raise BatchConfigurationError(
+                    f"Missing required metadata field: {field}"
+                )
+
         return BatchMetadata(
             name=metadata_section["name"],
             description=metadata_section["description"],
             author=metadata_section["author"],
             version=metadata_section["version"],
             creation_date=metadata_section["creation_date"],
-            tags=metadata_section.get("tags", [])
+            tags=metadata_section.get("tags", []),
         )
 
     @staticmethod
@@ -314,100 +322,116 @@ class ConfigParser:
         infra_section = config.get("infrastructure")
         if not infra_section:
             return None
-            
+
         return InfrastructureConfig(
-            history=infra_section.get("history"),
-            result=infra_section.get("result")
+            history=infra_section.get("history"), result=infra_section.get("result")
         )
 
     @staticmethod
     def parse_datasets(config: Dict[str, Any]) -> List[DatasetConfig]:
         """Parse datasets section (Section 3)."""
         datasets_section = config.get("datasets", [])
-        
+
         datasets = []
         for dataset_data in datasets_section:
             # Validate required fields
             required_fields = ["id", "name", "type", "parameters"]
             for field in required_fields:
                 if field not in dataset_data:
-                    raise BatchConfigurationError(f"Missing required dataset field: {field}")
-            
+                    raise BatchConfigurationError(
+                        f"Missing required dataset field: {field}"
+                    )
+
             # Validate dataset type
             valid_types = ["synthetic", "file", "entrez"]
             if dataset_data["type"] not in valid_types:
-                raise BatchConfigurationError(f"Invalid dataset type: {dataset_data['type']}. Must be one of {valid_types}")
-            
-            datasets.append(DatasetConfig(
-                id=dataset_data["id"],
-                name=dataset_data["name"],
-                type=dataset_data["type"],
-                parameters=dataset_data["parameters"]
-            ))
-        
+                raise BatchConfigurationError(
+                    f"Invalid dataset type: {dataset_data['type']}. Must be one of {valid_types}"
+                )
+
+            datasets.append(
+                DatasetConfig(
+                    id=dataset_data["id"],
+                    name=dataset_data["name"],
+                    type=dataset_data["type"],
+                    parameters=dataset_data["parameters"],
+                )
+            )
+
         return datasets
 
     @staticmethod
     def parse_algorithms(config: Dict[str, Any]) -> List[AlgorithmConfig]:
-        """Parse algorithms section (Section 4)."""
-        algorithms_section = config.get("algorithms", [])
-        
+        """Parse algorithm_configs section (Section 3)."""
+        algorithms_section = config.get("algorithm_configs", [])
+
         algorithms = []
         for alg_data in algorithms_section:
             # Validate required fields
             required_fields = ["id", "name", "algorithms", "algorithm_params"]
             for field in required_fields:
                 if field not in alg_data:
-                    raise BatchConfigurationError(f"Missing required algorithm field: {field}")
-            
-            algorithms.append(AlgorithmConfig(
-                id=alg_data["id"],
-                name=alg_data["name"],
-                description=alg_data.get("description", ""),
-                algorithms=alg_data["algorithms"],
-                algorithm_params=alg_data["algorithm_params"]
-            ))
-        
+                    raise BatchConfigurationError(
+                        f"Missing required algorithm field: {field}"
+                    )
+
+            algorithms.append(
+                AlgorithmConfig(
+                    id=alg_data["id"],
+                    name=alg_data["name"],
+                    description=alg_data.get("description", ""),
+                    algorithms=alg_data["algorithms"],
+                    algorithm_params=alg_data["algorithm_params"],
+                )
+            )
+
         return algorithms
 
     @staticmethod
     def parse_task(config: Dict[str, Any]) -> TaskConfig:
         """Parse task section (Section 5)."""
         task_section = config.get("task", {})
-        
+
         task_type = task_section.get("type")
         if not task_type:
             raise BatchConfigurationError("Missing required task.type")
-        
+
         valid_types = ["execution", "optimization", "sensitivity"]
         if task_type not in valid_types:
-            raise BatchConfigurationError(f"Invalid task type: {task_type}. Must be one of {valid_types}")
-        
+            raise BatchConfigurationError(
+                f"Invalid task type: {task_type}. Must be one of {valid_types}"
+            )
+
         return TaskConfig(type=task_type)
 
     @staticmethod
     def parse_execution(config: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """Parse execution section (Section 6A)."""
+        """Parse execution section (Section 5A)."""
         execution_section = config.get("execution")
         if not execution_section:
             return None
-        
-        executions = []
-        for exec_data in execution_section.get("executions", []):
+
+        tasks = []
+        for task_data in execution_section.get("tasks", []):
             # Validate required fields
-            required_fields = ["name", "datasets", "algorithms", "repetitions"]
+            required_fields = ["id", "name", "datasets", "algorithm_configs", "repetitions"]
             for field in required_fields:
-                if field not in exec_data:
-                    raise BatchConfigurationError(f"Missing required execution field: {field}")
-            
-            executions.append(ExecutionConfig(
-                name=exec_data["name"],
-                datasets=exec_data["datasets"],
-                algorithms=exec_data["algorithms"],
-                repetitions=exec_data["repetitions"]
-            ))
-        
-        return {"executions": executions}
+                if field not in task_data:
+                    raise BatchConfigurationError(
+                        f"Missing required execution task field: {field}"
+                    )
+
+            tasks.append(
+                ExecutionConfig(
+                    id=task_data["id"],
+                    name=task_data["name"],
+                    datasets=task_data["datasets"],
+                    algorithm_configs=task_data["algorithm_configs"],
+                    repetitions=task_data["repetitions"],
+                )
+            )
+
+        return {"tasks": tasks}
 
     @staticmethod
     def parse_optimization(config: Dict[str, Any]) -> Optional[Dict[str, Any]]:
@@ -415,44 +439,62 @@ class ConfigParser:
         optimization_section = config.get("optimization")
         if not optimization_section:
             return None
-        
+
         # Parse global optuna defaults
         method = optimization_section.get("method", "optuna")
         if method != "optuna":
-            raise OptimizationConfigurationError(f"Unsupported optimization method: {method}")
-        
+            raise OptimizationConfigurationError(
+                f"Unsupported optimization method: {method}"
+            )
+
         optuna_defaults = optimization_section.get("optuna_defaults", {})
-        
+
         # Parse individual optimizations
         optimizations = []
-        for opt_data in optimization_section.get("optimizations", []):
+        for opt_data in optimization_section.get("tasks", []):
             # Validate required fields
-            required_fields = ["name", "study_name", "direction", "trials", "datasets", "algorithm", "parameters"]
+            required_fields = [
+                "id",
+                "name",
+                "study_name",
+                "direction",
+                "trials",
+                "datasets",
+                "algorithm_config",
+                "parameters",
+            ]
             for field in required_fields:
                 if field not in opt_data:
-                    raise OptimizationConfigurationError(f"Missing required optimization field: {field}")
-            
+                    raise OptimizationConfigurationError(
+                        f"Missing required optimization field: {field}"
+                    )
+
             # Validate direction
             if opt_data["direction"] not in ["minimize", "maximize"]:
-                raise OptimizationConfigurationError(f"Invalid direction: {opt_data['direction']}")
-            
-            optimizations.append(OptimizationConfig(
-                name=opt_data["name"],
-                study_name=opt_data["study_name"],
-                direction=opt_data["direction"],
-                trials=opt_data["trials"],
-                timeout_per_trial=opt_data.get("timeout_per_trial", 300),
-                repetitions=opt_data.get("repetitions", 1),
-                datasets=opt_data["datasets"],
-                algorithm=opt_data["algorithm"],
-                parameters=opt_data["parameters"],
-                optuna_config=opt_data.get("optuna_config")
-            ))
-        
+                raise OptimizationConfigurationError(
+                    f"Invalid direction: {opt_data['direction']}"
+                )
+
+            optimizations.append(
+                OptimizationConfig(
+                    id=opt_data["id"],
+                    name=opt_data["name"],
+                    study_name=opt_data["study_name"],
+                    direction=opt_data["direction"],
+                    trials=opt_data["trials"],
+                    timeout_per_trial=opt_data.get("timeout_per_trial", 300),
+                    repetitions=opt_data.get("repetitions", 1),
+                    datasets=opt_data["datasets"],
+                    algorithm_config=opt_data["algorithm_config"],
+                    parameters=opt_data["parameters"],
+                    optuna_config=opt_data.get("optuna_config"),
+                )
+            )
+
         return {
             "method": method,
             "optuna_defaults": optuna_defaults,
-            "optimizations": optimizations
+            "tasks": optimizations,
         }
 
     @staticmethod
@@ -461,46 +503,65 @@ class ConfigParser:
         sensitivity_section = config.get("sensitivity")
         if not sensitivity_section:
             return None
-        
+
         # Parse global salib defaults
         method = sensitivity_section.get("method", "SALib")
         if method != "SALib":
-            raise SensitivityConfigurationError(f"Unsupported sensitivity method: {method}")
-        
+            raise SensitivityConfigurationError(
+                f"Unsupported sensitivity method: {method}"
+            )
+
         salib_defaults = sensitivity_section.get("salib_defaults", {})
-        
+
         # Parse individual analyses
         analyses = []
-        for analysis_data in sensitivity_section.get("analyses", []):
+        for analysis_data in sensitivity_section.get("tasks", []):
             # Validate required fields
-            required_fields = ["name", "method", "datasets", "algorithm", "parameters", "output_metrics"]
+            required_fields = [
+                "id",
+                "name",
+                "method",
+                "datasets",
+                "algorithm_config",
+                "parameters",
+                "output_metrics",
+            ]
             for field in required_fields:
                 if field not in analysis_data:
-                    raise SensitivityConfigurationError(f"Missing required sensitivity field: {field}")
-            
+                    raise SensitivityConfigurationError(
+                        f"Missing required sensitivity field: {field}"
+                    )
+
             # Validate method
             valid_methods = ["morris", "sobol", "fast", "delta"]
             if analysis_data["method"] not in valid_methods:
-                raise SensitivityConfigurationError(f"Invalid sensitivity method: {analysis_data['method']}")
-            
-            analyses.append(SensitivityConfig(
-                name=analysis_data["name"],
-                method=analysis_data["method"],
-                datasets=analysis_data["datasets"],
-                algorithm=analysis_data["algorithm"],
-                samples=analysis_data.get("samples", salib_defaults.get("samples", 1000)),
-                repetitions=analysis_data.get("repetitions", 1),
-                parameters=analysis_data["parameters"],
-                output_metrics=analysis_data["output_metrics"],
-                morris=analysis_data.get("morris"),
-                sobol=analysis_data.get("sobol"),
-                fast=analysis_data.get("fast")
-            ))
-        
+                raise SensitivityConfigurationError(
+                    f"Invalid sensitivity method: {analysis_data['method']}"
+                )
+
+            analyses.append(
+                SensitivityConfig(
+                    id=analysis_data["id"],
+                    name=analysis_data["name"],
+                    method=analysis_data["method"],
+                    datasets=analysis_data["datasets"],
+                    algorithm_config=analysis_data["algorithm_config"],
+                    samples=analysis_data.get(
+                        "samples", salib_defaults.get("samples", 1000)
+                    ),
+                    repetitions=analysis_data.get("repetitions", 1),
+                    parameters=analysis_data["parameters"],
+                    output_metrics=analysis_data["output_metrics"],
+                    morris=analysis_data.get("morris"),
+                    sobol=analysis_data.get("sobol"),
+                    fast=analysis_data.get("fast"),
+                )
+            )
+
         return {
             "method": method,
             "salib_defaults": salib_defaults,
-            "analyses": analyses
+            "tasks": analyses,
         }
 
     @staticmethod
@@ -512,14 +573,18 @@ class ConfigParser:
             # Use new unified format
             results_config = output_section.get("results", {})
             structure_config = output_section.get("structure", {})
-            
+
             return ExportConfig(
                 enabled=results_config.get("enabled", True),
                 destination=output_section.get("base_directory", "outputs/{session}"),
                 formats=results_config.get("formats", {}),
                 format_options=results_config.get("format_options", {}),
                 directory_structure=structure_config,
-                include=list(results_config.get("content", {}).keys()) if results_config.get("content") else []
+                include=(
+                    list(results_config.get("content", {}).keys())
+                    if results_config.get("content")
+                    else []
+                ),
             )
         else:
             # Fallback to old export format
@@ -530,14 +595,14 @@ class ConfigParser:
                 formats=export_section.get("formats"),
                 format_options=export_section.get("format_options"),
                 directory_structure=export_section.get("directory_structure"),
-                include=export_section.get("include")
+                include=export_section.get("include"),
             )
 
     @staticmethod
     def parse_plots(config: Dict[str, Any]) -> PlotsConfig:
         """Parse plots section (Section 8)."""
         plots_section = config.get("plots", {})
-        
+
         return PlotsConfig(
             enabled=plots_section.get("enabled", True),
             # Common plots
@@ -557,56 +622,55 @@ class ConfigParser:
             morris_trajectories=plots_section.get("morris_trajectories", True),
             interaction_effects=plots_section.get("interaction_effects", True),
             # Output formats
-            formats=plots_section.get("formats", ["png", "pdf"])
+            formats=plots_section.get("formats", ["png", "pdf"]),
         )
 
     @staticmethod
     def parse_monitoring(config: Dict[str, Any]) -> MonitoringConfig:
         """Parse monitoring section (Section 9)."""
         monitoring_section = config.get("monitoring", {})
-        
+
         interface = monitoring_section.get("interface", "simple")
-        if interface not in ["simple", "tui"]:
+        if interface not in ["simple", "tui", "hierarchical"]:
             raise BatchConfigurationError(f"Invalid monitoring interface: {interface}")
-        
+
         return MonitoringConfig(
             enabled=monitoring_section.get("enabled", True),
             interface=interface,
-            update_interval=monitoring_section.get("update_interval", 3)
+            update_interval=monitoring_section.get("update_interval", 3),
         )
 
     @staticmethod
     def parse_resources(config: Dict[str, Any]) -> ResourcesConfig:
         """Parse resources section (Section 10)."""
         resources_section = config.get("resources", {})
-        
+
         return ResourcesConfig(
             cpu=resources_section.get("cpu"),
             memory=resources_section.get("memory"),
             parallel=resources_section.get("parallel"),
-            timeouts=resources_section.get("timeouts")
+            timeouts=resources_section.get("timeouts"),
         )
 
     @staticmethod
     def parse_logging(config: Dict[str, Any]) -> LoggingConfig:
         """Parse logging section (Section 11)."""
         logging_section = config.get("logging", {})
-        
+
         level = logging_section.get("level", "INFO")
         valid_levels = ["DEBUG", "INFO", "WARNING", "ERROR"]
         if level not in valid_levels:
-            raise BatchConfigurationError(f"Invalid logging level: {level}. Must be one of {valid_levels}")
-        
-        return LoggingConfig(
-            level=level,
-            output=logging_section.get("output")
-        )
+            raise BatchConfigurationError(
+                f"Invalid logging level: {level}. Must be one of {valid_levels}"
+            )
+
+        return LoggingConfig(level=level, output=logging_section.get("output"))
 
     @staticmethod
     def parse_system(config: Dict[str, Any]) -> SystemConfig:
         """Parse system section (Section 12)."""
         system_section = config.get("system", {})
-        
+
         return SystemConfig(
             global_seed=system_section.get("global_seed"),
             work_directory=system_section.get("work_directory"),
@@ -615,18 +679,18 @@ class ConfigParser:
             error_handling=system_section.get("error_handling"),
             progress_tracking=system_section.get("progress_tracking"),
             environment=system_section.get("environment"),
-            reproducibility=system_section.get("reproducibility")
+            reproducibility=system_section.get("reproducibility"),
         )
 
     @classmethod
     def parse_config(cls, config_path: Union[str, Path]) -> BatchConfig:
         """
         Parse a complete batch configuration file.
-        
+
         This method validates that ONLY parameters from TEMPLATE.yaml are used.
         """
         config = cls.load_config(config_path)
-        
+
         # Parse all sections according to TEMPLATE.yaml structure
         metadata = cls.parse_metadata(config)
         infrastructure = cls.parse_infrastructure(config)
@@ -642,21 +706,27 @@ class ConfigParser:
         resources = cls.parse_resources(config)
         logging = cls.parse_logging(config)
         system = cls.parse_system(config)
-        
+
         # Validate task type consistency
         task_type = task.type
         if task_type == "execution" and not execution:
-            raise BatchConfigurationError("Task type 'execution' requires 'execution' section")
+            raise BatchConfigurationError(
+                "Task type 'execution' requires 'execution' section"
+            )
         if task_type == "optimization" and not optimization:
-            raise BatchConfigurationError("Task type 'optimization' requires 'optimization' section")
+            raise BatchConfigurationError(
+                "Task type 'optimization' requires 'optimization' section"
+            )
         if task_type == "sensitivity" and not sensitivity:
-            raise BatchConfigurationError("Task type 'sensitivity' requires 'sensitivity' section")
-        
+            raise BatchConfigurationError(
+                "Task type 'sensitivity' requires 'sensitivity' section"
+            )
+
         return BatchConfig(
             metadata=metadata,
             infrastructure=infrastructure,
             datasets=datasets,
-            algorithms=algorithms,
+            algorithm_configs=algorithms,
             task=task,
             execution=execution,
             optimization=optimization,
@@ -666,7 +736,7 @@ class ConfigParser:
             monitoring=monitoring,
             resources=resources,
             logging=logging,
-            system=system
+            system=system,
         )
 
 
@@ -691,45 +761,41 @@ def save_batch_config(config: BatchConfig, output_path: Union[str, Path]) -> Non
             "author": config.metadata.author,
             "version": config.metadata.version,
             "creation_date": config.metadata.creation_date,
-            "tags": config.metadata.tags
+            "tags": config.metadata.tags,
         }
     }
-    
+
     # Add optional sections only if they exist
     if config.infrastructure:
         config_dict["infrastructure"] = {
             "history": config.infrastructure.history,
-            "result": config.infrastructure.result
+            "result": config.infrastructure.result,
         }
-    
+
     # Add datasets
     if config.datasets:
         config_dict["datasets"] = [
-            {
-                "id": ds.id,
-                "name": ds.name,
-                "type": ds.type,
-                "parameters": ds.parameters
-            }
+            {"id": ds.id, "name": ds.name, "type": ds.type, "parameters": ds.parameters}
             for ds in config.datasets
         ]
-    
-    # Add algorithms
-    if config.algorithms:
-        config_dict["algorithms"] = [
+
+    # Add algorithm_configs
+    if config.algorithm_configs:
+        config_dict["algorithm_configs"] = [
             {
                 "id": alg.id,
                 "name": alg.name,
                 "description": alg.description,
                 "algorithms": alg.algorithms,
-                "algorithm_params": alg.algorithm_params
+                "algorithm_params": alg.algorithm_params,
             }
-            for alg in config.algorithms
+            for alg in config.algorithm_configs
         ]
-    
+
     # Add task
-    config_dict["task"] = {"type": config.task.type}
-    
+    if config.task:
+        config_dict["task"] = {"type": config.task.type}
+
     # Add task-specific configurations
     if config.execution:
         config_dict["execution"] = config.execution
@@ -737,7 +803,7 @@ def save_batch_config(config: BatchConfig, output_path: Union[str, Path]) -> Non
         config_dict["optimization"] = config.optimization
     if config.sensitivity:
         config_dict["sensitivity"] = config.sensitivity
-    
+
     # Add all other sections with their current values
     config_dict["export"] = {
         "enabled": config.export.enabled,
@@ -745,9 +811,9 @@ def save_batch_config(config: BatchConfig, output_path: Union[str, Path]) -> Non
         "formats": config.export.formats,
         "format_options": config.export.format_options,
         "directory_structure": config.export.directory_structure,
-        "include": config.export.include
+        "include": config.export.include,
     }
-    
+
     config_dict["plots"] = {
         "enabled": config.plots.enabled,
         "convergence": config.plots.convergence,
@@ -763,174 +829,37 @@ def save_batch_config(config: BatchConfig, output_path: Union[str, Path]) -> Non
         "sensitivity_indices": config.plots.sensitivity_indices,
         "morris_trajectories": config.plots.morris_trajectories,
         "interaction_effects": config.plots.interaction_effects,
-        "formats": config.plots.formats
+        "formats": config.plots.formats,
     }
-    
+
     config_dict["monitoring"] = {
         "enabled": config.monitoring.enabled,
         "interface": config.monitoring.interface,
-        "update_interval": config.monitoring.update_interval
+        "update_interval": config.monitoring.update_interval,
     }
-    
+
     config_dict["resources"] = {
         "cpu": config.resources.cpu,
         "memory": config.resources.memory,
         "parallel": config.resources.parallel,
-        "timeouts": config.resources.timeouts
+        "timeouts": config.resources.timeouts,
     }
-    
+
     config_dict["logging"] = {
         "level": config.logging.level,
-        "output": config.logging.output
+        "output": config.logging.output,
     }
-    config_dict["system"] = {
-        "reproducibility": config.system.reproducibility
-    }
-    
+    config_dict["system"] = {"reproducibility": config.system.reproducibility}
+
     # Write to YAML file
-    with open(output_path, 'w', encoding='utf-8') as file:
-        yaml.dump(config_dict, file, default_flow_style=False, allow_unicode=True, indent=2)
-
-    @staticmethod
-    def parse_optimization_configs(config: Dict[str, Any]) -> List['OptimizationConfig']:
-        """Extract optimization configurations for legacy compatibility."""
-        optimization_section = config.get("optimization", {})
-        if not optimization_section:
-            raise OptimizationConfigurationError("optimization section not found")
-
-        # Support new structure (optimizations) and legacy (direct fields)
-        optimizations_list = optimization_section.get("optimizations")
-
-        if optimizations_list is not None:
-            # New structure: list of optimizations
-            return [
-                ConfigParser._parse_single_optimization(opt_config)
-                for opt_config in optimizations_list
-            ]
-        else:
-            # Legacy structure: single configuration
-            legacy_config = optimization_section.copy()
-
-            # Ensure required fields for legacy structure
-            if "target_dataset" in legacy_config:
-                legacy_config["datasets"] = [legacy_config.pop("target_dataset")]
-            if "target_datasets" in legacy_config:
-                legacy_config["datasets"] = legacy_config.pop("target_datasets")
-
-            if "nome" not in legacy_config and "name" not in legacy_config:
-                legacy_config["name"] = (
-                    f"Optimization {legacy_config.get('target_algorithm', legacy_config.get('algorithm', 'Unknown'))}"
-                )
-
-            return [ConfigParser._parse_single_optimization(legacy_config)]
-
-    @staticmethod
-    def _parse_single_optimization(opt_config: Dict[str, Any]) -> 'OptimizationConfig':
-        """Parse a single optimization configuration."""
-        required_fields = ["algorithm", "parameters"]
-        for field in required_fields:
-            if field not in opt_config and f"target_{field}" not in opt_config:
-                raise OptimizationConfigurationError(
-                    f"Required field missing: {field} or target_{field}"
-                )
-
-        return OptimizationConfig(
-            name=opt_config.get("name", opt_config.get("nome", "Unnamed optimization")),
-            study_name=opt_config.get("study_name", "default_study"),
-            direction=opt_config.get("direction", "minimize"),
-            trials=opt_config.get("trials", opt_config.get("n_trials", 100)),
-            timeout_per_trial=opt_config.get("timeout_per_trial", 300),
-            repetitions=opt_config.get("repetitions", 1),
-            target_datasets=opt_config.get("datasets", opt_config.get("target_datasets", [])),
-            target_algorithm=opt_config.get("algorithm", opt_config.get("target_algorithm", "")),
-            parameters=opt_config["parameters"],
-            optuna_config=opt_config.get("optuna_config"),
-        )
-
-    @staticmethod
-    def parse_sensitivity_configs(config: Dict[str, Any]) -> List['SensitivityConfig']:
-        """Extract sensitivity analysis configurations for legacy compatibility."""
-        sensitivity_section = config.get("sensitivity", {})
-        if not sensitivity_section:
-            raise SensitivityConfigurationError("sensitivity section not found")
-
-        # Extract global configurations
-        global_config = sensitivity_section.get("salib_defaults", sensitivity_section.get("global_salib_config", {}))
-        global_samples = global_config.get("samples", global_config.get("n_samples", 1000))
-        global_repetitions = global_config.get("repetitions", global_config.get("repetitions_per_sample", 3))
-
-        # Support new structure (analyses) and legacy (direct fields)
-        analyses_list = sensitivity_section.get("analyses")
-
-        if analyses_list is not None:
-            return [
-                ConfigParser._parse_single_sensitivity(
-                    sens_config, global_samples, global_repetitions
-                )
-                for sens_config in analyses_list
-            ]
-        else:
-            # Legacy structure: single configuration
-            legacy_config = sensitivity_section.copy()
-
-            if "target_dataset" in legacy_config:
-                legacy_config["datasets"] = [legacy_config.pop("target_dataset")]
-            if "target_datasets" in legacy_config:
-                legacy_config["datasets"] = legacy_config.pop("target_datasets")
-
-            if "nome" not in legacy_config and "name" not in legacy_config:
-                legacy_config["name"] = (
-                    f"Analysis {legacy_config.get('target_algorithm', legacy_config.get('algorithm', 'Unknown'))}"
-                )
-
-            return [
-                ConfigParser._parse_single_sensitivity(
-                    legacy_config, global_samples, global_repetitions
-                )
-            ]
-
-    @staticmethod
-    def _parse_single_sensitivity(
-        sens_config: Dict[str, Any],
-        global_samples: int = 1000,
-        global_repetitions: int = 3,
-    ) -> 'SensitivityConfig':
-        """Parse a single sensitivity analysis configuration."""
-        required_fields = ["algorithm", "parameters"]
-        for field in required_fields:
-            if field not in sens_config and f"target_{field}" not in sens_config:
-                raise SensitivityConfigurationError(
-                    f"Required field missing: {field} or target_{field}"
-                )
-
-        # Collect method-specific configuration
-        analysis_method = sens_config.get("method", sens_config.get("analysis_method", "morris"))
-        method_config = None
-
-        if analysis_method == "morris" and "morris" in sens_config:
-            method_config = sens_config["morris"]
-        elif analysis_method == "sobol" and "sobol" in sens_config:
-            method_config = sens_config["sobol"]
-        elif analysis_method == "fast" and "fast" in sens_config:
-            method_config = sens_config["fast"]
-
-        return SensitivityConfig(
-            name=sens_config.get("name", sens_config.get("nome", "Unnamed analysis")),
-            method=analysis_method,
-            target_datasets=sens_config.get("datasets", sens_config.get("target_datasets", [])),
-            target_algorithm=sens_config.get("algorithm", sens_config.get("target_algorithm", "")),
-            samples=sens_config.get("samples", sens_config.get("n_samples", global_samples)),
-            repetitions=sens_config.get("repetitions", sens_config.get("repetitions_per_sample", global_repetitions)),
-            parameters=sens_config["parameters"],
-            output_metrics=sens_config.get(
-                "output_metrics", ["distance", "execution_time"]
-            ),
-            method_config=method_config,
+    with open(output_path, "w", encoding="utf-8") as file:
+        yaml.dump(
+            config_dict, file, default_flow_style=False, allow_unicode=True, indent=2
         )
 
     @staticmethod
     def parse_resources_config(config: Dict[str, Any]) -> Dict[str, Any]:
-        """Parse batch resource configurations for legacy compatibility."""
+        """Parse batch resource configurations."""
         resources_section = config.get("resources", {})
         parallel_config = resources_section.get("parallel", {})
         timeouts_config = resources_section.get("timeouts", {})
@@ -947,8 +876,9 @@ def save_batch_config(config: BatchConfig, output_path: Union[str, Path]) -> Non
             "timeouts": {
                 "timeout_per_algorithm": timeout_per_algorithm,
                 "timeout_total_batch": timeout_total_batch,
-                # Legacy support
-                "global_timeout": timeouts_config.get("global_timeout", timeout_per_algorithm),
+                "global_timeout": timeouts_config.get(
+                    "global_timeout", timeout_per_algorithm
+                ),
                 "per_algorithm_run": timeout_per_algorithm,
                 "total_batch": timeout_total_batch,
             },
