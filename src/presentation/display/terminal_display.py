@@ -73,7 +73,7 @@ class TerminalDisplay:
     def _handle_executionstarted(self, event) -> None:
         """Handle ExecutionStartedEvent."""
         self._print_line(
-            f"\n📊 Execution: {event.execution_name} ({event.total_items} items)"
+            f"\n📊 Task: {event.execution_name} ({event.total_items} items)"
         )
 
     def _handle_executionprogress(self, event) -> None:

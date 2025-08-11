@@ -13,6 +13,7 @@ from .progress_events import (
     ExecutionFinishedEvent,
     AlgorithmProgressEvent,
     ErrorEvent,
+    DisplayEvent,
 )
 
 
@@ -295,6 +296,14 @@ class ProgressBroker:
             context=context or {},
             session_id=session_id,
         )
+        self.emit(event)
+
+    def emit_display_event(self, event: DisplayEvent) -> None:
+        """Emit a unified display event for any phase.
+
+        The display/UI should subscribe to this single stream to render processing,
+        optimization and analysis using the same component.
+        """
         self.emit(event)
 
     def clear_listeners(self) -> None:

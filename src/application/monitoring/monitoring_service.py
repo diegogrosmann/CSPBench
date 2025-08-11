@@ -4,7 +4,7 @@ from typing import Any, Dict, Optional
 import logging
 
 from .progress_broker import ProgressBroker
-from .progress_events import TaskType
+from .progress_events import TaskType, DisplayEvent
 
 
 class MonitoringService:
@@ -306,6 +306,17 @@ class MonitoringService:
             session_id=self._session_id,
         )
         self._logger.error(f"Error reported: {error_message}")
+
+    # Unified display API
+    def emit_event(self, event: DisplayEvent) -> None:
+        """Publish a unified display event to the broker/UI.
+
+        Keeps a single callback for processing, optimization and analysis.
+        """
+        try:
+            self._broker.emit_display_event(event)
+        except Exception as e:
+            self._logger.warning(f"Failed to emit display event: {e}")
 
     # Compatibility methods for monitor interface
     def update_hierarchy(

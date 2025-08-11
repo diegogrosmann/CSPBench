@@ -1542,7 +1542,22 @@ class ExecutionOrchestrator(BaseOrchestrator):
                             self._logger.debug(
                                 f"Collected {len(progress_history)} progress entries for rep {returned_rep_num}"
                             )
-                            # Os dados de progresso são mantidos no resultado para análise posterior
+                            # Encaminhar mensagens de progresso para callbacks do monitor
+                            try:
+                                for ph in progress_history:
+                                    raw_msg = ph.get("message", "").strip()
+                                    prog_val = float(ph.get("progress", 0.0) or 0.0)
+                                    if monitoring_service and raw_msg:
+                                        monitoring_service.algorithm_callback(
+                                            algorithm_name=algorithm_name,
+                                            progress=prog_val,
+                                            message=raw_msg,
+                                            item_id=rep_id,
+                                        )
+                            except Exception as cb_err:
+                                self._logger.warning(
+                                    f"Failed to forward progress_history to callbacks for rep {returned_rep_num}: {cb_err}"
+                                )
 
                     # Verificar se houve erro (result_data contém 'error')
                     if isinstance(result_data, dict) and "error" in result_data:

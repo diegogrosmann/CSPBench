@@ -180,6 +180,15 @@ class Executor(ExecutorInterface):
         dataset: Dataset,
         sensitivity_config: Dict[str, Any],
         monitoring_service=None,
+        *,
+        task_index: int = 1,
+        total_tasks: int = 1,
+        dataset_index: int = 1,
+        total_datasets: int = 1,
+        config_index: int = 1,
+        total_configs: int = 1,
+        algorithm_index: int = 1,
+        total_algorithms: int = 1,
     ) -> Dict[str, Any]:
         """
         Execute sensitivity analysis delegating to SensitivityOrchestrator.
@@ -209,7 +218,17 @@ class Executor(ExecutorInterface):
 
             # Execute analysis
             results = orchestrator.execute_sensitivity_analysis(
-                algorithm_name, dataset, sensitivity_config
+                algorithm_name,
+                dataset,
+                sensitivity_config,
+                task_index=task_index,
+                total_tasks=total_tasks,
+                dataset_index=dataset_index,
+                total_datasets=total_datasets,
+                config_index=config_index,
+                total_configs=total_configs,
+                algorithm_index=algorithm_index,
+                total_algorithms=total_algorithms,
             )
 
             return results
@@ -321,3 +340,6 @@ class Executor(ExecutorInterface):
         # For now, return False
         # TODO: Implement cancellation system
         return False
+
+# Backward compatibility alias expected by legacy tests
+LocalExecutor = Executor

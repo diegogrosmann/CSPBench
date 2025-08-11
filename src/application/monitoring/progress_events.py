@@ -56,6 +56,14 @@ class ExecutionPhase(Enum):
     FAILED = "failed"
 
 
+class UnifiedPhase(Enum):
+    """Unified high-level phases for display across the system."""
+
+    PROCESSING = "processing"
+    OPTIMIZATION = "optimization"
+    ANALYSIS = "analysis"
+
+
 @dataclass
 class ProgressEvent:
     """Base class for all progress events."""
@@ -159,3 +167,21 @@ class ErrorEvent(ProgressEvent):
     error_message: str = ""
     error_type: str = "generic"
     context: Dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class DisplayEvent(ProgressEvent):
+    """Unified display event consumed by a single display for all phases.
+
+    This keeps a minimal, phase-agnostic contract and carries extra data in payload.
+    """
+
+    phase: UnifiedPhase = UnifiedPhase.PROCESSING
+    message: str = ""
+    progress: float = 0.0  # 0..1 progress for the current unit
+    dataset_id: Optional[str] = None
+    algorithm_name: Optional[str] = None
+    task_id: Optional[str] = None
+    trial_no: Optional[int] = None
+    rep_idx: Optional[int] = None
+    payload: Dict[str, Any] = field(default_factory=dict)

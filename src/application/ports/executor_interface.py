@@ -74,6 +74,15 @@ class ExecutorInterface(ABC):
         dataset: Dataset,
         sensitivity_config: Dict[str, Any],
         monitoring_service=None,
+        *,
+        task_index: int = 1,
+        total_tasks: int = 1,
+        dataset_index: int = 1,
+        total_datasets: int = 1,
+        config_index: int = 1,
+        total_configs: int = 1,
+        algorithm_index: int = 1,
+        total_algorithms: int = 1,
     ) -> Dict[str, Any]:
         """
         Execute sensitivity analysis.

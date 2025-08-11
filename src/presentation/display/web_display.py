@@ -93,8 +93,10 @@ class WebDisplay:
             if hasattr(event, 'message'):
                 self._logger.info(f"[WEB_DISPLAY] 💬 message: {event.message}")
 
-            # Route to specific handlers
-            if hasattr(self, f'_handle_{event_type.lower().replace("event", "")}'):
+            # Route to specific handlers (including unified DisplayEvent)
+            if event_type == "DisplayEvent":
+                self._handle_display(event)
+            elif hasattr(self, f'_handle_{event_type.lower().replace("event", "")}'):
                 handler = getattr(self, f'_handle_{event_type.lower().replace("event", "")}')
                 handler(event)
             else:
@@ -105,6 +107,51 @@ class WebDisplay:
 
         except Exception as e:
             self._logger.error(f"[WEB_DISPLAY] ❌ Error handling event {type(event).__name__}: {e}", exc_info=True)
+
+    def _handle_display(self, event) -> None:
+        """Handle unified DisplayEvent by appending to callbacks history and updating current context."""
+        try:
+            phase = getattr(event, "phase", None)
+            dataset_id = getattr(event, "dataset_id", None)
+            algorithm_name = getattr(event, "algorithm_name", None)
+            task_id = getattr(event, "task_id", None)
+            trial_no = getattr(event, "trial_no", None)
+            rep_idx = getattr(event, "rep_idx", None)
+            progress = getattr(event, "progress", 0.0)
+            message = getattr(event, "message", "")
+            payload = getattr(event, "payload", {}) or {}
+
+            # Update current context
+            if dataset_id:
+                self._current_dataset_id = dataset_id
+            if algorithm_name:
+                self._current_algorithm = algorithm_name
+
+            # Append history entry
+            entry = {
+                "ts": datetime.now().isoformat(),
+                "phase": getattr(phase, "value", str(phase)),
+                "dataset": dataset_id,
+                "algorithm": algorithm_name,
+                "task_id": task_id,
+                "trial": trial_no,
+                "rep": rep_idx,
+                "progress": progress,
+                "message": message,
+                "payload": payload,
+            }
+            self._callbacks_history.setdefault("history", []).append(entry)
+
+            # Update execution status
+            self._execution_status["current_execution"] = {
+                "dataset": self._current_dataset_id,
+                "algorithm": self._current_algorithm,
+                "phase": getattr(phase, "value", str(phase)),
+                "progress": progress,
+                "message": message,
+            }
+        except Exception as e:
+            self._logger.warning(f"[WEB_DISPLAY] Failed to handle DisplayEvent: {e}")
 
     def _handle_taskstarted(self, event) -> None:
         """Handle TaskStartedEvent - Initialize batch structure."""

@@ -26,26 +26,31 @@ class LiveTerminalDisplay:
         """
         self._verbose = verbose
         self._logger = logging.getLogger(__name__)
+        # Compact mode: show only progress lines (no headers/footers)
+        # Default now is non-compact (hierarchical display). Set CSPB_COMPACT_DISPLAY=1 to enable compact.
+        self._compact = os.getenv("CSPB_COMPACT_DISPLAY", "0") not in {"0", "false", "False"}
 
         # Terminal capabilities
         self._terminal_width = self._get_terminal_width()
 
         # State tracking
-        self._batch_info = {}
-        self._executions = {}
-        self._current_execution = None
-        self._current_dataset = None
-        self._current_config = None
-        self._algorithms = {}
-        self._start_time = None
-        self._last_update = datetime.now()
+        self._batch_info: Dict[str, Any] = {}
+        self._executions: Dict[str, Any] = {}
+        self._current_execution: Optional[str] = None
+        self._current_dataset: Optional[str] = None
+        self._current_config: Optional[str] = None
+        self._algorithms: Dict[str, Any] = {}
+        self._start_time: Optional[datetime] = None
+        self._last_update: datetime = datetime.now()
+
+        # Tracks which algorithm line is currently open (being updated in-place)
+        self._open_line_key: Optional[str] = None
 
         # Display control
         self._display_lock = threading.Lock()
         self._header_printed = False
-        self._last_display_state = (
-            {}
-        )  # Track what was last displayed to show only changes
+        # Track what was last displayed to show only changes
+        self._last_display_state: Dict[str, Any] = {}
 
     def _get_terminal_width(self) -> int:
         """Get terminal width or default to 80."""
@@ -74,6 +79,11 @@ class LiveTerminalDisplay:
             try:
                 event_type = type(event).__name__
 
+                # Unified display support
+                if event_type == "DisplayEvent":
+                    self._handle_display_event(event)
+                    return
+
                 if event_type == "TaskStartedEvent":
                     self._handle_task_started(event)
                 elif event_type == "ExecutionStartedEvent":
@@ -92,6 +102,145 @@ class LiveTerminalDisplay:
             except Exception as e:
                 self._logger.error(f"Error handling event {event_type}: {e}")
 
+
+    def _handle_display_event(self, event) -> None:
+        """Render unified DisplayEvent; for optimization and analysis, mirror hierarchical display."""
+        phase = getattr(event, "phase", None)
+        phase_name = str(getattr(phase, "value", phase)).lower()
+
+        # Tratar optimization e analysis (sensibilidade) como hierarquia
+        if phase_name not in {"optimization", "analysis"}:
+            if self._compact:
+                return
+            print(f"📝 {getattr(event, 'message', '')}")
+            return
+
+        # Extract optimization context
+        dataset = getattr(event, "dataset_id", "-")
+        algo = getattr(event, "algorithm_name", "-")
+        task_id = getattr(event, "task_id", "-")
+        trial = int(getattr(event, "trial_no", 0) or 0)
+        rep = int(getattr(event, "rep_idx", 0) or 0)
+        progress = float(getattr(event, "progress", 0.0) or 0.0)
+        msg = getattr(event, "message", "") or ""
+        payload = getattr(event, "payload", {}) or {}
+
+        total_trials = int(payload.get("total_trials") or 0)
+        repetitions = int(payload.get("repetitions") or 0)
+        # Optional hierarchical counters provided by executor
+        task_index = int(payload.get("task_index", 1))
+        total_tasks = int(payload.get("total_tasks", 1))
+        task_name = payload.get("task_name") or task_id or "Task"
+        ds_index = int(payload.get("dataset_index", 1))
+        total_ds = int(payload.get("total_datasets", 1))
+        cfg_index = int(payload.get("config_index", 1))
+        total_cfgs = int(payload.get("total_configs", 1))
+
+        # Skip cosmetic-noise events
+        if msg == "algorithm skipped":
+            return
+
+        # Initialize header when first optimization event arrives
+        if not self._header_printed and not self._compact:
+            self._print_header()
+
+        # Maintain a structure mirroring processing for optimization
+        exec_name = f"Optimization: {task_name}"
+        if exec_name not in self._executions:
+            self._executions[exec_name] = {
+                "name": exec_name,
+                "status": "running",
+                "datasets": {},
+                "metadata": {"type": "optimization"},
+                "current_dataset": None,
+                "current_config": None,
+                "index": task_index or 1,
+                "total_executions": total_tasks or 1,
+            }
+
+        self._current_execution = exec_name
+
+        # Dataset level
+        execution = self._executions[exec_name]
+        if dataset not in execution["datasets"]:
+            execution["datasets"][dataset] = {
+                "name": dataset,
+                "configs": {},
+                "current_config": None,
+                # Use indices from payload when available for consistent counters
+                "index": ds_index,
+                "total_datasets": total_ds,
+            }
+        d = execution["datasets"][dataset]
+        # Keep indices updated if later events provide better totals
+        d["index"] = ds_index or d.get("index", 1)
+        d["total_datasets"] = total_ds or d.get("total_datasets", 1)
+
+        # Treat algorithm as a config entry under a pseudo-config "Default"
+        cfg_name = "Default Configuration"
+        if cfg_name not in d["configs"]:
+            d["configs"][cfg_name] = {
+                "name": cfg_name,
+                "algorithms": {},
+                "progress": 0,
+                "index": cfg_index,
+                "total_configs": total_cfgs,
+            }
+        d["current_config"] = cfg_name
+        self._current_dataset = dataset
+        self._current_config = cfg_name
+
+        cfg = d["configs"][cfg_name]
+
+        # Initialize algorithm tracking
+        # Ignore algorithms with zero trials to avoid 0/0 bars
+        if total_trials <= 0 and msg in {"trial start", "trial rep", "trial end"}:
+            return
+
+        if algo not in cfg["algorithms"]:
+            cfg["algorithms"][algo] = {
+                "name": algo,
+                "progress": 0,
+                "current_run": 0,
+                "total_runs": total_trials,
+                "status": "running",
+                "message": "",
+            }
+
+        algo_info = cfg["algorithms"][algo]
+
+        # Update current_run based on trial index
+        if msg == "trial end" and trial > 0:
+            # trial indices start at 1
+            algo_info["current_run"] = max(algo_info.get("current_run", 0), trial)
+
+        # Determine percent by trials completed
+        # Update total_runs if the incoming total_trials is higher/better info
+        if total_trials and total_trials > int(algo_info.get("total_runs", 0)):
+            algo_info["total_runs"] = int(total_trials)
+        total_runs = max(1, int(algo_info.get("total_runs") or total_trials or 1))
+        current_runs = int(algo_info.get("current_run", 0))
+        pct = (current_runs / total_runs) * 100.0
+
+        # Completion status
+        if current_runs >= total_runs:
+            algo_info["status"] = "completed"
+            pct = 100.0
+
+        # Store message
+        algo_info["message"] = msg
+
+        # Compact vs non-compact rendering
+        if self._compact:
+            # Single line similar to processing output when finishing a trial rep
+            bar = self._create_progress_bar(pct)
+            print(
+                f"      {'✅' if pct >= 100 else '🔄'} {algo} ({current_runs}/{total_runs}): [{bar}] {pct:5.1f}%"
+            )
+        else:
+            # Reuse hierarchical incremental printer
+            self._refresh_display()
+
     def _handle_task_started(self, event) -> None:
         """Handle TaskStartedEvent."""
         self._start_time = datetime.now()
@@ -101,16 +250,18 @@ class LiveTerminalDisplay:
             "metadata": event.metadata or {},
         }
 
-        # Print initial header
-        self._print_header()
+        # Print initial header unless compact mode
+        if not self._compact:
+            self._print_header()
 
     def _handle_execution_started(self, event) -> None:
         """Handle ExecutionStartedEvent."""
         self._current_execution = event.execution_name
         metadata = getattr(event, "metadata", {})
 
-        if self._current_execution not in self._executions:
-            self._executions[self._current_execution] = {
+        exec_key = self._current_execution or "Default Execution"
+        if exec_key not in self._executions:
+            self._executions[exec_key] = {
                 "name": event.execution_name,
                 "status": "running",
                 "datasets": {},
@@ -122,7 +273,8 @@ class LiveTerminalDisplay:
                 "total_executions": metadata.get("total_executions", 1),
             }
 
-        self._refresh_display()
+        if not self._compact:
+            self._refresh_display()
 
     def _handle_execution_progress(self, event) -> None:
         """Handle ExecutionProgressEvent."""
@@ -146,7 +298,21 @@ class LiveTerminalDisplay:
         self._current_config = config_name
 
         # Update execution structure
-        execution = self._executions[self._current_execution]
+        exec_key = self._current_execution or "Default Execution"
+        execution = self._executions.get(exec_key)
+        if execution is None:
+            self._executions[exec_key] = {
+                "name": exec_key,
+                "status": "running",
+                "datasets": {},
+                "metadata": {},
+                "current_dataset": None,
+                "current_config": None,
+                "index": 1,
+                "total_executions": 1,
+            }
+            execution = self._executions[exec_key]
+
         if dataset_name not in execution["datasets"]:
             execution["datasets"][dataset_name] = {
                 "name": dataset_name,
@@ -171,7 +337,17 @@ class LiveTerminalDisplay:
         dataset["current_config"] = config_name
         execution["current_dataset"] = dataset_name
 
-        self._refresh_display()
+        if self._compact:
+            # Compact mode: print a single concise line per update
+            try:
+                print(
+                    f"[execution] ds={dataset_name} cfg={config_name} p={event.progress_percent:.0f}%"
+                )
+                self._last_update = datetime.now()
+            except Exception:
+                pass
+        else:
+            self._refresh_display()
 
     def _handle_algorithm_progress(self, event) -> None:
         """Handle AlgorithmProgressEvent."""
@@ -184,8 +360,8 @@ class LiveTerminalDisplay:
                 self._current_execution = list(self._executions.keys())[0]
             else:
                 self._current_execution = "Default Execution"
-                self._executions[self._current_execution] = {
-                    "name": self._current_execution,
+                self._executions["Default Execution"] = {
+                    "name": "Default Execution",
                     "status": "running",
                     "datasets": {},
                     "metadata": {},
@@ -197,7 +373,8 @@ class LiveTerminalDisplay:
         dataset_name = self._current_dataset or "default_dataset"
         config_name = self._current_config or "default_config"
 
-        execution = self._executions[self._current_execution]
+        exec_key = self._current_execution or "Default Execution"
+        execution = self._executions[exec_key]
 
         # Ensure dataset exists
         if dataset_name not in execution["datasets"]:
@@ -264,21 +441,34 @@ class LiveTerminalDisplay:
         # Update message
         algo_info["message"] = event.message
 
-        self._refresh_display()
+        if self._compact:
+            # Compact mode: show a minimal per-algorithm progress line
+            try:
+                print(
+                    f"[algorithm] alg={event.algorithm_name} runs={algo_info['current_run']}/{algo_info['total_runs']} status={algo_info['status']}"
+                )
+                self._last_update = datetime.now()
+            except Exception:
+                pass
+        else:
+            self._refresh_display()
 
     def _handle_execution_finished(self, event) -> None:
         """Handle ExecutionFinishedEvent."""
-        if self._current_execution in self._executions:
-            self._executions[self._current_execution]["status"] = (
+        exec_key = self._current_execution or "Default Execution"
+        if exec_key in self._executions:
+            self._executions[exec_key]["status"] = (
                 "completed" if event.success else "failed"
             )
 
-        self._refresh_display()
+        if not self._compact:
+            self._refresh_display()
 
     def _handle_task_finished(self, event) -> None:
         """Handle TaskFinishedEvent."""
         # Print final summary
-        self._print_final_summary(event)
+        if not self._compact:
+            self._print_final_summary(event)
 
     def _handle_error(self, event) -> None:
         """Handle ErrorEvent."""
@@ -312,7 +502,6 @@ class LiveTerminalDisplay:
         if not self._header_printed:
             self._print_status_header()
             self._header_printed = True
-
         # Show only incremental changes
         self._print_execution_changes()
 
@@ -331,7 +520,7 @@ class LiveTerminalDisplay:
                 exec_index = execution.get("index", 1)
                 total_executions = execution.get("total_executions", 1)
                 print(
-                    f"\n{exec_status} Execution: {exec_name} ({exec_index}/{total_executions})"
+                    f"\n{exec_status} Task: {exec_name} ({exec_index}/{total_executions})"
                 )
                 self._last_display_state[exec_name] = {"datasets": {}}
 
@@ -340,6 +529,10 @@ class LiveTerminalDisplay:
             if execution.get("datasets"):
                 for dataset_name, dataset in execution["datasets"].items():
                     if dataset_name not in exec_state["datasets"]:
+                        # Ensure any open algorithm line is closed before a new header
+                        if self._open_line_key is not None:
+                            print()
+                            self._open_line_key = None
                         # New dataset - include counter information
                         dataset_index = dataset.get("index", 1)
                         total_datasets = dataset.get("total_datasets", 1)
@@ -353,6 +546,10 @@ class LiveTerminalDisplay:
                     if dataset.get("configs"):
                         for config_name, config in dataset["configs"].items():
                             if config_name not in dataset_state["configs"]:
+                                # Ensure any open algorithm line is closed before a new header
+                                if self._open_line_key is not None:
+                                    print()
+                                    self._open_line_key = None
                                 # New configuration - include counter information
                                 config_index = config.get("index", 1)
                                 total_configs = config.get("total_configs", 1)
@@ -367,88 +564,63 @@ class LiveTerminalDisplay:
 
                             if config.get("algorithms"):
                                 for algo_name, algo in config["algorithms"].items():
-                                    # Calculate aggregated progress
+                                    # Calculate aggregated progress safely
+                                    total_runs = max(0, int(algo.get("total_runs", 0)))
+                                    current_runs = max(0, int(algo.get("current_run", 0)))
                                     completed_runs = (
-                                        algo["current_run"]
-                                        if algo["status"] == "completed"
-                                        else algo["current_run"] - 1
+                                        total_runs if total_runs > 0 and current_runs >= total_runs else current_runs
                                     )
-                                    total_runs = algo["total_runs"]
                                     progress_percent = (
-                                        (completed_runs / total_runs) * 100
-                                        if total_runs > 0
-                                        else 0
+                                        (completed_runs / total_runs) * 100 if total_runs > 0 else 0
                                     )
 
-                                    # Create unique key for tracking
-                                    algo_key = f"{algo_name}_{total_runs}"
+                                    # Use a stable key per algorithm (avoid duplication when total_runs changes)
+                                    algo_key = algo_name
+                                    full_key = f"{exec_name}|{dataset_name}|{config_name}|{algo_name}"
 
-                                    # Check if this is new or progress changed
-                                    last_progress = config_state["algorithms"].get(
-                                        algo_key, -1
-                                    )
+                                    # Last printed progress for this algorithm
+                                    last_progress = config_state["algorithms"].get(algo_key, -1)
 
+                                    # If first time seeing the algorithm, print initial 0% line (without newline)
                                     if algo_key not in config_state["algorithms"]:
-                                        # First time showing this algorithm - show as (0/N) initially
-                                        status_icon = "⏳"
-                                        progress_bar = self._create_progress_bar(0)
-                                        run_info = f"(0/{total_runs})"
-
+                                        # Ensure any previously open line is finalized
+                                        if self._open_line_key is not None and self._open_line_key != full_key:
+                                            print()
+                                            self._open_line_key = None
+                                        init_bar = self._create_progress_bar(0)
                                         print(
-                                            f"      {status_icon} {algo_name} {run_info}: [{progress_bar}]   0.0%",
+                                            f"      ⏳ {algo_name} (0/{total_runs}): [{init_bar}]   0.0%",
                                             end="",
                                             flush=True,
                                         )
+                                        self._open_line_key = full_key
                                         config_state["algorithms"][algo_key] = 0
 
-                                        # If the algorithm actually has progress already, update it on the same line
-                                        if progress_percent > 0:
-                                            status_icon = self._get_algorithm_status_icon_by_progress(
-                                                progress_percent
-                                            )
-                                            progress_bar = self._create_progress_bar(
-                                                progress_percent
-                                            )
-                                            run_info = (
-                                                f"({completed_runs}/{total_runs})"
-                                            )
-
-                                            print(
-                                                f"\r      {status_icon} {algo_name} {run_info}: [{progress_bar}] {progress_percent:5.1f}%",
-                                                end="",
-                                                flush=True,
-                                            )
-                                            config_state["algorithms"][
-                                                algo_key
-                                            ] = progress_percent
-
-                                            # Add newline only when algorithm is completed
-                                            if progress_percent >= 100:
-                                                print()  # Move to next line when completed
-                                    elif last_progress != progress_percent:
-                                        # Update existing line using carriage return
-                                        status_icon = (
-                                            self._get_algorithm_status_icon_by_progress(
-                                                progress_percent
-                                            )
-                                        )
-                                        progress_bar = self._create_progress_bar(
-                                            progress_percent
-                                        )
+                                    # Update in-place while running; print newline on completion
+                                    if 0 <= last_progress < 100 and progress_percent > last_progress and progress_percent < 100:
+                                        status_icon = self._get_algorithm_status_icon_by_progress(progress_percent)
+                                        progress_bar = self._create_progress_bar(progress_percent)
                                         run_info = f"({completed_runs}/{total_runs})"
+                                        line_text = f"      {status_icon} {algo_name} {run_info}: [{progress_bar}] {progress_percent:5.1f}%"
+                                        if self._open_line_key == full_key:
+                                            self._overwrite_line(line_text)
+                                        else:
+                                            print("\n" + line_text, end="", flush=True)
+                                            self._open_line_key = full_key
+                                        config_state["algorithms"][algo_key] = progress_percent
 
-                                        print(
-                                            f"\r      {status_icon} {algo_name} {run_info}: [{progress_bar}] {progress_percent:5.1f}%",
-                                            end="",
-                                            flush=True,
-                                        )
-                                        config_state["algorithms"][
-                                            algo_key
-                                        ] = progress_percent
-
-                                        # Add newline only when algorithm is completed
-                                        if progress_percent >= 100:
-                                            print()  # Move to next line when completed
+                                    if progress_percent >= 100 and last_progress < 100:
+                                        status_icon = "✅"
+                                        progress_bar = self._create_progress_bar(100)
+                                        run_info = f"({total_runs}/{total_runs})"
+                                        line_text = f"      {status_icon} {algo_name} {run_info}: [{progress_bar}] 100.0%"
+                                        if self._open_line_key == full_key:
+                                            self._overwrite_line(line_text)
+                                            print()
+                                        else:
+                                            print("\n" + line_text)
+                                        self._open_line_key = None
+                                        config_state["algorithms"][algo_key] = 100
 
     def _get_algorithm_status_icon(self, status: str) -> str:
         """Get status icon for algorithm."""
@@ -469,6 +641,15 @@ class LiveTerminalDisplay:
         filled = int(percentage / 100 * width)
         bar = "█" * filled + "░" * (width - filled)
         return bar
+
+    def _overwrite_line(self, text: str) -> None:
+        """Overwrite the current terminal line, clearing residual characters."""
+        try:
+            sys.stdout.write("\r\033[K" + text)
+            sys.stdout.flush()
+        except Exception:
+            # Fallback if ANSI not supported
+            print("\r" + text, end="", flush=True)
 
     def _print_final_summary(self, event) -> None:
         """Print final execution summary."""

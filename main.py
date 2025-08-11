@@ -71,6 +71,16 @@ from typing import Any, Dict, Optional
 import typer
 import yaml
 
+# Early startup notice as soon as possible when running as script
+if __name__ == "__main__":
+    try:
+        print(
+            "🔧 Inicializando CSPBench... aguarde, carregando módulos e configurações.",
+            flush=True,
+        )
+    except Exception:
+        pass
+
 # Load environment variables from .env file
 try:
     from dotenv import load_dotenv
@@ -113,6 +123,11 @@ config: Optional[Dict[str, Any]] = None
 session_manager: Optional[SessionManager] = None
 
 
+def _is_compact_mode() -> bool:
+    """Return True if compact display mode is enabled."""
+    return os.getenv("CSPB_COMPACT_DISPLAY", "1") not in {"0", "false", "False"}
+
+
 def load_config() -> Dict[str, Any]:
     """Load configuration from settings.yaml file."""
     config_path = Path("config/settings.yaml")
@@ -151,10 +166,11 @@ def create_entrez_repository(config: Dict[str, Any]) -> Optional[Any]:
         # Check if required environment variables are set
         email = os.getenv("NCBI_EMAIL")
         if not email:
-            typer.echo(
-                "⚠️  NCBI_EMAIL not set. Entrez datasets will not be available.",
-                err=True,
-            )
+            if not _is_compact_mode():
+                typer.echo(
+                    "⚠️  NCBI_EMAIL not set. Entrez datasets will not be available.",
+                    err=True,
+                )
             return None
 
         # Create repository
@@ -162,16 +178,19 @@ def create_entrez_repository(config: Dict[str, Any]) -> Optional[Any]:
 
         # Test availability
         if entrez_repo.is_available():
-            typer.echo("✅ Entrez datasets enabled")
+            if not _is_compact_mode():
+                typer.echo("✅ Entrez datasets enabled")
             return entrez_repo
         else:
-            typer.echo(
-                "⚠️  Entrez service not available. Check network connection.", err=True
-            )
+            if not _is_compact_mode():
+                typer.echo(
+                    "⚠️  Entrez service not available. Check network connection.", err=True
+                )
             return None
 
     except Exception as e:
-        typer.echo(f"⚠️  Failed to initialize Entrez repository: {str(e)}", err=True)
+        if not _is_compact_mode():
+            typer.echo(f"⚠️  Failed to initialize Entrez repository: {str(e)}", err=True)
         return None
 
 
@@ -397,7 +416,8 @@ def initialize_service(
         session_manager=session_manager,
     )
 
-    typer.echo("✅ CSPBench initialized successfully!")
+    if not _is_compact_mode():
+        typer.echo("✅ CSPBench initialized successfully!")
     return service
 
 
@@ -641,15 +661,11 @@ def execute_batch_file(batch_file: str):
         batch_dict = {
             "output": {
                 "base_directory": (
-                    batch_config.export.destination
-                    if batch_config.export
-                    else "outputs/{session}"
+                    batch_config.export.destination if batch_config.export else "outputs/{session}"
                 ),
                 "logging": {
                     "enabled": True,  # Default to enabled
-                    "level": (
-                        batch_config.logging.level if batch_config.logging else "INFO"
-                    ),
+                    "level": (batch_config.logging.level if batch_config.logging else "INFO"),
                 },
             }
         }
@@ -669,7 +685,9 @@ def execute_batch_file(batch_file: str):
         print("📋 Batch interrupted during execution")
         sys.exit(0)  # Exit with code 0 to indicate intentional cancellation
     except Exception as e:
+        import traceback
         print(f"❌ Batch error: {e}")
+        print("📄 Traceback:\n" + traceback.format_exc())
         sys.exit(1)
 
 

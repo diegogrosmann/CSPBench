@@ -67,8 +67,6 @@ class FileExporter(ExportPort):
         else:
             self._write_json(results, dest_path, options)
 
-        return str(dest_path)
-
     def export_batch_results(
         self,
         batch_results: List[Dict[str, Any]],
@@ -113,8 +111,6 @@ class FileExporter(ExportPort):
             self._write_txt(batch_data, dest_path)
         else:
             self._write_json(batch_data, dest_path, options)
-
-        return str(dest_path)
 
     def get_supported_formats(self) -> List[str]:
         """List supported formats."""

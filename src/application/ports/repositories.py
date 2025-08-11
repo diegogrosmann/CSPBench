@@ -74,70 +74,6 @@ class DatasetRepository(Protocol):
         ...
 
 
-@runtime_checkable
-class AlgorithmRegistry(Protocol):
-    """Port para registry de algoritmos."""
-
-    def get_algorithm(self, name: str) -> type[CSPAlgorithm]:
-        """
-        Obtém classe de algoritmo por nome.
-
-        Args:
-            name: Nome do algoritmo
-
-        Returns:
-            type[CSPAlgorithm]: Classe do algoritmo
-        """
-        ...
-
-    def list_algorithms(self) -> List[str]:
-        """
-        Lista algoritmos disponíveis.
-
-        Returns:
-            List[str]: Nomes dos algoritmos disponíveis
-        """
-        ...
-
-    def register_algorithm(self, algorithm_class: type[CSPAlgorithm]) -> None:
-        """
-        Registra novo algoritmo.
-
-        Args:
-            algorithm_class: Classe do algoritmo a ser registrada
-        """
-        ...
-
-
-@runtime_checkable
-class EntrezDatasetRepository(Protocol):
-    """Port para repositório de datasets Entrez/NCBI."""
-
-    def fetch_dataset(
-        self, query: str, db: str = "nucleotide", retmax: int = 20, **kwargs
-    ) -> Tuple[List[str], Dict[str, Any]]:
-        """
-        Busca e baixa dataset do NCBI usando Entrez API.
-
-        Args:
-            query: Query de busca no NCBI
-            db: Base de dados NCBI (nucleotide, protein, etc.)
-            retmax: Número máximo de sequências
-            **kwargs: Parâmetros adicionais (email, api_key, etc.)
-
-        Returns:
-            Tuple[List[str], Dict[str, Any]]: (sequências, metadados)
-        """
-        ...
-
-    def is_available(self) -> bool:
-        """
-        Verifica se o serviço Entrez está disponível.
-
-        Returns:
-            bool: True se disponível
-        """
-        ...
 
 
 class AlgorithmRegistry(Protocol):
@@ -491,7 +427,20 @@ class AbstractExecutorPort(ABC):
 
     @abstractmethod
     def execute_sensitivity_analysis(
-        self, algorithm_name: str, dataset: Dataset, sensitivity_config: Dict[str, Any]
+        self,
+        algorithm_name: str,
+        dataset: Dataset,
+        sensitivity_config: Dict[str, Any],
+        monitoring_service=None,
+        *,
+        task_index: int = 1,
+        total_tasks: int = 1,
+        dataset_index: int = 1,
+        total_datasets: int = 1,
+        config_index: int = 1,
+        total_configs: int = 1,
+        algorithm_index: int = 1,
+        total_algorithms: int = 1,
     ) -> Dict[str, Any]:
         """Executa análise de sensibilidade."""
         pass

@@ -40,6 +40,15 @@ class SensitivityOrchestrator:
         algorithm_name: str,
         dataset: Dataset,
         sensitivity_config: Dict[str, Any],
+        *,
+        task_index: int = 1,
+        total_tasks: int = 1,
+        dataset_index: int = 1,
+        total_datasets: int = 1,
+        config_index: int = 1,
+        total_configs: int = 1,
+        algorithm_index: int = 1,
+        total_algorithms: int = 1,
     ) -> Dict[str, Any]:
         """
         Executa análise de sensibilidade completa.
@@ -61,17 +70,59 @@ class SensitivityOrchestrator:
                 "Iniciando análise de sensibilidade para %s", algorithm_name
             )
 
-            print("DEBUG: Starting sensitivity analysis")
-            print(f"DEBUG: algorithm_name = {algorithm_name}")
-            print(f"DEBUG: dataset = {dataset}")
-            print(f"DEBUG: sensitivity_config = {sensitivity_config}")
-            print(f"DEBUG: sensitivity_config type = {type(sensitivity_config)}")
+            # Saída inicial padronizada (similar ao estilo de execução) e eventos de monitoramento
+            dataset_name = getattr(dataset, "name", getattr(dataset, "metadata", {}).get("name", "Dataset"))
+            config_name = sensitivity_config.get("config_name", "Default Configuration")
+            if self._monitoring_service:
+                from src.application.monitoring.progress_events import TaskType, UnifiedPhase, DisplayEvent
+                # Iniciar task de análise se ainda não ativa
+                try:
+                    self._monitoring_service.start_task(
+                        TaskType.SENSITIVITY,
+                        f"Sensitivity Analysis - {algorithm_name}",
+                        {"dataset": dataset_name, "algorithm": algorithm_name},
+                    )
+                except Exception:
+                    pass
+                # Evento inicial unificado, com todos os índices hierárquicos
+                try:
+                    self._monitoring_service.emit_event(
+                        DisplayEvent(
+                            phase=UnifiedPhase.ANALYSIS,
+                            message=f"Starting sensitivity: {algorithm_name} on {dataset_name}",
+                            dataset_id=dataset_name,
+                            algorithm_name=algorithm_name,
+                            progress=0.0,
+                            payload={
+                                "method": sensitivity_config.get("analysis_method", "morris"),
+                                "task_index": task_index,
+                                "total_tasks": total_tasks,
+                                "task_name": "Sensitivity Analysis",
+                                "dataset_index": dataset_index,
+                                "total_datasets": total_datasets,
+                                "config_index": config_index,
+                                "total_configs": total_configs,
+                                "algorithm_index": algorithm_index,
+                                "total_algorithms": total_algorithms,
+                            },
+                        )
+                    )
+                except Exception:
+                    pass
+            else:
+                print("\n🔄 Sensitivity Analysis")
+                print(f"  📊 Dataset: {dataset_name}")
+                print(f"  ⚙️  Algorithm: {algorithm_name}")
+                print(f"  🧪 Method: {sensitivity_config.get('analysis_method', 'morris')}")
+                print("  ------------------------------------------------------------")
+
+            self._logger.debug("Starting sensitivity analysis: %s | dataset=%s", algorithm_name, dataset_name)
+            self._logger.debug("Full sensitivity_config=%s", sensitivity_config)
 
             # Extrair configurações
             analysis_method = sensitivity_config.get("analysis_method", "morris")
             parameters = sensitivity_config["parameters"]
-            print(f"DEBUG: parameters = {parameters}")
-            print(f"DEBUG: parameters type = {type(parameters)}")
+            self._logger.debug("parameters=%s (type=%s)", parameters, type(parameters))
 
             n_samples = sensitivity_config.get("n_samples", 1000)
             repetitions = sensitivity_config.get("repetitions_per_sample", 3)
@@ -91,7 +142,12 @@ class SensitivityOrchestrator:
 
             # Executar algoritmo para cada amostra
             results = self._execute_samples(
-                algorithm_name, dataset, samples, problem_definition, repetitions
+                algorithm_name,
+                dataset,
+                samples,
+                problem_definition,
+                repetitions,
+                dataset_name=dataset_name,
             )
 
             # Análise de sensibilidade
@@ -119,8 +175,40 @@ class SensitivityOrchestrator:
                 "parameters_analyzed": list(parameters.keys()),
                 "sensitivity_indices": sensitivity_results,
                 "execution_time": execution_time,
+                "total_time": execution_time,  # alias usado em summaries
+                "avg_time_per_sample": execution_time / max(1, len(samples)),
                 "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
             }
+
+            if self._monitoring_service:
+                try:
+                    from src.application.monitoring.progress_events import UnifiedPhase, DisplayEvent
+                    self._monitoring_service.emit_event(
+                        DisplayEvent(
+                            phase=UnifiedPhase.ANALYSIS,
+                            message=f"Completed sensitivity: {algorithm_name}",
+                            dataset_id=dataset_name,
+                            algorithm_name=algorithm_name,
+                            progress=1.0,
+                            payload={
+                                "n_samples": len(samples),
+                                "parameters": list(parameters.keys()),
+                                "method": analysis_method,
+                                "execution_time": execution_time,
+                                "task_index": task_index,
+                                "total_tasks": total_tasks,
+                                "task_name": "Sensitivity Analysis",
+                                "dataset_index": dataset_index,
+                                "total_datasets": total_datasets,
+                                "config_index": config_index,
+                                "total_configs": total_configs,
+                                "algorithm_index": algorithm_index,
+                                "total_algorithms": total_algorithms,
+                            },
+                        )
+                    )
+                except Exception:
+                    pass
 
             self._logger.info(
                 "Análise de sensibilidade concluída em %.2fs", execution_time
@@ -128,7 +216,10 @@ class SensitivityOrchestrator:
             return final_results
 
         except Exception as e:
-            self._logger.error("Erro na análise de sensibilidade: %s", e)
+            import traceback
+            self._logger.error(
+                "Erro na análise de sensibilidade: %s\n%s", e, traceback.format_exc()
+            )
             raise SensitivityExecutionError(
                 f"Falha na análise de sensibilidade: {e}"
             ) from e
@@ -143,39 +234,39 @@ class SensitivityOrchestrator:
         Returns:
             Dict[str, Any]: Definição do problema SALib
         """
-        print("DEBUG: Creating SALib problem")
-        print(f"DEBUG: parameters = {parameters}")
-        print(f"DEBUG: parameters type = {type(parameters)}")
+        self._logger.debug(
+            "Creating SALib problem from parameters (%d)", len(parameters)
+        )
 
         problem_def = {"num_vars": len(parameters), "names": [], "bounds": []}
 
         for param_name, param_config in parameters.items():
-            print(f"DEBUG: Processing parameter {param_name}")
-            print(f"DEBUG: param_config = {param_config}")
-            print(f"DEBUG: param_config type = {type(param_config)}")
+            self._logger.debug(
+                "Processing parameter %s -> %s", param_name, param_config
+            )
 
             problem_def["names"].append(param_name)
 
             param_type = param_config.get("type", "float")
-            print(f"DEBUG: param_type = {param_type}")
+            self._logger.debug("param_type=%s", param_type)
 
             if param_type in ["integer", "float"]:
                 bounds = param_config["bounds"]
-                print(f"DEBUG: bounds = {bounds}")
+                self._logger.debug("bounds=%s", bounds)
                 problem_def["bounds"].append(bounds)
             elif param_type == "categorical":
                 # Para categóricos, mapear para índices
                 values = param_config["values"]
-                print(f"DEBUG: categorical values = {values}")
+                self._logger.debug("categorical values=%s", values)
                 problem_def["bounds"].append([0, len(values) - 1])
             else:
-                print(
-                    f"DEBUG: Unknown param_type {param_type}, defaulting to float bounds"
+                self._logger.debug(
+                    "Unknown param_type %s, defaulting to float bounds", param_type
                 )
                 bounds = param_config.get("bounds", [0.0, 1.0])
                 problem_def["bounds"].append(bounds)
 
-        print(f"DEBUG: Final problem_def = {problem_def}")
+        self._logger.debug("Final problem_def=%s", problem_def)
         return problem_def
 
     def _generate_samples(
@@ -242,6 +333,7 @@ class SensitivityOrchestrator:
         samples: np.ndarray,
         problem_def: Dict[str, Any],
         repetitions: int,
+        dataset_name: str = "",
     ) -> Dict[str, List[float]]:
         """
         Executa algoritmo para todas as amostras.
@@ -259,6 +351,37 @@ class SensitivityOrchestrator:
         results = {"distance": [], "execution_time": [], "fitness_calls": []}
 
         for i, sample in enumerate(samples):
+            # Barra de progresso simples (não usa overwrite agressivo para evitar conflito com display principal)
+            progress = (i + 1) / len(samples) * 100
+            if (i % max(1, len(samples)//50) == 0) or (i + 1 == len(samples)):
+                bar_width = 30
+                filled = int(progress / 100 * bar_width)
+                bar = "█" * filled + "░" * (bar_width - filled)
+                if not self._monitoring_service:
+                    print(
+                        f"    🔬 Samples: [{bar}] {progress:5.1f}% ({i+1}/{len(samples)})",
+                        end="\r" if i + 1 < len(samples) else "\n",
+                        flush=True,
+                    )
+                else:
+                    try:
+                        from src.application.monitoring.progress_events import UnifiedPhase, DisplayEvent
+                        self._monitoring_service.emit_event(
+                            DisplayEvent(
+                                phase=UnifiedPhase.ANALYSIS,
+                                message="sampling",
+                                dataset_id=dataset_name,
+                                algorithm_name=algorithm_name,
+                                progress=(i + 1) / len(samples),
+                                payload={
+                                    "current_sample": i + 1,
+                                    "total_samples": len(samples),
+                                    "repetitions": repetitions,
+                                },
+                            )
+                        )
+                    except Exception:
+                        pass
             if i % 100 == 0:
                 self._logger.info("Executando amostra %d/%d", i + 1, len(samples))
 
@@ -334,12 +457,12 @@ class SensitivityOrchestrator:
             Dict[str, Any]: Parâmetros do algoritmo
         """
         params = {}
-        print("DEBUG: Converting sample to params")
-        print(f"DEBUG: problem_def names: {problem_def['names']}")
-        print(f"DEBUG: sample values: {sample}")
+        self._logger.debug(
+            "Converting sample to params names=%s values=%s", problem_def["names"], sample
+        )
 
         for name, value in zip(problem_def["names"], sample):
-            print(f"DEBUG: Processing parameter {name} = {value}")
+            self._logger.debug("Processing parameter %s=%s", name, value)
             # Converter para tipo apropriado baseado no nome do parâmetro
             if name in [
                 "pop_size",
@@ -395,16 +518,20 @@ class SensitivityOrchestrator:
                 if name in categorical_maps:
                     idx = int(round(value)) % len(categorical_maps[name])
                     params[name] = categorical_maps[name][idx]
-                    print(f"DEBUG: Categorical {name} idx={idx} -> {params[name]}")
+                    self._logger.debug(
+                        "Categorical %s idx=%d -> %s", name, idx, params[name]
+                    )
                 else:
                     params[name] = int(round(value))
-                    print(f"DEBUG: Unknown categorical {name} -> {params[name]}")
+                    self._logger.debug(
+                        "Unknown categorical %s treated as int -> %s", name, params[name]
+                    )
             else:
                 # Default para float
                 params[name] = float(value)
-                print(f"DEBUG: Default float {name} -> {params[name]}")
+                self._logger.debug("Default float %s -> %s", name, params[name])
 
-        print(f"DEBUG: Final params: {params}")
+        self._logger.debug("Final params=%s", params)
         return params
 
     def _analyze_sensitivity(
