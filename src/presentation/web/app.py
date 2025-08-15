@@ -6,14 +6,21 @@ Modular design with proper separation of concerns.
 """
 
 import logging
+from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
-from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.errors import RateLimitExceeded
-from slowapi.util import get_remote_address
+
+Limiter = None
+_rate_limit_exceeded_handler = None
+RateLimitExceeded = Exception
+
+
+def get_remote_address(request):
+    return "0.0.0.0"
+
 
 from .core.config import web_config
 from .routes import algorithms, batch_execution, datasets, health, pages, results
@@ -41,13 +48,9 @@ app.add_middleware(
 )
 
 # Rate limiting
-limiter = Limiter(key_func=get_remote_address)
-app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+# Rate limiting disabled in this build
 
 # Static files
-from pathlib import Path
-
 datasets_path = Path(__file__).parent.parent.parent.parent / "datasets"
 app.mount(
     "/static", StaticFiles(directory="src/presentation/web/static"), name="static"
@@ -72,11 +75,13 @@ app.include_router(datasets_simple.router)
 async def test_progress_page():
     """Serve test progress page for debugging."""
     try:
-        with open("/workspaces/CSPBench/test_progress.html", "r") as f:
+        with open("/workspaces/CSPBench/test_progress.html") as f:
             html_content = f.read()
         return HTMLResponse(content=html_content)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error loading test page: {e}")
+        raise HTTPException(
+            status_code=500, detail=f"Error loading test page: {e}"
+        ) from e
 
 
 @app.on_event("startup")
@@ -113,17 +118,7 @@ async def shutdown_event():
         logger.error(f"Error during shutdown: {e}")
 
 
-# Legacy compatibility endpoints (can be removed after migration)
-@app.get("/health")
-async def legacy_health():
-    """Legacy health endpoint for backwards compatibility."""
-    return await health.simple_health()
-
-
-@app.get("/metrics")
-async def legacy_metrics():
-    """Legacy metrics endpoint for backwards compatibility."""
-    return await health.get_metrics()
+# Legacy endpoints removidos
 
 
 # For uvicorn direct execution

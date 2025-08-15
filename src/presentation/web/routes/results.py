@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import List, Optional
 
 from fastapi import APIRouter, HTTPException, Query
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
@@ -120,7 +120,7 @@ async def get_result_details(session_id: str):
         # Load detailed results if available
         results_files = list(session_dir.glob("results_*.json"))
         if results_files:
-            with open(results_files[0], "r") as f:
+            with open(results_files[0]) as f:
                 detailed_results = json.load(f)
             session_info_dict = session_info.dict()
             session_info_dict["detailed_results"] = detailed_results
@@ -300,7 +300,7 @@ async def _find_session_directory(session_id: str) -> Optional[Path]:
             # Check if any result file contains this session ID
             for file_path in session_dir.glob("results_*.json"):
                 try:
-                    with open(file_path, "r") as f:
+                    with open(file_path) as f:
                         data = json.load(f)
                         if data.get("session_id") == session_id:
                             return session_dir
@@ -343,7 +343,7 @@ async def _extract_session_info(session_dir: Path) -> ResultSession:
     results_files = list(session_dir.glob("results_*.json"))
     if results_files:
         try:
-            with open(results_files[0], "r") as f:
+            with open(results_files[0]) as f:
                 results_data = json.load(f)
 
             session_info.update(

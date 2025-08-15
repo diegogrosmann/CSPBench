@@ -8,11 +8,11 @@ Implements application use cases without infrastructure dependency.
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from src.application.monitoring.progress_events import TaskType
+
 # IMPORTANT: Import algorithms first to load the global_registry
 from src.application.ports import (
     AlgorithmRegistry,
-    DatasetRepository,
-    EntrezDatasetRepository,
     ExecutorPort,
     ExportPort,
 )
@@ -22,7 +22,6 @@ from src.application.services.config_parser import (
     SystemConfig,
 )
 from src.domain import (
-    AlgorithmExecutionError,
     AlgorithmNotFoundError,
     BatchConfigurationError,
     BatchExecutionError,
@@ -33,10 +32,8 @@ from src.domain import (
     SensitivityConfigurationError,
     SensitivityExecutionError,
 )
-from src.domain.dataset import SyntheticDatasetGenerator
+from src.domain import SyntheticDatasetGenerator
 from src.infrastructure.logging_config import LoggerConfig, get_logger
-from src.infrastructure.session_manager import SessionManager
-from src.application.monitoring.progress_events import TaskType
 
 
 class ExperimentService:
@@ -165,11 +162,11 @@ class ExperimentService:
             )
 
         # Task-specific sections
-        if batch_config.execution:
-            result["execution"] = {"executions": []}
-            for exec_config in batch_config.execution.get("executions", []):
+        if batch_config.experiment:
+            result["experiment"] = {"executions": []}
+            for exec_config in batch_config.experiment.get("executions", []):
                 if hasattr(exec_config, "name"):  # ExecutionConfig object
-                    result["execution"]["executions"].append(
+                    result["experiment"]["executions"].append(
                         {
                             "name": exec_config.name,
                             "datasets": exec_config.datasets,
@@ -178,7 +175,7 @@ class ExperimentService:
                         }
                     )
                 else:  # Already a dict
-                    result["execution"]["executions"].append(exec_config)
+                    result["experiment"]["executions"].append(exec_config)
 
         if batch_config.optimization:
             opt_section = batch_config.optimization
@@ -191,15 +188,15 @@ class ExperimentService:
                 for opt_obj in opt_section.get("optimizations", []):
                     # Convert dataclass OptimizationConfig to dict-like fields
                     try:
-                        name = getattr(opt_obj, "name")
-                        study_name = getattr(opt_obj, "study_name")
-                        direction = getattr(opt_obj, "direction")
-                        trials = getattr(opt_obj, "trials")
+                        name = opt_obj.name
+                        study_name = opt_obj.study_name
+                        direction = opt_obj.direction
+                        trials = opt_obj.trials
                         timeout_per_trial = getattr(opt_obj, "timeout_per_trial", 300)
                         repetitions = getattr(opt_obj, "repetitions", 1)
-                        datasets = getattr(opt_obj, "datasets")
-                        algorithm_id = getattr(opt_obj, "algorithm")
-                        parameters = getattr(opt_obj, "parameters")
+                        datasets = opt_obj.datasets
+                        algorithm_id = opt_obj.algorithm
+                        parameters = opt_obj.parameters
                         optuna_cfg = getattr(opt_obj, "optuna_config", None)
                     except Exception:
                         # If it's already a dict
@@ -224,7 +221,11 @@ class ExperimentService:
                             "trials": trials,
                             "timeout_per_trial": timeout_per_trial,
                             "repetitions": repetitions,
-                            "datasets": list(datasets) if isinstance(datasets, (list, tuple)) else datasets,
+                            "datasets": (
+                                list(datasets)
+                                if isinstance(datasets, (list, tuple))
+                                else datasets
+                            ),
                             "algorithm_config": [],
                             "parameters": parameters,
                         }
@@ -265,7 +266,9 @@ class ExperimentService:
 
         return result
 
-    def run_batch(self, batch_cfg: str, session_id: Optional[str] = None) -> Dict[str, Any]:
+    def run_batch(
+        self, batch_cfg: str, session_id: Optional[str] = None
+    ) -> Dict[str, Any]:
         """
         Execute batch experiments from configuration.
 
@@ -283,7 +286,7 @@ class ExperimentService:
             AlgorithmNotFoundError: If algorithm not found
         """
         try:
-            self._logger.info(f"Starting batch execution: {batch_cfg}")
+            self._logger.info(f"Starting batch experiment: {batch_cfg}")
 
             # Parse batch configuration using new parser
             parsed_config = ConfigParser.parse_config(batch_cfg)
@@ -324,8 +327,8 @@ class ExperimentService:
             if self._monitoring_service:
                 from src.application.monitoring import TaskType
 
-                # Map string task type to enum
-                task_type_enum = TaskType.EXECUTION
+                # Map string task type to enum (execution -> experiment)
+                task_type_enum = TaskType.EXPERIMENT
                 if task_type == "optimization":
                     task_type_enum = TaskType.OPTIMIZATION
                 elif task_type == "sensitivity":
@@ -342,44 +345,52 @@ class ExperimentService:
                 )
 
             # Process according to task type
-            use_unified = (
-                parsed_config.system and getattr(parsed_config.system, "use_unified_orchestrator", False)
+            use_unified = parsed_config.system and getattr(
+                parsed_config.system, "use_unified_orchestrator", False
             )
-            if task_type == "execution":
+            if task_type == "experiment":
                 # Convert BatchConfig back to dict for compatibility
                 batch_dict = self._convert_batch_config_to_dict(parsed_config)
                 if use_unified:
                     results = self._run_with_unified_executor(batch_dict)
                 else:
-                    results = self._process_execution_batch(
-                        batch_dict, resources_config.__dict__ if resources_config else {}
+                    results = self._process_experiment_batch(
+                        batch_dict,
+                        resources_config.__dict__ if resources_config else {},
                     )
             elif task_type == "optimization":
                 batch_dict = self._convert_batch_config_to_dict(parsed_config)
                 # Prefer unified executor if feature flag OR new template format detected
-                has_new_opt_format = bool(batch_dict.get("optimization", {}).get("tasks"))
+                has_new_opt_format = bool(
+                    batch_dict.get("optimization", {}).get("tasks")
+                )
                 if use_unified or has_new_opt_format:
                     uni_out = self._run_with_unified_executor(batch_dict)
                     # Convert unified structure {optimization:{optimizations:[...]}, analysis:{...}}
                     # into a flat list of result items with status="success" for consolidation
                     flattened: List[Dict[str, Any]] = []
-                    uni_results = uni_out.get("results", []) if isinstance(uni_out, dict) else []
+                    uni_results = (
+                        uni_out.get("results", []) if isinstance(uni_out, dict) else []
+                    )
                     for item in uni_results:
                         # item is expected to be {"optimization": {...}, "analysis": {...}} per our unified executor
                         if not isinstance(item, dict):
                             continue
                         opt_part = item.get("optimization", {})
                         for entry in opt_part.get("optimizations", []):
-                            flattened.append({
-                                **entry,
-                                "status": "success",
-                                "algorithm_name": entry.get("algorithm"),
-                                "dataset_id": entry.get("dataset"),
-                            })
+                            flattened.append(
+                                {
+                                    **entry,
+                                    "status": "success",
+                                    "algorithm_name": entry.get("algorithm"),
+                                    "dataset_id": entry.get("dataset"),
+                                }
+                            )
                     results = {"results": flattened}
                 else:
                     results = self._process_optimization_batch(
-                        batch_dict, resources_config.__dict__ if resources_config else {}
+                        batch_dict,
+                        resources_config.__dict__ if resources_config else {},
                     )
             elif task_type == "sensitivity":
                 # Para sensibilidade, use o YAML bruto para evitar reconversão de dataclasses
@@ -433,6 +444,7 @@ class ExperimentService:
 
         except Exception as e:  # noqa: BLE001
             import traceback
+
             tb = traceback.format_exc()
             self._logger.error("Erro durante execução de batch: %s\n%s", e, tb)
             print("\nTRACEBACK (batch failure):\n" + tb)
@@ -597,59 +609,7 @@ class ExperimentService:
                 f"Erro na execução da análise de sensibilidade: {e}"
             ) from e
 
-    def run_single_experiment(
-        self,
-        algorithm_name: str,
-        dataset_id: str,
-        params: Optional[Dict[str, Any]] = None,
-        timeout: Optional[int] = None,
-    ) -> Dict[str, Any]:
-        """
-        Execute single experiment.
-
-        Args:
-            algorithm_name: Algorithm name
-            dataset_id: Dataset identifier
-            params: Algorithm parameters
-            timeout: Timeout in seconds
-
-        Returns:
-            Dict[str, Any]: Experiment results
-        """
-        # Check if algorithm exists
-        if not self._algo_registry.algorithm_exists(algorithm_name):
-            raise AlgorithmNotFoundError(f"Algorithm not found: {algorithm_name}")
-
-        # Load dataset
-        dataset = self._load_dataset(dataset_id)
-
-        # Create batch configuration for single execution (legacy format)
-        batch_config = {
-            "experiments": [
-                {
-                    "algorithm": algorithm_name,
-                    "dataset": dataset_id,
-                    "params": params or {},
-                }
-            ],
-        }
-
-        # Add timeout if provided
-        if timeout is not None:
-            batch_config["experiments"][0]["timeout"] = timeout
-
-        # Execute as batch and return first result
-        results = self._executor.execute_batch(
-            batch_config, monitoring_service=None
-        )
-        if results:
-            result = results[0]
-            # Garantir que timeout está nos metadados se foi fornecido
-            if timeout is not None and "metadata" in result:
-                result["metadata"]["timeout"] = timeout
-            return result
-        else:
-            raise AlgorithmExecutionError(f"Erro na execução de {algorithm_name}")
+    # Método legado run_single_experiment removido (use batch estruturado com uma execução)
 
     def list_available_algorithms(self) -> List[str]:
         """List available algorithms."""
@@ -668,25 +628,21 @@ class ExperimentService:
 
     # Métodos privados auxiliares
 
-    def _process_execution_batch(
+    def _process_experiment_batch(
         self, batch_config: Dict[str, Any], resources_config: Dict[str, Any]
     ) -> Dict[str, Any]:
-        """
-        Process execution batch using existing executor.
+        """Processa batch de experimento usando o executor existente.
 
         Args:
-            batch_config: Batch configuration
-            resources_config: Resource configuration
+            batch_config: Configuração consolidada do batch (dict)
+            resources_config: Configuração de recursos (dict)
 
         Returns:
-            Dict[str, Any]: Execution results
+            Dict[str, Any]: Resultados do experimento
         """
-        self._logger.info("Processando batch de execução")
-
-        # Monitoramento será iniciado pelo ExecutionOrchestrator para evitar duplicação
+        self._logger.info("Processando batch de experimento")
 
         try:
-            # Include resources configuration in batch config
             batch_config_with_resources = batch_config.copy()
             batch_config_with_resources["resources"] = resources_config
 
@@ -695,28 +651,36 @@ class ExperimentService:
                 self._monitoring_service,
             )
 
-            # Finalizar monitoramento
             if self._monitoring_service:
                 self._monitoring_service.finish_monitoring({"results": results})
 
             return {"results": results}
         except Exception as e:
-            # Mostrar erro no monitoramento
             if self._monitoring_service:
                 self._monitoring_service.report_error(str(e))
             import traceback
-            self._logger.error("Stack trace (sensitivity batch failure):\n%s", traceback.format_exc())
+
+            self._logger.error(
+                "Stack trace (experiment batch failure):\n%s", traceback.format_exc()
+            )
             raise
 
     def _run_with_unified_executor(self, batch_dict: Dict[str, Any]) -> Dict[str, Any]:
         """Execute using the new UnifiedExecutor (feature-flagged)."""
         try:
-            from src.infrastructure import DomainAlgorithmRegistry, FileDatasetRepository
-            from src.infrastructure.orchestrators.unified_executor import UnifiedExecutor
+            from src.infrastructure import (
+                DomainAlgorithmRegistry,
+                FileDatasetRepository,
+            )
+            from src.infrastructure.orchestrators.unified_executor import (
+                UnifiedExecutor,
+            )
 
             algo_registry = DomainAlgorithmRegistry()
             dataset_repo = FileDatasetRepository("./datasets")
-            unified = UnifiedExecutor(algo_registry, dataset_repo, self._monitoring_service)
+            unified = UnifiedExecutor(
+                algo_registry, dataset_repo, self._monitoring_service
+            )
             out = unified.run_pipeline(batch_dict)
             return {"results": [out]}
         except Exception as e:
@@ -782,9 +746,11 @@ class ExperimentService:
                 self._logger.info(f"Executing optimization: {opt_config.name}")
 
                 # Resolve algorithms and base parameters by ID
-                algorithm_names, all_algorithm_params = self._resolve_algorithm_configuration(
-                    opt_config.algorithm,
-                    batch_config,
+                algorithm_names, all_algorithm_params = (
+                    self._resolve_algorithm_configuration(
+                        opt_config.algorithm,
+                        batch_config,
+                    )
                 )
 
                 # Process each algorithm individually
@@ -934,7 +900,9 @@ class ExperimentService:
         try:
             # Usar parser atual
             sens_section = ConfigParser.parse_sensitivity(batch_config)
-            sensitivity_configs = sens_section.get("analyses", []) if sens_section else []
+            sensitivity_configs = (
+                sens_section.get("analyses", []) if sens_section else []
+            )
 
             all_results = []
             sensitivity_summaries = []
@@ -972,12 +940,17 @@ class ExperimentService:
                         # Preparar configuração para o executor
                         # Resolver algoritmo(s) e parâmetros base por ID
                         import os
+
                         algo_field = getattr(sens_config, "algorithm", [])
-                        algo_ids = algo_field if isinstance(algo_field, list) else [algo_field]
+                        algo_ids = (
+                            algo_field if isinstance(algo_field, list) else [algo_field]
+                        )
                         # Usaremos apenas o primeiro id de configuração para determinar parâmetros base
-                        algorithm_names, base_params = self._resolve_algorithm_configuration(
-                            algo_ids[0],
-                            batch_config,
+                        algorithm_names, base_params = (
+                            self._resolve_algorithm_configuration(
+                                algo_ids[0],
+                                batch_config,
+                            )
                         )
                         # Selecionar um único algoritmo mais adequado (preferir BLF-GA se presente)
                         if "BLF-GA" in algorithm_names:
@@ -992,7 +965,10 @@ class ExperimentService:
                         # Ex.: {"BLF-GA": {...}, "CSC": {...}} ou plano: {pop_size: ...}
                         # Executar análise para cada algoritmo solicitado
                         for algorithm_name in algorithms_to_run:
-                            if isinstance(getattr(sens_config, "parameters", {}), dict) and algorithm_name in sens_config.parameters:
+                            if (
+                                isinstance(getattr(sens_config, "parameters", {}), dict)
+                                and algorithm_name in sens_config.parameters
+                            ):
                                 algo_params = sens_config.parameters[algorithm_name]
                             else:
                                 algo_params = sens_config.parameters
@@ -1027,9 +1003,11 @@ class ExperimentService:
                                 "output_metrics": sens_config.output_metrics,
                                 "method_config": (
                                     getattr(sens_config, "morris", None)
-                                    if getattr(sens_config, "method", "morris") == "morris"
+                                    if getattr(sens_config, "method", "morris")
+                                    == "morris"
                                     else getattr(sens_config, "sobol", None)
-                                ) or {},
+                                )
+                                or {},
                                 "resources": resources_config,  # Incluir configurações de recursos
                                 "internal_jobs": resources_config.get(
                                     "internal_jobs", 4
@@ -1042,14 +1020,7 @@ class ExperimentService:
                                     algorithm_name,
                                     dataset,
                                     executor_config,
-                                    task_index=1,  # TODO: calcular corretamente se múltiplas análises
-                                    total_tasks=1,
-                                    dataset_index=1,  # TODO: calcular corretamente se múltiplos datasets
-                                    total_datasets=1,
-                                    config_index=1,  # TODO: calcular corretamente se múltiplas configs
-                                    total_configs=1,
-                                    algorithm_index=1,  # TODO: calcular corretamente se múltiplos algoritmos
-                                    total_algorithms=1,
+                                    monitoring_service=self._monitoring_service,
                                 )
                             )
 
@@ -1062,9 +1033,15 @@ class ExperimentService:
                                     "algorithm": algorithm_name,
                                     "dataset": dataset_id,
                                     "n_samples": sensitivity_results.get("n_samples"),
-                                    "parameters_analyzed": list(algo_params.keys()) if isinstance(algo_params, dict) else [],
+                                    "parameters_analyzed": (
+                                        list(algo_params.keys())
+                                        if isinstance(algo_params, dict)
+                                        else []
+                                    ),
                                     "total_time": sensitivity_results.get("total_time"),
-                                    "avg_time_per_sample": sensitivity_results.get("avg_time_per_sample"),
+                                    "avg_time_per_sample": sensitivity_results.get(
+                                        "avg_time_per_sample"
+                                    ),
                                 }
                             )
 
@@ -1150,12 +1127,9 @@ class ExperimentService:
         if not isinstance(config, dict):
             raise BatchConfigurationError("Configuração deve ser um objeto/dicionário")
 
-        # Detectar tipo de task se não especificado
+        # Detectar tipo de task se não especificado (não suportamos mais 'experiments')
         if "task" not in config:
-            # Compatibilidade com formato antigo
-            if "experiments" in config:
-                config["task"] = {"type": "execution"}
-            elif "optimization" in config:
+            if "optimization" in config:
                 config["task"] = {"type": "optimization"}
             elif "sensitivity" in config:
                 config["task"] = {"type": "sensitivity"}
@@ -1251,7 +1225,7 @@ class ExperimentService:
             task_type = task["type"]
 
             # Validar estrutura específica por tipo de task
-            if task_type == "execution":
+            if task_type == "experiment":
                 if "execution" not in task:
                     raise BatchConfigurationError(
                         "Campo 'execution' obrigatório para task do tipo 'execution'"
@@ -1726,16 +1700,12 @@ class ExperimentService:
                 )
                 plots_dir = session_base_path / "plots"
             else:
-                # Fallback to old pattern using infrastructure settings from .env
+                # Fallback: usar timestamp determinístico (compatibilidade)
                 import os
                 from datetime import datetime
 
-                # Get infrastructure configuration from environment variables
-                session_format = os.getenv(
-                    "OUTPUT_SESSION_FOLDER_FORMAT", "%Y%m%d_%H%M%S"
-                )
-                current_session = datetime.now().strftime(session_format)
                 base_output_dir = os.getenv("OUTPUT_BASE_DIRECTORY", "outputs")
+                current_session = datetime.now().strftime("%Y%m%d_%H%M%S")
                 session_base_path = Path(base_output_dir) / "results" / current_session
                 plots_dir = session_base_path / "plots"
 
@@ -1843,7 +1813,9 @@ class ExperimentService:
             }
 
             session_path = plots_dir.parent
-            report_generator = OptimizationReportGenerator(str(session_path), config_dict)
+            report_generator = OptimizationReportGenerator(
+                str(session_path), config_dict
+            )
 
             # Note: This would require optuna study object
             # For now, log that optimization plots need study object
@@ -1952,7 +1924,11 @@ class ExperimentService:
         # Substitute in optimization/sensitivity configurations if present
         if getattr(parsed_config, "optimization", None):
             opt_section = parsed_config.optimization
-            optimizations = opt_section.get("optimizations", []) if isinstance(opt_section, dict) else []
+            optimizations = (
+                opt_section.get("optimizations", [])
+                if isinstance(opt_section, dict)
+                else []
+            )
             for opt in optimizations:
                 params = opt.get("parameters") if isinstance(opt, dict) else None
                 if isinstance(params, dict) and "seed" in params:
@@ -1964,9 +1940,15 @@ class ExperimentService:
 
         if getattr(parsed_config, "sensitivity", None):
             sens_section = parsed_config.sensitivity
-            analyses = sens_section.get("analyses", []) if isinstance(sens_section, dict) else []
+            analyses = (
+                sens_section.get("analyses", [])
+                if isinstance(sens_section, dict)
+                else []
+            )
             for analysis in analyses:
-                params = analysis.get("parameters") if isinstance(analysis, dict) else None
+                params = (
+                    analysis.get("parameters") if isinstance(analysis, dict) else None
+                )
                 if isinstance(params, dict) and "seed" in params:
                     old_seed = params.get("seed")
                     params["seed"] = global_seed

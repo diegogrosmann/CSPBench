@@ -608,8 +608,8 @@ def _calculate_progress_details(session: Dict[str, Any]) -> Dict[str, Any]:
 
     # Dados de teste simulados para debug baseados na configuração real do TEMPLATE.yaml
     if session.get("session_id") == "3e949d84-b9e4-4425-b197-5c3637f1cefe":
-        import time
         import logging
+        import time
 
         logger = logging.getLogger(__name__)
 
@@ -732,8 +732,8 @@ def _get_current_execution_details(session: Dict[str, Any]) -> Dict[str, Any]:
 
     # Dados de teste simulados para debug
     if session.get("session_id") == "3e949d84-b9e4-4425-b197-5c3637f1cefe":
-        import time
         import logging
+        import time
 
         logger_debug = logging.getLogger(__name__)
 
@@ -882,12 +882,12 @@ async def get_execution_progress(session_id: str):
                 "last_updated": session.get("last_updated"),
                 "session_id": session_id,
             }
-            
+
             # Include batch_structure if available
             if "batch_structure" in session:
                 response_data["batch_structure"] = session["batch_structure"]
-                
-            # Include callbacks_history if available  
+
+            # Include callbacks_history if available
             if "callbacks_history" in session:
                 response_data["callbacks_history"] = session["callbacks_history"]
 

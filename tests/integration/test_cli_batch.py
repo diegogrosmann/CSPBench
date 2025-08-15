@@ -19,17 +19,16 @@ def test_cli_batch_minimal():
 
     with tempfile.TemporaryDirectory() as tmp_dir:
         batch_file = Path(tmp_dir) / "batch.yaml"
+    # Configuração mínima válida
+    config = {"task": {"type": "experiment"}, "experiments": []}
 
-        # Configuração mínima válida
-        config = {"task": {"type": "execution"}, "experiments": []}
+    batch_file.write_text(yaml.dump(config))
 
-        batch_file.write_text(yaml.dump(config))
+    result = runner.invoke(app, ["batch", str(batch_file)])
 
-        result = runner.invoke(app, ["batch", str(batch_file)])
-
-        # Deve ter sucesso mesmo com lista vazia
-        assert result.exit_code == 0
-        assert "Batch concluído" in result.output
+    # Deve ter sucesso mesmo com lista vazia
+    assert result.exit_code == 0
+    assert "Batch concluído" in result.output
 
 
 def test_cli_batch_with_experiments():
@@ -41,7 +40,7 @@ def test_cli_batch_with_experiments():
 
         # Configuração com experimento de teste
         config = {
-            "task": {"type": "execution"},
+            "task": {"type": "experiment"},
             "experiments": [
                 {
                     "algorithm": "Baseline",
@@ -79,13 +78,12 @@ def test_cli_batch_json_format():
 
     with tempfile.TemporaryDirectory() as tmp_dir:
         batch_file = Path(tmp_dir) / "batch.json"
+    # Configuração em JSON
+    config = {"task": {"type": "experiment"}, "experiments": []}
 
-        # Configuração em JSON
-        config = {"task": {"type": "execution"}, "experiments": []}
+    batch_file.write_text(json.dumps(config))
 
-        batch_file.write_text(json.dumps(config))
+    result = runner.invoke(app, ["batch", str(batch_file)])
 
-        result = runner.invoke(app, ["batch", str(batch_file)])
-
-        assert result.exit_code == 0
-        assert "Batch concluído" in result.output
+    assert result.exit_code == 0
+    assert "Batch concluído" in result.output

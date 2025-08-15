@@ -8,6 +8,5 @@ Implementation based on hexagonal architecture with clear separation of responsi
 __version__ = "0.1.0"
 __author__ = "CSPBench Development Team"
 
-from . import application, domain, infrastructure, presentation
-
-__all__ = ["domain", "application", "infrastructure", "presentation"]
+# Lazy import strategy: não importar subpacotes automaticamente para evitar side-effects.
+__all__ = ["__version__", "__author__"]

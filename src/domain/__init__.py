@@ -6,7 +6,7 @@ Implements algorithms, metrics, and data entities without external dependencies.
 """
 
 from .algorithms import Algorithm, CSPAlgorithm, global_registry, register_algorithm
-from .dataset import Dataset, SyntheticDatasetGenerator
+from .dataset import Dataset
 from .errors import (
     AlgorithmError,
     AlgorithmExecutionError,
@@ -38,7 +38,6 @@ from .metrics import (
     diversity_metric,
     hamming_distance,
     max_distance,
-    max_hamming,
     median_distance,
     solution_quality,
 )
@@ -52,7 +51,6 @@ __all__ = [
     # Metrics
     "hamming_distance",
     "max_distance",
-    "max_hamming",
     "average_distance",
     "median_distance",
     "diversity_metric",
@@ -86,3 +84,14 @@ __all__ = [
     "OptimizationExecutionError",
     "SensitivityExecutionError",
 ]
+
+
+# Lazy re-export to avoid circular import with application layer
+def __getattr__(name):  # PEP 562
+    if name == "SyntheticDatasetGenerator":
+        from src.application.services.dataset_generator import (
+            SyntheticDatasetGenerator as _SDG,
+        )
+
+        return _SDG
+    raise AttributeError(name)

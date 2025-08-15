@@ -4,8 +4,9 @@ Infrastructure External Module
 Adapters for external systems like NCBI, databases, etc.
 """
 
-from .dataset_entrez import fetch_dataset
+from .dataset_entrez import EntrezDatasetDownloader, ENTREZ_DEFAULTS
 
 __all__ = [
-    "fetch_dataset",
+    "EntrezDatasetDownloader",
+    "ENTREZ_DEFAULTS",
 ]

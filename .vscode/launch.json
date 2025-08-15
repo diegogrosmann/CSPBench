@@ -41,7 +41,7 @@
             "subProcess": true
         },
         {
-            "name": "Debug CSPBench Test",
+            "name": "Debug CSPBench - Dataset Save",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/main.py",
@@ -53,7 +53,7 @@
                 "PYTHONDONTWRITEBYTECODE": "1"
             },
             "args": [
-                "test"
+                "datasetsave"
             ],
             "justMyCode": false,
             "stopOnEntry": false,

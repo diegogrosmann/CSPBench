@@ -11,71 +11,6 @@ from typing import Any, Dict, List, Protocol, Tuple, runtime_checkable
 from src.domain import CSPAlgorithm, Dataset
 
 
-@runtime_checkable
-class DatasetRepository(Protocol):
-    """Port para repositório de datasets."""
-
-    def save(self, dataset: Dataset, name: str) -> str:
-        """
-        Salva dataset com nome específico.
-
-        Args:
-            dataset: Dataset a ser salvo
-            name: Nome para identificar o dataset
-
-        Returns:
-            str: Identificador ou caminho do dataset salvo
-        """
-        ...
-
-    def load(self, identifier: str) -> Dataset:
-        """
-        Carrega dataset por identificador.
-
-        Args:
-            identifier: Identificador do dataset
-
-        Returns:
-            Dataset: Dataset carregado
-        """
-        ...
-
-    def list_available(self) -> List[str]:
-        """
-        Lista datasets disponíveis.
-
-        Returns:
-            List[str]: Lista de identificadores disponíveis
-        """
-        ...
-
-    def exists(self, identifier: str) -> bool:
-        """
-        Verifica se dataset existe.
-
-        Args:
-            identifier: Identificador do dataset
-
-        Returns:
-            bool: True se existe
-        """
-        ...
-
-    def delete(self, identifier: str) -> bool:
-        """
-        Remove dataset.
-
-        Args:
-            identifier: Identificador do dataset
-
-        Returns:
-            bool: True se removido com sucesso
-        """
-        ...
-
-
-
-
 class AlgorithmRegistry(Protocol):
     """Port para registry de algoritmos."""
 
@@ -130,37 +65,6 @@ class AlgorithmRegistry(Protocol):
 
         Returns:
             Dict[str, Any]: Metadados do algoritmo
-        """
-        ...
-
-
-@runtime_checkable
-class EntrezDatasetRepository(Protocol):
-    """Port para repositório de datasets Entrez/NCBI."""
-
-    def fetch_dataset(
-        self, query: str, db: str = "nucleotide", retmax: int = 20, **kwargs
-    ) -> Tuple[List[str], Dict[str, Any]]:
-        """
-        Busca e baixa dataset do NCBI usando Entrez API.
-
-        Args:
-            query: Query de busca no NCBI
-            db: Base de dados NCBI (nucleotide, protein, etc.)
-            retmax: Número máximo de sequências
-            **kwargs: Parâmetros adicionais (email, api_key, etc.)
-
-        Returns:
-            Tuple[List[str], Dict[str, Any]]: (sequências, metadados)
-        """
-        ...
-
-    def is_available(self) -> bool:
-        """
-        Verifica se o serviço Entrez está disponível.
-
-        Returns:
-            bool: True se disponível
         """
         ...
 
@@ -271,7 +175,11 @@ class ExecutorPort(Protocol):
         ...
 
     def execute_sensitivity_analysis(
-        self, algorithm_name: str, dataset: Dataset, sensitivity_config: Dict[str, Any]
+        self,
+        algorithm_name: str,
+        dataset: Dataset,
+        sensitivity_config: Dict[str, Any],
+        monitoring_service=None,
     ) -> Dict[str, Any]:
         """
         Executa análise de sensibilidade.
@@ -280,6 +188,7 @@ class ExecutorPort(Protocol):
             algorithm_name: Nome do algoritmo
             dataset: Dataset para análise
             sensitivity_config: Configuração da análise
+            monitoring_service: Serviço de monitoramento (opcional)
 
         Returns:
             Dict[str, Any]: Resultados da análise
@@ -309,38 +218,6 @@ class ExecutorPort(Protocol):
             bool: True se cancelada com sucesso
         """
         ...
-
-
-# Interfaces ABC alternativas para casos onde Protocol não é adequado
-
-
-class AbstractDatasetRepository(ABC):
-    """Interface ABC para repositório de datasets."""
-
-    @abstractmethod
-    def save(self, dataset: Dataset, name: str) -> str:
-        """Salva dataset com nome específico."""
-        pass
-
-    @abstractmethod
-    def load(self, identifier: str) -> Dataset:
-        """Carrega dataset por identificador."""
-        pass
-
-    @abstractmethod
-    def list_available(self) -> List[str]:
-        """Lista datasets disponíveis."""
-        pass
-
-    @abstractmethod
-    def exists(self, identifier: str) -> bool:
-        """Verifica se dataset existe."""
-        pass
-
-    @abstractmethod
-    def delete(self, identifier: str) -> bool:
-        """Remove dataset."""
-        pass
 
 
 class AbstractAlgorithmRegistry(ABC):

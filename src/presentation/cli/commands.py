@@ -1,427 +1,161 @@
-"""
-CLI Commands Registration Module
+"""CLI Commands Registration Module
 
-Centralizes the registration of all CLI commands for modularity.
+Centraliza registro de comandos. Adicionado comando `pipeline run` para novo orquestrador.
 """
 
-import json
 import os
+import json
 from pathlib import Path
-from typing import Optional
 
 import typer
 
-from src.domain import SyntheticDatasetGenerator
-from src.infrastructure.orchestrators.session_manager import SessionManager
+from src.domain.config import load_cspbench_config
+from src.application.services.pipeline_service import PipelineService
+from src.application.work.manager import get_work_manager
 
 
-def load_config():
-    """Load configuration from settings.yaml file."""
-    import yaml
-
-    config_path = Path("config/settings.yaml")
-
-    if not config_path.exists():
-        typer.echo(f"❌ Configuration file not found: {config_path}")
-        raise typer.Exit(1)
-
-    try:
-        with open(config_path, encoding="utf-8") as f:
-            return yaml.safe_load(f)
-    except Exception as e:
-        typer.echo(f"❌ Error loading configuration: {e}")
-        raise typer.Exit(1)
-
-
-def list_sessions() -> None:
-    """List all available sessions."""
-    try:
-        config = load_config()
-        session_mgr = SessionManager(config)
-        sessions = session_mgr.list_sessions()
-
-        if not sessions:
-            typer.echo("📂 No sessions found.")
-            return
-
-        typer.echo("📂 Available sessions:")
-        typer.echo("-" * 60)
-
-        # Sort by creation date (most recent first)
-        sorted_sessions = sorted(
-            sessions.items(),
-            key=lambda x: x[1]["created"],
-            reverse=True,
-        )
-
-        for session_name, info in sorted_sessions:
-            created_str = info["created"].strftime("%Y-%m-%d %H:%M:%S")
-            logs_status = "✅" if info["logs"] else "❌"
-            results_status = "✅" if info["results"] else "❌"
-
-            typer.echo(f"  {session_name}")
-            typer.echo(f"    Created: {created_str}")
-            typer.echo(f"    Logs: {logs_status}  Results: {results_status}")
-            typer.echo()
-
-    except Exception as e:
-        typer.echo(f"❌ Error listing sessions: {e}")
-
-
-def cleanup_old_sessions(keep_last: int = 10) -> None:
-    """Remove old sessions, keeping only the most recent ones."""
-    try:
-        config = load_config()
-        session_mgr = SessionManager(config)
-        session_mgr.cleanup_old_sessions(keep_last)
-        typer.echo(f"🧹 Cleanup completed. Kept the {keep_last} most recent sessions.")
-    except Exception as e:
-        typer.echo(f"❌ Cleanup error: {e}")
-
-
-def register_commands(app: typer.Typer, experiment_service_getter) -> None:
+def register_commands(app: typer.Typer) -> None:
     """
     Register all CLI commands in the Typer application.
-
-    Args:
-        app: Typer instance where to register commands
-        experiment_service_getter: Function that returns initialized ExperimentService
     """
-
-    @app.command()
-    def test():
-        """Basic system test."""
-        try:
-            service = experiment_service_getter()
-            assert service is not None
-
-            # Create synthetic dataset for testing
-            generator = SyntheticDatasetGenerator()
-            dataset = generator.generate_random(n=10, length=20, alphabet="ACTG")
-
-            typer.echo(
-                f"📊 Dataset generated: {len(dataset.sequences)} strings of size {len(dataset.sequences[0])}"
-            )
-
-            # Test available algorithm
-            from src.domain.algorithms import global_registry
-
-            available_algorithms = list(global_registry.keys())
-            if not available_algorithms:
-                typer.echo("⚠️ No algorithms available", color=True)
-                return
-
-            # Use the first available algorithm
-            algorithm_name = available_algorithms[0]
-            algorithm_class = global_registry[algorithm_name]
-
-            algorithm = algorithm_class(
-                strings=dataset.sequences, alphabet=dataset.alphabet
-            )
-
-            result_string, max_distance, metadata = algorithm.run()
-
-            typer.echo(f"🎯 Result: {result_string}")
-            typer.echo(f"📏 Maximum distance: {max_distance}")
-            typer.echo(f"📋 Metadata: {metadata}")
-            typer.echo("✅ Test completed successfully!")
-
-        except Exception as e:
-            typer.echo(f"❌ Test error: {e}")
-            raise typer.Exit(1)
-
-    @app.command()
-    def run(
-        algorithm: str = typer.Argument(..., help="Algorithm name"),
-        dataset: str = typer.Argument(..., help="Dataset path"),
-        params: Optional[str] = typer.Option(
-            None, "--params", "-p", help="JSON with parameters"
-        ),
-        timeout: Optional[int] = typer.Option(
-            None, "--timeout", "-t", help="Timeout in seconds"
-        ),
-        output: Optional[str] = typer.Option(
-            None, "--output", "-o", help="Output file"
-        ),
-    ):
-        """Execute an algorithm on a dataset."""
-        try:
-            service = experiment_service_getter()
-            assert service is not None
-
-            # Parse JSON parameters if provided
-            params_dict = json.loads(params) if params else {}
-
-            typer.echo(f"🚀 Executing {algorithm} on {dataset}...")
-
-            result = service.run_single_experiment(
-                algorithm, dataset, params=params_dict, timeout=timeout
-            )
-
-            typer.echo(f"🎯 Result: {result}")
-
-        except Exception as e:
-            typer.echo(f"❌ Error: {e}")
-            raise typer.Exit(1)
 
     @app.command()
     def batch(
-        cfg: Path = typer.Argument(
+        batch: Path = typer.Argument(
             ..., exists=True, readable=True, help="Batch YAML file"
         ),
-        verbose: bool = typer.Option(
-            False, "--verbose", "-v", help="Show result details"
-        ),
     ):
-        """Execute a batch file (runs, optimizations or sensitivity analysis)."""
+        """Submete pipeline (experiment|optimization|sensitivity) ao WorkManager.
+
+        Usa PipelineService para orquestrar execução assíncrona e registra WorkItem via WorkManager.
+        """
         try:
-            service = experiment_service_getter()
-            assert service is not None
+            typer.echo(f"🚀 Submetendo pipeline: batch={batch}")
+            config = load_cspbench_config(batch)
+            wm = get_work_manager()
 
-            typer.echo(f"📋 Executing batch: {cfg}...")
+            wid = PipelineService.run(config)
 
-            result = service.run_batch(str(cfg))
+            item = wm.get(wid)
+            if not item:
+                typer.echo("❌ Falha ao registrar WorkItem")
+                raise typer.Exit(1)
+            typer.echo(f"🆔 work_id={wid} status={item['status']}")
 
-            if verbose:
-                typer.echo("📊 Detailed results:")
-                for i, res in enumerate(result["results"][:5]):  # First 5 results
-                    typer.echo(f"  Result {i+1}: {res}")
-                if len(result["results"]) > 5:
-                    typer.echo(f"  ... and {len(result['results']) - 5} more results")
+            typer.echo(f"⏳ Aguardando o término...")
+            final_status = wm.wait_until_terminal(wid)
+            typer.echo(f"✅ Status final: {final_status}")
 
-            typer.echo(f"✅ Batch completed: {result['summary']}")
-
-        except Exception as e:
-            typer.echo(f"❌ Batch error: {e}")
+        except Exception as e:  # noqa: BLE001
+            typer.echo(f"❌ Erro: {e}")
             raise typer.Exit(1)
 
-    @app.command()
-    def algorithms():
-        """List available algorithms."""
-        try:
-            service = experiment_service_getter()  # To ensure initialization
+    # --- Subcomandos para WorkManager ---
+    work_app = typer.Typer(help="Gerencia WorkItems em execução")
 
-            # Import from algorithms module to activate auto-discovery
-            from src.domain.algorithms import global_registry
+    @work_app.command("restart")
+    def work_restart(work_id: str):
+        wm = get_work_manager()
+        if wm.restart(work_id):
+            typer.echo("🔁 Restarted (queued)")
+        else:
+            typer.echo("❌ Não foi possível reiniciar (estado inválido?)")
+            raise typer.Exit(1)
+
+    app.add_typer(work_app, name="work")
+
+    @app.command()
+    def algorithms():  # thin wrapper
+        """List available algorithms (delegated)."""
+        """Lista algoritmos registrados retornando exit code lógico."""
+        try:
+            from src.domain.algorithms import global_registry  # lazy import
 
             typer.echo("🧠 Available algorithms:")
             for name, cls in global_registry.items():
-                typer.echo(f"  • {name}: {cls.__doc__ or 'No description'}")
-
+                typer.echo("  • %s: %s" % (name, cls.__doc__ or "No description"))
             if not global_registry:
                 typer.echo("  (No algorithms registered)")
-
-        except Exception as e:
-            typer.echo(f"❌ Error: {e}")
+            return
+        except Exception as e:  # noqa: BLE001
+            typer.echo("❌ Error listing algorithms: %s" % e)
             raise typer.Exit(1)
-
-    @app.command()
-    def config_info():
-        """Show configuration information."""
-        try:
-            import yaml
-
-            config_path = Path("config/settings.yaml")
-            if not config_path.exists():
-                typer.echo(f"❌ Configuration file not found: {config_path}")
-                raise typer.Exit(1)
-
-            with open(config_path, encoding="utf-8") as f:
-                config = yaml.safe_load(f)
-
-            app_info = config["application"]
-            typer.echo(f"📋 {app_info['name']} v{app_info['version']}")
-            typer.echo(f"📝 {app_info['description']}")
-
-            typer.echo("\\n🔧 Infrastructure configuration:")
-            for component, info in config["infrastructure"].items():
-                typer.echo(f"  • {component}: {info['type']}")
-
-            typer.echo("\\n🌍 Environment variables:")
-            typer.echo(
-                f"  • NCBI_EMAIL: {'defined' if os.getenv('NCBI_EMAIL') else 'not defined'}"
-            )
-            typer.echo(
-                f"  • NCBI_API_KEY: {'defined' if os.getenv('NCBI_API_KEY') else 'not defined'}"
-            )
-            typer.echo(f"  • LOG_LEVEL: {os.getenv('LOG_LEVEL', 'not defined')}")
-            typer.echo(f"  • WEB_HOST: {os.getenv('WEB_HOST', 'not defined')}")
-            typer.echo(f"  • WEB_PORT: {os.getenv('WEB_PORT', 'not defined')}")
-            typer.echo(f"  • DATASET_PATH: {os.getenv('DATASET_PATH', 'not defined')}")
-            typer.echo(
-                f"  • OUTPUT_BASE_DIRECTORY: {os.getenv('OUTPUT_BASE_DIRECTORY', 'not defined')}"
-            )
-            typer.echo(
-                f"  • OUTPUT_BASE_DIRECTORY: {os.getenv('OUTPUT_BASE_DIRECTORY', 'not defined')}"
-            )
-            typer.echo(
-                f"  • FORCE_CLEANUP: {os.getenv('FORCE_CLEANUP', 'not defined')}"
-            )
-
-        except Exception as e:
-            typer.echo(f"❌ Error: {e}")
-            raise typer.Exit(1)
-
-    @app.command()
-    def sessions() -> None:
-        """
-        List all available sessions with their information.
-        """
-        list_sessions()
-
-    @app.command()
-    def cleanup(
-        keep: int = typer.Option(
-            10, "--keep", "-k", help="Number of most recent sessions to keep"
-        )
-    ) -> None:
-        """
-        Remove old sessions, keeping only the most recent ones.
-        """
-        cleanup_old_sessions(keep)
-
-    @app.command()
-    def show_session(
-        session_name: str = typer.Argument(
-            ..., help="Session name (format: YYYYMMDD_HHMMSS)"
-        )
-    ) -> None:
-        """
-        Show details of a specific session.
-        """
-        try:
-            config = load_config()
-            session_mgr = SessionManager(config)
-            sessions = session_mgr.list_sessions()
-
-            if session_name not in sessions:
-                typer.echo(f"❌ Session '{session_name}' not found.")
-                typer.echo("\n📂 Available sessions:")
-                for name in sorted(sessions.keys(), reverse=True):
-                    typer.echo(f"  • {name}")
-                return
-
-            info = sessions[session_name]
-            created = info["created"].strftime("%Y-%m-%d %H:%M:%S")
-
-            typer.echo(f"🗂️  Session: {session_name}")
-            typer.echo(f"📅 Created: {created}")
-            typer.echo()
-
-            # Show logs if they exist
-            if info["logs"]:
-                log_path = session_mgr.get_log_path(session_name)
-                typer.echo(f"📄 Log: {log_path}")
-                if log_path.exists():
-                    stat = log_path.stat()
-                    size_kb = stat.st_size / 1024
-                    typer.echo(f"   📊 Size: {size_kb:.1f} KB")
-
-            # Show results if they exist
-            if info["results"]:
-                result_path = session_mgr.get_result_path(session_name)
-                typer.echo(f"🗃️  Result: {result_path}")
-                if result_path.exists():
-                    stat = result_path.stat()
-                    size_kb = stat.st_size / 1024
-                    typer.echo(f"   📊 Size: {size_kb:.1f} KB")
-
-                    # Try to show result summary
-                    try:
-                        import json
-
-                        with open(result_path) as f:
-                            result_data = json.load(f)
-
-                        if "summary" in result_data:
-                            summary = result_data["summary"]
-                            typer.echo(f"   📈 Summary: {summary}")
-
-                    except Exception:
-                        pass  # Ignore errors when reading result
-
-        except Exception as e:
-            typer.echo(f"❌ Error showing session: {e}")
 
     @app.command()
     def web(
-        host: str = typer.Option("0.0.0.0", "--host", "-h", help="Host to bind to"),
-        port: int = typer.Option(8000, "--port", "-p", help="Port to bind to"),
-        dev: bool = typer.Option(False, "--dev", help="Run in development mode"),
+        host: str = typer.Option(None, "--host", "-h", help="Host to bind to"),
+        port: int = typer.Option(None, "--port", "-p", help="Port to bind to"),
+        dev: bool = typer.Option(None, "--dev", help="Run in development mode"),
     ) -> None:
-        """
-        Start the web interface for CSPBench.
-        """
+        """Start the web interface (delegated)."""
         try:
+            host = host if host is not None else os.getenv("WEB_HOST", "0.0.0.0")
+            port = int(port) if port is not None else int(os.getenv("WEB_PORT", "8000"))
+
+            # Use dev flag or WEB_DEBUG env var
+            debug_env = os.getenv("WEB_DEBUG", "false").lower() == "true"
+            debug = dev if dev is not None else debug_env
+
+            log_level = os.getenv("WEB_LOG_LEVEL", "info" if debug else "warning")
+            access_log = os.getenv("WEB_ACCESS_LOG", str(debug)).lower() == "true"
+
             typer.echo("🌐 Starting CSPBench Web Interface...")
-            typer.echo(f"🖥️  Host: {host}")
-            typer.echo(f"🔌 Port: {port}")
-            typer.echo(f"🛠️  Mode: {'Development' if dev else 'Production'}")
+            typer.echo("🖥️  Host: %s" % host)
+            typer.echo("🔌 Port: %s" % port)
+            typer.echo("🛠️  Mode: %s" % ("Development" if debug else "Production"))
+            typer.echo("📜 Log Level: %s" % log_level)
+            typer.echo("📈 Access Log: %s" % ("Enabled" if access_log else "Disabled"))
 
-            # Check if web dependencies are available
             try:
-                import uvicorn
+                import uvicorn  # type: ignore
 
-                from src.presentation.web.app import app as web_app
-            except ImportError as e:
-                typer.echo(f"❌ Web dependencies not installed: {e}")
+                # Importa aplicação para registrar rotas
+                from src.presentation.web.app import app as web_app  # noqa: F401
+            except ImportError as e:  # noqa: BLE001
+                typer.echo("❌ Web dependencies not installed: %s" % e)
                 typer.echo("💡 Install with: pip install -r requirements.web.txt")
                 raise typer.Exit(1)
 
-            typer.echo(f"\n🚀 Web interface starting at http://{host}:{port}")
-            typer.echo("🔗 Click the link above or paste it into your browser")
+            typer.echo("\n🚀 Web interface starting at http://%s:%s" % (host, port))
+            typer.echo("🔗 Open the link in your browser")
             typer.echo("⏹️  Press Ctrl+C to stop the server")
 
-            # Start uvicorn server
             uvicorn.run(
                 "src.presentation.web.app:app",
                 host=host,
                 port=port,
-                reload=dev,
-                log_level="info" if dev else "warning",
-                access_log=dev,
+                reload=debug,
+                log_level=log_level,
+                access_log=access_log,
             )
-
+            return
         except KeyboardInterrupt:
             typer.echo("\n🛑 Web server stopped")
-        except Exception as e:
-            typer.echo(f"❌ Error starting web server: {e}")
+            return
+        except Exception as e:  # noqa: BLE001
+            typer.echo("❌ Error starting web server: %s" % e)
             raise typer.Exit(1)
 
-    @app.command()
-    def view_report(
-        session_name: str = typer.Argument(
-            ..., help="Session name (format: YYYYMMDD_HHMMSS)"
-        )
-    ) -> None:
-        """
-        Open the HTML report of a session in the browser.
-        """
+    @app.command(name="datasetsave")
+    def dataset_save() -> None:
+        """Interactive synthetic dataset generation wizard."""
         try:
-            config = load_config()
-            session_mgr = SessionManager(config)
-            sessions = session_mgr.list_sessions()
-
-            if session_name not in sessions:
-                typer.echo(f"❌ Session '{session_name}' not found.")
-                return
-
-            # Build report path
-            result_base_dir = Path(
-                config["infrastructure"]["result"]["base_result_dir"]
+            from src.infrastructure.orchestration.dataset_generation_orchestrator import (
+                DatasetGenerationOrchestrator,
             )
-            report_path = result_base_dir / session_name / "report" / "report.html"
 
-            if not report_path.exists():
-                typer.echo(f"❌ Report not found for session '{session_name}'.")
-                typer.echo(f"   Expected at: {report_path}")
-                return
-
-            # Open in browser
-            import webbrowser
-
-            webbrowser.open(f"file://{report_path.absolute()}")
-            typer.echo(f"🌐 Opening report in browser: {report_path}")
-
-        except Exception as e:
-            typer.echo(f"❌ Error opening report: {e}")
+            dataset_path = os.getenv("DATASET_PATH", "datasets")
+            typer.echo("📁 Using dataset path: %s" % dataset_path)
+            orchestrator = DatasetGenerationOrchestrator(base_path=dataset_path)
+            result_path = orchestrator.run_interactive_generation()
+            if result_path:
+                typer.echo("\n🎉 Dataset saved successfully!")
+            else:
+                typer.echo("\n❌ Operation cancelled.")
+            return
+        except KeyboardInterrupt:
+            typer.echo("\n🚫 Operation cancelled by user")
+            raise typer.Exit(1)
+        except Exception as e:  # noqa: BLE001
+            typer.echo("❌ Error in dataset wizard: %s" % e)
+            raise typer.Exit(1)

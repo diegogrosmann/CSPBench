@@ -27,6 +27,8 @@ classifiers = [
 requires-python = ">=3.8"
 dependencies = [
     "typer>=0.9.0",
+    # Pin de compatibilidade: Typer 0.9 não suporta mudança de assinatura em click 8.2+
+    "click>=8.0,<8.2",
     "PyYAML>=6.0",
     "biopython>=1.80",
     "numpy>=1.20.0",
@@ -119,7 +121,7 @@ addopts = [
     "-ra",
     "--strict-markers",
     "--strict-config",
-    "--cov=cspbench",
+    "--cov=src",
     "--cov-report=term-missing",
     "--cov-report=html",
 ]
@@ -153,7 +155,7 @@ module = [
 ignore_missing_imports = true
 
 [tool.coverage.run]
-source = ["cspbench"]
+source = ["src"]
 omit = [
     "*/tests/*",
     "*/test_*",

@@ -72,7 +72,6 @@ class WebConfig:
 
         try:
             # Import algorithms to populate global_registry
-            import algorithms
 
             logger.info(f"Loaded {len(global_registry)} algorithms")
 

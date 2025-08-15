@@ -2,7 +2,6 @@
 Pydantic models for web API requests and responses.
 """
 
-from datetime import datetime
 from typing import Dict, List, Optional
 
 from pydantic import BaseModel, validator

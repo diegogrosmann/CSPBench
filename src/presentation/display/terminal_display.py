@@ -1,16 +1,12 @@
 """Terminal display adapter for progress events."""
 
-import sys
-from typing import Optional, TYPE_CHECKING, Any
-from datetime import datetime
 import logging
+import sys
+from datetime import datetime
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from src.application.monitoring.progress_events import (
-        ProgressEvent,
-        AlgorithmProgressEvent,
-        ExecutionProgressEvent,
-    )
+    pass
 
 
 class TerminalDisplay:

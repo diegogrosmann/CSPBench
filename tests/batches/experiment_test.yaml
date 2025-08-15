@@ -1,0 +1,249 @@
+# ===================================================================
+# STANDARDIZED TEMPLATE CSPBench - UNIFIED STRUCTURE v0.8
+# ===================================================================
+# This template defines the standard structure for all batch types.
+# Infrastructure settings (paths, directories) are configured in .env
+# This template only contains execution-specific configurations
+# 
+# Supported types: execution, optimization, sensitivity
+# Usage: Copy this template and adapt for your specific needs
+#
+# =====================================================================
+# SECTION 1: METADATA (REQUIRED FOR ALL)
+# =====================================================================
+# This section contains basic information about the batch.
+# All fields are required for traceability and documentation.
+metadata:
+  name: "Batch Name"                  # Descriptive batch name (string)
+  description: "Detailed description of what the batch does"    # Complete description (string)
+  author: "Author Name"               # Responsible author (string)
+  version: "1.0"                      # Batch version (string)
+  creation_date: "2025-07-13"         # Creation date in YYYY-MM-DD format
+  tags: ["tag1", "tag2"]              # Tags for categorization (list)
+
+# =====================================================================
+# SECTION 2: DATASETS (STANDARDIZED FOR ALL)
+# =====================================================================
+# Defines the datasets available for use in the batch.
+# Each dataset has a unique ID that can be referenced in executions.
+# Supported types: synthetic, file, entrez
+datasets:
+  # === SYNTHETIC DATASETS ===
+  # Generate artificial data for testing and development
+  - id: dataset_test                  # string: Unique dataset ID
+    name: "Test Dataset"              # string: Descriptive name
+    type: "synthetic"                 # string: Dataset type
+    parameters:                       # Parameters specific to synthetic datasets:
+      n: 10                           # int: Number of sequences (3-100 recommended)
+      L: 20                           # int: Sequence length (5-1000)
+      alphabet: "ACGT"                # string: Sequence alphabet
+                                      # "ACGT" = DNA, "01" = binary, "ACDEFGH..." = custom
+      noise: 0.1                      # float: Noise level (0.0-1.0)
+                                      # 0.0 = no noise, 0.5 = very noisy
+      seed: 42                        # int|null: Seed for reproducibility
+                                      # int = deterministic, null = random
+
+  # === FILE DATASETS ===
+  # Load data from existing FASTA files
+  - id: dataset_file                  # string: Unique dataset ID
+    name: "File Dataset"              # string: Descriptive name
+    type: "file"                      # string: Dataset type
+    parameters:                       # Parameters specific to file datasets:
+      filename: "example.fasta"       # string: Filename (must be in datasets/)
+                                      # Supported formats: .fasta, .fa, .txt
+
+  # === ENTREZ DATASETS (NCBI) - ✅ FULLY IMPLEMENTED ===
+  # Download data directly from NCBI using Entrez API
+  # NOTE: Requires NCBI_EMAIL environment variable and Biopython installation
+  - id: dataset_ncbi                  # string: Unique dataset ID
+    name: "NCBI Dataset"              # string: Descriptive name
+    type: "entrez"                    # string: Dataset type (FUNCTIONAL)
+    parameters:                       # Parameters for Entrez datasets:
+      query: "COIGene AND 600:650[SLEN]"                        # string: NCBI search query
+                                      # Syntax: https://www.ncbi.nlm.nih.gov/books/NBK25499/
+                                      # Examples: "escherichia coli", "COIGene", "ribosomal RNA"
+      db: "nucleotide"                # string: NCBI database
+                                      # "nucleotide", "protein", "pubmed", etc.
+      retmax: 10                      # int: Maximum number of sequences (1-1000)
+                                      # Higher values may take longer to download
+                                      # System will handle length filtering automatically
+
+# =====================================================================
+# SECTION 3: ALGORITHMS (STANDARDIZED FOR ALL)
+# =====================================================================
+# Defines algorithm configurations that can be reused.
+# Allows creating parameter "presets" for different scenarios.
+algorithms:
+  - id: "default_config"              # string: Unique configuration ID
+    name: "Default Configuration"     # string: Descriptive name
+    description: "Algorithms with default parameters"           # string: Detailed description
+    algorithms:                       # list: List of algorithms included in this configuration
+      - "Baseline"                    # Baseline algorithm (simplest)
+      - "BLF-GA"                      # Block-based Genetic Algorithm (main)
+      - "CSC"                         # Closest String with Constraints
+      - "H³-CSP"                      # Heuristic Closest String Problem
+      - "DP-CSP"                      # Dynamic Programming CSP
+    
+    # Algorithm-specific parameters
+  # For experiment: fixed values used directly
+    # For optimization/sensitivity: base values that can be overridden
+    algorithm_params:
+      # === BASELINE - Simple Greedy Algorithm ===
+      "Baseline":
+        tie_break: "lex"              # string: Tie-breaking criterion
+                                      # "lex" = lexicographic, "random" = random, "first" = first
+      
+      # === BLF-GA - Block-based Genetic Algorithm ===
+      "BLF-GA":
+        # Population Parameters
+        pop_size: 1.5                 # int|float: Population size (fixed int or n multiplier)
+                                      # Examples: 100 (fixed), 1.5 (1.5*n), 2.0 (2*n)
+        min_pop_size: 20              # int: Minimum population size threshold
+        max_gens: 100                 # int: Maximum number of generations (30-500)
+        max_time: 1200.0              # float: Maximum execution time in seconds
+        seed: null                    # int|null: Seed for reproducibility (null = random)
+        
+        # Genetic Operators
+        cross_prob: 0.9               # float: Crossover probability (0.6-0.95)
+        mut_prob: 0.1                 # float: Mutation probability (0.01-0.3)
+        elite_rate: 0.05              # float: Elitism rate (0.01-0.15)
+        
+        # Block Parameters (BLF-GA specific)
+        initial_blocks: 0.2           # float: Initial block proportion (0.1-0.5)
+        min_block_len: 1              # int: Minimum block length
+        rediv_freq: 10                # int: Redivision frequency (5-25)
+        
+        # Diversity and Immigration
+        immigrant_freq: 10            # int: Immigration frequency (10-30)
+        immigrant_ratio: 0.2          # float: Immigration rate (0.1-0.3)
+        diversity_threshold: 0.4      # float: Diversity threshold for adaptive mutation (0-1)
+        
+        # Operator Methods
+        crossover_type: "one_point"   # string: Crossover method (original parameter name)
+                                      # "one_point", "uniform", "blend_blocks"
+        mutation_type: "multi"        # string: Mutation method (original parameter name)
+                                      # "multi", "inversion", "transposition"
+        mutation_multi_n: 2          # int: Number of mutations for multi-mutation method
+        tournament_k: 2               # int: Tournament size for tournament selection
+        refinement_type: "greedy"     # string: Local refinement method (original parameter name)
+                                      # "greedy", "swap", "insertion", "2opt"
+        refine_elites: "best"         # string: Which elites to refine ("all", "best")
+        refine_iter_limit: 100        # int: Maximum iterations per refinement
+        
+        # Adaptive Mutation Parameters
+        mutation_adapt_N: 10          # int: Generations to detect convergence for adaptive mutation
+        mutation_adapt_factor: 2.0    # float: Temporary mutation increase factor
+        mutation_adapt_duration: 5    # int: Duration of mutation increase in generations
+        
+        # Niching Parameters
+        niching: false                # bool: Enable niching for diversity preservation
+        niching_radius: 3             # int: Minimum distance between solutions in niche
+        
+        # Stopping and Restart Criteria
+        no_improve_patience: 0.2      # float: Patience without improvement (0.1-0.5)
+                                      # Proportion of generations without improvement before stopping
+        restart_patience: 20          # int: Generations without improvement for partial restart
+        restart_ratio: 0.3            # float: Proportion of population to restart (0.1-0.5)
+        disable_elitism_gens: 5       # int: Disable elitism every N generations to prevent convergence
+      
+      # === CSC - Closest String with Constraints ===
+      "CSC":
+        min_d: 2                      # int: Initial minimum distance (1-5)
+        d_factor: 0.75                # float: Distance increment factor (0.5-1.0)
+        min_blocks: 4                 # int: Minimum number of blocks (2-8)
+        max_blocks: 8                 # int: Maximum number of blocks (4-16)
+        n_div: 6                      # int: Divisor for number of sequences
+        l_div: 25                     # int: Divisor for block length (10-50)
+      
+      # === H³-CSP - Heuristic Closest String Problem ===
+      "H³-CSP":
+        # Block Division Parameters
+        auto_blocks: true             # bool: Use automatic block division (√L method)
+                                      # true = automatic, false = manual
+        min_block_size: 2             # int: Minimum block size (1-5)
+        max_blocks: null              # int|null: Maximum number of blocks (null = automatic)
+        block_size: 4                 # int: Base block size when not automatic (2-8)
+        block_strategy: null          # string|null: Division strategy (null = default)
+        
+        # Difficulty Thresholds per Block
+        block_small: 2                # int: Threshold for "small" blocks (exhaustive search)
+        block_medium: 4               # int: Threshold for "medium" blocks (reduced beam search)
+        block_large: 8                # int: Threshold for "large" blocks (full beam search)
+        
+        # Search Parameters
+        exhaustive_limit: 10000       # int: Limit for exhaustive search (|Σ|^m combinations)
+        beam_width: 32                # int: Beam search width for large blocks
+        k_candidates: 5               # int: Number of candidates considered per block (3-10)
+        
+        # Refinement Parameters
+        local_iters: 3                # int: Local search iterations (1-5)
+        local_search_iters: 3         # int: Alias for local_iters (compatibility)
+        
+        # Execution Control
+        max_time: 300                 # int: Maximum execution time in seconds
+        seed: null                    # int|null: Seed for reproducibility
+        
+        # Experimental Parameters
+        diversity_threshold: 1        # int: Diversity threshold (experimental feature)
+        fallback_enabled: true        # bool: Enable fallback for large blocks
+      
+      # === DP-CSP - Dynamic Programming CSP ===
+      "DP-CSP":
+        max_d: null                   # int|null: Maximum distance considered (3-10)
+                                      # High values greatly increase execution time
+                                      # null = use baseline distance as reference
+        warn_threshold: 9             # int: Sequence limit for warning (actual default is 9)
+                                      # Above this value, the algorithm may be very slow
+        max_time: 300                 # int: Maximum execution time in seconds
+        seed: null                    # int|null: Seed for reproducibility
+  
+  # You can add multiple algorithms:
+  - id: "aggressive_csc"              # string: Unique configuration ID
+    name: "Aggressive CSC Configuration"                        # string: Descriptive name
+    description: "Aggressive parameters for CSC algorithm"      # string: Detailed description
+    algorithms:                       # list: List of algorithms included in this configuration
+      - "CSC"                         # Closest String with Constraints
+    
+    algorithm_params:
+      "CSC":
+        min_d: 1                      # int: Tighter clustering
+        d_factor: 0.6                 # float: Lower distance factor
+        min_blocks: 3                 # int: More blocks
+        max_blocks: 6                 # int: Higher maximum
+        l_div: 20                     # int: More divisions
+
+# =====================================================================
+# SECTION 4: TASK TYPE (REQUIRED)
+# =====================================================================
+# Defines the type of operation to be performed.
+# Each type has specific configurations in the corresponding section.
+task:
+  type: "experiment"                  # string: Task type
+                                      # "experiment" = run algorithms with fixed parameters
+                                      # "optimization" = optimize hyperparameters with Optuna
+                                      # "sensitivity" = analyze sensitivity with SALib
+
+# =====================================================================
+# SECTION 5A: SPECIFIC CONFIGURATION - EXPERIMENT
+# =====================================================================
+# Use this section when task.type = "experiment"
+# Runs algorithms on datasets with pre-defined parameters
+experiment:
+  tasks:
+    # List of experiment tasks to perform (formerly 'executions')
+    - name: "Test Experiment"         # string: Descriptive experiment name
+      datasets:
+        - "dataset_test"
+        - "dataset_file"
+      algorithms:
+        - "default_config"
+        - "aggressive_csc"
+      repetitions: 30                  # int: Number of repetitions per combination (1-10 recommended)
+                                      # Each dataset+algorithm combination will be executed N times
+    # You can add multiple executions:
+    - name: "Complete Experiment"
+      datasets: 
+        - "dataset_ncbi"
+      algorithms: 
+        - "aggressive_csc"
+      repetitions: 20

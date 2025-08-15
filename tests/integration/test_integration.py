@@ -14,7 +14,9 @@ import yaml
 
 from src.application.services.experiment_service import ExperimentService
 from src.domain import Dataset, SyntheticDatasetGenerator
-from src.infrastructure.orchestrators.executors import LocalExecutor
+
+# Importa LocalExecutor via pacote raiz (alias para Executor)
+from src.infrastructure.orchestrators import LocalExecutor
 
 
 class TestEndToEndExecution:

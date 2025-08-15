@@ -2,10 +2,12 @@
 File-based Dataset Repository
 
 Implements DatasetRepository using file system.
+Respects DATASET_DIRECTORY from environment for base path.
 """
 
+import os
 from pathlib import Path
-from typing import List
+from typing import List, Any
 
 from src.domain import Dataset
 from src.domain.errors import DatasetNotFoundError, DatasetValidationError
@@ -14,13 +16,20 @@ from src.domain.errors import DatasetNotFoundError, DatasetValidationError
 class FileDatasetRepository:
     """FASTA file-based dataset repository."""
 
-    def __init__(self, base_path: str = "saved_datasets"):
-        self.base_path = Path(base_path)
-        self.base_path.mkdir(exist_ok=True)
+    @staticmethod
+    def _get_base_path(base_path: str | None = None) -> Path:
+        """Get base path, using environment variable as default."""
+        if base_path is None:
+            base_path = os.getenv("DATASET_DIRECTORY", "./datasets")
+        path = Path(base_path)
+        path.mkdir(parents=True, exist_ok=True)
+        return path
 
-    def save(self, dataset: Dataset, name: str) -> str:
+    @staticmethod
+    def save(dataset: Dataset, name: str, base_path: str | None = None) -> str:
         """Save dataset to FASTA file."""
-        file_path = self.base_path / f"{name}.fasta"
+        base = FileDatasetRepository._get_base_path(base_path)
+        file_path = base / f"{name}.fasta"
 
         with open(file_path, "w") as f:
             for i, sequence in enumerate(dataset.sequences):
@@ -28,59 +37,80 @@ class FileDatasetRepository:
 
         return str(file_path)
 
-    def load(self, identifier: str) -> Dataset:
-        """Load dataset from file."""
-        file_path = self._resolve_path(identifier)
+    @staticmethod
+    def load(
+        filename: str, base_path: str | None = None
+    ) -> tuple[Dataset, dict[str, Any]]:
+        """Load dataset from file and also return a dict with used parameters."""
+        base = FileDatasetRepository._get_base_path(base_path)
+        file_path = FileDatasetRepository._resolve_path(filename, base)
 
         if not file_path.exists():
-            raise DatasetNotFoundError(f"Dataset not found: {identifier}")
+            raise DatasetNotFoundError(f"Dataset not found: {filename}")
 
-        sequences = self._parse_fasta(file_path)
-        metadata = {"source": str(file_path), "format": "fasta"}
+        sequences = FileDatasetRepository._parse_fasta(file_path)
 
-        return Dataset(sequences, metadata)
+        params: dict[str, Any] = {"file_path": file_path}
 
-    def list_available(self) -> List[str]:
+        return Dataset(sequences), params
+
+    @staticmethod
+    def list_available(base_path: str | None = None) -> List[str]:
         """List available datasets."""
-        files = list(self.base_path.glob("*.fasta"))
+        base = FileDatasetRepository._get_base_path(base_path)
+        files = list(base.glob("*.fasta"))
         return [f.stem for f in files]
 
-    def exists(self, identifier: str) -> bool:
+    @staticmethod
+    def exists(filename: str, base_path: str | None = None) -> bool:
         """Check if dataset exists."""
-        file_path = self._resolve_path(identifier)
+        base = FileDatasetRepository._get_base_path(base_path)
+        file_path = FileDatasetRepository._resolve_path(filename, base)
         return file_path.exists()
 
-    def delete(self, identifier: str) -> bool:
+    @staticmethod
+    def delete(filename: str, base_path: str | None = None) -> bool:
         """Remove dataset."""
-        file_path = self._resolve_path(identifier)
+        base = FileDatasetRepository._get_base_path(base_path)
+        file_path = FileDatasetRepository._resolve_path(filename, base)
         if file_path.exists():
             file_path.unlink()
             return True
         return False
 
-    def _resolve_path(self, identifier: str) -> Path:
-        """Resolve identifier to file path."""
-        if identifier.endswith(".fasta"):
-            return self.base_path / identifier
-        return self.base_path / f"{identifier}.fasta"
+    @staticmethod
+    def _resolve_path(filename: str, base_path: Path) -> Path:
+        """Resolve filename to file path.
 
-    def _parse_fasta(self, file_path: Path) -> List[str]:
-        """Parse FASTA file."""
-        sequences = []
-        current_sequence = ""
+        If 'filename' is an absolute path, return it directly.
+        Otherwise, treat it as a name relative to base path, with optional .fasta.
+        """
+        p = Path(filename)
+        if p.is_absolute():
+            return p
+        if filename.endswith(".fasta"):
+            return base_path / filename
+        return base_path / f"{filename}.fasta"
 
-        with open(file_path) as f:
-            for line in f:
-                line = line.strip()
+    @staticmethod
+    def _parse_fasta(file_path: Path) -> List[str]:
+        """Parse FASTA file (multi-line sequences supported)."""
+        sequences: List[str] = []
+        current: list[str] = []
+
+        with file_path.open("r", encoding="utf-8") as f:
+            for raw in f:
+                line = raw.strip()
+                if not line:
+                    continue
                 if line.startswith(">"):
-                    if current_sequence:
-                        sequences.append(current_sequence)
-                        current_sequence = ""
+                    if current:
+                        sequences.append("".join(current))
+                        current = []
                 else:
-                    current_sequence += line
-
-            if current_sequence:
-                sequences.append(current_sequence)
+                    current.append(line)
+            if current:
+                sequences.append("".join(current))
 
         if not sequences:
             raise DatasetValidationError(f"No sequences found in {file_path}")
@@ -88,7 +118,6 @@ class FileDatasetRepository:
         return sequences
 
 
-class FastaDatasetRepository(FileDatasetRepository):
-    """Alias for compatibility."""
-
-    pass
+# Backward compatibility alias for legacy imports
+# Some modules/tests may still import FastaDatasetRepository
+FastaDatasetRepository = FileDatasetRepository

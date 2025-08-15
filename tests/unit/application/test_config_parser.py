@@ -79,7 +79,7 @@ class TestConfigurationParser:
                     "algorithm_params": {"Baseline": {"tie_break": "lex"}},
                 }
             ],
-            "task": {"type": "execution"},
+            "task": {"type": "experiment"},
             "execution": {
                 "executions": [
                     {
@@ -364,12 +364,11 @@ class TestConfigurationValidator:
             "metadados": {"nome": "test"},
             "datasets": [],
             "algorithms": [],
-            "task": {"type": "execution"},
+            "task": {"type": "experiment"},
             "execution": {},
         }
-
         task_type = ConfigurationValidator.validate_batch_structure(config)
-        assert task_type == "execution"
+        assert task_type == "experiment"
 
     def test_validate_batch_structure_optimization(self):
         """Test validation of optimization batch structure."""
@@ -400,15 +399,14 @@ class TestConfigurationValidator:
     def test_validate_batch_structure_legacy(self):
         """Test validation of legacy batch structure."""
         config = {"experiments": [{"algorithm": "baseline", "dataset": "test"}]}
-
         task_type = ConfigurationValidator.validate_batch_structure(config)
-        assert task_type == "execution"
+        assert task_type == "experiment"
 
     def test_validate_batch_structure_missing_sections(self):
         """Test validation with missing required sections."""
         config = {
             "metadados": {"nome": "test"},
-            "task": {"type": "execution"},
+            "task": {"type": "experiment"},
             # Missing datasets and algorithms
         }
 
@@ -421,11 +419,10 @@ class TestConfigurationValidator:
             "batch_info": {"nome": "test"},  # legacy name
             "datasets": [],
             "algorithms": [],
-            "task": {"type": "execution"},
+            "task": {"type": "experiment"},
         }
-
         task_type = ConfigurationValidator.validate_batch_structure(config)
-        assert task_type == "execution"
+        assert task_type == "experiment"
 
     def test_validate_batch_structure_unrecognized(self):
         """Test validation with unrecognized structure."""

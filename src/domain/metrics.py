@@ -46,20 +46,6 @@ def max_distance(center: str, strings: List[str]) -> int:
     return max(hamming_distance(center, s) for s in strings)
 
 
-def max_hamming(center: str, strings: List[str]) -> int:
-    """
-    Alias for max_distance for compatibility.
-
-    Args:
-        center: Center string
-        strings: List of reference strings
-
-    Returns:
-        int: Maximum distance
-    """
-    return max_distance(center, strings)
-
-
 def average_distance(center: str, strings: List[str]) -> float:
     """
     Calculate average distance from a center to a set of strings.
