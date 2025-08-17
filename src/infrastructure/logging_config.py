@@ -6,29 +6,36 @@ Centralized logging configurations without external console dependencies.
 
 import logging
 import logging.handlers
+import os
 from pathlib import Path
 from typing import Optional
 
 
 def setup_basic_logging(
-    level: str = "INFO",
-    log_dir: str = "outputs/logs",
-    base_name: str = "cspbench",
-    max_bytes: int = 10 * 1024 * 1024,  # 10MB
-    backup_count: int = 5,
+    level: Optional[str] = None,
+    log_dir: Optional[str] = None,
+    base_name: Optional[str] = None,
+    max_bytes: Optional[int] = None,
+    backup_count: Optional[int] = None,
     log_file_path: Optional[str] = None,  # Full file path if specified
 ) -> None:
     """
-    Configure basic system logging.
+    Configure basic system logging using environment variables as defaults.
 
     Args:
-        level: Log level (DEBUG, INFO, WARNING, ERROR)
-        log_dir: Directory for log files
-        base_name: Base name for log files
-        max_bytes: Maximum file size before rotation
-        backup_count: Number of backups to maintain
+        level: Log level (DEBUG, INFO, WARNING, ERROR) - defaults to LOG_LEVEL env var
+        log_dir: Directory for log files - defaults to LOG_DIRECTORY env var
+        base_name: Base name for log files - defaults to LOG_BASE_NAME env var
+        max_bytes: Maximum file size before rotation - defaults to LOG_MAX_BYTES env var
+        backup_count: Number of backups to maintain - defaults to LOG_BACKUP_COUNT env var
         log_file_path: Full file path (overrides log_dir + base_name)
     """
+    # Use environment variables as defaults
+    level = level or os.getenv("LOG_LEVEL", "INFO")
+    log_dir = log_dir or os.getenv("LOG_DIRECTORY", "outputs/logs")
+    base_name = base_name or os.getenv("LOG_BASE_NAME", "cspbench")
+    max_bytes = max_bytes or int(os.getenv("LOG_MAX_BYTES", "10485760"))  # 10MB
+    backup_count = backup_count or int(os.getenv("LOG_BACKUP_COUNT", "5"))
     # Determine file path
     if log_file_path:
         log_file = Path(log_file_path)
@@ -50,10 +57,6 @@ def setup_basic_logging(
         log_file, maxBytes=max_bytes, backupCount=backup_count, encoding="utf-8"
     )
     file_handler.setFormatter(formatter)
-    file_handler = logging.handlers.RotatingFileHandler(
-        log_file, maxBytes=max_bytes, backupCount=backup_count, encoding="utf-8"
-    )
-    file_handler.setFormatter(formatter)
 
     # Configure root logger
     root_logger = logging.getLogger()
@@ -65,6 +68,15 @@ def setup_basic_logging(
 
     # Add new handler
     root_logger.addHandler(file_handler)
+
+
+def setup_logging_from_env() -> None:
+    """
+    Configure logging using only environment variables.
+    
+    This is a convenience function that sets up logging entirely from .env configuration.
+    """
+    setup_basic_logging()
 
 
 def get_logger(name: str) -> logging.Logger:
@@ -84,12 +96,14 @@ class LoggerConfig:
     """Centralized logger configuration."""
 
     _initialized = False
-    _log_level = "INFO"
+    _log_level = None
 
     @classmethod
-    def initialize(cls, level: str = "INFO", **kwargs) -> None:
+    def initialize(cls, level: Optional[str] = None, **kwargs) -> None:
         """Initialize logging configuration."""
         if not cls._initialized:
+            # Use environment variable if level not provided
+            level = level or os.getenv("LOG_LEVEL", "INFO")
             setup_basic_logging(level=level, **kwargs)
             cls._log_level = level
             cls._initialized = True
@@ -97,7 +111,7 @@ class LoggerConfig:
     @classmethod
     def get_level(cls) -> str:
         """Return current logging level."""
-        return cls._log_level
+        return cls._log_level or os.getenv("LOG_LEVEL", "INFO")
 
     @classmethod
     def set_level(cls, level: str) -> None:
@@ -107,5 +121,24 @@ class LoggerConfig:
 
     @classmethod
     def is_initialized(cls) -> bool:
-        """Check if logging was initialized."""
+        """Verifica se o logging foi inicializado."""
         return cls._initialized
+    
+    @classmethod
+    def get_logger(cls, name: str) -> logging.Logger:
+        """
+        Obtém um logger configurado.
+        
+        Args:
+            name: Nome do logger (tipicamente __name__)
+            
+        Returns:
+            Logger configurado
+        """
+        # Se não foi inicializado, inicializa automaticamente
+        if not cls._initialized:
+            cls.initialize()
+        
+        return logging.getLogger(name)
+        
+        return logging.getLogger(name)

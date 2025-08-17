@@ -9,47 +9,39 @@ import time
 from statistics import variance
 from typing import Any, Callable
 
-from src.domain.config import AlgParams, SensitivityTask, ResourcesConfig
+from src.domain.config import AlgParams, SensitivityTask, ResourcesConfig, SystemConfig
+from src.domain.dataset import Dataset
 from src.infrastructure.monitoring.monitor_interface import Monitor, NoOpMonitor
+from src.application.ports.repositories import AbstractExecutionEngine
 from .algorithm_runner import run_algorithm
 
 
-class SensitivityExecutor:
+class SensitivityExecutor(AbstractExecutionEngine):
     def run(
         self,
         task: SensitivityTask,
-        dataset_obj,
+        dataset_obj: Dataset,
         alg: AlgParams,
         resources: ResourcesConfig | None,
-        monitor: Monitor | None,
-        writer=None,
-        global_seed: int | None = None,
+        monitor: Monitor | None = None,
+        system_config: SystemConfig | None = None,
         check_control: Callable[[], str] | None = None,
         store=None,
     ) -> dict[str, Any]:
         """Run simple parameter sampling to estimate rough sensitivity via variance."""
         monitor = monitor or NoOpMonitor()
         base_params = dict(alg.params)
-        if isinstance(dataset_obj, list):
-            strings = dataset_obj
-            alphabet = (
-                "".join(sorted({c for s in strings for c in s})) if strings else ""
-            )
-            dataset_id = (
-                f"ds_{__import__('hashlib').md5(''.join(strings).encode()).hexdigest()[:8]}"
-                if strings
-                else "ds_unknown"
-            )
-        else:
-            strings = getattr(dataset_obj, "sequences", [])
-            alphabet = (
-                dataset_obj.metadata.get("alphabet")
-                if hasattr(dataset_obj, "metadata")
-                else ""
-            )
-            if not alphabet and strings:
-                alphabet = "".join(sorted({c for s in strings for c in s}))
-            dataset_id = getattr(dataset_obj, "id", "dataset")
+        
+        # Extract data from Dataset object
+        strings = dataset_obj.sequences
+        alphabet = dataset_obj.alphabet
+        dataset_id = getattr(dataset_obj, 'id', f"ds_{__import__('hashlib').md5(''.join(strings).encode()).hexdigest()[:8]}")
+        
+        # Extract global_seed from system_config
+        global_seed = None
+        if system_config and hasattr(system_config, 'global_seed'):
+            global_seed = system_config.global_seed
+        
         rng = random.Random(global_seed)
         param_space = task.parameters or {}
         samples = int(task.config.get("samples", 16) if task.config else 16)
@@ -100,18 +92,6 @@ class SensitivityExecutor:
                     "objective": res.get("objective", float("inf")),
                 }
             )
-            if writer:
-                writer.append(
-                    {
-                        "task_id": task.id,
-                        "dataset_id": dataset_id,
-                        "algorithm": alg.name,
-                        "unit_id": unit_id,
-                        "sample": i,
-                        "mode": "sensitivity",
-                        **{k: v for k, v in res.items() if k != "metadata"},
-                    }
-                )
             if store:
                 try:
                     store.record_execution_end(
@@ -132,4 +112,8 @@ class SensitivityExecutor:
             "SensitivityExecutor finished",
             {"task": task.id, "samples": samples},
         )
-        return {"samples": samples, "param_scores": param_scores}
+        return {
+            "status": "completed" if samples > 0 else "failed",
+            "samples": samples, 
+            "param_scores": param_scores
+        }

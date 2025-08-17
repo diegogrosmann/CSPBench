@@ -31,7 +31,7 @@ class ResourceController:
 
         Args:
             config: Resource configuration dictionary containing:
-                - cpu: {max_cores, affinity}
+                - cpu: {max_cores, affinity, max_workers, exclusive_cores}
                 - memory: {max_memory_gb}
                 - parallel: {enabled, max_workers, internal_jobs}
                 - timeouts: {timeout_per_algorithm, timeout_total_batch}
@@ -47,9 +47,14 @@ class ResourceController:
         self._parallel_config = config.get("parallel", {})
         self._timeout_config = config.get("timeouts", {})
 
-        # Resource limits
-        self._max_cores = self._cpu_config.get("max_cores")
+        # Resource limits with defaults
+        self._max_cores = self._cpu_config.get("max_cores") or self._cpu_config.get("max_workers")
+        if self._max_cores is None:
+            # Default to number of CPU cores when max_workers is None
+            self._max_cores = psutil.cpu_count()
+        
         self._cpu_affinity = self._cpu_config.get("affinity")
+        self._exclusive_cores = self._cpu_config.get("exclusive_cores", False)
         self._max_memory_gb = self._memory_config.get("max_memory_gb")
         self._timeout_per_algorithm = self._timeout_config.get(
             "timeout_per_algorithm", 3600
@@ -65,8 +70,30 @@ class ResourceController:
         self._logger.info(
             f"[RESOURCE] Controller initialized with limits: "
             f"cores={self._max_cores}, memory={self._max_memory_gb}GB, "
+            f"exclusive_cores={self._exclusive_cores}, "
             f"timeout_algo={self._timeout_per_algorithm}s, timeout_batch={self._timeout_total_batch}s"
         )
+
+    def get_default_cpu_affinity(self) -> Optional[List[int]]:
+        """
+        Calculate default CPU affinity based on exclusive_cores setting.
+        
+        Returns:
+            List of CPU cores to use, or None if no restriction
+        """
+        if not self._exclusive_cores:
+            return None
+            
+        try:
+            total_cores = psutil.cpu_count()
+            if total_cores <= 1:
+                return [0]  # Only one core available
+            
+            # Exclude core 0 for main process when exclusive_cores is enabled
+            return list(range(1, min(total_cores, self._max_cores + 1)))
+        except Exception as e:
+            self._logger.warning(f"[RESOURCE] Cannot calculate CPU affinity: {e}")
+            return None
 
     def apply_cpu_limits(self, process: Optional[psutil.Process] = None) -> None:
         """
@@ -79,11 +106,13 @@ class ResourceController:
             process = psutil.Process()
 
         try:
-            # Apply CPU affinity if specified
-            if self._cpu_affinity:
+            # Apply CPU affinity - either specified or calculated from exclusive_cores
+            affinity_to_use = self._cpu_affinity or self.get_default_cpu_affinity()
+            
+            if affinity_to_use:
                 available_cpus = list(range(psutil.cpu_count()))
                 valid_affinity = [
-                    cpu for cpu in self._cpu_affinity if cpu in available_cpus
+                    cpu for cpu in affinity_to_use if cpu in available_cpus
                 ]
                 if valid_affinity:
                     process.cpu_affinity(valid_affinity)
@@ -92,7 +121,7 @@ class ResourceController:
                     )
                 else:
                     self._logger.warning(
-                        f"[RESOURCE] Invalid CPU affinity: {self._cpu_affinity}"
+                        f"[RESOURCE] Invalid CPU affinity: {affinity_to_use}"
                     )
 
             # Apply CPU core limit (nice value - not perfect but helps)

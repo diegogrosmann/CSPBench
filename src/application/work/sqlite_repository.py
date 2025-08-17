@@ -1,31 +1,11 @@
+"""DEPRECATED: SQLiteWorkRepository removido - use WorkStateStore.
+
+Este arquivo está obsoleto. A funcionalidade foi consolidada no WorkStateStore.
+"""
+
 from __future__ import annotations
 
-import json
-import sqlite3
-import threading
-from pathlib import Path
-from typing import Optional
-
-from src.domain.work import WorkItem, WorkStatus
-from src.domain.config import CSPBenchConfig
-from .repository import WorkRepository
-
-_SCHEMA = [
-    """
-    CREATE TABLE IF NOT EXISTS work_items (
-        id TEXT PRIMARY KEY,
-        status TEXT NOT NULL,
-        created_at REAL NOT NULL,
-        updated_at REAL NOT NULL,
-        output_path TEXT,
-        error TEXT,
-        directory TEXT,
-        config_json TEXT NOT NULL,
-        extra_json TEXT
-    );
-    """,
-    "CREATE INDEX IF NOT EXISTS idx_work_status ON work_items(status);",
-]
+# Este módulo foi removido - use WorkStateStore para persistência
 
 
 class SQLiteWorkRepository(WorkRepository):

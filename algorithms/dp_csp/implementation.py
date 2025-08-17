@@ -398,10 +398,10 @@ def exact_dp_closest_string(
         # RESOURCE CHECKS
         if state_count_est > 2_000_000_000:
             msg = (
-                f"DP-CSP interrupted: (d+1)^n = {state_count_est:,} exceeds practical limit "
-                "(~2e9 states, ~16GB RAM). Try reducing n or d."
+                f"DP-CSP skipped: problem size (d+1)^n = {state_count_est:,} exceeds practical limit "
+                "(~2 billion states, ~16GB RAM). Consider reducing dataset size or parameters."
             )
-            logger.error("[DP_CSP] %s", msg)
+            logger.warning("[DP_CSP] %s", msg)
             if warning_callback:
                 warning_callback(msg)
             raise RuntimeError(msg)

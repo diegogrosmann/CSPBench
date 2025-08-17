@@ -11,6 +11,7 @@ datasets/*
 !datasets/example.fasta
 
 outputs/*
+logs/*
 
 # Ignore all files in batches, except examples
 batches/*

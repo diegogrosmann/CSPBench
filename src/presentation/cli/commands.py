@@ -12,17 +12,29 @@ import typer
 from src.domain.config import load_cspbench_config
 from src.application.services.pipeline_service import PipelineService
 from src.application.work.manager import get_work_manager
+from src.presentation.display.terminal_monitor import TerminalMonitor
+from src.infrastructure.monitoring.monitor_interface import LoggingMonitor, NoOpMonitor
+from src.infrastructure.logging_config import setup_logging_from_env, get_logger
+import logging
+
+# Create module logger
+command_logger = get_logger("CSPBench.CLI.Commands")
 
 
 def register_commands(app: typer.Typer) -> None:
     """
     Register all CLI commands in the Typer application.
     """
+    command_logger.info("Registrando comandos CLI no Typer")
 
     @app.command()
     def batch(
         batch: Path = typer.Argument(
             ..., exists=True, readable=True, help="Batch YAML file"
+        ),
+        monitor: str = typer.Option(
+            "terminal", 
+            help="Monitor type: 'none' (no monitoring), 'terminal' (visual terminal monitor), 'log' (logging monitor)"
         ),
     ):
         """Submete pipeline (experiment|optimization|sensitivity) ao WorkManager.
@@ -34,7 +46,29 @@ def register_commands(app: typer.Typer) -> None:
             config = load_cspbench_config(batch)
             wm = get_work_manager()
 
-            wid = PipelineService.run(config)
+            # Configurar monitor baseado na opção escolhida
+            display_monitor = None
+            if monitor == "terminal":
+                display_monitor = TerminalMonitor()
+                typer.echo("📊 Monitor de terminal ativado")
+            elif monitor == "log":
+                # Configurar logging para arquivo usando variáveis de ambiente
+                setup_logging_from_env()
+                logger = get_logger("CSPBench.Pipeline")
+                display_monitor = LoggingMonitor(logger)
+                typer.echo("📝 Monitor de log ativado")
+            elif monitor == "none":
+                display_monitor = NoOpMonitor()
+                typer.echo("🔇 Monitor desabilitado")
+                command_logger.info("Monitor desabilitado")
+            else:
+                error_msg = f"❌ Tipo de monitor inválido: {monitor}"
+                typer.echo(error_msg)
+                typer.echo("💡 Opções válidas: 'none', 'terminal', 'log'")
+                command_logger.error(f"Tipo de monitor inválido: {monitor}")
+                raise typer.Exit(1)
+
+            wid = PipelineService.run(config, monitor=display_monitor)
 
             item = wm.get(wid)
             if not item:

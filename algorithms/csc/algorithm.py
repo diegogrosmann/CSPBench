@@ -39,7 +39,21 @@ class CSCAlgorithm(CSPAlgorithm):
             strings: List of dataset strings
             alphabet: Alphabet used
             **params: Algorithm-specific parameters
+        
+        Raises:
+            ValueError: If strings have different lengths (CSC requirement)
         """
+        # Validate that all strings have the same length (CSC requirement)
+        if strings:
+            string_lengths = [len(s) for s in strings]
+            if len(set(string_lengths)) > 1:
+                min_len, max_len = min(string_lengths), max(string_lengths)
+                raise ValueError(
+                    f"CSC requires all strings to have the same length. "
+                    f"Found lengths ranging from {min_len} to {max_len}. "
+                    f"Consider preprocessing the dataset to normalize string lengths."
+                )
+        
         super().__init__(strings, alphabet, **params)
 
     def run(self) -> tuple[str, int, dict]:

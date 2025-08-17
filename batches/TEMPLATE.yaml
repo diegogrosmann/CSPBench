@@ -78,15 +78,21 @@ datasets:
     parameters:                       # Parameters for Entrez datasets:
       query: "COIGene AND 600:650[SLEN]"                        # string: NCBI search query
                                       # Syntax: https://www.ncbi.nlm.nih.gov/books/NBK25499/
-                                      # Examples: "escherichia coli", "COIGene", "ribosomal RNA"
+                                      # Para mais informações, consulte: https://www.ncbi.nlm.nih.gov/books/NBK25499/
       db: "nucleotide"                # string: NCBI database
                                       # "nucleotide", "protein", "pubmed", etc.
       retmax: 10                      # int: Maximum number of sequences (1-1000)
                                       # Higher values may take longer to download
                                       # System will handle length filtering automatically
-      min_length: 20                  # int: Minimum sequence length filter
-      max_length: 20                  # int: Maximum sequence length filter
-
+      #min_length: 20                  # int: Minimum sequence length filter
+      #max_length: 20                  # int: Maximum sequence length filter
+      uniform_policy: "strict"           # string: Uniformization policy when sequences have different lengths
+                                      # "strict" = only accept sequences of exactly the same length
+                                      # "majority" = use the most common length, discard others
+                                      # "pad" = pad shorter sequences to match the longest
+                                      # "trim" = trim longer sequences to match the shortest
+                                      # null = allow variable lengths (no uniformization)
+  
 # =====================================================================
 # SECTION 3: ALGORITHMS (STANDARDIZED FOR ALL)
 # =====================================================================
@@ -237,7 +243,7 @@ algorithms:
 # Defines the type of operation to be performed.
 # Each type has specific configurations in the corresponding section.
 task:
-  type: "experiment"                  # string: Task type
+  type: "sensitivity"                  # string: Task type
                                       # "experiment" = run algorithms with fixed parameters
                                       # "optimization" = optimize hyperparameters with Optuna
                                       # "sensitivity" = analyze sensitivity with SALib
@@ -257,15 +263,16 @@ experiment:
       algorithms:
         - "default_config"
         - "aggressive_csc"
-      repetitions: 30                  # int: Number of repetitions per combination (1-10 recommended)
+      repetitions: 5                  # int: Number of repetitions per combination (1-10 recommended)
                                       # Each dataset+algorithm combination will be executed N times
     # You can add multiple executions:
     - name: "Complete Experiment"
       datasets: 
-        - "dataset_ncbi"
+      #  - "dataset_ncbi"
+        - "dataset_file"
       algorithms: 
         - "aggressive_csc"
-      repetitions: 20
+      repetitions: 4
 
 # =====================================================================
 # SECTION 5B: SPECIFIC CONFIGURATION - OPTIMIZATION
@@ -422,7 +429,7 @@ sensitivity:
       
       # Specific configuration for Morris method (if method = "morris")
       config:
-        samples: 1000                   # int: Specific number of samples
+        samples: 200                   # int: Specific number of samples
         seed: 42
         levels: 4                     # int: Levels for Morris grid (4-10)
         grid_jump: 2                  # int: Grid jump size
@@ -495,16 +502,16 @@ resources:
   # CPU limitations
   cpu:
     # Do not use the same cores as the main application during tests
-    exclusive_cores: true                # bool: If true, tests do not share cores with the main app
-    max_cores: null                      # int|null: Maximum number of cores to use (null = all available)
-    internal_jobs: 1                  # int: Maximum internal parallel jobs per algorithm
+    exclusive_cores: false             # bool: If true, tests do not share cores with the main app
+    max_workers: Null                 # int|null: Maximum number of cores to use (null = all available)
+    internal_jobs: 4                  # int: Maximum internal parallel jobs per algorithm
                                       # Controls internal algorithm parallelism (threads/processes)
                                       # Suggested value: 4 for CPUs with 8+ cores
                                       # Relation: max_workers × internal_jobs ≤ CPU_cores
 
   memory:
-    max_memory_gb: null               # float|null: Maximum memory in GB
-     
+    max_memory_gb: null               # float|null: Maximum memory in GB (minimum recommended: 1 GB) 
+    
   # Timeouts and limits
   timeouts:
     timeout_per_item: 3600       # int: Timeout per individual algorithm execution (seconds)

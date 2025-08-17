@@ -6,9 +6,11 @@ pela camada de infraestrutura seguindo o padrão de arquitetura hexagonal.
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Protocol, Tuple, runtime_checkable
+from typing import Any, Dict, List, Protocol, runtime_checkable, Callable
 
 from src.domain import CSPAlgorithm, Dataset
+from src.domain.config import AlgParams, ResourcesConfig, SystemConfig
+from src.infrastructure.monitoring.monitor_interface import Monitor
 
 
 class AlgorithmRegistry(Protocol):
@@ -131,91 +133,35 @@ class ExportPort(Protocol):
 
 
 @runtime_checkable
-class ExecutorPort(Protocol):
-    """Port para execução de algoritmos."""
+class ExecutionEngine(Protocol):
+    """Port para engines de execução de tarefas do pipeline."""
 
-    def execute_batch(
-        self, batch_config: Dict[str, Any], monitoring_service=None
-    ) -> List[Dict[str, Any]]:
-        """
-        Executa batch de experimentos.
-
-        Args:
-            batch_config: Configuração do batch
-            monitoring_service: Serviço de monitoramento (opcional)
-
-        Returns:
-            List[Dict[str, Any]]: Lista de resultados
-        """
-        ...
-
-    def execute_optimization(
+    def run(
         self,
-        algorithm_name: str,
-        dataset: Dataset,
-        optimization_config: Dict[str, Any],
-        monitoring_service=None,
-        config_index: int = 1,
-        total_configs: int = 1,
-        dataset_index: int = 1,
-        total_datasets: int = 1,
+        task: Any,  # ExperimentTask | OptimizationTask | SensitivityTask
+        dataset_obj: Dataset,
+        alg: AlgParams,
+        resources: ResourcesConfig | None,
+        monitor: Monitor | None = None,
+        system_config: SystemConfig | None = None,
+        check_control: Callable[[], str] | None = None,
+        store: Any = None,
     ) -> Dict[str, Any]:
         """
-        Executa otimização de hiperparâmetros.
+        Executa uma tarefa específica.
 
         Args:
-            algorithm_name: Nome do algoritmo
-            dataset: Dataset para otimização
-            optimization_config: Configuração da otimização
-            monitoring_service: Serviço de monitoramento (opcional)
+            task: Tarefa a ser executada
+            dataset_obj: Dataset objeto
+            alg: Parâmetros do algoritmo
+            resources: Configuração de recursos
+            monitor: Monitor para logs (padrão: NoOpMonitor)
+            system_config: Configuração do sistema
+            check_control: Função de controle pause/cancel (opcional)
+            store: Store para persistência (opcional)
 
         Returns:
-            Dict[str, Any]: Resultados da otimização
-        """
-        ...
-
-    def execute_sensitivity_analysis(
-        self,
-        algorithm_name: str,
-        dataset: Dataset,
-        sensitivity_config: Dict[str, Any],
-        monitoring_service=None,
-    ) -> Dict[str, Any]:
-        """
-        Executa análise de sensibilidade.
-
-        Args:
-            algorithm_name: Nome do algoritmo
-            dataset: Dataset para análise
-            sensitivity_config: Configuração da análise
-            monitoring_service: Serviço de monitoramento (opcional)
-
-        Returns:
-            Dict[str, Any]: Resultados da análise
-        """
-        ...
-
-    def get_execution_status(self, execution_id: str) -> str:
-        """
-        Obtém status de execução.
-
-        Args:
-            execution_id: ID da execução
-
-        Returns:
-            str: Status da execução
-        """
-        ...
-
-    def cancel_execution(self, execution_id: str) -> bool:
-        """
-        Cancela execução em andamento.
-
-        Args:
-            execution_id: ID da execução
-
-        Returns:
-            bool: True se cancelada com sucesso
+            Dict[str, Any]: Resultados da execução
         """
         ...
 
@@ -279,55 +225,59 @@ class AbstractExportPort(ABC):
         pass
 
 
-class AbstractExecutorPort(ABC):
-    """Interface ABC para execução de algoritmos."""
-
+class AbstractStore(ABC):
+    """Interface ABC para persistência de execuções."""
+    
     @abstractmethod
-    def execute_batch(self, batch_config: Dict[str, Any]) -> List[Dict[str, Any]]:
-        """Executa batch de experimentos."""
-        pass
-
-    @abstractmethod
-    def execute_optimization(
+    def record_execution_start(
         self,
-        algorithm_name: str,
-        dataset: Dataset,
-        optimization_config: Dict[str, Any],
-        monitoring_service=None,
-        config_index: int = 1,
-        total_configs: int = 1,
-        dataset_index: int = 1,
-        total_datasets: int = 1,
-    ) -> Dict[str, Any]:
-        """Executa otimização de hiperparâmetros."""
-        pass
-
-    @abstractmethod
-    def execute_sensitivity_analysis(
-        self,
-        algorithm_name: str,
-        dataset: Dataset,
-        sensitivity_config: Dict[str, Any],
-        monitoring_service=None,
         *,
-        task_index: int = 1,
-        total_tasks: int = 1,
-        dataset_index: int = 1,
-        total_datasets: int = 1,
-        config_index: int = 1,
-        total_configs: int = 1,
-        algorithm_index: int = 1,
-        total_algorithms: int = 1,
+        unit_id: str,
+        task_id: str,
+        dataset_id: str,
+        algorithm: str,
+        mode: str,
+        repetition: int | None = None,
+        trial: int | None = None,
+        sample: int | None = None,
+        params: Dict[str, Any] | None = None,
+    ) -> None:
+        """Registra início de execução."""
+        pass
+    
+    @abstractmethod
+    def record_execution_end(
+        self,
+        unit_id: str,
+        status: str,
+        result: Dict[str, Any] | None,
+        objective: float | None,
+    ) -> None:
+        """Registra fim de execução."""
+        pass
+    
+    @abstractmethod
+    def get_completed_repetitions(
+        self, task_id: str, dataset_id: str, algorithm: str
+    ) -> List[Dict[str, Any]]:
+        """Obtém repetições já completadas para resume."""
+        pass
+
+
+class AbstractExecutionEngine(ABC):
+    """Interface ABC para engines de execução de tarefas."""
+
+    @abstractmethod
+    def run(
+        self,
+        task: Any,
+        dataset_obj: Dataset,
+        alg: AlgParams,
+        resources: ResourcesConfig | None,
+        monitor: Monitor | None = None,
+        system_config: SystemConfig | None = None,
+        check_control: Callable[[], str] | None = None,
+        store: AbstractStore | None = None,
     ) -> Dict[str, Any]:
-        """Executa análise de sensibilidade."""
-        pass
-
-    @abstractmethod
-    def get_execution_status(self, execution_id: str) -> str:
-        """Obtém status de execução."""
-        pass
-
-    @abstractmethod
-    def cancel_execution(self, execution_id: str) -> bool:
-        """Cancela execução em andamento."""
+        """Executa uma tarefa específica."""
         pass

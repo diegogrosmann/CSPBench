@@ -87,7 +87,7 @@ class EntrezDatasetDownloader:
 
         sequences, used_params = EntrezDatasetDownloader._fetch_sequences(params_dict)
 
-        return Dataset(sequences), used_params
+        return Dataset(name="entrez_dataset", sequences=sequences), used_params
 
     @staticmethod
     def _config_to_params(config: EntrezDatasetConfig) -> Dict[str, Any]:

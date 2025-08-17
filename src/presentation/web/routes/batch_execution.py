@@ -24,9 +24,12 @@ from fastapi import (
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.templating import Jinja2Templates
 
+from src.infrastructure.logging_config import get_logger
 from ..services.session_manager import ExecutionSessionManager
 
-logger = logging.getLogger(__name__)
+# Create module logger
+logger = get_logger("CSPBench.Web.BatchExecution")
+logger.info("Módulo de rotas de batch execution inicializado")
 
 router = APIRouter(prefix="/execution", tags=["batch-execution"])
 templates = Jinja2Templates(directory="src/presentation/web/templates")
@@ -38,21 +41,27 @@ session_manager = ExecutionSessionManager()
 @router.get("/batch", response_class=HTMLResponse)
 async def batch_execution_page(request: Request):
     """Render the batch execution page."""
-    return templates.TemplateResponse("batch_execution.html", {"request": request})
+    logger.info("Página de execução de batch acessada")
+    logger.debug(f"Request details: {request.url}")
     return templates.TemplateResponse("batch_execution.html", {"request": request})
 
 
 @router.get("/api/batches")
 async def list_batch_files():
     """List all available batch files in the batches directory."""
+    logger.info("API: Listando arquivos de batch")
+    
     try:
         batches_dir = Path("batches")
         if not batches_dir.exists():
+            logger.warning("Diretório 'batches' não existe")
             return {"batch_files": []}
 
+        logger.debug(f"Verificando arquivos em: {batches_dir.absolute()}")
         batch_files = []
         for file_path in batches_dir.glob("*.yaml"):
             if file_path.is_file():
+                logger.debug(f"Processando arquivo de batch: {file_path.name}")
                 # Extract description from file
                 description = _extract_batch_description(file_path)
 

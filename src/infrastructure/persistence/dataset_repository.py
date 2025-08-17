@@ -51,8 +51,11 @@ class FileDatasetRepository:
         sequences = FileDatasetRepository._parse_fasta(file_path)
 
         params: dict[str, Any] = {"file_path": file_path}
+        
+        # Use filename without extension as default name
+        dataset_name = file_path.stem
 
-        return Dataset(sequences), params
+        return Dataset(name=dataset_name, sequences=sequences), params
 
     @staticmethod
     def list_available(base_path: str | None = None) -> List[str]:

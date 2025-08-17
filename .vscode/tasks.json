@@ -5,7 +5,9 @@
             "label": "Run CSPBench",
             "type": "shell",
             "command": "${workspaceFolder}/.venv/bin/python",
-            "args": ["main.py"],
+            "args": [
+                "main.py"
+            ],
             "group": "build",
             "presentation": {
                 "echo": true,
@@ -27,7 +29,12 @@
             "label": "Run Tests",
             "type": "shell",
             "command": "${workspaceFolder}/.venv/bin/python",
-            "args": ["-m", "pytest", "tests/", "-v"],
+            "args": [
+                "-m",
+                "pytest",
+                "tests/",
+                "-v"
+            ],
             "group": "test",
             "presentation": {
                 "echo": true,
@@ -49,7 +56,10 @@
             "label": "Start Web Interface",
             "type": "shell",
             "command": "${workspaceFolder}/.venv/bin/python",
-            "args": ["main.py", "--web"],
+            "args": [
+                "main.py",
+                "--web"
+            ],
             "group": "build",
             "isBackground": true,
             "presentation": {
@@ -72,7 +82,11 @@
             "label": "Format Code",
             "type": "shell",
             "command": "${workspaceFolder}/.venv/bin/python",
-            "args": ["-m", "black", "."],
+            "args": [
+                "-m",
+                "black",
+                "."
+            ],
             "group": "build",
             "presentation": {
                 "echo": true,
@@ -91,13 +105,18 @@
         },
         {
             "label": "Lint Code",
-            "type": "shell", 
+            "type": "shell",
             "command": "${workspaceFolder}/.venv/bin/python",
-            "args": ["-m", "ruff", "check", "."],
+            "args": [
+                "-m",
+                "ruff",
+                "check",
+                "."
+            ],
             "group": "build",
             "presentation": {
                 "echo": true,
-                "reveal": "always", 
+                "reveal": "always",
                 "focus": false,
                 "panel": "shared"
             },
@@ -114,7 +133,42 @@
             "label": "Setup Environment",
             "type": "shell",
             "command": "${workspaceFolder}/.venv/bin/pip",
-            "args": ["install", "-r", "requirements.txt"],
+            "args": [
+                "install",
+                "-r",
+                "requirements.txt"
+            ],
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": [],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            }
+        },
+        {
+            "label": "Clean Cache",
+            "type": "shell",
+            "command": "rm",
+            "args": [
+                "-rf",
+                "__pycache__",
+                "*.pyc",
+                "*.pyo",
+                "*/*.pyc",
+                "*/*.pyo",
+                "*/__pycache__",
+                ".pytest_cache",
+                ".coverage",
+                "htmlcov",
+                "logs",
+                "outputs",
+                "cache"
+            ],
             "group": "build",
             "presentation": {
                 "echo": true,

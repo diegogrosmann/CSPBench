@@ -74,6 +74,10 @@ Version: Optimized for clarity and to serve as reliable baseline
 """
 
 import logging
+from src.infrastructure.logging_config import get_logger
+
+# Create algorithm-specific logger
+baseline_logger = get_logger("CSPBench.Algorithm.Baseline")
 
 logger = logging.getLogger(__name__)
 
@@ -142,15 +146,24 @@ def greedy_consensus(strings: list[str], alphabet: str) -> str:
         and implementation validation.
     """
     # INPUT VALIDATION
+    baseline_logger.info("Iniciando algoritmo Baseline (Greedy Consensus)")
+    baseline_logger.debug(f"Entrada: {len(strings)} strings, alfabeto: '{alphabet}'")
+    
     if not strings:
+        baseline_logger.warning("Lista de strings vazia fornecida")
         return ""
 
     # INITIALIZATION
     L = len(strings[0])  # String length (assumed uniform)
+    baseline_logger.info(f"Comprimento das strings: {L}")
+    baseline_logger.debug(f"Strings de entrada: {strings[:3]}{'...' if len(strings) > 3 else ''}")  # Show first 3 strings
+    
     consensus = []  # Consensus string being constructed
 
     # POSITION-BY-POSITION CONSTRUCTION
+    baseline_logger.debug("Iniciando construção posição por posição")
     for pos in range(L):
+        baseline_logger.debug(f"Processando posição {pos}")
         best_char = None  # Best symbol for current position
         best_max_dist = float("inf")  # Smallest maximum distance found
 

@@ -33,9 +33,15 @@ def load_dataset(cfg: DatasetAny) -> tuple[Dataset, dict]:
         return SyntheticDatasetGenerator.generate_from_config(cfg)
 
     if isinstance(cfg, FileDatasetConfig):
-        return FileDatasetRepository.load(cfg.filename)
+        dataset, params = FileDatasetRepository.load(cfg.filename)
+        if hasattr(cfg, 'name') and cfg.name:
+            dataset.name = cfg.name
+        return dataset, params
 
     if isinstance(cfg, EntrezDatasetConfig):
-        return EntrezDatasetDownloader.download(cfg)
+        dataset, params = EntrezDatasetDownloader.download(cfg)
+        if hasattr(cfg, 'name') and cfg.name:
+            dataset.name = cfg.name
+        return dataset, params
 
     raise TypeError(f"Tipo de dataset não suportado: {type(cfg)!r}")

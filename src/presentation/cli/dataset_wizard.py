@@ -152,6 +152,7 @@ class DatasetWizard:
         from src.infrastructure.external.dataset_entrez import ENTREZ_DEFAULTS
 
         print("\n--- Dataset Real (NCBI) ---")
+        print("ℹ️ Para mais informações sobre a sintaxe de consultas Entrez, consulte: https://www.ncbi.nlm.nih.gov/books/NBK25499/")
         # Apenas NCBI é suportado agora
         db = _ask("Banco (db)", ENTREZ_DEFAULTS["db"]) or ENTREZ_DEFAULTS["db"]
         query = _ask("Consulta (query)", ENTREZ_DEFAULTS["query"]) or "*"

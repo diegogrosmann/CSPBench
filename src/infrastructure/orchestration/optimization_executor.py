@@ -8,48 +8,41 @@ import random
 import time
 from typing import Any, Callable
 
-from src.domain.config import AlgParams, OptimizationTask, ResourcesConfig
+from src.domain.config import AlgParams, OptimizationTask, ResourcesConfig, SystemConfig
+from src.domain.dataset import Dataset
 from src.infrastructure.monitoring.monitor_interface import Monitor, NoOpMonitor
+from src.application.ports.repositories import AbstractExecutionEngine
 from .algorithm_runner import run_algorithm
 
 
-class OptimizationExecutor:
+class OptimizationExecutor(AbstractExecutionEngine):
     def run(
         self,
         task: OptimizationTask,
-        dataset_obj,
+        dataset_obj: Dataset,
         alg: AlgParams,
         resources: ResourcesConfig | None,
-        monitor: Monitor | None,
-        writer=None,
-        global_seed: int | None = None,
+        monitor: Monitor | None = None,
+        system_config: SystemConfig | None = None,
         check_control: Callable[[], str] | None = None,
         store=None,
     ) -> dict[str, Any]:
         """Run random search optimization trials for a given algorithm/dataset pair."""
         monitor = monitor or NoOpMonitor()
         trials = int(task.config.get("trials", 10) if task.config else 10)
+        
+        # Extract global_seed from system_config
+        global_seed = None
+        if system_config and hasattr(system_config, 'global_seed'):
+            global_seed = system_config.global_seed
+        
         rng = random.Random(global_seed)
-        if isinstance(dataset_obj, list):
-            strings = dataset_obj
-            alphabet = (
-                "".join(sorted({c for s in strings for c in s})) if strings else ""
-            )
-            dataset_id = (
-                f"ds_{__import__('hashlib').md5(''.join(strings).encode()).hexdigest()[:8]}"
-                if strings
-                else "ds_unknown"
-            )
-        else:
-            strings = getattr(dataset_obj, "sequences", [])
-            alphabet = (
-                dataset_obj.metadata.get("alphabet")
-                if hasattr(dataset_obj, "metadata")
-                else ""
-            )
-            if not alphabet and strings:
-                alphabet = "".join(sorted({c for s in strings for c in s}))
-            dataset_id = getattr(dataset_obj, "id", "dataset")
+        
+        # Extract data from Dataset object
+        strings = dataset_obj.sequences
+        alphabet = dataset_obj.alphabet
+        dataset_id = getattr(dataset_obj, 'id', f"ds_{__import__('hashlib').md5(''.join(strings).encode()).hexdigest()[:8]}")
+        
         param_space = task.parameters or {}
         best = float("inf")
         best_params: dict[str, Any] = {}
@@ -105,18 +98,6 @@ class OptimizationExecutor:
                 best = res["objective"]
                 best_params = sample_params
             monitor.unit_finished(unit_id, res)
-            if writer:
-                writer.append(
-                    {
-                        "task_id": task.id,
-                        "dataset_id": dataset_id,
-                        "algorithm": alg.name,
-                        "unit_id": unit_id,
-                        "trial": t,
-                        "mode": "optimization",
-                        **{k: v for k, v in res.items() if k != "metadata"},
-                    }
-                )
             if store:
                 try:
                     store.record_execution_end(
@@ -125,7 +106,12 @@ class OptimizationExecutor:
                 except Exception:  # noqa: BLE001
                     pass
 
-        summary = {"trials": trials, "best_objective": best, "best_params": best_params}
+        summary = {
+            "status": "completed" if trials > 0 else "failed",
+            "trials": trials, 
+            "best_objective": best, 
+            "best_params": best_params
+        }
         monitor.log(
             "info", "OptimizationExecutor finished", {**summary, "task": task.id}
         )

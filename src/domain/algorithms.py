@@ -62,6 +62,9 @@ class CSPAlgorithm(ABC):
         self.progress_callback: Optional[Callable[[str, float], None]] = None
         self.warning_callback: Optional[Callable[[str], None]] = None
 
+        # Resource control
+        self.internal_jobs = params.get("internal_jobs", 1)
+
         # History settings
         self.save_history = params.get("save_history", False)
         self.history_frequency = params.get(
@@ -71,6 +74,10 @@ class CSPAlgorithm(ABC):
 
         # Monitoring integration
         self._algorithm_monitor = None
+        
+        # Configure random generator with seed
+        self.seed = params.get('seed', None)
+        self._setup_random_generator()
 
     def set_algorithm_monitor(self, monitor) -> None:
         """Set algorithm monitor for enhanced tracking."""
@@ -114,6 +121,20 @@ class CSPAlgorithm(ABC):
             # Report to monitor if available
             if self._algorithm_monitor:
                 self._algorithm_monitor.report_history_entry(iteration, **data)
+
+    def _setup_random_generator(self) -> None:
+        """Configure random generator with provided seed."""
+        import random
+        if self.seed is not None:
+            self.rng = random.Random(self.seed)
+            # Configure numpy if available
+            try:
+                import numpy as np
+                np.random.seed(self.seed)
+            except ImportError:
+                pass
+        else:
+            self.rng = random.Random()
 
     def _get_timestamp(self) -> float:
         """Return current timestamp for history."""

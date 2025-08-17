@@ -2,7 +2,7 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Debug CSPBench Main (Interactive)",
+            "name": "Debug CSPBench - Main",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/main.py",
@@ -20,7 +20,7 @@
             "subProcess": true
         },
         {
-            "name": "Debug CSPBench Web Interface (main.py)",
+            "name": "Debug CSPBench - Web",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/main.py",
@@ -35,6 +35,24 @@
             "args": [
                 "web"
             ],
+            "justMyCode": false,
+            "stopOnEntry": false,
+            "showReturnValue": true,
+            "subProcess": true
+        },
+        {
+            "name": "Debug CSPBench - TEMPLATE",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/main.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "python": "${workspaceFolder}/.venv/bin/python",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}",
+                "PYTHONDONTWRITEBYTECODE": "1"
+            },
+            "args": ["batches/TEMPLATE.yaml"],
             "justMyCode": false,
             "stopOnEntry": false,
             "showReturnValue": true,

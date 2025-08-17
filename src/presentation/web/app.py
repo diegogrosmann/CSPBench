@@ -25,8 +25,7 @@ def get_remote_address(request):
 from .core.config import web_config
 from .routes import algorithms, batch_execution, datasets, health, pages, results
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
+# Get logger (logging is configured globally in main.py via LoggerConfig)
 logger = logging.getLogger(__name__)
 
 # Create FastAPI app

@@ -79,6 +79,18 @@ _SCHEMA = [
         updated_at REAL
     )
     """,
+    """
+    CREATE TABLE IF NOT EXISTS pipeline_state(
+        work_id TEXT PRIMARY KEY,
+        current_task_index INTEGER,
+        current_dataset_index INTEGER,
+        current_preset_index INTEGER,
+        current_algorithm_index INTEGER,
+        pipeline_status TEXT,
+        paused_at REAL,
+        config_json TEXT
+    )
+    """,
 ]
 
 
@@ -243,6 +255,156 @@ class WorkStateStore:
             """,
             (status, time.time(), res_js, objective, unit_id),
         )
+
+    def has_dataset(self, dataset_id: str) -> bool:
+        """Verifica se dataset já está persistido com sequências."""
+        if not dataset_id:
+            return False
+        with self._lock:
+            cursor = self._conn.cursor()
+            cursor.execute(
+                "SELECT COUNT(*) FROM dataset_sequences WHERE dataset_id=?",
+                (dataset_id,)
+            )
+            count = cursor.fetchone()[0]
+            return count > 0
+
+    def get_completed_repetitions(
+        self, task_id: str, dataset_id: str, algorithm: str
+    ) -> list[dict[str, Any]]:
+        """Obtém repetições já completadas para funcionalidade de resume."""
+        if not all([task_id, dataset_id, algorithm]):
+            return []
+        
+        with self._lock:
+            cursor = self._conn.cursor()
+            cursor.execute(
+                """
+                SELECT repetition, result_json, objective, params_json 
+                FROM executions 
+                WHERE task_id=? AND dataset_id=? AND algorithm=? 
+                  AND mode='experiment' AND status='ok' AND repetition IS NOT NULL
+                ORDER BY repetition
+                """,
+                (task_id, dataset_id, algorithm)
+            )
+            rows = cursor.fetchall()
+            
+            results = []
+            for row in rows:
+                repetition, result_json, objective, params_json = row
+                try:
+                    result = json.loads(result_json) if result_json else {}
+                    params = json.loads(params_json) if params_json else {}
+                    results.append({
+                        "repetition": repetition,
+                        "result": result,
+                        "objective": objective,
+                        "params": params
+                    })
+                except json.JSONDecodeError:
+                    continue  # Skip malformed entries
+            
+            return results
+
+    def get_dataset_strings(self, dataset_id: str) -> list[str]:
+        """Recupera strings do dataset persistido."""
+        if not dataset_id:
+            return []
+        with self._lock:
+            cursor = self._conn.cursor()
+            cursor.execute(
+                "SELECT sequence FROM dataset_sequences WHERE dataset_id=? ORDER BY seq_index",
+                (dataset_id,)
+            )
+            rows = cursor.fetchall()
+            return [row[0] for row in rows]
+
+    def persist_complete_dataset(self, dataset_obj: Any, strings: list[str], parameters: dict[str, Any] | None = None) -> None:
+        """Salva dataset completo (metadados + strings + parâmetros)."""
+        if not strings or not getattr(dataset_obj, "id", None):
+            return
+        
+        # Salvar metadados do dataset (inclui parâmetros nos metadados)
+        self.ensure_dataset(dataset_obj)
+        
+        # Salvar as sequências
+        self.add_sequences(dataset_obj.id, strings)
+
+    def save_pipeline_state(
+        self, 
+        work_id: str, 
+        task_index: int, 
+        dataset_index: int, 
+        preset_index: int, 
+        algorithm_index: int, 
+        status: str, 
+        config: Any
+    ) -> None:
+        """Salva estado atual do pipeline."""
+        if not work_id:
+            return
+        
+        config_json = json.dumps(asdict(config) if is_dataclass(config) else config, ensure_ascii=False)
+        timestamp = time.time()
+        
+        self._execute(
+            """
+            INSERT OR REPLACE INTO pipeline_state(
+                work_id, current_task_index, current_dataset_index, 
+                current_preset_index, current_algorithm_index, 
+                pipeline_status, paused_at, config_json
+            ) VALUES(?,?,?,?,?,?,?,?)
+            """,
+            (work_id, task_index, dataset_index, preset_index, algorithm_index, status, timestamp, config_json)
+        )
+
+    def load_pipeline_state(self, work_id: str) -> dict[str, Any] | None:
+        """Carrega estado salvo do pipeline."""
+        if not work_id:
+            return None
+        
+        with self._lock:
+            cursor = self._conn.cursor()
+            cursor.execute(
+                """
+                SELECT current_task_index, current_dataset_index, current_preset_index, 
+                       current_algorithm_index, pipeline_status, paused_at, config_json
+                FROM pipeline_state WHERE work_id=?
+                """,
+                (work_id,)
+            )
+            row = cursor.fetchone()
+            if not row:
+                return None
+            
+            return {
+                "current_task_index": row[0],
+                "current_dataset_index": row[1], 
+                "current_preset_index": row[2],
+                "current_algorithm_index": row[3],
+                "pipeline_status": row[4],
+                "paused_at": row[5],
+                "config_json": row[6]
+            }
+
+    def update_pipeline_status(self, work_id: str, status: str) -> None:
+        """Atualiza status do pipeline (paused/running/completed)."""
+        if not work_id:
+            return
+        
+        timestamp = time.time()
+        self._execute(
+            "UPDATE pipeline_state SET pipeline_status=?, paused_at=? WHERE work_id=?",
+            (status, timestamp, work_id)
+        )
+
+    def clear_pipeline_state(self, work_id: str) -> None:
+        """Remove estado do pipeline (quando completado)."""
+        if not work_id:
+            return
+        
+        self._execute("DELETE FROM pipeline_state WHERE work_id=?", (work_id,))
 
     def close(self):
         with self._lock:

@@ -16,18 +16,24 @@ class Dataset:
     Attributes:
         sequences: List of dataset strings
         metadata: Dataset metadata (size, origin, etc.)
+        name: Optional dataset name for identification
     """
 
-    def __init__(self, sequences: List[str] = [], alphabet: Optional[str] = None):
+    def __init__(self, name: str, sequences: List[str] = [], alphabet: Optional[str] = None):
         """
         Initialize a dataset with sequences.
 
         Args:
             sequences: List of strings
             alphabet: Optional alphabet. If None, will be inferred from sequences
+            name: Optional dataset name for identification
         """
         self.sequences = sequences
         self._alphabet = alphabet
+        self.name = name
+        self._statistics_cache = None
+        self._diversity_cache = None
+        self._inferred_alphabet_cache = None
         if not self.validate():
             raise ValueError(
                 "Invalid dataset: sequences contain characters not in alphabet"
@@ -35,14 +41,22 @@ class Dataset:
 
     def _infer_alphabet(self) -> str:
         """Infer alphabet from sequences."""
+        if self._inferred_alphabet_cache is not None:
+            return self._inferred_alphabet_cache
+            
         alphabet_set = set()
         for seq in self.sequences:
             alphabet_set.update(seq)
-        return "".join(sorted(alphabet_set))
+        self._inferred_alphabet_cache = "".join(sorted(alphabet_set))
+        return self._inferred_alphabet_cache
 
     def _calculate_diversity(self) -> float:
         """Calculate average dataset diversity."""
+        if self._diversity_cache is not None:
+            return self._diversity_cache
+            
         if len(self.sequences) < 2:
+            self._diversity_cache = 0.0
             return 0.0
 
         total_distance = 0
@@ -58,7 +72,9 @@ class Dataset:
 
         avg_distance = total_distance / total_pairs if total_pairs > 0 else 0
         max_possible = len(self.sequences[0])
-        return avg_distance / max_possible if max_possible > 0 else 0
+        diversity = avg_distance / max_possible if max_possible > 0 else 0
+        self._diversity_cache = diversity
+        return diversity
 
     @property
     def size(self) -> int:
@@ -66,18 +82,26 @@ class Dataset:
         return len(self.sequences)
 
     @property
-    def length(self) -> int:
-        """Return representative length.
-
-        Para conjuntos não uniformes, retorna o maior comprimento.
-        """
+    def min_length(self) -> int:
+        """Return minimum sequence length."""
         if not self.sequences:
             return 0
-        lengths = [len(s) for s in self.sequences]
-        is_uniform = len(set(lengths)) == 1
-        if is_uniform:
-            return len(self.sequences[0])
-        return max(lengths)
+        return min(len(s) for s in self.sequences)
+
+    @property
+    def max_length(self) -> int:
+        """Return maximum sequence length."""
+        if not self.sequences:
+            return 0
+        return max(len(s) for s in self.sequences)
+
+    @property
+    def average_length(self) -> float:
+        """Return average sequence length."""
+        if not self.sequences:
+            return 0.0
+        total_length = sum(len(s) for s in self.sequences)
+        return total_length / len(self.sequences)
 
     @property
     def alphabet(self) -> str:
@@ -103,6 +127,12 @@ class Dataset:
 
         return True
 
+    def _invalidate_cache(self) -> None:
+        """Invalidate statistics and diversity cache."""
+        self._statistics_cache = None
+        self._diversity_cache = None
+        self._inferred_alphabet_cache = None
+
     def get_statistics(self) -> Dict[str, Any]:
         """
         Return detailed dataset statistics.
@@ -110,15 +140,17 @@ class Dataset:
         Returns:
             dict: Dataset statistics
         """
+        if self._statistics_cache is not None:
+            return self._statistics_cache
+            
         lengths = [len(s) for s in self.sequences]
         is_uniform = len(set(lengths)) == 1
-        min_length = min(lengths) if lengths else 0
-        max_length = max(lengths) if lengths else 0
 
-        return {
+        self._statistics_cache = {
             "size": self.size,
-            "min_length": min_length,
-            "max_length": max_length,
+            "min_length": self.min_length,
+            "max_length": self.max_length,
+            "average_length": self.average_length,
             "alphabet": self._infer_alphabet(),
             "alphabet_size": len(self._infer_alphabet()),
             "diversity": self._calculate_diversity(),
@@ -126,8 +158,9 @@ class Dataset:
             "uniform_lengths": is_uniform,
             "lengths": lengths,
             "n": len(self.sequences),
-            "L": max_length,
+            "L": self.max_length,
         }
+        return self._statistics_cache
 
     def to_dict(self) -> Dict[str, Any]:
         """
@@ -136,7 +169,10 @@ class Dataset:
         Returns:
             dict: Dictionary representation
         """
-        return {"sequences": self.sequences.copy(), "metadata": self.get_statistics()}
+        metadata = self.get_statistics()
+        if self.name:
+            metadata["name"] = self.name
+        return {"sequences": self.sequences.copy(), "metadata": metadata}
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Dataset":
@@ -150,7 +186,8 @@ class Dataset:
             Dataset: Created instance
         """
         alphabet = data.get("metadata", {}).get("alphabet")
-        return cls(data["sequences"], alphabet)
+        name = data.get("metadata", {}).get("name", "unnamed_dataset")
+        return cls(name=name, sequences=data["sequences"], alphabet=alphabet)
 
     def add_sequence(self, sequence: str) -> None:
         """
@@ -169,6 +206,7 @@ class Dataset:
                 raise ValueError("Sequence contains characters not in alphabet")
 
         self.sequences.append(sequence)
+        self._invalidate_cache()
 
     def remove_sequence(self, index: int) -> str:
         """
@@ -187,6 +225,7 @@ class Dataset:
             raise IndexError("Index out of range")
 
         removed = self.sequences.pop(index)
+        self._invalidate_cache()
         return removed
 
     def filter_by_pattern(self, pattern: str, position: int) -> "Dataset":
@@ -201,25 +240,8 @@ class Dataset:
             Dataset: New dataset with filtered sequences
         """
         filtered_sequences = [seq for seq in self.sequences if seq[position] == pattern]
-        return Dataset(filtered_sequences)
-
-    def sample(self, n: int, seed: Optional[int] = None) -> "Dataset":
-        """
-        Return random sample from dataset.
-
-        Args:
-            n: Number of sequences in sample
-            seed: Seed for reproducibility
-
-        Returns:
-            Dataset: New dataset with sample
-        """
-        if n > len(self.sequences):
-            raise ValueError("Sample size larger than dataset")
-
-        rng = random.Random(seed)
-        sampled_sequences = rng.sample(self.sequences, n)
-        return Dataset(sampled_sequences)
+        filtered_name = f"{self.name}_filtered" if self.name else "filtered_dataset"
+        return Dataset(name=filtered_name, sequences=filtered_sequences, alphabet=self._alphabet)
 
     def get_sequences(self) -> List[str]:
         """

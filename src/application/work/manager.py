@@ -142,16 +142,6 @@ class WorkManager:
                 self._repo.update(item)
             return ok
 
-    def attach_directory(self, work_id: str, directory: Path) -> bool:
-        with self._lock:
-            item = self._repo.get(work_id)
-            if not item:
-                return False
-            item.output_path = str(directory)
-            item.updated_at = self._now()
-            self._repo.update(item)
-            return True
-
     def wait_until_terminal(
         self, work_id: str, timeout: float | None = None, poll_interval: float = 0.5
     ) -> Optional[str]:

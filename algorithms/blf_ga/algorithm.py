@@ -54,6 +54,7 @@ class BLFGAAlgorithm(CSPAlgorithm):
             "crossover_method": "crossover_type",
             "mutation_method": "mutation_type",
             "refinement_method": "refinement_type",
+            "internal_jobs": "internal_workers",  # Map internal_jobs to internal_workers
             # selection_method is not directly supported, ignore it
         }
 
@@ -69,6 +70,10 @@ class BLFGAAlgorithm(CSPAlgorithm):
             # Map parameter name if needed
             param_name = param_mapping.get(k, k)
             blfga_params[param_name] = v
+
+        # Add internal_jobs as internal_workers for BLF-GA
+        if hasattr(self, 'internal_jobs'):
+            blfga_params['internal_workers'] = self.internal_jobs
 
         self.blf_ga_instance = BLFGA(self.strings, self.alphabet, **blfga_params)
 
