@@ -1,9 +1,33 @@
 /**
  * Modern API Client Component for CSPBench Web Interface
  * Centralized HTTP client with modern fetch API, error handling, and loading states
+ *
+ * This file is idempotent: it won't redeclare classes or rebind listeners
+ * if loaded multiple times.
  */
 
-class APIClient {
+(function(global){
+    // Define APIError only if not already defined
+    if (!global.APIError) {
+        class APIError extends Error {
+            constructor(message, status = 0, endpoint = '') {
+                super(message);
+                this.name = 'APIError';
+                this.status = status;
+                this.endpoint = endpoint;
+                this.timestamp = new Date().toISOString();
+            }
+            toString() {
+                return `APIError: ${this.message} (${this.status}) at ${this.endpoint}`;
+            }
+        }
+        global.APIError = APIError;
+    }
+    const APIError = global.APIError;
+
+    // Define APIClient only if not already defined
+    if (!global.APIClient) {
+        class APIClient {
     constructor(baseURL = '') {
         this.baseURL = baseURL;
         this.defaultHeaders = {
@@ -107,8 +131,6 @@ class APIClient {
 
     // Convenience methods for common HTTP verbs
 
-    // Convenience methods for common HTTP verbs
-
     /**
      * GET request
      */
@@ -139,225 +161,179 @@ class APIClient {
         return this.get('/api/algorithms', 'algorithms');
     }
 
-    async executeAlgorithm(request) {
-        return this.post('/api/execute', request, 'execute');
+    // =============================================================================
+    // BATCH EXECUTION API METHODS
+    // =============================================================================
+
+    /**
+     * Execute a batch configuration file
+     */
+    async executeBatch(batchFile, monitorType = 'log') {
+        return this.request('/api/batch/execute', {
+            method: 'POST',
+            body: JSON.stringify({
+                batch_file: batchFile,
+                monitor_type: monitorType
+            })
+        }, 'execute_batch');
     }
 
-    // Dataset endpoints
-    async getDatasets() {
-        return this.get('/api/datasets', 'datasets');
+    /**
+     * Get batch execution status
+     */
+    async getBatchStatus(workId) {
+        return this.request(`/api/batch/${workId}/status`, {
+            method: 'GET'
+        }, `status_${workId}`);
     }
 
-    async generateDataset(config) {
-        return this.post('/api/generate-dataset', config, 'generate_dataset');
+    /**
+     * Get batch execution results
+     */
+    async getBatchResults(workId) {
+        return this.request(`/api/batch/${workId}/results`, {
+            method: 'GET'
+        }, `results_${workId}`);
     }
 
-    // Dataset Generator endpoints
-    async generateSyntheticDataset(params) {
-        return this.post('/api/datasets-simple/generate/synthetic', params, 'generate_synthetic');
+    /**
+     * List all batch executions with optional status filter
+     */
+    async listBatchExecutions(status = null) {
+        const params = status ? `?status=${status}` : '';
+        return this.request(`/api/batch/list${params}`, {
+            method: 'GET'
+        }, 'list_batches');
     }
 
-    async downloadNCBIDataset(params) {
-        return this.post('/api/datasets/generate/ncbi', params, 'download_ncbi');
+    /**
+     * Control batch execution (cancel, pause, resume)
+     */
+    async controlBatchExecution(workId, action) {
+        return this.request(`/api/batch/${workId}/control`, {
+            method: 'POST',
+            body: JSON.stringify({ action })
+        }, `control_${workId}`);
     }
 
-    async getGenerationStatus(sessionId) {
-        return this.get(`/api/generation/status/${sessionId}`, `status_${sessionId}`);
-    }
-
-    async getSavedDatasets() {
-        const response = await this.get('/api/datasets/saved', 'saved_datasets');
-        return response.saved_datasets || [];
-    }
-
-    async getDatasetDownloadUrl(datasetId) {
-        // For saved datasets, return the download URL directly
-        return `${this.baseURL}/api/datasets/download/${datasetId}`;
-    }
-
-    async deleteDataset(filename) {
-        return this.request(`/api/datasets/saved/${filename}`, {
+    /**
+     * Delete batch execution
+     */
+    async deleteBatchExecution(workId) {
+        return this.request(`/api/batch/${workId}`, {
             method: 'DELETE'
-        }, `delete_dataset_${filename}`);
+        }, `delete_${workId}`);
     }
 
-    async cancelGeneration(sessionId) {
-        return this.post(`/api/generation/cancel/${sessionId}`, null, `cancel_${sessionId}`);
-    }
+    // =============================================================================
+    // BATCH FILE MANAGEMENT API METHODS  
+    // =============================================================================
 
-    // Execution management
-    async getExecutionStatus(sessionId) {
-        return this.get(`/api/status/${sessionId}`, `status_${sessionId}`);
-    }
-
-    async getExecutionResults(sessionId) {
-        return this.get(`/api/results/${sessionId}`, `results_${sessionId}`);
-    }
-
-    async cancelExecution(sessionId) {
-        return this.post(`/api/cancel/${sessionId}`, null, `cancel_${sessionId}`);
+    /**
+     * Get list of batch configuration files
+     */
+    async getBatchFiles() {
+        return this.request('/api/batches', {
+            method: 'GET'
+        }, 'get_batch_files');
     }
 
     /**
-     * Download results as blob
+     * Upload a new batch configuration file
      */
-    async downloadResults(sessionId) {
-        const response = await fetch(`${this.baseURL}/api/download/${sessionId}`);
-        if (!response.ok) {
-            throw new APIError(`Failed to download results: ${response.statusText}`, response.status);
+    async uploadBatchFile(formData) {
+        // Note: FormData automatically sets Content-Type with boundary
+        return this.request('/api/batches/upload', {
+            method: 'POST',
+            body: formData,
+            headers: {} // Let browser set Content-Type for FormData
+        }, 'upload_batch');
+    }
+
+    /**
+     * Create a new batch configuration file
+     */
+    async createBatchFile(name, content, description = '') {
+        return this.request('/api/batches', {
+            method: 'POST',
+            body: JSON.stringify({
+                name,
+                content,
+                description
+            })
+        }, 'create_batch');
+    }
+
+    /**
+     * Get batch file content
+     */
+    async getBatchFile(fileName) {
+        return this.request(`/api/batches/${fileName}`, {
+            method: 'GET'
+        }, `get_batch_${fileName}`);
+    }
+
+    /**
+     * Update batch file content
+     */
+    async updateBatchFile(fileName, content, description = '') {
+        return this.request(`/api/batches/${fileName}`, {
+            method: 'PUT',
+            body: JSON.stringify({
+                content,
+                description
+            })
+        }, `update_batch_${fileName}`);
+    }
+
+    /**
+     * Delete batch file
+     */
+    async deleteBatchFile(fileName) {
+        return this.request(`/api/batches/${fileName}`, {
+            method: 'DELETE'
+        }, `delete_batch_${fileName}`);
+    }   
         }
-        return response.blob();
+        global.APIClient = APIClient;
+    }
+    const APIClient = global.APIClient;
+
+    // Create a single global apiClient instance if not existing
+    if (!global.apiClient) {
+        global.apiClient = new APIClient();
     }
 
-    /**
-     * Upload file with progress tracking
-     */
-    async uploadFile(endpoint, file, onProgress = null, requestId = null) {
-        const formData = new FormData();
-        formData.append('file', file);
-
-        const finalRequestId = requestId || `UPLOAD_${endpoint}`;
-        
-        try {
-            this.setLoading(finalRequestId, true);
-
-            const xhr = new XMLHttpRequest();
-            
-            return new Promise((resolve, reject) => {
-                xhr.upload.addEventListener('progress', (event) => {
-                    if (event.lengthComputable && onProgress) {
-                        const progress = (event.loaded / event.total) * 100;
-                        onProgress(progress);
-                    }
-                });
-
-                xhr.addEventListener('load', () => {
-                    if (xhr.status >= 200 && xhr.status < 300) {
-                        try {
-                            const data = JSON.parse(xhr.responseText);
-                            this.dispatchSuccessEvent(finalRequestId, data);
-                            resolve(data);
-                        } catch (e) {
-                            resolve(xhr.responseText);
-                        }
-                    } else {
-                        const error = new APIError(
-                            `HTTP ${xhr.status}: ${xhr.statusText}`,
-                            xhr.status,
-                            endpoint
-                        );
-                        this.dispatchErrorEvent(finalRequestId, error);
-                        reject(error);
-                    }
-                });
-
-                xhr.addEventListener('error', () => {
-                    const error = new APIError('Network error', 0, endpoint);
-                    this.dispatchErrorEvent(finalRequestId, error);
-                    reject(error);
-                });
-
-                xhr.open('POST', `${this.baseURL}${endpoint}`);
-                xhr.send(formData);
+    // Register global listeners once
+    if (!global.__apiClientListenersRegistered) {
+        // Global loading indicator management
+        document.addEventListener('api:loading', (event) => {
+            const { requestId, isLoading } = event.detail;
+            const loadingIndicators = document.querySelectorAll(`[data-loading="${requestId}"]`);
+            loadingIndicators.forEach(indicator => {
+                indicator.classList.toggle('loading', !!isLoading);
             });
+        });
 
-        } finally {
-            this.setLoading(finalRequestId, false);
-        }
-    }
-}
-
-/**
- * Custom API Error class
- */
-class APIError extends Error {
-    constructor(message, status = 0, endpoint = '') {
-        super(message);
-        this.name = 'APIError';
-        this.status = status;
-        this.endpoint = endpoint;
-        this.timestamp = new Date().toISOString();
-    }
-
-    toString() {
-        return `APIError: ${this.message} (${this.status}) at ${this.endpoint}`;
-    }
-}
-
-// Global API client instance
-const apiClient = new APIClient();
-
-// Global loading indicator management
-document.addEventListener('api:loading', (event) => {
-    const { requestId, isLoading } = event.detail;
-    
-    // Update global loading state in UI
-    const loadingIndicators = document.querySelectorAll(`[data-loading="${requestId}"]`);
-    loadingIndicators.forEach(indicator => {
-        if (isLoading) {
-            indicator.classList.add('loading');
-        } else {
-            indicator.classList.remove('loading');
-        }
-    });
-});
-
-// Global error handling
-document.addEventListener('api:error', (event) => {
-    const { requestId, error } = event.detail;
-    
-    console.error(`API Error for ${requestId}:`, error);
-    
-    // Show user-friendly error message
-    if (error instanceof APIError) {
-        showAlert(`API Error: ${error.message}`, 'danger');
-    } else {
-        showAlert('An unexpected error occurred. Please try again.', 'danger');
-    }
-});
-
-/**
- * Utility function to show Bootstrap alerts
- */
-function showAlert(message, type = 'info', duration = 5000) {
-    const alertContainer = document.getElementById('alert-container');
-    if (!alertContainer) return;
-
-    const alertId = `alert-${Date.now()}`;
-    const alertHTML = `
-        <div class="alert alert-${type} alert-dismissible fade show" role="alert" id="${alertId}">
-            <i class="bi bi-${getAlertIcon(type)} me-2"></i>
-            ${message}
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        </div>
-    `;
-
-    alertContainer.insertAdjacentHTML('beforeend', alertHTML);
-
-    // Auto-dismiss after duration
-    if (duration > 0) {
-        setTimeout(() => {
-            const alertElement = document.getElementById(alertId);
-            if (alertElement) {
-                const alert = new bootstrap.Alert(alertElement);
-                alert.close();
+        // Global error handling
+        document.addEventListener('api:error', (event) => {
+            const { requestId, error } = event.detail;
+            console.error(`API Error for ${requestId}:`, error);
+            if (error instanceof APIError) {
+                if (typeof global.showAlert === 'function') {
+                    global.showAlert(`API Error: ${error.message}`, 'danger');
+                } else if (global.notifications && typeof global.notifications.error === 'function') {
+                    global.notifications.error(`API Error: ${error.message}`);
+                }
+            } else {
+                if (typeof global.showAlert === 'function') {
+                    global.showAlert('An unexpected error occurred. Please try again.', 'danger');
+                } else if (global.notifications && typeof global.notifications.error === 'function') {
+                    global.notifications.error('An unexpected error occurred. Please try again.');
+                }
             }
-        }, duration);
+        });
+
+        global.__apiClientListenersRegistered = true;
     }
-}
-
-/**
- * Get appropriate icon for alert type
- */
-function getAlertIcon(type) {
-    const icons = {
-        success: 'check-circle-fill',
-        danger: 'exclamation-triangle-fill',
-        warning: 'exclamation-triangle-fill',
-        info: 'info-circle-fill'
-    };
-    return icons[type] || 'info-circle-fill';
-}
-
-// Global API client instance
-window.apiClient = new APIClient();
+})(window);

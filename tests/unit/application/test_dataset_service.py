@@ -17,7 +17,11 @@ def test_load_dataset_synthetic(tmp_path):
         "src.application.services.dataset_service.SyntheticDatasetGenerator.generate_from_config"
     ) as gen:
         gen.return_value = (
-            Dataset(sequences=["AAAAA", "AAAAT", "AAATA"], alphabet="AT", name="test_dataset"),
+            Dataset(
+                sequences=["AAAAA", "AAAAT", "AAATA"],
+                alphabet="AT",
+                name="test_dataset",
+            ),
             {"mode": "random"},
         )
         ds, params = load_dataset(cfg)
@@ -33,7 +37,10 @@ def test_load_dataset_file(tmp_path):
     with patch(
         "src.application.services.dataset_service.FileDatasetRepository.load"
     ) as loader:
-        loader.return_value = (Dataset(sequences=["ACGT", "ATGT"], name="test-file"), {"file_path": str(fasta)})
+        loader.return_value = (
+            Dataset(sequences=["ACGT", "ATGT"], name="test-file"),
+            {"file_path": str(fasta)},
+        )
         ds, params = load_dataset(cfg)
         assert ds.size == 2
         assert "file_path" in params
@@ -46,7 +53,10 @@ def test_load_dataset_entrez():
     with patch(
         "src.application.services.dataset_service.EntrezDatasetDownloader.download"
     ) as dl:
-        dl.return_value = (Dataset(sequences=["ACGT", "ATGT"], name="test_dataset"), {"term": "cox1", "n": 2})
+        dl.return_value = (
+            Dataset(sequences=["ACGT", "ATGT"], name="test_dataset"),
+            {"term": "cox1", "n": 2},
+        )
         ds, params = load_dataset(cfg)
         assert ds.size == 2
         assert params.get("n") == 2

@@ -6,6 +6,19 @@
 <!-- Empty for home page -->
 {% endblock %}
 
+{% block header %}
+<div class="text-center mb-5">
+    <div class="hero-section p-5 rounded-4 shadow" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+        <h1 class="display-4 fw-bold text-white mb-3">
+            <i class="bi bi-dna me-3"></i>CSPBench Web Interface
+        </h1>
+        <p class="lead text-white-50 mb-0">
+            Comprehensive Benchmarking Framework for Closest String Problem Algorithms
+        </p>
+    </div>
+</div>
+{% endblock %}
+
 {% block content %}
 <!-- Hero Section with Welcome Message -->
 <div class="row mb-5">
@@ -66,18 +79,18 @@
 </div>
 
 <div class="row g-4 mb-5">
-    <!-- Batch Execution -->
+    <!-- Batch Manager -->
     <div class="col-lg-4 col-md-6">
         <div class="card h-100 shadow-sm card-hover main-card" data-type="batch">
             <div class="card-body text-center p-4">
                 <i class="bi bi-collection display-4 text-info mb-3"></i>
-                <h5 class="card-title text-info mb-3">Batch Execution</h5>
+                <h5 class="card-title text-info mb-3">Batch Manager</h5>
                 <p class="card-text text-muted mb-3">
                     Execute multiple algorithms on various datasets with different configurations 
                     for comprehensive comparative analysis.
                 </p>
                 <div class="card-hover-details">
-                    <div class="hover-title">📦 Batch Execution</div>
+                    <div class="hover-title">📦 Batch Manager</div>
                     <ul class="hover-features">
                         <li><i class="bi bi-check2-circle text-success"></i> Multiple algorithms</li>
                         <li><i class="bi bi-check2-circle text-success"></i> Multiple datasets</li>
@@ -85,34 +98,35 @@
                         <li><i class="bi bi-check2-circle text-success"></i> Comparative analysis</li>
                     </ul>
                 </div>
-                <a href="/execution/batch" class="btn btn-info btn-lg w-100">
-                    <i class="bi bi-play-fill me-2"></i>Start Execution
+                <a href="/batch/manage" class="btn btn-info btn-lg w-100">
+                    <i class="bi bi-file-earmark-text me-2"></i>Batch Manager
                 </a>
             </div>
         </div>
     </div>
     
-    <!-- Dataset Generator -->
+    <!-- Dataset Manager -->
     <div class="col-lg-4 col-md-6">
-        <div class="card h-100 shadow-sm card-hover main-card" data-type="generator">
+        <div class="card h-100 shadow-sm card-hover main-card" data-type="manager">
             <div class="card-body text-center p-4">
-                <i class="bi bi-file-earmark-plus display-4 text-success mb-3"></i>
-                <h5 class="card-title text-success mb-3">Dataset Generator</h5>
+                <i class="bi bi-folder-fill display-4 text-info mb-3"></i>
+                <h5 class="card-title text-info mb-3">Dataset Manager</h5>
                 <p class="card-text text-muted mb-3">
-                    Create custom synthetic datasets with different parameters 
-                    to test algorithms in specific scenarios.
+                    Complete dataset management: create, upload, download, and organize 
+                    all your datasets with generation capabilities.
                 </p>
                 <div class="card-hover-details">
-                    <div class="hover-title">🛠️ Dataset Generator</div>
+                    <div class="hover-title">� Dataset Manager</div>
                     <ul class="hover-features">
-                        <li><i class="bi bi-check2-circle text-success"></i> Synthetic datasets</li>
-                        <li><i class="bi bi-check2-circle text-success"></i> Customizable parameters</li>
-                        <li><i class="bi bi-check2-circle text-success"></i> Multiple formats</li>
-                        <li><i class="bi bi-check2-circle text-success"></i> Export options</li>
+                        <li><i class="bi bi-check2-circle text-success"></i> Generate synthetic datasets</li>
+                        <li><i class="bi bi-check2-circle text-success"></i> Download from NCBI</li>
+                        <li><i class="bi bi-check2-circle text-success"></i> Upload FASTA files</li>
+                        <li><i class="bi bi-check2-circle text-success"></i> Browse & preview</li>
+                        <li><i class="bi bi-check2-circle text-success"></i> Download & delete</li>
                     </ul>
                 </div>
-                <a href="/datasets" class="btn btn-success btn-lg w-100">
-                    <i class="bi bi-plus-circle me-2"></i>Generate Dataset
+                <a href="/dataset/manage" class="btn btn-info btn-lg w-100">
+                    <i class="bi bi-folder me-2"></i>Manage Datasets
                 </a>
             </div>
         </div>
@@ -175,8 +189,8 @@
                     </div>
                     <div class="col-lg-3 col-md-6">
                         <div class="status-item p-3">
-                            <i class="bi bi-clock-history display-6 text-success mb-2"></i>
-                            <h4 class="fw-bold text-success mb-1">Online</h4>
+                            <i class="bi bi-clock-history display-6 text-success mb-2" id="system-status-icon"></i>
+                            <h4 class="fw-bold text-success mb-1" id="system-status">Loading...</h4>
                             <p class="text-muted mb-0">System Active</p>
                             <small class="text-muted">Ready for execution</small>
                         </div>
@@ -184,7 +198,7 @@
                     <div class="col-lg-3 col-md-6">
                         <div class="status-item p-3">
                             <i class="bi bi-shield-check display-6 text-warning mb-2"></i>
-                            <h4 class="fw-bold text-warning mb-1">v1.0</h4>
+                            <h4 class="fw-bold text-warning mb-1" id="system-version">Loading...</h4>
                             <p class="text-muted mb-0">Stable Version</p>
                             <small class="text-muted">Hexagonal architecture</small>
                         </div>
@@ -202,12 +216,12 @@
                                         Tip: Getting started with CSPBench?
                                     </h6>
                                     <p class="text-muted mb-0 small">
-                                        We recommend starting with <strong>Batch Execution</strong> using one of the example datasets 
+                                        We recommend starting with <strong>Batch Manager</strong> using one of the example datasets 
                                         to familiarize yourself with the platform.
                                     </p>
                                 </div>
                                 <div class="col-md-4 text-end">
-                                    <a href="/execution/batch" class="btn btn-outline-primary btn-sm">
+                                    <a href="/batch/manage" class="btn btn-outline-primary btn-sm">
                                         <i class="bi bi-arrow-right me-1"></i>Get Started
                                     </a>
                                 </div>
@@ -280,6 +294,33 @@
 .status-item:hover {
     background-color: rgba(0,123,255,0.03);
     transform: translateY(-2px);
+}
+
+/* Dynamic status colors */
+.status-item .text-success {
+    color: #198754 !important;
+}
+
+.status-item .text-warning {
+    color: #ffc107 !important;
+}
+
+.status-item .text-danger {
+    color: #dc3545 !important;
+}
+
+.status-item .text-info {
+    color: #0dcaf0 !important;
+}
+
+/* Offline state styling */
+.status-item:has(.text-danger) {
+    opacity: 0.7;
+    background-color: rgba(220, 53, 69, 0.05);
+}
+
+.status-item:has(.text-danger):hover {
+    background-color: rgba(220, 53, 69, 0.1);
 }
 
 /* Legacy compact card styles for compatibility */
@@ -402,48 +443,148 @@ function navigateToExecution(type) {
         return;
     }
     if (type === 'generator') {
-        window.location.href = '/datasets';
+        window.location.href = '/dataset-generator';
+        return;
+    }
+    if (type === 'manager') {
+        window.location.href = '/dataset/manage';
         return;
     }
     if (type === 'batch') {
-        window.location.href = '/execution/batch';
+        window.location.href = '/batch/manage';
         return;
     }
-    window.location.href = `/execution/${type}`;
+    window.location.href = `/batch/${type}`;
 }
 
 // Load stats on page load
 document.addEventListener('DOMContentLoaded', async () => {
+    await loadSystemStats();
+    
+    // Set up periodic status check every 30 seconds
+    setInterval(checkSystemStatus, 30000);
+});
+
+async function loadSystemStats() {
     try {
         // Load algorithm count
-        const algorithmsResponse = await fetch('/api/algorithms');
-        if (algorithmsResponse.ok) {
-            const algorithms = await algorithmsResponse.json();
-            document.getElementById('algorithm-count').textContent = algorithms.length;
-        } else {
+        try {
+            const algorithmsResponse = await fetch('/api/algorithms', { 
+                signal: AbortSignal.timeout(5000) 
+            });
+            if (algorithmsResponse.ok) {
+                const algorithms = await algorithmsResponse.json();
+                document.getElementById('algorithm-count').textContent = algorithms.length;
+            } else {
+                document.getElementById('algorithm-count').textContent = '?';
+            }
+        } catch (e) {
             document.getElementById('algorithm-count').textContent = '?';
+            console.warn('Failed to load algorithms:', e);
         }
         
         // Load dataset count
         try {
-            const datasetsResponse = await fetch('/api/datasets/saved');
+            const datasetsResponse = await fetch('/api/datasets/', { 
+                signal: AbortSignal.timeout(5000) 
+            });
             if (datasetsResponse.ok) {
                 const datasets = await datasetsResponse.json();
-                const count = datasets.saved_datasets ? datasets.saved_datasets.length : 0;
+                const count = datasets.datasets ? datasets.datasets.length : 0;
                 document.getElementById('dataset-count').textContent = count;
             } else {
                 document.getElementById('dataset-count').textContent = '?';
             }
         } catch (e) {
-            document.getElementById('dataset-count').textContent = '5';
+            document.getElementById('dataset-count').textContent = '?';
+            console.warn('Failed to load datasets:', e);
         }
+        
+        // Load system status and version
+        await checkSystemStatus();
         
     } catch (error) {
         console.error('Failed to load stats:', error);
-        document.getElementById('algorithm-count').textContent = '?';
-        document.getElementById('dataset-count').textContent = '?';
+        setOfflineState();
     }
-});
+}
+
+async function checkSystemStatus() {
+    // Check system status
+    try {
+        const statusResponse = await fetch('/health/status', { 
+            signal: AbortSignal.timeout(5000) 
+        });
+        
+        if (statusResponse.ok) {
+            const statusData = await statusResponse.json();
+            updateSystemStatus(statusData.status, statusData.status_type);
+        } else {
+            // Server responded but with error status
+            updateSystemStatus('Error', 'danger');
+        }
+    } catch (e) {
+        // Network error or timeout - server is offline
+        console.warn('System status check failed:', e);
+        updateSystemStatus('Offline', 'danger');
+    }
+    
+    // Check system version
+    try {
+        const versionResponse = await fetch('/health/version', { 
+            signal: AbortSignal.timeout(5000) 
+        });
+        
+        if (versionResponse.ok) {
+            const versionData = await versionResponse.json();
+            document.getElementById('system-version').textContent = versionData.version;
+        } else {
+            document.getElementById('system-version').textContent = 'Unknown';
+        }
+    } catch (e) {
+        // If status is working but version fails, keep last known version
+        // If status is also failing, version will be set in updateSystemStatus
+        console.warn('Version check failed:', e);
+        if (document.getElementById('system-status').textContent === 'Offline') {
+            document.getElementById('system-version').textContent = 'Unavailable';
+        }
+    }
+}
+
+function updateSystemStatus(status, statusType) {
+    const statusElement = document.getElementById('system-status');
+    const iconElement = document.getElementById('system-status-icon');
+    
+    statusElement.textContent = status;
+    
+    // Reset classes
+    statusElement.className = 'fw-bold mb-1';
+    iconElement.className = 'display-6 mb-2';
+    
+    // Apply styling based on status type
+    if (statusType === 'success') {
+        statusElement.classList.add('text-success');
+        iconElement.classList.add('bi-clock-history', 'text-success');
+    } else if (statusType === 'warning') {
+        statusElement.classList.add('text-warning');
+        iconElement.classList.add('bi-exclamation-triangle', 'text-warning');
+    } else { // danger/error
+        statusElement.classList.add('text-danger');
+        iconElement.classList.add('bi-x-circle', 'text-danger');
+    }
+    
+    // If offline, also update version
+    if (status === 'Offline') {
+        document.getElementById('system-version').textContent = 'Unavailable';
+    }
+}
+
+function setOfflineState() {
+    document.getElementById('algorithm-count').textContent = '?';
+    document.getElementById('dataset-count').textContent = '?';
+    updateSystemStatus('Offline', 'danger');
+    document.getElementById('system-version').textContent = 'Unavailable';
+}
 
 // Add click handlers to both main cards and legacy cards
 document.addEventListener('DOMContentLoaded', () => {

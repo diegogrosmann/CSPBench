@@ -14,8 +14,9 @@
 # This section contains basic information about the batch.
 # All fields are required for traceability and documentation.
 metadata:
-  name: "Batch Name"                  # Descriptive batch name (string)
-  description: "Detailed description of what the batch does"    # Complete description (string)
+  name: "Batch Example"                  # Descriptive batch name (string)
+  description: "Detailed description of what the batch does"
+    # Complete description (string)    
   author: "Author Name"               # Responsible author (string)
   version: "1.0"                      # Batch version (string)
   creation_date: "2025-07-13"         # Creation date in YYYY-MM-DD format
@@ -243,7 +244,7 @@ algorithms:
 # Defines the type of operation to be performed.
 # Each type has specific configurations in the corresponding section.
 task:
-  type: "sensitivity"                  # string: Task type
+  type: "experiment"                  # string: Task type
                                       # "experiment" = run algorithms with fixed parameters
                                       # "optimization" = optimize hyperparameters with Optuna
                                       # "sensitivity" = analyze sensitivity with SALib

@@ -1,8 +1,13 @@
+(function(global){
 /**
  * Modern Notification System for CSPBench
  * Bootstrap-based toast notifications with animations
+ *
+ * This file is idempotent and safe to load multiple times.
  */
 
+// Define NotificationManager only once
+if (!global.NotificationManager) {
 class NotificationManager {
     constructor() {
         this.container = null;
@@ -326,8 +331,11 @@ class NotificationManager {
         });
     }
 }
+global.NotificationManager = NotificationManager;
+}
 
 // Progress notification for long-running operations
+if (!global.ProgressNotification) {
 class ProgressNotification {
     constructor(title = 'Processing...', message = '') {
         this.title = title;
@@ -424,17 +432,21 @@ class ProgressNotification {
         }
     }
 }
+global.ProgressNotification = ProgressNotification;
+}
 
-// Global notification manager instance
-const notifications = new NotificationManager();
+// Create a single global notifications instance if not existing
+if (!global.notifications) {
+    global.notifications = new global.NotificationManager();
+}
 
 // Replace the global showAlert function
-window.showAlert = function(message, type = 'info', duration = 5000) {
-    notifications.show(message, type, { duration });
+global.showAlert = function(message, type = 'info', duration = 5000) {
+    if (global.notifications) {
+        global.notifications.show(message, type, { duration });
+    } else {
+        console[type === 'error' ? 'error' : 'log'](message);
+    }
 };
 
-// Export for global use
-if (typeof window !== 'undefined') {
-    window.notifications = notifications;
-    window.ProgressNotification = ProgressNotification;
-}
+})(window);

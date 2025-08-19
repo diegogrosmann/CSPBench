@@ -63,6 +63,8 @@ def _ask_float(
             return value
         except ValueError:
             print("⚠️  Informe um número numérico válido.")
+
+
 def _ask_optional_int(prompt: str, default: Optional[int]) -> Optional[int]:
     while True:
         suffix = f" [{default}]" if default is not None else " [None]"
@@ -152,16 +154,24 @@ class DatasetWizard:
         from src.infrastructure.external.dataset_entrez import ENTREZ_DEFAULTS
 
         print("\n--- Dataset Real (NCBI) ---")
-        print("ℹ️ Para mais informações sobre a sintaxe de consultas Entrez, consulte: https://www.ncbi.nlm.nih.gov/books/NBK25499/")
+        print(
+            "ℹ️ Para mais informações sobre a sintaxe de consultas Entrez, consulte: https://www.ncbi.nlm.nih.gov/books/NBK25499/"
+        )
         # Apenas NCBI é suportado agora
         db = _ask("Banco (db)", ENTREZ_DEFAULTS["db"]) or ENTREZ_DEFAULTS["db"]
         query = _ask("Consulta (query)", ENTREZ_DEFAULTS["query"]) or "*"
-        max_seq = _ask_optional_int("Máx. sequências", ENTREZ_DEFAULTS["max_sequences"])  # None permitido
-        min_len = _ask_optional_int("Comprimento mínimo", ENTREZ_DEFAULTS["min_length"])  # None permitido
-        max_len = _ask_optional_int("Comprimento máximo", ENTREZ_DEFAULTS["max_length"])  # None permitido
+        max_seq = _ask_optional_int(
+            "Máx. sequências", ENTREZ_DEFAULTS["max_sequences"]
+        )  # None permitido
+        min_len = _ask_optional_int(
+            "Comprimento mínimo", ENTREZ_DEFAULTS["min_length"]
+        )  # None permitido
+        max_len = _ask_optional_int(
+            "Comprimento máximo", ENTREZ_DEFAULTS["max_length"]
+        )  # None permitido
 
         # Validar relação entre min/max quando ambos informados
-        while (min_len is not None and max_len is not None and max_len < min_len):
+        while min_len is not None and max_len is not None and max_len < min_len:
             print("⚠️  'Comprimento máximo' deve ser >= 'Comprimento mínimo'.")
             max_len = _ask_optional_int("Comprimento máximo", None)
         return {

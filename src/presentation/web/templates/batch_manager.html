@@ -1,0 +1,695 @@
+{% extends "base.html" %}
+
+{% block title %}Batch Manager - CSPBench{% endblock %}
+
+{% block extra_css %}
+<style>
+    .batch-manager {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        padding: 2rem 0;
+    }
+
+    .manager-container {
+        max-width: 1400px;
+                    });
+
+            this.renderBatchFilesList();
+            
+        } catch (error) {
+            console.error('Error loading batch files:', error);uto;
+        padding: 0 1rem;
+    }
+
+    .manager-card {
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        margin-bottom: 2rem;
+        overflow: hidden;
+        transition: all 0.3s ease;
+    }
+
+    .manager-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+    }
+
+    .card-header {
+        background: #f8f9fa;
+        border-bottom: 1px solid #dee2e6;
+        padding: 1.5rem;
+        font-weight: 600;
+        color: #495057;
+    }
+
+    .disabled-notice {
+        background: #fff3cd;
+        border: 1px solid #ffc107;
+        border-radius: 8px;
+        padding: 1rem;
+        margin: 1rem;
+        color: #856404;
+    }
+
+    /* Modal stability fixes */
+    .modal {
+        pointer-events: none;
+    }
+
+    .modal.show {
+        pointer-events: auto;
+    }
+
+    .modal-backdrop {
+        pointer-events: auto;
+    }
+
+    .modal-content {
+        pointer-events: auto;
+        position: relative;
+    }
+
+    /* Prevent flicker on hover */
+    .modal-dialog {
+        transition: none !important;
+        transform: none !important;
+    }
+
+    .modal.fade .modal-dialog {
+        transition: transform 0.3s ease-out;
+    }
+</style>
+{% endblock %}
+
+{% block header %}
+<!-- Remove o header padrão (CSPBench Web Interface) -->
+{% endblock %}
+
+{% block breadcrumb_items %}
+<li class="breadcrumb-item active" aria-current="page">
+    <i class="bi bi-file-earmark-text me-1"></i>Batch Manager
+</li>
+{% endblock %}
+
+{% block content %}
+<div class="batch-manager">
+    <div class="manager-container">
+        <!-- Header -->
+        <div class="text-center text-white mb-4">
+            <h1 class="display-4 fw-bold mb-3">
+                <i class="bi bi-file-earmark-text me-3"></i>
+                Batch Manager
+            </h1>
+            <p class="lead">
+                Manage your batch configuration files for CSP algorithm execution
+            </p>
+        </div>
+
+        <!-- Batch Manager Tabs -->
+        <div class="manager-card">
+            <div class="card-header">
+                <ul class="nav nav-tabs card-header-tabs" id="managerTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="batch-files-tab" data-bs-toggle="tab" 
+                                data-bs-target="#batch-files" type="button" role="tab">
+                            <i class="bi bi-files me-2"></i>Batch Files
+                        </button>
+                    </li>
+                </ul>
+            </div>
+
+            <div class="tab-content" id="managerTabContent">
+                <!-- Batch Files Tab -->
+                <div class="tab-pane fade show active" id="batch-files" role="tabpanel">
+                    <div class="p-4">
+                        <div id="batch-manager-container">
+                            <!-- Batch manager component will be loaded here -->
+                            <div class="text-center p-4">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                                <p class="mt-2 text-muted">Loading batch manager...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Upload Modal -->
+<div id="upload-modal" class="modal fade" tabindex="-1" aria-labelledby="uploadModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="uploadModalLabel">
+                    <i class="bi bi-upload me-2"></i>Upload Batch File
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="upload-form" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label for="upload-file" class="form-label">Choose YAML file</label>
+                        <input type="file" class="form-control" id="upload-file" accept=".yaml,.yml" required>
+                        <div class="form-text">Select a YAML batch configuration file to upload.</div>
+                    </div>
+                </form>
+                <div id="upload-error" class="alert alert-danger d-none"></div>
+                <div id="upload-success" class="alert alert-success d-none"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="upload-submit-btn">
+                    <i class="bi bi-upload me-1"></i>Upload
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+console.log('Batch Manager: Template script starting...');
+
+// Batch Manager Class - Inline Implementation
+class BatchManagerTabbed {
+    constructor() {
+        this.containerId = 'batch-manager-container';
+        this.batchFiles = [];
+        this.initialized = false;
+        this.apiClient = new APIClient(); // Initialize API client
+        console.log('BatchManagerTabbed: Constructor called');
+    }
+
+    async initialize() {
+        if (this.initialized) return;
+        console.log('BatchManagerTabbed: Starting initialization...');
+
+        try {
+            await this.render();
+            await this.loadBatchFiles();
+            this.setupEventHandlers();
+            this.initialized = true;
+            console.log('BatchManagerTabbed: Initialization completed successfully');
+        } catch (error) {
+            console.error('BatchManagerTabbed: Failed to initialize:', error);
+            this.renderError('Failed to initialize batch manager: ' + error.message);
+        }
+    }
+
+    async render() {
+        const container = document.getElementById(this.containerId);
+        if (!container) {
+            throw new Error(`Container element with ID '${this.containerId}' not found`);
+        }
+
+        container.innerHTML = `
+            <div class="batch-manager-content">
+                <!-- Batch Files List -->
+                <div class="mb-4">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5><i class="bi bi-files me-2"></i>Batch Configuration Files</h5>
+                        <div class="btn-group" role="group">
+                            <button class="btn btn-success btn-sm" id="upload-batch-btn">
+                                <i class="bi bi-upload me-1"></i>Upload
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div id="batch-files-list">
+                        <div class="text-center p-4">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading batch files...</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Batch Editor (overlay modal) -->
+                <div id="batch-editor" class="modal fade" tabindex="-1" aria-labelledby="batchEditorLabel" aria-hidden="true">
+                    <div class="modal-dialog modal-xl">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title" id="batchEditorLabel">
+                                    <i class="bi bi-pencil me-2"></i>Batch Editor - <span id="editor-filename">Unknown File</span>
+                                </h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body">
+                                <form id="batch-form">
+                                    <div class="mb-3">
+                                        <label for="batch-content" class="form-label">YAML Configuration</label>
+                                        <textarea class="form-control" id="batch-content" rows="25" 
+                                                  placeholder="Enter your batch configuration in YAML format..."
+                                                  style="font-family: 'Courier New', monospace; font-size: 14px;"></textarea>
+                                    </div>
+                                </form>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                                    <i class="bi bi-x-circle me-1"></i>Cancel
+                                </button>
+                                <button type="button" class="btn btn-success" id="save-batch-btn">
+                                    <i class="bi bi-check-circle me-1"></i>Save
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    async loadBatchFiles() {
+        const listContainer = document.getElementById('batch-files-list');
+        if (!listContainer) {
+            console.error('batch-files-list container not found');
+            return;
+        }
+
+        try {
+            // Show loading state
+            listContainer.innerHTML = `
+                <div class="text-center p-4">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading batch files...</span>
+                    </div>
+                    <p class="mt-2 text-muted">Loading from API...</p>
+                </div>
+            `;
+            
+            const response = await fetch('/api/batches/', {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json'
+                }
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
+            const data = await response.json();
+            
+            if (!data.files || !Array.isArray(data.files)) {
+                throw new Error('Invalid API response: missing files array');
+            }
+            
+            this.batchFiles = data.files.map(file => ({
+                name: file.name,
+                description: file.description || 'No description available',
+                created: file.created,
+                modified: file.modified,
+                size: file.size,
+                path: file.path,
+                is_template: file.is_template,
+                metadata_name: file.metadata_name
+            }));
+
+            console.log('Files processed:', this.batchFiles);
+            console.log('Calling renderBatchFilesList()...');
+            this.renderBatchFilesList();
+            console.log('=== LOAD BATCH FILES SUCCESS ===');
+            
+        } catch (error) {
+            console.error('=== LOAD BATCH FILES ERROR ===');
+            console.error('Error details:', error);
+            console.error('Error stack:', error.stack);
+            
+            // Show detailed error
+            listContainer.innerHTML = `
+                <div class="alert alert-danger">
+                    <h6><i class="bi bi-exclamation-triangle me-2"></i>Load Error</h6>
+                    <p><strong>Error:</strong> ${error.message}</p>
+                    <button class="btn btn-outline-primary btn-sm" onclick="window.batchManagerInstance?.loadBatchFiles()">
+                        <i class="bi bi-arrow-clockwise me-1"></i>Retry
+                    </button>
+            `;
+        }
+    }
+
+    renderBatchFilesList() {
+        const listContainer = document.getElementById('batch-files-list');
+        if (!listContainer) return;
+
+        if (this.batchFiles.length === 0) {
+            listContainer.innerHTML = `
+                <div class="text-center p-4 text-muted">
+                    <i class="bi bi-folder2-open display-4 mb-3"></i>
+                    <p>No batch files found</p>
+                    <p class="small">Create your first batch configuration to get started</p>
+                </div>
+            `;
+            return;
+        }
+
+        const filesHtml = this.batchFiles.map(file => {
+            const displayName = file.metadata_name || file.name;
+            return `
+            <div class="card mb-2">
+                <div class="card-body p-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="mb-1">
+                                <i class="bi bi-file-earmark-text me-2"></i>
+                                ${displayName}
+                                ${file.is_template ? '<span class="badge bg-info ms-2">Template</span>' : ''}
+                            </h6>
+                            <p class="mb-0 small text-muted">${file.description || 'No description'}</p>
+                            <small class="text-muted">File: ${file.name} | Size: ${file.size} | Created: ${new Date(file.created).toLocaleDateString()}</small>
+                        </div>
+                        <div class="btn-group">
+                            <button class="btn btn-outline-info btn-sm" data-action="download" data-file="${file.name}" title="Download">
+                                <i class="bi bi-download"></i>
+                            </button>
+                            <button class="btn btn-outline-success btn-sm" data-action="execute" data-file="${file.name}" title="Execute Batch">
+                                <i class="bi bi-play-fill"></i>
+                            </button>
+                            ${!file.is_template ? `
+                            <button class="btn btn-outline-danger btn-sm" data-action="delete" data-file="${file.name}" title="Delete">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                            ` : ''}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        }).join('');
+
+        listContainer.innerHTML = filesHtml;
+    }
+
+    renderBatchFilesError() {
+        const listContainer = document.getElementById('batch-files-list');
+        if (!listContainer) return;
+
+        listContainer.innerHTML = `
+            <div class="alert alert-warning">
+                <i class="bi bi-exclamation-triangle me-2"></i>
+                Failed to load batch files. Please try refreshing the page.
+            </div>
+        `;
+    }
+
+    setupEventHandlers() {
+        // File action buttons (using event delegation)
+        const listContainer = document.getElementById('batch-files-list');
+        if (listContainer) {
+            listContainer.addEventListener('click', (e) => this.handleFileAction(e));
+        }
+
+        // Setup upload modal functionality
+        this.setupUploadModal();
+    }
+
+    setupUploadModal() {
+        // Verify Bootstrap is loaded
+        if (typeof bootstrap === 'undefined') {
+            console.error('Bootstrap is not loaded');
+            return;
+        }
+        
+        // Verify modal element exists
+        const uploadModalElement = document.getElementById('upload-modal');
+        if (!uploadModalElement) {
+            console.error('Upload modal element not found');
+            return;
+        }
+        
+        this.uploadModal = new bootstrap.Modal(uploadModalElement);
+        const uploadBtn = document.getElementById('upload-batch-btn');
+        const submitBtn = document.getElementById('upload-submit-btn');
+        
+        // Show upload modal
+        uploadBtn?.addEventListener('click', () => {
+            this.uploadModal.show();
+        });
+        
+        // Handle upload submission
+        submitBtn?.addEventListener('click', async () => {
+            await this.uploadFile();
+        });
+
+        // Clear messages when modal is hidden
+        document.getElementById('upload-modal').addEventListener('hidden.bs.modal', () => {
+            document.getElementById('upload-error').classList.add('d-none');
+            document.getElementById('upload-success').classList.add('d-none');
+            document.getElementById('upload-file-form').reset();
+        });
+    }
+
+    async uploadFile() {
+        const form = document.getElementById('upload-form');
+        const formData = new FormData();
+        const submitBtn = document.getElementById('upload-submit-btn');
+        
+        const fileInput = document.getElementById('upload-file');
+        const file = fileInput ? fileInput.files[0] : null;
+        
+        if (!file) {
+            this.showUploadError('Please select a file to upload');
+            return;
+        }
+        
+        // Generate random name using timestamp and random string
+        const timestamp = Date.now();
+        const randomStr = Math.random().toString(36).substring(2, 8);
+        const randomName = `batch_${timestamp}_${randomStr}`;
+        
+        formData.append('name', randomName);
+        formData.append('file', file);
+        formData.append('overwrite', 'false');
+        
+        try {
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Uploading...';
+            
+            const response = await fetch('/api/batches/upload', {
+                method: 'POST',
+                body: formData
+            });
+            
+            const result = await response.json();
+            
+            if (response.ok && result.success) {
+                this.showUploadSuccess(result.message);
+                // Reset the file input
+                const fileInput = document.getElementById('upload-file');
+                if (fileInput) fileInput.value = '';
+                setTimeout(() => {
+                    this.uploadModal.hide();
+                    this.loadBatchFiles();
+                }, 1500);
+            } else {
+                this.showUploadError(result.detail || result.message || 'Upload failed');
+            }
+        } catch (error) {
+            this.showUploadError('Upload failed: ' + error.message);
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<i class="bi bi-upload me-1"></i>Upload';
+        }
+    }
+    
+    showUploadError(message) {
+        const errorDiv = document.getElementById('upload-error');
+        const successDiv = document.getElementById('upload-success');
+        successDiv.classList.add('d-none');
+        errorDiv.textContent = message;
+        errorDiv.classList.remove('d-none');
+    }
+    
+    showUploadSuccess(message) {
+        const errorDiv = document.getElementById('upload-error');
+        const successDiv = document.getElementById('upload-success');
+        errorDiv.classList.add('d-none');
+        successDiv.textContent = message;
+        successDiv.classList.remove('d-none');
+    }
+
+    handleFileAction(event) {
+        const button = event.target.closest('button[data-action]');
+        if (!button) return;
+
+        const action = button.dataset.action;
+        const fileName = button.dataset.file;
+
+        switch (action) {
+            case 'download':
+                this.downloadBatchFile(fileName);
+                break;
+            case 'execute':
+                this.executeBatchFromList(fileName);
+                break;
+            case 'delete':
+                this.deleteBatchFile(fileName);
+                break;
+        }
+    }
+
+    downloadBatchFile(fileName) {
+        console.log('Downloading batch file:', fileName);
+        // Use the API download endpoint
+        const downloadUrl = `/api/batches/${fileName}/download`;
+        const link = document.createElement('a');
+        link.href = downloadUrl;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+
+    async executeBatchFromList(fileName) {
+        try {
+            console.log('Executing batch from list:', fileName);
+            
+            // Show loading state
+            const button = document.querySelector(`button[data-action="execute"][data-file="${fileName}"]`);
+            const originalHTML = button.innerHTML;
+            button.innerHTML = '<i class="bi bi-hourglass-split"></i>';
+            button.disabled = true;
+            
+            // Execute the batch
+            const result = await this.apiClient.executeBatch(fileName, 'log');
+            
+            // Show success message
+            this.showAlert(`Batch "${fileName}" started successfully! Redirecting to monitoring...`, 'success');
+            
+            // Redirect to monitoring page after a short delay
+            setTimeout(() => {
+                window.location.href = '/monitoring';
+            }, 2000);
+            
+        } catch (error) {
+            console.error('Error executing batch:', error);
+            this.showAlert(`Failed to execute batch: ${error.message}`, 'danger');
+        } finally {
+            // Restore button state
+            const button = document.querySelector(`button[data-action="execute"][data-file="${fileName}"]`);
+            if (button) {
+                button.innerHTML = '<i class="bi bi-play-fill"></i>';
+                button.disabled = false;
+            }
+        }
+    }
+
+    async renderActiveExecutions() {
+        // This method is no longer needed since we removed the active executions tab
+        // Keeping it for compatibility but it does nothing
+        console.log('renderActiveExecutions called (deprecated)');
+    }
+
+    async deleteBatchFile(fileName) {
+        if (!confirm(`Are you sure you want to delete ${fileName}?`)) {
+            return;
+        }
+
+        try {
+            console.log('Deleting batch file:', fileName);
+            
+            const response = await fetch(`/api/batches/${fileName}`, {
+                method: 'DELETE'
+            });
+            
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.detail || `Delete failed: ${response.status}`);
+            }
+            
+            const result = await response.json();
+            console.log('Delete result:', result);
+            
+            alert(`${fileName} deleted successfully`);
+            await this.loadBatchFiles(); // Refresh the list
+        } catch (error) {
+            console.error('Failed to delete batch file:', error);
+            alert('Failed to delete batch file: ' + error.message);
+        }
+    }
+
+    showAlert(message, type = 'info') {
+        // Create alert element
+        const alertDiv = document.createElement('div');
+        alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+        alertDiv.innerHTML = `
+            <i class="bi bi-${this.getAlertIcon(type)} me-2"></i>
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        `;
+        
+        // Find or create alerts container
+        let alertsContainer = document.getElementById('alerts-container');
+        if (!alertsContainer) {
+            alertsContainer = document.createElement('div');
+            alertsContainer.id = 'alerts-container';
+            alertsContainer.style.cssText = 'position: fixed; top: 20px; right: 20px; z-index: 9999; width: 400px;';
+            document.body.appendChild(alertsContainer);
+        }
+        
+        // Add alert to container
+        alertsContainer.appendChild(alertDiv);
+        
+        // Auto-remove after 5 seconds
+        setTimeout(() => {
+            if (alertDiv.parentNode) {
+                alertDiv.remove();
+            }
+        }, 5000);
+    }
+
+    getAlertIcon(type) {
+        const icons = {
+            'success': 'check-circle',
+            'danger': 'exclamation-triangle',
+            'warning': 'exclamation-triangle',
+            'info': 'info-circle'
+        };
+        return icons[type] || 'info-circle';
+    }
+
+    renderError(message) {
+        const container = document.getElementById(this.containerId);
+        if (container) {
+            container.innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="bi bi-exclamation-triangle me-2"></i>
+                    ${message}
+                </div>
+            `;
+        }
+    }
+}
+
+// Initialize when DOM is ready
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOM loaded, initializing Batch Manager...');
+    
+    const container = document.getElementById('batch-manager-container');
+    if (!container) {
+        console.error('batch-manager-container not found');
+        return;
+    }
+
+    try {
+        const batchManager = new BatchManagerTabbed();
+        batchManager.initialize();
+        
+        // Store reference globally for debugging
+        window.batchManagerInstance = batchManager;
+        
+    } catch (error) {
+        console.error('Error initializing Batch Manager:', error);
+    }
+});
+
+console.log('Batch Manager: Script loaded successfully');
+</script>
+{% endblock %}

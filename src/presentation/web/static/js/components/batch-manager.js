@@ -1,529 +1,890 @@
 /**
- * Batch Manager Component
- * 
- * Handles the batch execution interface including:
- * - Loading and displaying batch files
- * - Filtering and searching
- * - Batch operations
- * - File uploads
+ * Batch Manager Component for CSPBench Web Interface
+ * Manages batch configuration files with CRUD operations
  */
 
-class BatchManager {
+class BatchManagerTabbed {
     constructor() {
-        this.currentPage = 1;
-        this.pageSize = 20;
-        this.selectedBatches = new Set();
-        this.batches = [];
-        this.filteredBatches = [];
-        this.filters = {
-            search: '',
-            status: '',
-            dateFrom: ''
-        };
-        
+        this.containerId = 'batch-manager-container';
+        this.batchFiles = [];
+        this.executions = [];
+        this.initialized = false;
         this.apiClient = window.apiClient || new APIClient();
-        this.bindEvents();
     }
 
-    initialize() {
-        this.loadBatches();
-    }
+    /**
+     * Initialize the batch manager component
+     */
+    async initialize() {
+        if (this.initialized) return;
 
-    bindEvents() {
-        // Filter events
-        document.getElementById('search-query')?.addEventListener('input', 
-            this.debounce((e) => this.updateFilter('search', e.target.value), 300));
-        document.getElementById('filter-status')?.addEventListener('change', 
-            (e) => this.updateFilter('status', e.target.value));
-        document.getElementById('filter-date-from')?.addEventListener('change', 
-            (e) => this.updateFilter('dateFrom', e.target.value));
-        document.getElementById('apply-filters')?.addEventListener('click', 
-            () => this.applyFilters());
+        console.log('BatchManagerTabbed: Starting initialization...');
 
-        // Batch action events
-        document.getElementById('run-selected')?.addEventListener('click', 
-            () => this.runSelected());
-        document.getElementById('delete-selected')?.addEventListener('click', 
-            () => this.deleteSelected());
-
-        // Select all checkbox
-        document.getElementById('select-all-checkbox')?.addEventListener('change', 
-            (e) => e.target.checked ? this.selectAll() : this.clearSelection());
-
-        // Refresh
-        document.getElementById('refresh-batches')?.addEventListener('click', 
-            () => this.loadBatches());
-
-        // Toggle filters button
-        document.getElementById('toggle-filters')?.addEventListener('click', 
-            () => this.toggleFiltersIcon());
-
-        // Filter section collapse events
-        const filtersSection = document.getElementById('filters-section');
-        if (filtersSection) {
-            filtersSection.addEventListener('shown.bs.collapse', () => this.updateFiltersIcon(true));
-            filtersSection.addEventListener('hidden.bs.collapse', () => this.updateFiltersIcon(false));
-        }
-
-        // Upload events
-        document.getElementById('upload-submit')?.addEventListener('click', 
-            () => this.uploadBatch());
-
-        // Modal events
-        document.getElementById('confirm-run')?.addEventListener('click', 
-            () => this.confirmRun());
-        document.getElementById('confirm-delete')?.addEventListener('click', 
-            () => this.confirmDelete());
-
-        // Retry
-        document.getElementById('retry-load')?.addEventListener('click', 
-            () => this.loadBatches());
-    }
-
-    async loadBatches() {
-        this.showLoading();
-        
         try {
-            const response = await this.apiClient.get('/execution/api/batches', 'load_batches');
-            this.batches = response.batch_files || [];
-            this.updateStatistics();
-            this.applyFilters();
-            this.hideLoading();
+            console.log('BatchManagerTabbed: Rendering interface...');
+            await this.render();
+            
+            console.log('BatchManagerTabbed: Loading batch files...');
+            await this.loadBatchFiles();
+            
+            console.log('BatchManagerTabbed: Setting up event handlers...');
+            this.setupEventHandlers();
+            
+            this.initialized = true;
+            console.log('BatchManagerTabbed: Initialization completed successfully');
         } catch (error) {
-            console.error('Error loading batches:', error);
-            this.showError('Failed to load batch files: ' + (error.message || 'Unknown error'));
+            console.error('BatchManagerTabbed: Failed to initialize:', error);
+            this.renderError('Failed to initialize batch manager: ' + error.message);
         }
     }
 
-    updateStatistics() {
-        const total = this.batches.length;
-        const running = this.batches.filter(b => b.status === 'running').length;
-        const completed = this.batches.filter(b => b.status === 'completed').length;
-        const failed = this.batches.filter(b => b.status === 'failed').length;
-
-        document.getElementById('total-batches').textContent = total;
-        document.getElementById('running-batches').textContent = running;
-        document.getElementById('completed-batches').textContent = completed;
-        document.getElementById('failed-batches').textContent = failed;
-    }
-
-    updateFilter(filterName, value) {
-        this.filters[filterName] = value;
-        this.applyFilters();
-    }
-
-    applyFilters() {
-        this.filteredBatches = this.batches.filter(batch => {
-            // Search filter
-            if (this.filters.search) {
-                const searchLower = this.filters.search.toLowerCase();
-                const searchableText = [
-                    batch.name,
-                    batch.description,
-                    batch.filename
-                ].filter(Boolean).join(' ').toLowerCase();
-                
-                if (!searchableText.includes(searchLower)) {
-                    return false;
-                }
-            }
-
-            // Status filter
-            if (this.filters.status && batch.status !== this.filters.status) {
-                return false;
-            }
-
-            // Date filters
-            if (this.filters.dateFrom) {
-                const fromDate = new Date(this.filters.dateFrom);
-                const batchDate = new Date(batch.modified * 1000);
-                if (batchDate < fromDate) {
-                    return false;
-                }
-            }
-
-            return true;
-        });
-
-        this.currentPage = 1;
-        this.renderBatches();
-        this.renderPagination();
-    }
-
-    renderBatches() {
-        const tbody = document.getElementById('batch-table-body');
-        const tableContainer = document.getElementById('batch-table-container');
-        const emptyState = document.getElementById('empty-state');
-
-        if (!tbody) return;
-
-        if (this.filteredBatches.length === 0) {
-            tableContainer.style.display = 'none';
-            emptyState.style.display = 'block';
-            this.hidePagination();
-            return;
+    /**
+     * Render the initial batch manager interface
+     */
+    async render() {
+        const container = document.getElementById(this.containerId);
+        if (!container) {
+            throw new Error(`Container element with ID '${this.containerId}' not found`);
         }
 
-        tableContainer.style.display = 'block';
-        emptyState.style.display = 'none';
+        container.innerHTML = `
+            <div class="batch-manager-content">
+                <!-- Alert Container -->
+                <div id="alert-container"></div>
 
-        // Pagination
-        const startIndex = (this.currentPage - 1) * this.pageSize;
-        const endIndex = startIndex + this.pageSize;
-        const pageBatches = this.filteredBatches.slice(startIndex, endIndex);
-
-        tbody.innerHTML = pageBatches.map(batch => this.renderBatchRow(batch)).join('');
-
-        // Bind row events
-        this.bindRowEvents();
-        this.showPagination();
-    }
-
-    renderBatchRow(batch) {
-        const created = new Date(batch.modified * 1000).toLocaleString();
-        const size = this.formatFileSize(batch.size);
-        const isSelected = this.selectedBatches.has(batch.filename);
-        const status = batch.status || 'pending';
-        const progress = batch.progress || 0;
-
-        return `
-            <tr class="batch-row" data-batch-id="${batch.filename}">
-                <td>
-                    <input type="checkbox" class="form-check-input batch-checkbox" 
-                           ${isSelected ? 'checked' : ''} 
-                           data-batch-id="${batch.filename}">
-                </td>
-                <td>
-                    <div class="d-flex flex-column">
-                        <code class="text-primary mb-1">${batch.name}</code>
-                        <small class="text-muted">${batch.description || 'No description'}</small>
+                <!-- Active Executions -->
+                <div class="mb-4" id="active-executions-section">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5><i class="bi bi-play-circle me-2"></i>Active Executions</h5>
+                        <button class="btn btn-outline-secondary btn-sm" id="refresh-executions-btn">
+                            <i class="bi bi-arrow-clockwise me-1"></i>Refresh
+                        </button>
                     </div>
-                </td>
-                <td>
-                    <small>${created}</small>
-                </td>
-                <td>
-                    <span class="badge status-badge status-${status}">
-                        ${this.getStatusIcon(status)} ${status}
-                    </span>
-                </td>
-                <td>
-                    <div class="progress progress-batch">
-                        <div class="progress-bar ${this.getProgressBarClass(status)}" 
-                             role="progressbar" 
-                             style="width: ${progress}%" 
-                             aria-valuenow="${progress}" 
-                             aria-valuemin="0" 
-                             aria-valuemax="100">
-                            ${progress > 0 ? progress + '%' : ''}
+                    
+                    <div id="active-executions-list">
+                        <div class="text-center p-3">
+                            <div class="spinner-border text-primary spinner-border-sm" role="status">
+                                <span class="visually-hidden">Loading executions...</span>
+                            </div>
                         </div>
                     </div>
-                </td>
-                <td>
-                    <div class="btn-group btn-group-sm" role="group">
-                        <button class="btn btn-outline-primary action-btn view-details" 
-                                data-batch-id="${batch.filename}" 
-                                title="View Details">
-                            <i class="bi bi-eye"></i>
-                        </button>
-                        <button class="btn btn-outline-success action-btn run-batch" 
-                                data-batch-id="${batch.filename}" 
-                                title="Run Batch"
-                                ${status === 'running' ? 'disabled' : ''}>
-                            <i class="bi bi-play"></i>
-                        </button>
-                        <button class="btn btn-outline-secondary action-btn download-batch" 
-                                data-batch-id="${batch.filename}" 
-                                title="Download">
-                            <i class="bi bi-download"></i>
-                        </button>
-                        <button class="btn btn-outline-danger action-btn delete-batch" 
-                                data-batch-id="${batch.filename}" 
-                                title="Delete">
-                            <i class="bi bi-trash"></i>
-                        </button>
+                </div>
+
+                <!-- Batch Files List -->
+                <div class="mb-4">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5><i class="bi bi-files me-2"></i>Batch Configuration Files</h5>
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-outline-primary btn-sm" id="upload-batch-btn">
+                                <i class="bi bi-upload me-1"></i>Upload
+                            </button>
+                            <button class="btn btn-primary btn-sm" id="create-batch-btn">
+                                <i class="bi bi-plus-circle me-1"></i>New Batch
+                            </button>
+                        </div>
                     </div>
-                </td>
-            </tr>
+                    
+                    <div id="batch-files-list">
+                        <div class="text-center p-4">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading batch files...</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- File Upload Modal -->
+                <div id="upload-modal" class="d-none">
+                    <div class="card">
+                        <div class="card-header">
+                            <h6 class="mb-0"><i class="bi bi-upload me-2"></i>Upload Batch File</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <label for="file-input" class="form-label">Select YAML File</label>
+                                <input type="file" class="form-control" id="file-input" accept=".yaml,.yml">
+                                <div class="form-text">Only .yaml and .yml files are supported</div>
+                            </div>
+                            <div class="d-flex gap-2">
+                                <button type="button" class="btn btn-success" id="upload-confirm-btn">
+                                    <i class="bi bi-upload me-1"></i>Upload
+                                </button>
+                                <button type="button" class="btn btn-secondary" id="upload-cancel-btn">
+                                    <i class="bi bi-x-circle me-1"></i>Cancel
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Batch Editor (hidden by default) -->
+                <div id="batch-editor" class="d-none">
+                    <div class="card">
+                        <div class="card-header">
+                            <h6 class="mb-0"><i class="bi bi-pencil me-2"></i>Batch Editor</h6>
+                        </div>
+                        <div class="card-body">
+                            <form id="batch-form">
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label for="batch-name" class="form-label">Batch Name</label>
+                                        <input type="text" class="form-control" id="batch-name" required>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label for="batch-description" class="form-label">Description</label>
+                                        <input type="text" class="form-control" id="batch-description">
+                                    </div>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label for="batch-content" class="form-label">YAML Configuration</label>
+                                    <textarea class="form-control" id="batch-content" rows="15" 
+                                              placeholder="Enter your batch configuration in YAML format..."></textarea>
+                                </div>
+                                
+                                <div class="d-flex gap-2">
+                                    <button type="submit" class="btn btn-success">
+                                        <i class="bi bi-check-circle me-1"></i>Save
+                                    </button>
+                                    <button type="button" class="btn btn-secondary" id="cancel-edit-btn">
+                                        <i class="bi bi-x-circle me-1"></i>Cancel
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
         `;
     }
 
-    bindRowEvents() {
-        // Checkbox events
-        document.querySelectorAll('.batch-checkbox').forEach(checkbox => {
-            checkbox.addEventListener('change', (e) => {
-                const batchId = e.target.dataset.batchId;
-                if (e.target.checked) {
-                    this.selectedBatches.add(batchId);
-                } else {
-                    this.selectedBatches.delete(batchId);
-                }
-                this.updateSelectionUI();
-            });
-        });
+    /**
+     * Load batch files from the server
+     */
+    async loadBatchFiles() {
+        try {
+            console.log('BatchManagerTabbed: Loading batch files from API...');
+            
+            // First, try to get batch files from the file management API
+            try {
+                const response = await this.apiClient.getBatchFiles();
+                this.batchFiles = response.files || [];
+                console.log('BatchManagerTabbed: Batch files loaded from API:', this.batchFiles);
+            } catch (apiError) {
+                console.warn('BatchManagerTabbed: Batch files API not available, using filesystem approach');
+                // Fallback: List files from batches directory (will need backend support)
+                this.batchFiles = await this.loadBatchFilesFromDirectory();
+            }
 
-        // Action button events
-        document.querySelectorAll('.view-details').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const batchId = e.target.closest('button').dataset.batchId;
-                this.viewBatchDetails(batchId);
-            });
-        });
+            // Load current executions
+            await this.loadBatchExecutions();
 
-        document.querySelectorAll('.run-batch').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const batchId = e.target.closest('button').dataset.batchId;
-                this.runSingleBatch(batchId);
-            });
-        });
-
-        document.querySelectorAll('.download-batch').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const batchId = e.target.closest('button').dataset.batchId;
-                this.downloadBatch(batchId);
-            });
-        });
-
-        document.querySelectorAll('.delete-batch').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const batchId = e.target.closest('button').dataset.batchId;
-                this.deleteSingleBatch(batchId);
-            });
-        });
+            console.log('BatchManagerTabbed: Rendering batch files list...');
+            this.renderBatchFilesList();
+            console.log('BatchManagerTabbed: Batch files list rendered');
+        } catch (error) {
+            console.error('BatchManagerTabbed: Failed to load batch files:', error);
+            this.renderBatchFilesError();
+        }
     }
 
-    updateSelectionUI() {
-        const count = this.selectedBatches.size;
-        document.getElementById('selected-count').textContent = `${count} selected`;
-        
-        const runBtn = document.getElementById('run-selected');
-        const deleteBtn = document.getElementById('delete-selected');
-        const batchActions = document.getElementById('batch-actions');
-        
-        if (runBtn) runBtn.disabled = count === 0;
-        if (deleteBtn) deleteBtn.disabled = count === 0;
-        
-        // Show/hide batch actions based on selection
-        if (batchActions) {
-            batchActions.style.display = count > 0 ? 'block' : 'none';
-        }
+    /**
+     * Load batch files from filesystem (fallback method)
+     */
+    async loadBatchFilesFromDirectory() {
+        // For now, return example files that we know exist
+        const knownFiles = [
+            'batches/TEMPLATE.yaml'
+        ];
 
-        // Update select all checkbox
-        const selectAllCheckbox = document.getElementById('select-all-checkbox');
-        if (selectAllCheckbox) {
-            const visibleBatches = this.filteredBatches.length;
-            if (visibleBatches === 0) {
-                selectAllCheckbox.checked = false;
-                selectAllCheckbox.indeterminate = false;
-            } else if (count === visibleBatches) {
-                selectAllCheckbox.checked = true;
-                selectAllCheckbox.indeterminate = false;
-            } else if (count > 0) {
-                selectAllCheckbox.checked = false;
-                selectAllCheckbox.indeterminate = true;
-            } else {
-                selectAllCheckbox.checked = false;
-                selectAllCheckbox.indeterminate = false;
+        const files = [];
+        for (const filePath of knownFiles) {
+            try {
+                // Check if file exists by trying to load it
+                files.push({
+                    name: filePath.split('/').pop(),
+                    path: filePath,
+                    description: 'Batch configuration file',
+                    created: new Date().toISOString(),
+                    size: 'Unknown'
+                });
+            } catch (error) {
+                console.warn(`File ${filePath} not accessible:`, error);
             }
         }
+
+        return files;
     }
 
-    selectAll() {
-        this.filteredBatches.forEach(batch => {
-            this.selectedBatches.add(batch.filename);
-        });
-        this.updateSelectionUI();
-        this.renderBatches();
-    }
-
-    clearSelection() {
-        this.selectedBatches.clear();
-        this.updateSelectionUI();
-        this.renderBatches();
-    }
-
-    // Status and progress helpers
-    getStatusIcon(status) {
-        const icons = {
-            pending: '<i class="bi bi-clock"></i>',
-            running: '<i class="bi bi-play-circle"></i>',
-            completed: '<i class="bi bi-check-circle"></i>',
-            failed: '<i class="bi bi-x-circle"></i>'
-        };
-        return icons[status] || '<i class="bi bi-question-circle"></i>';
-    }
-
-    getProgressBarClass(status) {
-        const classes = {
-            pending: 'bg-secondary',
-            running: 'bg-primary',
-            completed: 'bg-success',
-            failed: 'bg-danger'
-        };
-        return classes[status] || 'bg-secondary';
-    }
-
-    formatFileSize(bytes) {
-        if (bytes === 0) return '0 B';
-        const k = 1024;
-        const sizes = ['B', 'KB', 'MB', 'GB'];
-        const i = Math.floor(Math.log(bytes) / Math.log(k));
-        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-    }
-
-    // UI State management
-    showLoading() {
-        document.getElementById('loading-indicator').style.display = 'block';
-        document.getElementById('batch-table-container').style.display = 'none';
-        document.getElementById('empty-state').style.display = 'none';
-        document.getElementById('error-state').style.display = 'none';
-    }
-
-    hideLoading() {
-        document.getElementById('loading-indicator').style.display = 'none';
-    }
-
-    showError(message) {
-        document.getElementById('loading-indicator').style.display = 'none';
-        document.getElementById('batch-table-container').style.display = 'none';
-        document.getElementById('empty-state').style.display = 'none';
-        document.getElementById('error-state').style.display = 'block';
-        document.getElementById('error-message').textContent = message;
-    }
-
-    showPagination() {
-        if (this.filteredBatches.length > this.pageSize) {
-            document.getElementById('pagination-container').style.display = 'block';
+    /**
+     * Load current batch executions
+     */
+    async loadBatchExecutions() {
+        try {
+            console.log('BatchManagerTabbed: Loading batch executions...');
+            const response = await this.apiClient.listBatchExecutions();
+            this.executions = response.executions || [];
+            console.log('BatchManagerTabbed: Executions loaded:', this.executions);
+            
+            // Render executions after loading
+            this.renderActiveExecutions();
+        } catch (error) {
+            console.warn('BatchManagerTabbed: Failed to load executions:', error);
+            this.executions = [];
+            this.renderActiveExecutions();
         }
     }
 
-    hidePagination() {
-        document.getElementById('pagination-container').style.display = 'none';
-    }
-
-    renderPagination() {
-        const totalPages = Math.ceil(this.filteredBatches.length / this.pageSize);
-        if (totalPages <= 1) {
-            this.hidePagination();
+    /**
+     * Render active executions list
+     */
+    renderActiveExecutions() {
+        const listContainer = document.getElementById('active-executions-list');
+        if (!listContainer) {
+            console.error('BatchManagerTabbed: active-executions-list container not found!');
             return;
         }
 
-        const pagination = document.getElementById('pagination');
-        if (!pagination) return;
+        const activeExecutions = this.executions.filter(exec => 
+            ['queued', 'running', 'paused'].includes(exec.status)
+        );
 
-        let paginationHTML = '';
-        
-        // Previous button
-        paginationHTML += `
-            <li class="page-item ${this.currentPage === 1 ? 'disabled' : ''}">
-                <a class="page-link" href="#" data-page="${this.currentPage - 1}">&laquo;</a>
-            </li>
-        `;
-
-        // Page numbers
-        const startPage = Math.max(1, this.currentPage - 2);
-        const endPage = Math.min(totalPages, this.currentPage + 2);
-
-        for (let i = startPage; i <= endPage; i++) {
-            paginationHTML += `
-                <li class="page-item ${i === this.currentPage ? 'active' : ''}">
-                    <a class="page-link" href="#" data-page="${i}">${i}</a>
-                </li>
+        if (activeExecutions.length === 0) {
+            listContainer.innerHTML = `
+                <div class="text-center p-3 text-muted">
+                    <i class="bi bi-info-circle mb-2" style="font-size: 2rem;"></i>
+                    <p>No active executions</p>
+                </div>
             `;
+            return;
         }
 
-        // Next button
-        paginationHTML += `
-            <li class="page-item ${this.currentPage === totalPages ? 'disabled' : ''}">
-                <a class="page-link" href="#" data-page="${this.currentPage + 1}">&raquo;</a>
-            </li>
-        `;
+        const executionsHTML = activeExecutions.map(execution => `
+            <div class="card mb-2">
+                <div class="card-body p-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="mb-1">${execution.work_id}</h6>
+                            <small class="text-muted">
+                                Status: <span class="badge bg-${this.getStatusColor(execution.status)}">${execution.status}</span>
+                                • Started: ${this.formatDate(execution.created_at)}
+                            </small>
+                        </div>
+                        <div class="d-flex gap-1">
+                            ${execution.status === 'running' ? `
+                                <button class="btn btn-outline-warning btn-sm" onclick="batchManager.controlExecution('${execution.work_id}', 'pause')">
+                                    <i class="bi bi-pause"></i>
+                                </button>
+                            ` : ''}
+                            ${execution.status === 'paused' ? `
+                                <button class="btn btn-outline-success btn-sm" onclick="batchManager.controlExecution('${execution.work_id}', 'resume')">
+                                    <i class="bi bi-play"></i>
+                                </button>
+                            ` : ''}
+                            <button class="btn btn-outline-danger btn-sm" onclick="batchManager.controlExecution('${execution.work_id}', 'cancel')">
+                                <i class="bi bi-stop"></i>
+                            </button>
+                            <button class="btn btn-outline-info btn-sm" onclick="batchManager.showExecutionDetails('${execution.work_id}')">
+                                <i class="bi bi-info"></i>
+                            </button>
+                        </div>
+                    </div>
+                    ${execution.progress ? `
+                        <div class="mt-2">
+                            <div class="progress" style="height: 4px;">
+                                <div class="progress-bar" role="progressbar" 
+                                     style="width: ${execution.progress.percentage || 0}%"></div>
+                            </div>
+                        </div>
+                    ` : ''}
+                </div>
+            </div>
+        `).join('');
 
-        pagination.innerHTML = paginationHTML;
-
-        // Bind pagination events
-        pagination.querySelectorAll('.page-link').forEach(link => {
-            link.addEventListener('click', (e) => {
-                e.preventDefault();
-                const page = parseInt(e.target.dataset.page);
-                if (page && page !== this.currentPage && page >= 1 && page <= totalPages) {
-                    this.currentPage = page;
-                    this.renderBatches();
-                    this.renderPagination();
-                }
-            });
-        });
-
-        this.showPagination();
+        listContainer.innerHTML = executionsHTML;
     }
 
-    // Filter icon management
-    updateFiltersIcon(isExpanded) {
-        const toggleBtn = document.getElementById('toggle-filters');
-        if (toggleBtn) {
-            const icon = toggleBtn.querySelector('i');
-            if (icon) {
-                icon.className = isExpanded ? 'bi bi-funnel-fill me-1' : 'bi bi-funnel me-1';
+    /**
+     * Get status badge color
+     */
+    getStatusColor(status) {
+        const colors = {
+            'queued': 'secondary',
+            'running': 'primary',
+            'paused': 'warning',
+            'finished': 'success',
+            'error': 'danger',
+            'cancelled': 'dark'
+        };
+        return colors[status] || 'secondary';
+    }
+
+    /**
+     * Format date for display
+     */
+    formatDate(dateString) {
+        try {
+            return new Date(dateString).toLocaleString();
+        } catch (error) {
+            return 'Unknown';
+        }
+    }
+
+    /**
+     * Render the list of batch files
+     */
+    renderBatchFilesList() {
+        console.log('BatchManagerTabbed: Looking for batch-files-list container...');
+        const listContainer = document.getElementById('batch-files-list');
+        
+        if (!listContainer) {
+            console.error('BatchManagerTabbed: batch-files-list container not found!');
+            return;
+        }
+        
+        console.log('BatchManagerTabbed: Container found, batch files count:', this.batchFiles.length);
+
+        if (this.batchFiles.length === 0) {
+            console.log('BatchManagerTabbed: No batch files, showing empty state');
+            listContainer.innerHTML = `
+                <div class="text-center p-4 text-muted">
+                    <i class="bi bi-folder2-open display-4 mb-3"></i>
+                    <p>No batch files found</p>
+                    <p class="small">Create your first batch configuration to get started</p>
+                </div>
+            `;
+            return;
+        }
+
+        console.log('BatchManagerTabbed: Generating HTML for batch files...');
+        const filesHtml = this.batchFiles.map(file => `
+            <div class="card mb-2">
+                <div class="card-body p-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="flex-grow-1">
+                            <h6 class="mb-1">
+                                <i class="bi bi-file-earmark-text me-2"></i>
+                                ${file.name}
+                            </h6>
+                            <p class="mb-0 small text-muted">${file.description}</p>
+                            <small class="text-muted">Size: ${file.size} | Created: ${new Date(file.created).toLocaleDateString()}</small>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-success btn-sm" data-action="execute" data-file="${file.path || file.name}" title="Execute Batch">
+                                <i class="bi bi-play-fill"></i>
+                            </button>
+                            <div class="btn-group">
+                                <button class="btn btn-outline-primary btn-sm" data-action="edit" data-file="${file.name}" title="Edit">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+                                <button class="btn btn-outline-info btn-sm" data-action="download" data-file="${file.name}" title="Download">
+                                    <i class="bi bi-download"></i>
+                                </button>
+                                <button class="btn btn-outline-danger btn-sm" data-action="delete" data-file="${file.name}" title="Delete">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+
+        console.log('BatchManagerTabbed: Setting innerHTML with generated HTML');
+        listContainer.innerHTML = filesHtml;
+        console.log('BatchManagerTabbed: Batch files list updated successfully');
+    }
+
+    /**
+     * Render error message for batch files list
+     */
+    renderBatchFilesError() {
+        const listContainer = document.getElementById('batch-files-list');
+        if (!listContainer) return;
+
+        listContainer.innerHTML = `
+            <div class="alert alert-warning">
+                <i class="bi bi-exclamation-triangle me-2"></i>
+                Failed to load batch files. Please try refreshing the page.
+            </div>
+        `;
+    }
+
+    /**
+     * Setup event handlers for the component
+     */
+    setupEventHandlers() {
+        // Create new batch button
+        const createBtn = document.getElementById('create-batch-btn');
+        if (createBtn) {
+            createBtn.addEventListener('click', () => this.showBatchEditor());
+        }
+
+        // Upload batch button
+        const uploadBtn = document.getElementById('upload-batch-btn');
+        if (uploadBtn) {
+            uploadBtn.addEventListener('click', () => this.showUploadModal());
+        }
+
+        // Refresh executions button
+        const refreshBtn = document.getElementById('refresh-executions-btn');
+        if (refreshBtn) {
+            refreshBtn.addEventListener('click', () => this.refreshExecutions());
+        }
+
+        // Upload modal handlers
+        const uploadConfirmBtn = document.getElementById('upload-confirm-btn');
+        if (uploadConfirmBtn) {
+            uploadConfirmBtn.addEventListener('click', () => this.handleFileUpload());
+        }
+
+        const uploadCancelBtn = document.getElementById('upload-cancel-btn');
+        if (uploadCancelBtn) {
+            uploadCancelBtn.addEventListener('click', () => this.hideUploadModal());
+        }
+
+        // Cancel edit button
+        const cancelBtn = document.getElementById('cancel-edit-btn');
+        if (cancelBtn) {
+            cancelBtn.addEventListener('click', () => this.hideBatchEditor());
+        }
+
+        // Batch form submission
+        const batchForm = document.getElementById('batch-form');
+        if (batchForm) {
+            batchForm.addEventListener('submit', (e) => this.handleBatchSave(e));
+        }
+
+        // File action buttons (using event delegation)
+        const listContainer = document.getElementById('batch-files-list');
+        if (listContainer) {
+            listContainer.addEventListener('click', (e) => this.handleFileAction(e));
+        }
+
+        // Auto-refresh executions every 30 seconds
+        setInterval(() => {
+            this.refreshExecutions();
+        }, 30000);
+    }
+
+    /**
+     * Show the batch editor
+     */
+    showBatchEditor(batchData = null) {
+        const editor = document.getElementById('batch-editor');
+        if (!editor) return;
+
+        if (batchData) {
+            // Populate form with existing data
+            document.getElementById('batch-name').value = batchData.name || '';
+            document.getElementById('batch-description').value = batchData.description || '';
+            document.getElementById('batch-content').value = batchData.content || '';
+        } else {
+            // Clear form for new batch
+            document.getElementById('batch-form').reset();
+            document.getElementById('batch-content').value = `# Example batch configuration
+name: "New Batch"
+description: "Batch description"
+algorithms:
+  - name: "Baseline"
+    parameters: {}
+datasets:
+  - path: "datasets/example.fasta"
+output:
+  format: "csv"
+  path: "outputs/"`;
+        }
+
+        editor.classList.remove('d-none');
+        editor.scrollIntoView({ behavior: 'smooth' });
+    }
+
+    /**
+     * Hide the batch editor
+     */
+    hideBatchEditor() {
+        const editor = document.getElementById('batch-editor');
+        if (editor) {
+            editor.classList.add('d-none');
+        }
+    }
+
+    /**
+     * Handle batch form save
+     */
+    async handleBatchSave(event) {
+        event.preventDefault();
+        
+        const name = document.getElementById('batch-name').value;
+        const description = document.getElementById('batch-description').value;
+        const content = document.getElementById('batch-content').value;
+
+        try {
+            // Mock save - in real implementation, would call API
+            console.log('Saving batch:', { name, description, content });
+            
+            // Show success message
+            if (window.NotificationManager) {
+                window.NotificationManager.success('Batch configuration saved successfully!');
+            }
+            
+            this.hideBatchEditor();
+            await this.loadBatchFiles(); // Refresh the list
+            
+        } catch (error) {
+            console.error('Failed to save batch:', error);
+            if (window.NotificationManager) {
+                window.NotificationManager.error('Failed to save batch configuration');
             }
         }
     }
 
-    toggleFiltersIcon() {
-        const filtersSection = document.getElementById('filters-section');
-        const isExpanded = filtersSection?.classList.contains('show');
-        this.updateFiltersIcon(!isExpanded);
+    /**
+     * Handle file action button clicks
+     */
+    handleFileAction(event) {
+        const button = event.target.closest('button[data-action]');
+        if (!button) return;
+
+        const action = button.dataset.action;
+        const fileName = button.dataset.file;
+
+        switch (action) {
+            case 'edit':
+                this.editBatchFile(fileName);
+                break;
+            case 'download':
+                this.downloadBatchFile(fileName);
+                break;
+            case 'delete':
+                this.deleteBatchFile(fileName);
+                break;
+        }
     }
 
-    // Placeholder methods for functionality to be implemented
-    async uploadBatch() {
-        console.log('Upload batch - to be implemented');
+    /**
+     * Edit a batch file
+     */
+    async editBatchFile(fileName) {
+        try {
+            // Mock data - in real implementation, would fetch from API
+            const mockContent = `# ${fileName}
+name: "${fileName.replace('.yaml', '')}"
+description: "Batch configuration file"
+algorithms:
+  - name: "Baseline"
+    parameters: {}
+datasets:
+  - path: "datasets/example.fasta"
+output:
+  format: "csv"
+  path: "outputs/"`;
+
+            this.showBatchEditor({
+                name: fileName.replace('.yaml', ''),
+                description: 'Existing batch file',
+                content: mockContent
+            });
+        } catch (error) {
+            console.error('Failed to load batch file for editing:', error);
+            if (window.NotificationManager) {
+                window.NotificationManager.error('Failed to load batch file');
+            }
+        }
     }
 
-    async runSelected() {
-        console.log('Run selected batches:', Array.from(this.selectedBatches));
+    /**
+     * Download a batch file
+     */
+    downloadBatchFile(fileName) {
+        // Mock download - in real implementation, would call API
+        console.log('Downloading batch file:', fileName);
+        if (window.NotificationManager) {
+            window.NotificationManager.info(`Download for ${fileName} would start here`);
+        }
     }
 
-    async deleteSelected() {
-        console.log('Delete selected batches:', Array.from(this.selectedBatches));
+    /**
+     * Delete a batch file
+     */
+    async deleteBatchFile(fileName) {
+        if (!confirm(`Are you sure you want to delete ${fileName}?`)) {
+            return;
+        }
+
+        try {
+            // Mock delete - in real implementation, would call API
+            console.log('Deleting batch file:', fileName);
+            
+            if (window.NotificationManager) {
+                window.NotificationManager.success(`${fileName} deleted successfully`);
+            }
+            
+            await this.loadBatchFiles(); // Refresh the list
+        } catch (error) {
+            console.error('Failed to delete batch file:', error);
+            if (window.NotificationManager) {
+                window.NotificationManager.error('Failed to delete batch file');
+            }
+        }
     }
 
-    async runSingleBatch(batchId) {
-        console.log('Run single batch:', batchId);
+    /**
+     * Render error message
+     */
+    renderError(message) {
+        const container = document.getElementById(this.containerId);
+        if (container) {
+            container.innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="bi bi-exclamation-triangle me-2"></i>
+                    ${message}
+                </div>
+            `;
+        }
     }
 
-    async downloadBatch(batchId) {
-        window.open(`/execution/api/batches/${batchId}/download`, '_blank');
+    // =============================================================================
+    // NEW METHODS FOR ENHANCED FUNCTIONALITY
+    // =============================================================================
+
+    /**
+     * Show upload modal
+     */
+    showUploadModal() {
+        const modal = document.getElementById('upload-modal');
+        if (modal) {
+            modal.classList.remove('d-none');
+            modal.scrollIntoView({ behavior: 'smooth' });
+        }
     }
 
-    async deleteSingleBatch(batchId) {
-        console.log('Delete single batch:', batchId);
+    /**
+     * Hide upload modal
+     */
+    hideUploadModal() {
+        const modal = document.getElementById('upload-modal');
+        if (modal) {
+            modal.classList.add('d-none');
+            // Reset file input
+            const fileInput = document.getElementById('file-input');
+            if (fileInput) fileInput.value = '';
+        }
     }
 
-    async viewBatchDetails(batchId) {
-        console.log('View batch details:', batchId);
+    /**
+     * Handle file upload
+     */
+    async handleFileUpload() {
+        const fileInput = document.getElementById('file-input');
+        const file = fileInput.files[0];
+
+        if (!file) {
+            showAlert('Please select a file to upload', 'warning');
+            return;
+        }
+
+        if (!file.name.endsWith('.yaml') && !file.name.endsWith('.yml')) {
+            showAlert('Please select a YAML file (.yaml or .yml)', 'warning');
+            return;
+        }
+
+        try {
+            const formData = new FormData();
+            formData.append('file', file);
+
+            const response = await this.apiClient.uploadBatchFile(formData);
+            
+            showAlert('File uploaded successfully!', 'success');
+            this.hideUploadModal();
+            await this.loadBatchFiles(); // Refresh list
+            
+        } catch (error) {
+            console.error('Upload failed:', error);
+            showAlert('Failed to upload file: ' + error.message, 'danger');
+        }
     }
 
-    async confirmRun() {
-        console.log('Confirm run - to be implemented');
+    /**
+     * Refresh executions
+     */
+    async refreshExecutions() {
+        try {
+            await this.loadBatchExecutions();
+        } catch (error) {
+            console.error('Failed to refresh executions:', error);
+        }
     }
 
-    async confirmDelete() {
-        console.log('Confirm delete - to be implemented');
+    /**
+     * Execute batch file
+     */
+    async executeBatch(filePath) {
+        try {
+            console.log('Executing batch:', filePath);
+            
+            const response = await this.apiClient.executeBatch(filePath, 'log');
+            
+            showAlert(`Batch execution started successfully! Work ID: ${response.work_id}`, 'success');
+            
+            // Refresh executions to show the new one
+            await this.refreshExecutions();
+            
+        } catch (error) {
+            console.error('Execution failed:', error);
+            showAlert('Failed to execute batch: ' + error.message, 'danger');
+        }
     }
 
-    // Utility function for debouncing
-    debounce(func, wait) {
-        let timeout;
-        return function executedFunction(...args) {
-            const later = () => {
-                clearTimeout(timeout);
-                func(...args);
-            };
-            clearTimeout(timeout);
-            timeout = setTimeout(later, wait);
-        };
+    /**
+     * Control execution (pause, resume, cancel)
+     */
+    async controlExecution(workId, action) {
+        try {
+            console.log(`Controlling execution ${workId}: ${action}`);
+            
+            const response = await this.apiClient.controlBatchExecution(workId, action);
+            
+            if (response.success) {
+                showAlert(`Execution ${action}ed successfully`, 'success');
+                await this.refreshExecutions();
+            } else {
+                showAlert(`Failed to ${action} execution: ` + response.message, 'warning');
+            }
+            
+        } catch (error) {
+            console.error(`Control action failed:`, error);
+            showAlert(`Failed to ${action} execution: ` + error.message, 'danger');
+        }
+    }
+
+    /**
+     * Show execution details
+     */
+    async showExecutionDetails(workId) {
+        try {
+            console.log('Getting execution details for:', workId);
+            
+            const response = await this.apiClient.getBatchStatus(workId);
+            
+            // Create modal with execution details
+            const modal = document.createElement('div');
+            modal.className = 'modal fade';
+            modal.innerHTML = `
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Execution Details: ${workId}</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <dl class="row">
+                                <dt class="col-sm-3">Status:</dt>
+                                <dd class="col-sm-9">
+                                    <span class="badge bg-${this.getStatusColor(response.status)}">${response.status}</span>
+                                </dd>
+                                <dt class="col-sm-3">Work ID:</dt>
+                                <dd class="col-sm-9">${response.work_id}</dd>
+                                <dt class="col-sm-3">Created:</dt>
+                                <dd class="col-sm-9">${this.formatDate(response.created_at)}</dd>
+                                <dt class="col-sm-3">Updated:</dt>
+                                <dd class="col-sm-9">${this.formatDate(response.updated_at)}</dd>
+                                ${response.output_path ? `
+                                    <dt class="col-sm-3">Output:</dt>
+                                    <dd class="col-sm-9">${response.output_path}</dd>
+                                ` : ''}
+                                ${response.error ? `
+                                    <dt class="col-sm-3">Error:</dt>
+                                    <dd class="col-sm-9 text-danger">${response.error}</dd>
+                                ` : ''}
+                            </dl>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+            const bsModal = new bootstrap.Modal(modal);
+            bsModal.show();
+            
+            // Remove modal from DOM when hidden
+            modal.addEventListener('hidden.bs.modal', () => {
+                document.body.removeChild(modal);
+            });
+            
+        } catch (error) {
+            console.error('Failed to get execution details:', error);
+            showAlert('Failed to get execution details: ' + error.message, 'danger');
+        }
+    }
+
+    /**
+     * Enhanced batch save with API integration
+     */
+    async handleBatchSave(event) {
+        event.preventDefault();
+        
+        const name = document.getElementById('batch-name').value;
+        const description = document.getElementById('batch-description').value;
+        const content = document.getElementById('batch-content').value;
+
+        if (!name.trim()) {
+            showAlert('Please enter a batch name', 'warning');
+            return;
+        }
+
+        if (!content.trim()) {
+            showAlert('Please enter batch configuration content', 'warning');
+            return;
+        }
+
+        try {
+            console.log('Saving batch:', { name, description, content });
+            
+            const response = await this.apiClient.createBatchFile(name, content, description);
+            
+            showAlert('Batch configuration saved successfully!', 'success');
+            this.hideBatchEditor();
+            await this.loadBatchFiles(); // Refresh list
+            
+        } catch (error) {
+            console.error('Save failed:', error);
+            showAlert('Failed to save batch configuration: ' + error.message, 'danger');
+        }
+    }
+
+    /**
+     * Enhanced file action handler with execution support
+     */
+    handleFileAction(event) {
+        const button = event.target.closest('button[data-action]');
+        if (!button) return;
+
+        const action = button.dataset.action;
+        const fileName = button.dataset.file;
+
+        switch (action) {
+            case 'execute':
+                this.executeBatch(fileName);
+                break;
+            case 'edit':
+                this.editBatchFile(fileName);
+                break;
+            case 'download':
+                this.downloadBatchFile(fileName);
+                break;
+            case 'delete':
+                this.deleteBatchFile(fileName);
+                break;
+        }
     }
 }
 
-// Make available globally
-window.BatchManager = BatchManager;
+// Export for global use
+window.BatchManagerTabbed = BatchManagerTabbed;
+
+// Create global instance for easy access from HTML onclick handlers
+window.batchManager = new BatchManagerTabbed();

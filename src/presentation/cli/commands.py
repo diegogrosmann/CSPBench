@@ -33,8 +33,8 @@ def register_commands(app: typer.Typer) -> None:
             ..., exists=True, readable=True, help="Batch YAML file"
         ),
         monitor: str = typer.Option(
-            "terminal", 
-            help="Monitor type: 'none' (no monitoring), 'terminal' (visual terminal monitor), 'log' (logging monitor)"
+            "terminal",
+            help="Monitor type: 'none' (no monitoring), 'terminal' (visual terminal monitor), 'log' (logging monitor)",
         ),
     ):
         """Submete pipeline (experiment|optimization|sensitivity) ao WorkManager.

@@ -72,8 +72,8 @@ class BLFGAAlgorithm(CSPAlgorithm):
             blfga_params[param_name] = v
 
         # Add internal_jobs as internal_workers for BLF-GA
-        if hasattr(self, 'internal_jobs'):
-            blfga_params['internal_workers'] = self.internal_jobs
+        if hasattr(self, "internal_jobs"):
+            blfga_params["internal_workers"] = self.internal_jobs
 
         self.blf_ga_instance = BLFGA(self.strings, self.alphabet, **blfga_params)
 

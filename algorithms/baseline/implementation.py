@@ -148,7 +148,7 @@ def greedy_consensus(strings: list[str], alphabet: str) -> str:
     # INPUT VALIDATION
     baseline_logger.info("Iniciando algoritmo Baseline (Greedy Consensus)")
     baseline_logger.debug(f"Entrada: {len(strings)} strings, alfabeto: '{alphabet}'")
-    
+
     if not strings:
         baseline_logger.warning("Lista de strings vazia fornecida")
         return ""
@@ -156,8 +156,10 @@ def greedy_consensus(strings: list[str], alphabet: str) -> str:
     # INITIALIZATION
     L = len(strings[0])  # String length (assumed uniform)
     baseline_logger.info(f"Comprimento das strings: {L}")
-    baseline_logger.debug(f"Strings de entrada: {strings[:3]}{'...' if len(strings) > 3 else ''}")  # Show first 3 strings
-    
+    baseline_logger.debug(
+        f"Strings de entrada: {strings[:3]}{'...' if len(strings) > 3 else ''}"
+    )  # Show first 3 strings
+
     consensus = []  # Consensus string being constructed
 
     # POSITION-BY-POSITION CONSTRUCTION

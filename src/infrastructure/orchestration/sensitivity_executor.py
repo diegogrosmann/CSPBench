@@ -31,17 +31,21 @@ class SensitivityExecutor(AbstractExecutionEngine):
         """Run simple parameter sampling to estimate rough sensitivity via variance."""
         monitor = monitor or NoOpMonitor()
         base_params = dict(alg.params)
-        
+
         # Extract data from Dataset object
         strings = dataset_obj.sequences
         alphabet = dataset_obj.alphabet
-        dataset_id = getattr(dataset_obj, 'id', f"ds_{__import__('hashlib').md5(''.join(strings).encode()).hexdigest()[:8]}")
-        
+        dataset_id = getattr(
+            dataset_obj,
+            "id",
+            f"ds_{__import__('hashlib').md5(''.join(strings).encode()).hexdigest()[:8]}",
+        )
+
         # Extract global_seed from system_config
         global_seed = None
-        if system_config and hasattr(system_config, 'global_seed'):
+        if system_config and hasattr(system_config, "global_seed"):
             global_seed = system_config.global_seed
-        
+
         rng = random.Random(global_seed)
         param_space = task.parameters or {}
         samples = int(task.config.get("samples", 16) if task.config else 16)
@@ -114,6 +118,6 @@ class SensitivityExecutor(AbstractExecutionEngine):
         )
         return {
             "status": "completed" if samples > 0 else "failed",
-            "samples": samples, 
-            "param_scores": param_scores
+            "samples": samples,
+            "param_scores": param_scores,
         }

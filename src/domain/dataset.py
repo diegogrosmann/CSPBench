@@ -19,7 +19,9 @@ class Dataset:
         name: Optional dataset name for identification
     """
 
-    def __init__(self, name: str, sequences: List[str] = [], alphabet: Optional[str] = None):
+    def __init__(
+        self, name: str, sequences: List[str] = [], alphabet: Optional[str] = None
+    ):
         """
         Initialize a dataset with sequences.
 
@@ -43,7 +45,7 @@ class Dataset:
         """Infer alphabet from sequences."""
         if self._inferred_alphabet_cache is not None:
             return self._inferred_alphabet_cache
-            
+
         alphabet_set = set()
         for seq in self.sequences:
             alphabet_set.update(seq)
@@ -54,7 +56,7 @@ class Dataset:
         """Calculate average dataset diversity."""
         if self._diversity_cache is not None:
             return self._diversity_cache
-            
+
         if len(self.sequences) < 2:
             self._diversity_cache = 0.0
             return 0.0
@@ -142,7 +144,7 @@ class Dataset:
         """
         if self._statistics_cache is not None:
             return self._statistics_cache
-            
+
         lengths = [len(s) for s in self.sequences]
         is_uniform = len(set(lengths)) == 1
 
@@ -241,7 +243,9 @@ class Dataset:
         """
         filtered_sequences = [seq for seq in self.sequences if seq[position] == pattern]
         filtered_name = f"{self.name}_filtered" if self.name else "filtered_dataset"
-        return Dataset(name=filtered_name, sequences=filtered_sequences, alphabet=self._alphabet)
+        return Dataset(
+            name=filtered_name, sequences=filtered_sequences, alphabet=self._alphabet
+        )
 
     def get_sequences(self) -> List[str]:
         """

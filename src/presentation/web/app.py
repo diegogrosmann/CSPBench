@@ -2,7 +2,7 @@
 FastAPI Web Application for CSPBench
 
 Refactored web interface following hexagonal architecture principles.
-Modular design with proper separation of concerns.
+Modular design with proper separation of concerns and global WorkManager.
 """
 
 import logging
@@ -13,28 +13,37 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
+# Import global WorkManager lifespan
+from src.application.work.global_manager import work_manager_lifespan
+
 Limiter = None
 _rate_limit_exceeded_handler = None
 RateLimitExceeded = Exception
 
 
 def get_remote_address(request):
-    return "0.0.0.0"
+    """Extract remote address from request."""
+    forwarded_for = request.headers.get("X-Forwarded-For")
+    if forwarded_for:
+        return forwarded_for.split(",")[0].strip()
+    return request.client.host
 
 
 from .core.config import web_config
-from .routes import algorithms, batch_execution, datasets, health, pages, results
+from .routes import algorithms, datasets, health, pages, monitoring
+from . import websocket_routes
 
 # Get logger (logging is configured globally in main.py via LoggerConfig)
 logger = logging.getLogger(__name__)
 
-# Create FastAPI app
+# Create FastAPI app with global WorkManager lifespan
 app = FastAPI(
     title="CSPBench - Closest String Problem Benchmark",
     description="Web interface for running and comparing CSP algorithms",
     version="1.0.0",
     docs_url=None,  # Disable API docs
     redoc_url=None,  # Disable ReDoc
+    lifespan=work_manager_lifespan  # Add global WorkManager lifecycle
 )
 
 # Middleware
@@ -57,30 +66,50 @@ app.mount(
 app.mount("/datasets", StaticFiles(directory=str(datasets_path)), name="datasets")
 
 # Include route modules
-app.include_router(health.router)
-app.include_router(pages.router)
-app.include_router(algorithms.router)
-app.include_router(datasets.router)
+# Include routers
+app.include_router(algorithms.router, tags=["algorithms"])
+app.include_router(datasets.router, tags=["datasets"])
+app.include_router(health.router, tags=["health"])
+app.include_router(pages.router, tags=["pages"])
+app.include_router(monitoring.router, tags=["monitoring"])
+app.include_router(websocket_routes.router, tags=["websockets"])
+
+# Import and include batch routes
+from .routes import batches
+app.include_router(batches.router)
+
+# Import and include batch execution routes
+from .routes import batch_execution
 app.include_router(batch_execution.router)
-app.include_router(results.router)
 
-# Include simple datasets router for testing
-from .routes import datasets_simple
-
-app.include_router(datasets_simple.router)
+# Import and include file routes
+from .routes import files
+app.include_router(files.router)
 
 
 @app.get("/test-progress")
 async def test_progress_page():
     """Serve test progress page for debugging."""
     try:
-        with open("/workspaces/CSPBench/test_progress.html") as f:
-            html_content = f.read()
-        return HTMLResponse(content=html_content)
-    except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Error loading test page: {e}"
-        ) from e
+        with open("src/presentation/web/static/test-progress.html", "r") as f:
+            content = f.read()
+        return HTMLResponse(content=content)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="Test progress page not found")
+
+
+# Remove old startup/shutdown events as they're replaced by lifespan
+# Global WorkManager is now managed by the lifespan context manager
+
+
+# Legacy endpoints removidos
+
+
+# For uvicorn direct execution
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run(app, host="0.0.0.0", port=8000)
 
 
 @app.on_event("startup")

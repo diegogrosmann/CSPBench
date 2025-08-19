@@ -19,11 +19,7 @@
     
     <!-- Custom CSS -->
     <link rel="stylesheet" href="/static/css/style.css">
-    <link rel="stylesheet" href="/static/css/components/algorithm-selector.css">
-    <link rel="stylesheet" href="/static/css/components/dataset-selector.css">
-    <link rel="stylesheet" href="/static/css/components/algorithm-config.css">
-    <link rel="stylesheet" href="/static/css/components/execution-monitor.css">
-    <link rel="stylesheet" href="/static/css/components/dataset-generator.css">
+
     
     {% block extra_css %}{% endblock %}
     
@@ -132,8 +128,14 @@
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="/execution/batch">
-                            <i class="bi bi-collection me-1"></i>Batch Execution
+                                                <a class="nav-link" href="/batch/manage">
+                            <i class="bi bi-file-earmark-text me-2"></i>
+                            Batch Manager
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/monitoring">
+                            <i class="bi bi-activity me-1"></i>Monitoring
                         </a>
                     </li>
                     <li class="nav-item">
@@ -165,18 +167,7 @@
             <!-- Alert Container for Messages -->
             <div id="alert-container" class="mb-4"></div>
             
-            {% block header %}
-            <div class="text-center mb-5">
-                <div class="hero-section p-5 rounded-4 shadow" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
-                    <h1 class="display-4 fw-bold text-white mb-3">
-                        <i class="bi bi-dna me-3"></i>CSPBench Web Interface
-                    </h1>
-                    <p class="lead text-white-50 mb-0">
-                        Comprehensive Benchmarking Framework for Closest String Problem Algorithms
-                    </p>
-                </div>
-            </div>
-            {% endblock %}
+            {% block header %}{% endblock %}
             
             {% block content %}{% endblock %}
         </div>
@@ -205,19 +196,15 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
     
     <!-- Custom JavaScript Components -->
-    <!-- Custom JavaScript Components -->
-    <script src="/static/js/components/api-client.js"></script>
-    <script src="/static/js/components/notifications.js"></script>
-    <script src="/static/js/components/algorithm-selector.js"></script>
-    <script src="/static/js/components/algorithm-selector-new.js"></script>
-    <script src="/static/js/components/dataset-selector.js"></script>
-    <script src="/static/js/components/algorithm-config.js"></script>
-    <script src="/static/js/components/execution-monitor.js"></script>
-    <script src="/static/js/components/dataset-generator.js"></script>
-    
+    <script src="/static/js/components/api-client.js?v=20250818"></script>
+    <script src="/static/js/components/notifications.js?v=20250818"></script>
+     
     <!-- Initialize global API client -->
     <script>
-        window.apiClient = new APIClient();
+        // api-client.js will initialize window.apiClient idempotently
+        if (!window.apiClient && typeof window.APIClient !== 'undefined') {
+            window.apiClient = new APIClient();
+        }
     </script>
     
     {% block extra_js %}{% endblock %}

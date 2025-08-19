@@ -1,0 +1,542 @@
+{% extends "base.html" %}
+
+{% block title %}Real-time Monitoring - CSPBench{% endblock %}
+
+{% block extra_css %}
+<style>
+    .monitoring-dashboard {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        padding: 2rem 0;
+    }
+
+    .dashboard-container {
+        max-width: 1600px;
+        margin: 0 auto;
+        padding: 0 1rem;
+    }
+
+    .dashboard-card {
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        margin-bottom: 2rem;
+        overflow: hidden;
+        transition: all 0.3s ease;
+    }
+
+    .dashboard-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+    }
+
+    .card-header {
+        background: #f8f9fa;
+        border-bottom: 1px solid #dee2e6;
+        padding: 1.5rem;
+        font-weight: 600;
+        color: #495057;
+    }
+
+    .execution-card {
+        transition: all 0.3s ease;
+        border: 1px solid #dee2e6;
+    }
+
+    .execution-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+
+    .status-indicator {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        display: inline-block;
+        margin-right: 0.5rem;
+    }
+
+    .status-running {
+        background-color: #007bff;
+        animation: pulse 2s infinite;
+    }
+
+    .status-finished {
+        background-color: #28a745;
+    }
+
+    .status-failed {
+        background-color: #dc3545;
+    }
+
+    .status-unknown {
+        background-color: #ffc107;
+    }
+
+    @keyframes pulse {
+        0% { opacity: 1; }
+        50% { opacity: 0.5; }
+        100% { opacity: 1; }
+    }
+
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 1rem;
+        margin-bottom: 2rem;
+    }
+
+    .stat-card {
+        background: white;
+        border-radius: 8px;
+        padding: 1.5rem;
+        text-align: center;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    }
+
+    .stat-number {
+        font-size: 2rem;
+        font-weight: bold;
+        color: #495057;
+        margin-bottom: 0.5rem;
+    }
+
+    .stat-label {
+        color: #6c757d;
+        font-size: 0.9rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .ws-status {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .ws-indicator {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background-color: #28a745;
+        animation: pulse 2s infinite;
+    }
+
+    .ws-indicator.disconnected {
+        background-color: #dc3545;
+        animation: none;
+    }
+
+    .log-viewer {
+        background: #1e1e1e;
+        color: #d4d4d4;
+        font-family: 'Fira Code', 'Courier New', monospace;
+        font-size: 0.85rem;
+        line-height: 1.4;
+        padding: 1rem;
+        border-radius: 4px;
+        max-height: 400px;
+        overflow-y: auto;
+    }
+
+    .auto-refresh-toggle {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    /* Executions Table Styles */
+    .executions-table {
+        margin: 0;
+    }
+
+    .executions-table th {
+        background-color: #f8f9fa;
+        border: none;
+        font-weight: 600;
+        color: #495057;
+        padding: 1rem 0.75rem;
+        font-size: 0.875rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .executions-table td {
+        padding: 1rem 0.75rem;
+        border: none;
+        border-top: 1px solid #dee2e6;
+        vertical-align: middle;
+    }
+
+    .executions-table tbody tr {
+        cursor: pointer;
+        transition: background-color 0.2s ease;
+    }
+
+    .executions-table tbody tr:hover {
+        background-color: #f8f9fa;
+    }
+
+    .status-badge {
+        padding: 0.25rem 0.75rem;
+        border-radius: 0.375rem;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.375rem;
+    }
+
+    .status-badge.running {
+        background-color: #e7f3ff;
+        color: #0066cc;
+        border: 1px solid #b3d9ff;
+    }
+
+    .status-badge.finished {
+        background-color: #e8f5e8;
+        color: #2d7d32;
+        border: 1px solid #c8e6c9;
+    }
+
+    .status-badge.failed {
+        background-color: #ffebee;
+        color: #c62828;
+        border: 1px solid #ffcdd2;
+    }
+
+    .status-badge.unknown {
+        background-color: #f5f5f5;
+        color: #757575;
+        border: 1px solid #e0e0e0;
+    }
+
+    .status-badge.paused {
+        background-color: #fff3e0;
+        color: #ef6c00;
+        border: 1px solid #ffcc02;
+    }
+
+    .status-icon {
+        animation: none;
+    }
+
+    .status-badge.running .status-icon {
+        animation: pulse 2s infinite;
+    }
+
+    .work-id-cell {
+        font-family: 'Fira Code', 'Courier New', monospace;
+        font-size: 0.875rem;
+        font-weight: 500;
+    }
+
+    .time-cell {
+        color: #6c757d;
+        font-size: 0.875rem;
+    }
+
+    .no-executions {
+        text-align: center;
+        padding: 3rem 2rem;
+        color: #6c757d;
+    }
+
+    .no-executions i {
+        font-size: 3rem;
+        margin-bottom: 1rem;
+        opacity: 0.5;
+    }
+</style>
+{% endblock %}
+
+{% block breadcrumb_items %}
+<li class="breadcrumb-item active" aria-current="page">
+    <i class="bi bi-activity me-1"></i>Real-time Monitoring
+</li>
+{% endblock %}
+
+{% block content %}
+<div class="monitoring-dashboard">
+    <div class="dashboard-container">
+        <!-- Header -->
+        <div class="text-center text-white mb-4">
+            <h1 class="display-4 fw-bold mb-3">
+                <i class="bi bi-activity me-3"></i>Real-time Monitoring
+            </h1>
+            <p class="lead">Monitor batch executions and system performance in real-time</p>
+        </div>
+
+        <!-- Stats Grid -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-number" id="total-executions">-</div>
+                <div class="stat-label">Total Executions</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="recent-executions">-</div>
+                <div class="stat-label">Recent (24h)</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="active-connections">-</div>
+                <div class="stat-label">Active Connections</div>
+            </div>
+            <div class="stat-card">
+                <div class="ws-status">
+                    <div class="ws-indicator disconnected" id="ws-indicator"></div>
+                    <div>
+                        <div class="stat-number" style="font-size: 1.2rem;" id="ws-status-text">-</div>
+                        <div class="stat-label">WebSocket Status</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Executions Table -->
+        <div class="dashboard-card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="bi bi-list-ul me-2"></i>Executions
+                </h5>
+                <div class="d-flex align-items-center gap-3">
+                    <!-- Status Filter -->
+                    <div class="d-flex align-items-center gap-2">
+                        <label for="status-filter" class="form-label small mb-0">Filter:</label>
+                        <select class="form-select form-select-sm" id="status-filter" style="width: auto;">
+                            <option value="all">All Executions</option>
+                            <option value="active">Active Only</option>
+                            <option value="running">Running</option>
+                            <option value="finished">Finished</option>
+                            <option value="failed">Failed</option>
+                        </select>
+                    </div>
+                    <!-- Controls -->
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="auto-refresh-toggle">
+                            <input type="checkbox" class="form-check-input" id="auto-refresh" checked>
+                            <label for="auto-refresh" class="form-check-label small">Auto-refresh</label>
+                        </div>
+                        <button class="btn btn-outline-primary btn-sm" onclick="refreshDashboard()">
+                            <i class="bi bi-arrow-clockwise"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="p-0">
+                <div id="execution-monitor-container">
+                    <div class="text-center p-4">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <p class="mt-2 text-muted">Loading executions...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- System Information -->
+        <div class="dashboard-card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-cpu me-2"></i>System Information
+                </h5>
+            </div>
+            <div class="p-4">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>WebSocket Statistics</h6>
+                        <div id="websocket-stats">
+                            <div class="text-muted">Loading...</div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Application Status</h6>
+                        <div id="app-status">
+                            <div class="text-muted">Loading...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- Include required components -->
+<script src="/static/js/components/websocket-client.js"></script>
+<script src="/static/js/components/execution-monitor.js"></script>
+
+<script>
+console.log('Real-time Monitoring: Initializing...');
+
+let executionMonitor = null;
+let dashboardStats = null;
+let autoRefreshInterval = null;
+
+// Initialize dashboard
+document.addEventListener('DOMContentLoaded', async function() {
+    console.log('DOM loaded, initializing monitoring dashboard...');
+    
+    try {
+        // Initialize execution monitor
+        executionMonitor = new ExecutionMonitor('execution-monitor-container');
+        await executionMonitor.initialize();
+        
+        // Load initial stats
+        await loadDashboardStats();
+        
+        // Setup auto-refresh
+        setupAutoRefresh();
+        
+        // Store global reference
+        window.executionMonitor = executionMonitor;
+        
+        console.log('Monitoring dashboard initialized successfully');
+        
+    } catch (error) {
+        console.error('Error initializing monitoring dashboard:', error);
+        showError('Failed to initialize dashboard: ' + error.message);
+    }
+});
+
+async function loadDashboardStats() {
+    try {
+        const apiClient = new APIClient();
+        const stats = await apiClient.request('/api/monitoring/stats');
+        
+        // Update stats display
+        document.getElementById('total-executions').textContent = stats.executions.total;
+        document.getElementById('recent-executions').textContent = stats.executions.recent_24h;
+        document.getElementById('active-connections').textContent = stats.websocket.total_connections;
+        
+        // Update WebSocket status
+        updateWebSocketStatus(stats.websocket);
+        
+        // Update system info
+        updateSystemInfo(stats);
+        
+        dashboardStats = stats;
+        
+    } catch (error) {
+        console.error('Error loading dashboard stats:', error);
+    }
+}
+
+function updateWebSocketStatus(wsStats) {
+    const indicator = document.getElementById('ws-indicator');
+    const statusText = document.getElementById('ws-status-text');
+    
+    // Check if ExecutionMonitor exists and is connected
+    if (window.executionMonitor && window.executionMonitor.wsClient && window.executionMonitor.wsClient.isConnected()) {
+        indicator.className = 'ws-indicator';
+        statusText.textContent = 'Connected';
+        // Update connection count only when connected
+        document.getElementById('active-connections').textContent = wsStats.total_connections;
+    } else {
+        indicator.className = 'ws-indicator disconnected';
+        statusText.textContent = 'Disconnected';
+        // Keep connection count as "-" when disconnected
+        if (document.getElementById('active-connections').textContent === '-') {
+            // Don't update from initial state
+        } else {
+            document.getElementById('active-connections').textContent = wsStats.total_connections;
+        }
+    }
+}
+
+function updateSystemInfo(stats) {
+    const wsStatsElement = document.getElementById('websocket-stats');
+    const appStatusElement = document.getElementById('app-status');
+    
+    wsStatsElement.innerHTML = `
+        <div class="small">
+            <div><strong>Connections:</strong> ${stats.websocket.total_connections}</div>
+            <div><strong>Subscriptions:</strong> ${stats.websocket.total_subscriptions}</div>
+            <div><strong>Active Work Items:</strong> ${stats.websocket.active_work_items}</div>
+        </div>
+    `;
+    
+    appStatusElement.innerHTML = `
+        <div class="small">
+            <div><strong>Status:</strong> <span class="badge bg-success">Running</span></div>
+            <div><strong>Last Update:</strong> ${new Date(stats.timestamp).toLocaleTimeString()}</div>
+        </div>
+    `;
+}
+
+function setupAutoRefresh() {
+    const autoRefreshCheckbox = document.getElementById('auto-refresh');
+    
+    function updateAutoRefresh() {
+        if (autoRefreshInterval) {
+            clearInterval(autoRefreshInterval);
+            autoRefreshInterval = null;
+        }
+        
+        if (autoRefreshCheckbox.checked) {
+            autoRefreshInterval = setInterval(async () => {
+                await loadDashboardStats();
+                if (executionMonitor) {
+                    await executionMonitor.loadActiveExecutions();
+                }
+            }, 10000); // Refresh every 10 seconds
+        }
+    }
+    
+    autoRefreshCheckbox.addEventListener('change', updateAutoRefresh);
+    updateAutoRefresh(); // Initial setup
+}
+
+async function refreshDashboard() {
+    console.log('Manually refreshing dashboard...');
+    
+    try {
+        await loadDashboardStats();
+        if (executionMonitor) {
+            await executionMonitor.loadActiveExecutions();
+        }
+        console.log('Dashboard refreshed successfully');
+    } catch (error) {
+        console.error('Error refreshing dashboard:', error);
+        showError('Failed to refresh dashboard: ' + error.message);
+    }
+}
+
+function showError(message) {
+    // Create alert element
+    const alert = document.createElement('div');
+    alert.className = 'alert alert-danger alert-dismissible fade show position-fixed';
+    alert.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+    alert.innerHTML = `
+        <i class="bi bi-exclamation-triangle me-2"></i>
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    document.body.appendChild(alert);
+    
+    // Auto-remove after 5 seconds
+    setTimeout(() => {
+        if (alert.parentNode) {
+            alert.remove();
+        }
+    }, 5000);
+}
+
+// Cleanup on page unload
+window.addEventListener('beforeunload', function() {
+    if (executionMonitor) {
+        executionMonitor.destroy();
+    }
+    
+    if (autoRefreshInterval) {
+        clearInterval(autoRefreshInterval);
+    }
+});
+
+console.log('Real-time Monitoring: Script loaded successfully');
+</script>
+{% endblock %}

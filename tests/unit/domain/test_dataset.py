@@ -277,7 +277,9 @@ class TestDatasetValidation:
 
     def test_validate_no_alphabet_specified(self):
         """Test validation when no alphabet is specified."""
-        dataset = Dataset(name="test", sequences=["ACGT", "ATGX"])  # X not in inferred alphabet
+        dataset = Dataset(
+            name="test", sequences=["ACGT", "ATGX"]
+        )  # X not in inferred alphabet
 
         # Should still be valid as no explicit alphabet constraint
         assert dataset.validate() is True

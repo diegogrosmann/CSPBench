@@ -16,5 +16,6 @@
     "python.analysis.include": [
         "**/*.py"
     ],
-    "debug.allowBreakpointsEverywhere": true
+    "debug.allowBreakpointsEverywhere": true,
+    "python.terminal.activateEnvInCurrentTerminal": true
 }

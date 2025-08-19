@@ -73,7 +73,7 @@ def setup_basic_logging(
 def setup_logging_from_env() -> None:
     """
     Configure logging using only environment variables.
-    
+
     This is a convenience function that sets up logging entirely from .env configuration.
     """
     setup_basic_logging()
@@ -123,22 +123,22 @@ class LoggerConfig:
     def is_initialized(cls) -> bool:
         """Verifica se o logging foi inicializado."""
         return cls._initialized
-    
+
     @classmethod
     def get_logger(cls, name: str) -> logging.Logger:
         """
         Obtém um logger configurado.
-        
+
         Args:
             name: Nome do logger (tipicamente __name__)
-            
+
         Returns:
             Logger configurado
         """
         # Se não foi inicializado, inicializa automaticamente
         if not cls._initialized:
             cls.initialize()
-        
+
         return logging.getLogger(name)
-        
+
         return logging.getLogger(name)

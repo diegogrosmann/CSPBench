@@ -34,13 +34,13 @@ def load_dataset(cfg: DatasetAny) -> tuple[Dataset, dict]:
 
     if isinstance(cfg, FileDatasetConfig):
         dataset, params = FileDatasetRepository.load(cfg.filename)
-        if hasattr(cfg, 'name') and cfg.name:
+        if hasattr(cfg, "name") and cfg.name:
             dataset.name = cfg.name
         return dataset, params
 
     if isinstance(cfg, EntrezDatasetConfig):
         dataset, params = EntrezDatasetDownloader.download(cfg)
-        if hasattr(cfg, 'name') and cfg.name:
+        if hasattr(cfg, "name") and cfg.name:
             dataset.name = cfg.name
         return dataset, params
 

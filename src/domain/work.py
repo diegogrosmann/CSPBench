@@ -93,6 +93,32 @@ class WorkItem:
 
     # --- representation ---
     def to_dict(self) -> dict[str, Any]:
-        d = asdict(self)
-        d["status"] = self.status.value
-        return d
+        """Convert WorkItem to dictionary for JSON serialization."""
+        # Get config name safely
+        config_name = None
+        if self.config:
+            try:
+                if hasattr(self.config, 'metadata') and hasattr(self.config.metadata, 'name'):
+                    config_name = self.config.metadata.name
+                elif hasattr(self.config, 'name'):
+                    config_name = self.config.name
+            except:
+                config_name = "Unknown"
+        
+        return {
+            "work_id": self.id,
+            "status": self.status.value,
+            "created_at": self._format_timestamp(self.created_at),
+            "updated_at": self._format_timestamp(self.updated_at),
+            "output_path": self.output_path,
+            "error": self.error,
+            "config_name": config_name,
+            "progress": self.extra.get("progress"),
+            # Include extra data without nesting issues
+            **{k: v for k, v in self.extra.items() if k != "config" and isinstance(v, (str, int, float, bool, type(None)))}
+        }
+    
+    def _format_timestamp(self, timestamp: float) -> str:
+        """Format timestamp for JSON response."""
+        from datetime import datetime
+        return datetime.fromtimestamp(timestamp).isoformat()

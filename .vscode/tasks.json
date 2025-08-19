@@ -58,7 +58,7 @@
             "command": "${workspaceFolder}/.venv/bin/python",
             "args": [
                 "main.py",
-                "--web"
+                "web"
             ],
             "group": "build",
             "isBackground": true,
@@ -167,7 +167,8 @@
                 "htmlcov",
                 "logs",
                 "outputs",
-                "cache"
+                "cache",
+                "data"
             ],
             "group": "build",
             "presentation": {

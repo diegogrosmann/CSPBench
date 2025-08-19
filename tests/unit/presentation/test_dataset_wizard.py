@@ -18,6 +18,7 @@ def test_dataset_wizard_synthetic_defaults():
             assert isinstance(params["length"], int)
             assert isinstance(params["alphabet"], str)
 
+
 def test_dataset_wizard_default_filename_rules():
     wiz = DatasetWizard()
     sf = wiz.generate_default_filename(

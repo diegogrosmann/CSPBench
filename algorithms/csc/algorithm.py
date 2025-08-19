@@ -39,7 +39,7 @@ class CSCAlgorithm(CSPAlgorithm):
             strings: List of dataset strings
             alphabet: Alphabet used
             **params: Algorithm-specific parameters
-        
+
         Raises:
             ValueError: If strings have different lengths (CSC requirement)
         """
@@ -53,7 +53,7 @@ class CSCAlgorithm(CSPAlgorithm):
                     f"Found lengths ranging from {min_len} to {max_len}. "
                     f"Consider preprocessing the dataset to normalize string lengths."
                 )
-        
+
         super().__init__(strings, alphabet, **params)
 
     def run(self) -> tuple[str, int, dict]:

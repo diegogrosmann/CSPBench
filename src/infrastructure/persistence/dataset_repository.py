@@ -51,7 +51,7 @@ class FileDatasetRepository:
         sequences = FileDatasetRepository._parse_fasta(file_path)
 
         params: dict[str, Any] = {"file_path": file_path}
-        
+
         # Use filename without extension as default name
         dataset_name = file_path.stem
 

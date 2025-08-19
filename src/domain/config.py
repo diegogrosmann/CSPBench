@@ -379,15 +379,16 @@ def _build_experiment_tasks(
     presets: Dict[str, AlgorithmsPresetConfig],
 ) -> ExperimentTasksConfig:
     import logging
+
     logger = logging.getLogger("CSPBench.Config.Experiment")
-    
+
     exp_section = batch.get("experiment") or {}
     tasks_list = exp_section.get("tasks") or exp_section.get("executions") or []
     if not isinstance(tasks_list, list):
         raise BatchConfigurationError("experiment.tasks deve ser lista")
-        
+
     logger.debug(f"Processando {len(tasks_list)} tarefas de experimento")
-    
+
     items: List[ExperimentTaskConfig] = []
     for _idx, t in enumerate(tasks_list):
         if not isinstance(t, dict):
@@ -396,22 +397,26 @@ def _build_experiment_tasks(
         if not name:
             raise BatchConfigurationError("Task de experimento sem 'name'")
         tid = t.get("id", _slug(name))
-        
+
         logger.debug(f"Processando task: id='{tid}', name='{name}'")
-        
+
         ds_ids = t.get("datasets", []) or []
         alg_ids = t.get("algorithms", []) or []
         alg_config_ids = t.get("algorithm_config", []) or []
-        
+
         # Support both 'algorithms' and 'algorithm_config' for backward compatibility
         if not alg_ids and alg_config_ids:
             alg_ids = alg_config_ids
-            logger.debug(f"Task '{tid}': usando 'algorithm_config' em vez de 'algorithms' ({len(alg_ids)} itens)")
-        
+            logger.debug(
+                f"Task '{tid}': usando 'algorithm_config' em vez de 'algorithms' ({len(alg_ids)} itens)"
+            )
+
         if not ds_ids:
             raise BatchConfigurationError(f"Task '{tid}' sem datasets")
         if not alg_ids:
-            logger.error(f"Task '{tid}': Erro - nem 'algorithms' nem 'algorithm_config' encontrados")
+            logger.error(
+                f"Task '{tid}': Erro - nem 'algorithms' nem 'algorithm_config' encontrados"
+            )
             logger.debug(f"Task '{tid}': Chaves disponíveis: {list(t.keys())}")
             raise BatchConfigurationError(
                 f"Task '{tid}' sem algorithms (lista de ids de presets)"
@@ -449,16 +454,17 @@ def _build_optimization_tasks(
     presets: Dict[str, AlgorithmsPresetConfig],
 ) -> OptimizationTasksConfig:
     import logging
+
     logger = logging.getLogger("CSPBench.Config.Optimization")
-    
+
     opt_section = batch.get("optimization") or {}
     tasks_list = opt_section.get("tasks") or opt_section.get("executions") or []
-    
+
     if not isinstance(tasks_list, list):
         raise BatchConfigurationError("optimization.tasks deve ser lista")
-    
+
     logger.debug(f"Processando {len(tasks_list)} tarefas de optimization")
-    
+
     items: List[OptimizationTaskConfig] = []
     for t in tasks_list:
         if not isinstance(t, dict):
@@ -467,22 +473,26 @@ def _build_optimization_tasks(
         if not name:
             raise BatchConfigurationError("Optimization task sem 'name'")
         tid = t.get("id", _slug(name))
-        
+
         logger.debug(f"Processando task: id='{tid}', name='{name}'")
-        
+
         ds_ids = t.get("datasets", []) or []
         alg_ids = t.get("algorithms", []) or []
         alg_config_ids = t.get("algorithm_config", []) or []
-        
+
         # Support both 'algorithms' and 'algorithm_config' for backward compatibility
         if not alg_ids and alg_config_ids:
             alg_ids = alg_config_ids
-            logger.debug(f"Task '{tid}': usando 'algorithm_config' em vez de 'algorithms' ({len(alg_ids)} itens)")
-        
+            logger.debug(
+                f"Task '{tid}': usando 'algorithm_config' em vez de 'algorithms' ({len(alg_ids)} itens)"
+            )
+
         if not ds_ids:
             raise BatchConfigurationError(f"Optimization task '{tid}' sem datasets")
         if not alg_ids:
-            logger.error(f"Task '{tid}': Erro - nem 'algorithms' nem 'algorithm_config' encontrados")
+            logger.error(
+                f"Task '{tid}': Erro - nem 'algorithms' nem 'algorithm_config' encontrados"
+            )
             logger.debug(f"Task '{tid}': Chaves disponíveis: {list(t.keys())}")
             raise BatchConfigurationError(f"Optimization task '{tid}' sem algorithms")
         ds_objs = []
@@ -522,15 +532,16 @@ def _build_sensitivity_tasks(
     presets: Dict[str, AlgorithmsPresetConfig],
 ) -> SensitivityTasksConfig:
     import logging
+
     logger = logging.getLogger("CSPBench.Config.Sensitivity")
-    
+
     sens_section = batch.get("sensitivity") or {}
     tasks_list = sens_section.get("tasks") or sens_section.get("executions") or []
     if not isinstance(tasks_list, list):
         raise BatchConfigurationError("sensitivity.tasks deve ser lista")
-        
+
     logger.debug(f"Processando {len(tasks_list)} tarefas de análise de sensibilidade")
-    
+
     items: List[SensitivityTaskConfig] = []
     for t in tasks_list:
         if not isinstance(t, dict):
@@ -539,26 +550,32 @@ def _build_sensitivity_tasks(
         if not name:
             raise BatchConfigurationError("Sensitivity task sem 'name'")
         tid = t.get("id", _slug(name))
-        
+
         logger.debug(f"Processando task: id='{tid}', name='{name}'")
-        
+
         ds_ids = t.get("datasets", []) or []
         alg_ids = t.get("algorithms", []) or []
         alg_config_ids = t.get("algorithm_config", []) or []
         alg_singular_ids = t.get("algorithm", []) or []
-        
+
         # Support 'algorithms', 'algorithm_config', and 'algorithm' (singular) for backward compatibility
         if not alg_ids and alg_config_ids:
             alg_ids = alg_config_ids
-            logger.debug(f"Task '{tid}': usando 'algorithm_config' em vez de 'algorithms' ({len(alg_ids)} itens)")
+            logger.debug(
+                f"Task '{tid}': usando 'algorithm_config' em vez de 'algorithms' ({len(alg_ids)} itens)"
+            )
         elif not alg_ids and alg_singular_ids:
             alg_ids = alg_singular_ids
-            logger.debug(f"Task '{tid}': usando 'algorithm' (singular) em vez de 'algorithms' ({len(alg_ids)} itens)")
-        
+            logger.debug(
+                f"Task '{tid}': usando 'algorithm' (singular) em vez de 'algorithms' ({len(alg_ids)} itens)"
+            )
+
         if not ds_ids:
             raise BatchConfigurationError(f"Sensitivity task '{tid}' sem datasets")
         if not alg_ids:
-            logger.error(f"Task '{tid}': Erro - nem 'algorithms' nem 'algorithm_config' nem 'algorithm' encontrados")
+            logger.error(
+                f"Task '{tid}': Erro - nem 'algorithms' nem 'algorithm_config' nem 'algorithm' encontrados"
+            )
             logger.debug(f"Task '{tid}': Chaves disponíveis: {list(t.keys())}")
             raise BatchConfigurationError(f"Sensitivity task '{tid}' sem algorithms")
         ds_objs = []
@@ -643,7 +660,8 @@ def _build_resources(
     timeouts_block = merged.get("timeouts") or {}
     cpu = CPUConfig(
         exclusive_cores=bool(cpu_block.get("exclusive_cores", True)),
-        max_workers=cpu_block.get("max_workers") or cpu_block.get("max_cores"),  # Support both for compatibility
+        max_workers=cpu_block.get("max_workers")
+        or cpu_block.get("max_cores"),  # Support both for compatibility
         internal_jobs=int(cpu_block.get("internal_jobs", 1)),
     )
     memory = MemoryConfig(max_memory_gb=mem_block.get("max_memory_gb"))

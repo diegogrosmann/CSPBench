@@ -181,7 +181,9 @@ class EntrezDatasetDownloader:
         logger.debug("Iniciando ESearch...")
         try:
             # Se max_sequences é None, usamos um retmax interno razoável para busca
-            search_retmax = (max_sequences * 2) if isinstance(max_sequences, int) else 100
+            search_retmax = (
+                (max_sequences * 2) if isinstance(max_sequences, int) else 100
+            )
             handle = Entrez.esearch(db=db, term=query, retmax=search_retmax)
             search_result = Entrez.read(handle)
             handle.close()

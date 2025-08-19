@@ -6,7 +6,7 @@ The web interface has been completely redesigned with a modular, component-based
 ## Key Features
 
 ### 🎯 Execution Type Selection
-- **Batch Execution**: Run multiple configurations in sequence  
+- **Batch Manager**: Manage batch configuration files  
 - **Algorithm Comparison**: Compare multiple algorithms on the same dataset
 - **Benchmark Suite**: Run comprehensive benchmarks
 - **Custom Workflow**: Create custom execution workflows
@@ -21,10 +21,13 @@ The web interface has been completely redesigned with a modular, component-based
 - **ExecutionMonitor** (`execution-monitor.js`): Real-time execution tracking
 - **ResultsViewer** (`results-viewer.js`): Results display and analysis
 
-#### Template System
-- **Base Template** (`base.html`): Common layout and navigation
-- **Index Page** (`index.html`): Execution type selection
-- **Batch Execution** (`batch_execution.html`): Batch workflow
+#### Templates
+Templates are organized by functionality:
+
+- **Base Layout** (`base.html`): Common structure and navigation
+- **Dashboard** (`index.html`): Main dashboard with metrics and controls  
+- **Results** (`results.html`): Algorithm execution results
+- **Batch Manager** (`batch_manager.html`): Batch file management
 
 ### 🎨 Modern Design
 - CSS custom properties for consistent theming

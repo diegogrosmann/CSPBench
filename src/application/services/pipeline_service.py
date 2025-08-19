@@ -22,7 +22,7 @@ logger = get_logger("CSPBench.PipelineService")
 
 class PipelineService:
     """High-level service for pipeline execution."""
-    
+
     def __init__(self):
         logger.info("PipelineService inicializado")
 
@@ -34,14 +34,20 @@ class PipelineService:
     ) -> None:
         logger.info(f"Iniciando execução do pipeline para work_id: {work_id}")
         logger.debug(f"Configuração: {config.metadata.name}")
-        
+
         wm = get_work_manager()
+        # Garantir registro do monitor para este work_id (defensive)
+        try:
+            wm.register_monitor(work_id, monitor)
+        except Exception:
+            logger.debug("Falha ao registrar monitor no _execute (ignorado)")
+
         item_dict = wm.get(work_id)
         if not item_dict:
             error_msg = f"Work: {work_id} não está registrado"
             logger.error(error_msg)
             raise Exception(error_msg)
-            
+
         try:
             logger.info(f"Marcando work_id {work_id} como 'running'")
             wm.mark_running(work_id)
@@ -67,11 +73,11 @@ class PipelineService:
                 logger.info("Iniciando execução do runner")
                 runner.run(config)
                 logger.info("Pipeline executado com sucesso")
-                
+
                 # Considera o caminho de saída como o próprio state.db desta execução
                 wm.mark_finished(work_id)
                 logger.info(f"Work_id {work_id} marcado como finalizado")
-                
+
                 item_final = wm.get(work_id)
                 if item_final:
                     store.upsert_work(item_final)
@@ -114,6 +120,12 @@ class PipelineService:
         logger.info("Submetendo trabalho ao WorkManager")
         work_id, item = wm.submit(config=config, extra=None)
         logger.info(f"Trabalho submetido com work_id: {work_id}")
+
+        # Registrar o monitor associado a este work_id no registry global (helpful for web)
+        try:
+            wm.register_monitor(work_id, mon)
+        except Exception:
+            logger.debug("Não foi possível registrar monitor no WorkManager (não-crítico)")
 
         # Cria diretório da execução e registra estado 'queued' no state.db da execução
         work_dir = item["output_path"]

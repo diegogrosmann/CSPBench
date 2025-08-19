@@ -30,14 +30,15 @@ def _worker_init(controller_cfg, monitor_instance=None):  # executa em cada work
     global _WORKER_CONTROLLER_CFG, _WORKER_MONITOR
     _WORKER_CONTROLLER_CFG = controller_cfg
     _WORKER_MONITOR = monitor_instance or NoOpMonitor()
-    
+
     # Create worker-specific logger
     worker_logger = get_logger("CSPBench.ExperimentExecutor.Worker")
     worker_logger.debug("Inicializando worker do ExperimentExecutor")
-    
+
     try:
         # Recria controller local e aplica limites CPU/memória
         from src.infrastructure.execution_control import ExecutionController
+
         ec = ExecutionController.from_config(controller_cfg)
         ec.apply_cpu_limits()
         ec.apply_memory_limits()
@@ -50,30 +51,36 @@ def _worker_init(controller_cfg, monitor_instance=None):  # executa em cada work
 
 
 def _worker_exec(
-    algorithm_name: str, 
-    strings: list[str], 
-    alphabet: str, 
+    algorithm_name: str,
+    strings: list[str],
+    alphabet: str,
     params: dict[str, Any],
     unit_id: str,
-    repetition: int
+    repetition: int,
 ):
     global _WORKER_MONITOR
     from .algorithm_runner import run_algorithm as _run
 
     # Create worker-specific logger
     worker_logger = get_logger("CSPBench.ExperimentExecutor.Worker")
-    worker_logger.info(f"Worker iniciando execução: algoritmo={algorithm_name}, repetição={repetition}")
+    worker_logger.info(
+        f"Worker iniciando execução: algoritmo={algorithm_name}, repetição={repetition}"
+    )
 
     monitor = _WORKER_MONITOR or NoOpMonitor()
-    
+
     # Agora o unit_started é chamado quando realmente inicia no worker
     monitor.unit_started(unit_id, {"repetition": repetition})
-    
+
     try:
-        worker_logger.debug(f"Executando algoritmo {algorithm_name} com {len(strings)} strings")
+        worker_logger.debug(
+            f"Executando algoritmo {algorithm_name} com {len(strings)} strings"
+        )
         result = _run(algorithm_name, strings, alphabet, params)
-        
-        worker_logger.info(f"Algoritmo {algorithm_name} (rep {repetition}) executado: status={result.get('status')}")
+
+        worker_logger.info(
+            f"Algoritmo {algorithm_name} (rep {repetition}) executado: status={result.get('status')}"
+        )
         monitor.unit_finished(unit_id, result)
         return result
     except Exception as e:
@@ -108,21 +115,23 @@ class ExperimentExecutor(AbstractExecutionEngine):
         store: AbstractStore | None = None,
     ) -> dict[str, Any]:
         logger.info(f"Iniciando experimento: {task.name}")
-        logger.info(f"Dataset: {dataset_obj.name}, Algoritmo: {alg.name}, Repetições: {task.repetitions}")
-        
+        logger.info(
+            f"Dataset: {dataset_obj.name}, Algoritmo: {alg.name}, Repetições: {task.repetitions}"
+        )
+
         # Use store from parameter or instance
         store = store or self.store
         monitor = monitor or NoOpMonitor()
         repetitions = max(1, task.repetitions)
-        
+
         logger.debug(f"Configuração do experimento: repetições={repetitions}")
-        
+
         # Extract global_seed from system_config
         global_seed = None
-        if system_config and hasattr(system_config, 'global_seed'):
+        if system_config and hasattr(system_config, "global_seed"):
             global_seed = system_config.global_seed
             logger.debug(f"Seed global configurada: {global_seed}")
-        
+
         # Extract data from Dataset object
         strings = dataset_obj.sequences
         alphabet = dataset_obj.alphabet
@@ -132,11 +141,17 @@ class ExperimentExecutor(AbstractExecutionEngine):
         start_repetition = 0
         completed_results = []
         if store and dataset_id:
-            completed_reps = store.get_completed_repetitions(task.id, dataset_id, alg.name)
+            completed_reps = store.get_completed_repetitions(
+                task.id, dataset_id, alg.name
+            )
             start_repetition = len(completed_reps)
             completed_results = [rep["result"] for rep in completed_reps]
             if start_repetition > 0:
-                monitor.log("info", f"Resuming from repetition {start_repetition}", {"task": task.id})
+                monitor.log(
+                    "info",
+                    f"Resuming from repetition {start_repetition}",
+                    {"task": task.id},
+                )
 
         per_item_timeout = None
         total_timeout = None
@@ -161,6 +176,7 @@ class ExperimentExecutor(AbstractExecutionEngine):
             # ResourceController will set defaults, but we need a fallback for executor parallelization
             if max_workers is None:
                 import os
+
                 max_workers = os.cpu_count() or 1
             else:
                 max_workers = max(1, max_workers)
@@ -175,9 +191,11 @@ class ExperimentExecutor(AbstractExecutionEngine):
             controller_cfg = {
                 "cpu": {
                     "max_workers": resources.cpu.max_workers if resources else None,
-                    "exclusive_cores": resources.cpu.exclusive_cores if resources else False,
+                    "exclusive_cores": (
+                        resources.cpu.exclusive_cores if resources else False
+                    ),
                     "internal_jobs": resources.cpu.internal_jobs if resources else 1,
-                    "affinity": None  # Let ExecutionController calculate this
+                    "affinity": None,  # Let ExecutionController calculate this
                 },
                 "memory": {
                     "max_memory_gb": (
@@ -204,7 +222,7 @@ class ExperimentExecutor(AbstractExecutionEngine):
             params = dict(alg.params)
             if global_seed is not None:
                 params.setdefault("seed", (global_seed + rep_index) & 0x7FFFFFFF)
-            
+
             # Pass internal_jobs to algorithm (not for executor parallelization)
             if self.execution_controller:
                 internal_jobs = self.execution_controller.internal_jobs
@@ -212,7 +230,7 @@ class ExperimentExecutor(AbstractExecutionEngine):
                     params.setdefault("internal_jobs", internal_jobs)
             elif resources and resources.cpu.internal_jobs:
                 params.setdefault("internal_jobs", resources.cpu.internal_jobs)
-            
+
             unit_id = f"{task.id}:{dataset_id}:{alg.name}:rep{rep_index}"
             if store:
                 try:
@@ -289,11 +307,11 @@ class ExperimentExecutor(AbstractExecutionEngine):
                     params = dict(alg.params)
                     if global_seed is not None:
                         params.setdefault("seed", (global_seed + r) & 0x7FFFFFFF)
-                    
+
                     # Pass internal_jobs to algorithm (not for executor parallelization)
                     if resources and resources.cpu.internal_jobs:
                         params.setdefault("internal_jobs", resources.cpu.internal_jobs)
-                    
+
                     unit_id = f"{task.id}:{dataset_id}:{alg.name}:rep{r}"
                     if store:
                         try:
@@ -309,9 +327,11 @@ class ExperimentExecutor(AbstractExecutionEngine):
                         except Exception:  # noqa: BLE001
                             pass
                     # Submit job to pool (will be queued if no workers available)
-                    f = pool.submit(_worker_exec, alg.name, strings, alphabet, params, unit_id, r)
+                    f = pool.submit(
+                        _worker_exec, alg.name, strings, alphabet, params, unit_id, r
+                    )
                     futures.append((unit_id, f))
-                
+
                 # Collect results (may complete in different order than submission)
                 for unit_id, fut in futures:
                     if not _wait_ok():
@@ -322,7 +342,7 @@ class ExperimentExecutor(AbstractExecutionEngine):
                         )
                         fut.cancel()
                         continue
-                    
+
                     try:
                         res = fut.result(timeout=per_item_timeout)
                     except Exception as e:  # noqa: BLE001
@@ -351,7 +371,7 @@ class ExperimentExecutor(AbstractExecutionEngine):
         # Agregar estatísticas simples
         success = [r for r in results if r["status"] == "ok"]
         best = min((r["objective"] for r in success), default=float("inf"))
-        
+
         # Determine overall status based on results
         if len(success) == len(results):
             overall_status = "completed"
@@ -359,7 +379,7 @@ class ExperimentExecutor(AbstractExecutionEngine):
             overall_status = "partial"
         else:
             overall_status = "failed"
-        
+
         agg = {
             "status": overall_status,
             "total_units": len(results),
@@ -369,8 +389,10 @@ class ExperimentExecutor(AbstractExecutionEngine):
         }
         monitor.log("info", "ExperimentExecutor finished", {**agg, "task": task.id})
         return agg
-    
-    def _apply_resource_controls(self, resources: ResourcesConfig, max_workers: int | None) -> None:
+
+    def _apply_resource_controls(
+        self, resources: ResourcesConfig, max_workers: int | None
+    ) -> None:
         """Apply resource controls by creating temporary ExecutionController."""
         try:
             if resources:

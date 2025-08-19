@@ -30,19 +30,23 @@ class OptimizationExecutor(AbstractExecutionEngine):
         """Run random search optimization trials for a given algorithm/dataset pair."""
         monitor = monitor or NoOpMonitor()
         trials = int(task.config.get("trials", 10) if task.config else 10)
-        
+
         # Extract global_seed from system_config
         global_seed = None
-        if system_config and hasattr(system_config, 'global_seed'):
+        if system_config and hasattr(system_config, "global_seed"):
             global_seed = system_config.global_seed
-        
+
         rng = random.Random(global_seed)
-        
+
         # Extract data from Dataset object
         strings = dataset_obj.sequences
         alphabet = dataset_obj.alphabet
-        dataset_id = getattr(dataset_obj, 'id', f"ds_{__import__('hashlib').md5(''.join(strings).encode()).hexdigest()[:8]}")
-        
+        dataset_id = getattr(
+            dataset_obj,
+            "id",
+            f"ds_{__import__('hashlib').md5(''.join(strings).encode()).hexdigest()[:8]}",
+        )
+
         param_space = task.parameters or {}
         best = float("inf")
         best_params: dict[str, Any] = {}
@@ -108,9 +112,9 @@ class OptimizationExecutor(AbstractExecutionEngine):
 
         summary = {
             "status": "completed" if trials > 0 else "failed",
-            "trials": trials, 
-            "best_objective": best, 
-            "best_params": best_params
+            "trials": trials,
+            "best_objective": best,
+            "best_params": best_params,
         }
         monitor.log(
             "info", "OptimizationExecutor finished", {**summary, "task": task.id}

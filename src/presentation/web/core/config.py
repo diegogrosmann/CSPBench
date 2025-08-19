@@ -1,127 +1,85 @@
-"""
-Web application configuration and initialization.
-"""
+"""Web application configuration module."""
 
-import logging
+import os
+import threading
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Optional
 
-import yaml
+from src.application.services.pipeline_service import PipelineService
+from src.domain.config import CSPBenchConfig
+from src.infrastructure.logging_config import get_logger
 
-from src.application.services.experiment_service import ExperimentService
-from src.domain.algorithms import global_registry
-from src.infrastructure.orchestrators.session_manager import SessionManager
-
-logger = logging.getLogger(__name__)
+logger = get_logger("CSPBench.WebConfig")
 
 
 class WebConfig:
-    """Web application configuration manager."""
-
+    """Configuration management for CSPBench web interface."""
+    
+    _instance: Optional["WebConfig"] = None
+    _lock = threading.Lock()
+    
     def __init__(self):
-        self.config: Optional[Dict[str, Any]] = None
-        self.experiment_service: Optional[ExperimentService] = None
-        self.session_manager: Optional[SessionManager] = None
-        self._initialized = False
+        """Initialize the configuration."""
+        self.config: Optional[CSPBenchConfig] = None
+        self.pipeline_service: Optional[PipelineService] = None
+        
+        # Web-specific configuration
+        self.web_host = os.getenv("WEB_HOST", "0.0.0.0")
+        self.web_port = int(os.getenv("WEB_PORT", "8000"))
+        self.debug = bool(os.getenv("DEBUG", "false").lower() in ["true", "1", "yes"])
+        self.log_level = os.getenv("LOG_LEVEL", "info").upper()
+        self.access_log = bool(os.getenv("ACCESS_LOG", "true").lower() in ["true", "1", "yes"])
+        
+        # Paths
+        self.datasets_path = Path(os.getenv("DATASET_PATH", "datasets"))
+        self.batches_path = Path(os.getenv("BATCH_PATH", "batches"))
+        self.outputs_path = Path(os.getenv("OUTPUT_PATH", "outputs"))
+        
+        # Ensure directories exist
+        self.datasets_path.mkdir(exist_ok=True)
+        self.batches_path.mkdir(exist_ok=True)
+        self.outputs_path.mkdir(exist_ok=True)
 
-    def load_config(self) -> Dict[str, Any]:
-        """Load configuration from settings.yaml file."""
-        if self.config is not None:
-            return self.config
-
+        logger.info("Web configuration initialized")
+    
+    @classmethod
+    def get_instance(cls) -> "WebConfig":
+        """Get singleton instance."""
+        if cls._instance is None:
+            with cls._lock:
+                if cls._instance is None:
+                    cls._instance = cls()
+        return cls._instance
+    
+    def initialize_services(self):
+        """Initialize CSPBench configuration and services."""
         try:
-            config_path = Path("config/settings.yaml")
-
-            if not config_path.exists():
-                logger.warning(
-                    f"Configuration file not found: {config_path}, using defaults"
-                )
-                self.config = self._get_default_config()
-            else:
-                with open(config_path, encoding="utf-8") as f:
-                    self.config = yaml.safe_load(f)
-
-            return self.config
-
-        except Exception as e:
-            logger.error(f"Error loading configuration: {e}")
-            self.config = self._get_default_config()
-            return self.config
-
-    def _get_default_config(self) -> Dict[str, Any]:
-        """Get default configuration."""
-        return {
-            "application": {"name": "CSPBench", "version": "0.1.0"},
-            "infrastructure": {"executor": {"config": {"timeout_default": 300}}},
-            "web": {
-                "security": {
-                    "max_dataset_size": 50 * 1024 * 1024,  # 50MB
-                    "allowed_extensions": [".fasta", ".fa", ".txt", ".seq"],
-                    "max_sessions_per_ip": 10,
-                    "session_timeout": 7200,  # 2 hours
-                    "max_filename_length": 255,
-                },
-                "rate_limiting": {"enabled": True, "requests_per_minute": 60},
-            },
-        }
-
-    def initialize_services(self) -> bool:
-        """Initialize infrastructure services."""
-        if self._initialized:
+            logger.info("Loading CSPBench configuration...")
+            from src.domain.config import load_cspbench_config
+            self.config = load_cspbench_config()
+            
+            logger.info("Initializing pipeline service...")
+            self.pipeline_service = PipelineService(self.config)
+            
+            logger.info("Web services initialized successfully")
             return True
-
-        try:
-            # Import algorithms to populate global_registry
-
-            logger.info(f"Loaded {len(global_registry)} algorithms")
-
-            # Load configuration
-            config = self.load_config()
-
-            # Initialize infrastructure components
-            from src.infrastructure.io.exporters.json_exporter import JsonExporter
-            from src.infrastructure.orchestrators.executors import Executor
-            from src.infrastructure.persistence.algorithm_registry import (
-                DomainAlgorithmRegistry,
-            )
-            from src.infrastructure.persistence.dataset_repository import (
-                FileDatasetRepository,
-            )
-
-            dataset_repository = FileDatasetRepository("./datasets")
-            algorithm_registry = DomainAlgorithmRegistry()
-            executor = Executor()
-            exporter = JsonExporter("./outputs")
-
-            self.experiment_service = ExperimentService(
-                dataset_repo=dataset_repository,
-                exporter=exporter,
-                executor=executor,
-                algo_registry=algorithm_registry,
-            )
-
-            self.session_manager = SessionManager(config)
-
-            self._initialized = True
-            logger.info("All services initialized successfully")
-            return True
-
+            
         except Exception as e:
-            logger.error(f"Failed to initialize services: {e}")
+            logger.error(f"Failed to initialize web services: {e}")
             return False
-
-    def get_experiment_service(self) -> Optional[ExperimentService]:
-        """Get experiment service instance."""
-        if not self._initialized:
+    
+    def get_pipeline_service(self) -> PipelineService:
+        """Get pipeline service instance."""
+        if self.pipeline_service is None:
             self.initialize_services()
-        return self.experiment_service
-
-    def get_session_manager(self) -> Optional[SessionManager]:
-        """Get session manager instance."""
-        if not self._initialized:
+        return self.pipeline_service
+    
+    def get_config(self) -> CSPBenchConfig:
+        """Get CSPBench configuration."""
+        if self.config is None:
             self.initialize_services()
-        return self.session_manager
+        return self.config
 
 
-# Global configuration instance
-web_config = WebConfig()
+# Global instance
+web_config = WebConfig.get_instance()

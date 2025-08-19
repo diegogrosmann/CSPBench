@@ -1,0 +1,1230 @@
+{% extends "base.html" %}
+
+{% block title %}Dataset Manager - CSPBench{% endblock %}
+
+{% block breadcrumb_items %}
+<li class="breadcrumb-item active" aria-current="page">
+    <i class="bi bi-database me-1"></i>Dataset Manager
+</li>
+{% endblock %}
+
+{% block header %}
+<!-- Remove o header padrão (CSPBench Web Interface) -->
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .dataset-manager {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        padding: 2rem 0;
+    }
+
+    .manager-container {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 0 1rem;
+    }
+
+    .manager-card {
+        background: white;
+        border-radius: 15px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        overflow: hidden;
+        margin-bottom: 2rem;
+    }
+
+.dataset-manager-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+.section-header {
+    border-bottom: 2px solid #e9ecef;
+    padding-bottom: 1rem;
+    margin-bottom: 2rem;
+}
+
+.section-header h2 {
+    color: #495057;
+    font-weight: 600;
+    margin: 0;
+}
+
+.section-header p {
+    color: #6c757d;
+    margin: 0.5rem 0 0 0;
+}
+
+.action-buttons {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 2rem;
+    flex-wrap: wrap;
+}
+
+.btn-action {
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    border: none;
+    font-weight: 500;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: all 0.2s ease;
+}
+
+.btn-action.primary {
+    background: linear-gradient(135deg, #007bff, #0056b3);
+    color: white;
+}
+
+.btn-action.success {
+    background: linear-gradient(135deg, #28a745, #1e7e34);
+    color: white;
+}
+
+.btn-action.secondary {
+    background: #f8f9fa;
+    color: #495057;
+    border: 1px solid #dee2e6;
+}
+
+.btn-action:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.datasets-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 1.5rem;
+    margin-top: 2rem;
+}
+
+.dataset-card {
+    background: white;
+    border: 1px solid #e9ecef;
+    border-radius: 12px;
+    padding: 1.5rem;
+    transition: all 0.3s ease;
+    position: relative;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.dataset-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+    border-color: #007bff;
+}
+
+.dataset-header {
+    display: flex;
+    justify-content: between;
+    align-items: flex-start;
+    margin-bottom: 1rem;
+}
+
+.dataset-name {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #495057;
+    margin: 0;
+    word-break: break-word;
+}
+
+.dataset-type {
+    background: #007bff;
+    color: white;
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.dataset-type.synthetic {
+    background: #28a745;
+}
+
+.dataset-type.ncbi {
+    background: #fd7e14;
+}
+
+.dataset-stats {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.5rem;
+    margin: 1rem 0;
+}
+
+.stat-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    color: #6c757d;
+}
+
+.stat-icon {
+    font-size: 1rem;
+}
+
+.stat-value {
+    font-weight: 500;
+    color: #495057;
+}
+
+.dataset-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 1rem;
+    flex-wrap: wrap;
+}
+
+.btn-dataset {
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    border: none;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    flex: 1;
+    min-width: fit-content;
+}
+
+.btn-dataset.primary {
+    background: #007bff;
+    color: white;
+}
+
+.btn-dataset.outline {
+    background: transparent;
+    color: #007bff;
+    border: 1px solid #007bff;
+}
+
+.btn-dataset.danger {
+    background: #dc3545;
+    color: white;
+}
+
+.btn-dataset:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.btn-dataset:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.loading-spinner {
+    text-align: center;
+    padding: 3rem;
+    color: #6c757d;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 4rem 2rem;
+    color: #6c757d;
+}
+
+.empty-state-icon {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+    opacity: 0.5;
+}
+
+.filters-section {
+    background: #f8f9fa;
+    padding: 1.5rem;
+    border-radius: 12px;
+    margin-bottom: 2rem;
+}
+
+.filters-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    align-items: end;
+}
+
+.filter-group {
+    display: flex;
+    flex-direction: column;
+}
+
+.filter-group label {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #495057;
+    margin-bottom: 0.25rem;
+}
+
+.filter-group input,
+.filter-group select {
+    padding: 0.5rem;
+    border: 1px solid #ced4da;
+    border-radius: 6px;
+    font-size: 0.875rem;
+}
+
+.filter-group input:focus,
+.filter-group select:focus {
+    outline: none;
+    border-color: #007bff;
+    box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+}
+
+.modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    z-index: 1000;
+}
+
+.modal.show {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal-content {
+    background: white;
+    padding: 2rem;
+    border-radius: 12px;
+    max-width: 500px;
+    width: 90%;
+    max-height: 80vh;
+    overflow-y: auto;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.modal-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #495057;
+    margin: 0;
+}
+
+.btn-close {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: #6c757d;
+}
+
+.preview-content {
+    font-family: 'Courier New', monospace;
+    background: #f8f9fa;
+    padding: 1rem;
+    border-radius: 6px;
+    white-space: pre-wrap;
+    max-height: 300px;
+    overflow-y: auto;
+    font-size: 0.875rem;
+    border: 1px solid #e9ecef;
+}
+
+@media (max-width: 768px) {
+    .datasets-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .action-buttons {
+        flex-direction: column;
+    }
+    
+    .dataset-stats {
+        grid-template-columns: 1fr;
+    }
+    
+    .dataset-actions {
+        flex-direction: column;
+    }
+    
+    .filters-grid {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="dataset-manager">
+    <div class="manager-container">
+        <!-- Header -->
+        <div class="text-center text-white mb-4">
+            <h1 class="display-4 fw-bold mb-3">
+                <i class="bi bi-database me-3"></i>
+                Dataset Manager
+            </h1>
+            <p class="lead mb-0">
+                Manage your datasets: view, upload, generate, download, and delete datasets for CSP algorithm testing
+            </p>
+        </div>
+
+        <!-- Dataset Manager Card -->
+        <div class="manager-card">
+            <div class="card-header">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="bi bi-folder-open me-2"></i>Dataset Collection
+                    </h5>
+                    <!-- Action Buttons -->
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-success btn-sm" onclick="openGenerateModal()">
+                            <i class="bi bi-plus-circle me-1"></i>Generate
+                        </button>
+                        <button class="btn btn-primary btn-sm" onclick="openUploadModal()">
+                            <i class="bi bi-upload me-1"></i>Upload
+                        </button>
+                        <button class="btn btn-outline-secondary btn-sm" onclick="refreshDatasets()">
+                            <i class="bi bi-arrow-clockwise me-1"></i>Refresh
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card-body p-4">
+                <div class="dataset-manager-container">
+
+    <!-- Filters -->
+    <div class="filters-section">
+        <div class="filters-grid">
+            <div class="filter-group">
+                <label for="filter-name">Search by Name</label>
+                <input type="text" id="filter-name" placeholder="Enter dataset name..." onkeyup="applyFilters()">
+            </div>
+            <div class="filter-group">
+                <label for="filter-size">Min Sequences</label>
+                <input type="number" id="filter-size" placeholder="0" min="0" onchange="applyFilters()">
+            </div>
+            <div class="filter-group">
+                <label for="sort-by">Sort By</label>
+                <select id="sort-by" onchange="applyFilters()">
+                    <option value="name">Name</option>
+                    <option value="created_at">Date Created</option>
+                    <option value="size">Number of Sequences</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <!-- Datasets Table -->
+    <div id="datasets-container">
+        <div class="text-center p-4">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading datasets...</span>
+            </div>
+            <p class="mt-2 text-muted">Loading datasets...</p>
+        </div>
+    </div>
+</div>
+
+<!-- Upload Modal -->
+<div id="upload-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 class="modal-title">Upload Dataset</h3>
+            <button class="btn-close" onclick="closeUploadModal()">&times;</button>
+        </div>
+        <form id="upload-form" onsubmit="uploadDataset(event)">
+            <div class="filter-group" style="margin-bottom: 1rem;">
+                <label for="upload-name">Dataset Name</label>
+                <input type="text" id="upload-name" required placeholder="Enter dataset name...">
+            </div>
+            <div class="filter-group" style="margin-bottom: 1.5rem;">
+                <label for="upload-file">FASTA File</label>
+                <input type="file" id="upload-file" accept=".fasta,.fa,.txt" required 
+                       class="form-control" style="margin-bottom: 0.5rem;">
+                <small class="text-muted">
+                    <i class="bi bi-info-circle me-1"></i>
+                    Accepted formats: .fasta, .fa, .txt (FASTA format)
+                </small>
+            </div>
+            <div class="dataset-actions">
+                <button type="submit" class="btn-dataset primary">
+                    <i class="bi bi-upload"></i>
+                    Upload Dataset
+                </button>
+                <button type="button" class="btn-dataset outline" onclick="closeUploadModal()">
+                    Cancel
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Preview Modal -->
+<div id="preview-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 class="modal-title" id="preview-title">Dataset Preview</h3>
+            <button class="btn-close" onclick="closePreviewModal()">&times;</button>
+        </div>
+        <div id="preview-stats" style="margin-bottom: 1rem;"></div>
+        <div class="preview-content" id="preview-sequences"></div>
+    </div>
+</div>
+
+<!-- Generate Modal -->
+<div id="generate-modal" class="modal">
+    <div class="modal-content" style="max-width: 800px;">
+        <div class="modal-header">
+            <h3 class="modal-title">Generate Dataset</h3>
+            <button class="btn-close" onclick="closeGenerateModal()">&times;</button>
+        </div>
+        
+        <!-- Type Selection -->
+        <div class="filter-group" style="margin-bottom: 1.5rem;">
+            <label>Dataset Type</label>
+            <div style="display: flex; gap: 1rem; margin-top: 0.5rem;">
+                <button type="button" class="btn-dataset primary" id="synthetic-tab-btn" onclick="switchGenerateType('synthetic')">
+                    🧪 Synthetic
+                </button>
+                <button type="button" class="btn-dataset outline" id="ncbi-tab-btn" onclick="switchGenerateType('ncbi')">
+                    🌐 NCBI
+                </button>
+            </div>
+        </div>
+        
+        <!-- Synthetic Form -->
+        <div id="synthetic-generate-form" class="generate-form">
+            <div class="filters-grid" style="margin-bottom: 1rem;">
+                <div class="filter-group">
+                    <label for="gen-name">Dataset Name</label>
+                    <input type="text" id="gen-name" required placeholder="Enter dataset name...">
+                </div>
+                <div class="filter-group">
+                    <label for="gen-method">Generation Method</label>
+                    <select id="gen-method" onchange="updateGenerateParams()">
+                        <option value="random">Random Sequences</option>
+                        <option value="noise">Noise-based</option>
+                        <option value="clustered">Clustered</option>
+                        <option value="mutations">Mutations</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label for="gen-sequences">Number of Sequences</label>
+                    <input type="number" id="gen-sequences" value="20" min="3" max="1000">
+                </div>
+                <div class="filter-group">
+                    <label for="gen-length">Sequence Length</label>
+                    <input type="number" id="gen-length" value="50" min="5" max="10000">
+                </div>
+                <div class="filter-group">
+                    <label for="gen-alphabet">Alphabet</label>
+                    <select id="gen-alphabet">
+                        <option value="ACGT">DNA (ACGT)</option>
+                        <option value="ACGU">RNA (ACGU)</option>
+                        <option value="ABCDEFGHIJKLMNOPQRSTUVWXYZ">Protein</option>
+                        <option value="01">Binary</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label for="gen-seed">Random Seed (Optional)</label>
+                    <input type="number" id="gen-seed" placeholder="Leave empty for random">
+                </div>
+            </div>
+            
+            <div id="method-params-container" style="background: #f8f9fa; padding: 1rem; border-radius: 6px; margin-bottom: 1rem;">
+                <div id="method-params-content">
+                    <!-- Method-specific parameters will be populated here -->
+                </div>
+            </div>
+        </div>
+        
+        <!-- NCBI Form -->
+        <div id="ncbi-generate-form" class="generate-form" style="display: none;">
+            <div class="filters-grid" style="margin-bottom: 1rem;">
+                <div class="filter-group">
+                    <label for="ncbi-name">Dataset Name</label>
+                    <input type="text" id="ncbi-name" required placeholder="Enter dataset name...">
+                </div>
+                <div class="filter-group">
+                    <label for="ncbi-query">Search Query</label>
+                    <input type="text" id="ncbi-query" value="COI[Gene]" required>
+                </div>
+                <div class="filter-group">
+                    <label for="ncbi-database">Database</label>
+                    <select id="ncbi-database">
+                        <option value="nucleotide">Nucleotide</option>
+                        <option value="protein">Protein</option>
+                        <option value="genome">Genome</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label for="ncbi-max-sequences">Max Sequences</label>
+                    <input type="number" id="ncbi-max-sequences" value="100" min="1" max="10000">
+                </div>
+                <div class="filter-group">
+                    <label for="ncbi-min-length">Min Length (Optional)</label>
+                    <input type="number" id="ncbi-min-length" placeholder="No filter">
+                </div>
+                <div class="filter-group">
+                    <label for="ncbi-max-length">Max Length (Optional)</label>
+                    <input type="number" id="ncbi-max-length" placeholder="No filter">
+                </div>
+            </div>
+        </div>
+        
+        <!-- Generation Status -->
+        <div id="generation-status" style="display: none; background: rgba(0, 123, 255, 0.05); border: 1px solid rgba(0, 123, 255, 0.1); padding: 0.75rem; border-radius: 6px; margin-bottom: 1rem;">
+            <div id="generation-message" style="font-size: 0.85rem; color: #495057; margin-bottom: 0.5rem; font-weight: 500;">Starting generation...</div>
+            <div style="width: 100%; height: 3px; background: rgba(0, 123, 255, 0.1); border-radius: 2px; overflow: hidden;">
+                <div id="generation-progress" style="height: 100%; background: linear-gradient(90deg, #007bff, #0056b3); width: 0%; transition: width 0.4s ease; border-radius: 2px;"></div>
+            </div>
+        </div>
+        
+        <!-- Actions -->
+        <div class="dataset-actions">
+            <button type="button" class="btn-dataset primary" id="generate-start-btn">
+                <i class="bi bi-play-circle"></i>
+                Start Generation
+            </button>
+            <button type="button" class="btn-dataset outline" onclick="closeGenerateModal()">
+                Cancel
+            </button>
+        </div>
+    </div>
+</div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Global variables
+let datasets = [];
+let filteredDatasets = [];
+
+// Initialize page
+document.addEventListener('DOMContentLoaded', function() {
+    loadDatasets();
+    
+    // Initialize generation modal events
+    document.getElementById('gen-method').addEventListener('change', updateGenerateParams);
+    document.getElementById('generate-start-btn').addEventListener('click', startGeneration);
+    
+    // Initialize with default method parameters
+    updateGenerateParams();
+});
+
+// Load datasets from API
+async function loadDatasets() {
+    try {
+        const response = await fetch('/api/datasets/');
+        const data = await response.json();
+        
+        if (response.ok) {
+            datasets = data.datasets;
+            filteredDatasets = [...datasets];
+            renderDatasets();
+        } else {
+            showError('Failed to load datasets');
+        }
+    } catch (error) {
+        console.error('Error loading datasets:', error);
+        showError('Failed to load datasets');
+    }
+}
+
+// Render datasets table
+function renderDatasets() {
+    const container = document.getElementById('datasets-container');
+    
+    if (filteredDatasets.length === 0) {
+        container.innerHTML = `
+            <div class="text-center p-5">
+                <i class="bi bi-folder2-open display-4 mb-3 text-muted"></i>
+                <h5>No datasets found</h5>
+                <p class="text-muted">Create your first dataset by generating or uploading one.</p>
+                <button class="btn btn-success" onclick="openGenerateModal()">
+                    <i class="bi bi-plus-circle me-1"></i>Generate Dataset
+                </button>
+            </div>
+        `;
+        return;
+    }
+    
+    container.innerHTML = `
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead class="table-light">
+                    <tr>
+                        <th><i class="bi bi-file-text me-1"></i>Name</th>
+                        <th><i class="bi bi-tag me-1"></i>Type</th>
+                        <th><i class="bi bi-hash me-1"></i>Sequences</th>
+                        <th><i class="bi bi-rulers me-1"></i>Length Range</th>
+                        <th><i class="bi bi-calendar me-1"></i>Created</th>
+                        <th><i class="bi bi-gear me-1"></i>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${filteredDatasets.map(dataset => createDatasetRow(dataset)).join('')}
+                </tbody>
+            </table>
+        </div>
+    `;
+}
+
+// Create dataset table row
+function createDatasetRow(dataset) {
+    const typeClass = dataset.type === 'synthetic' ? 'text-success' : 
+                     dataset.type === 'ncbi' ? 'text-info' : 'text-primary';
+    
+    const typeBadge = dataset.type === 'synthetic' ? 'success' : 
+                     dataset.type === 'ncbi' ? 'info' : 'primary';
+    
+    const lengthRange = dataset.uniform_lengths ? 
+        `${dataset.max_length} bp` : 
+        `${dataset.min_length}-${dataset.max_length} bp`;
+    
+    const createdDate = new Date(dataset.created_at).toLocaleDateString('pt-BR');
+    
+    return `
+        <tr data-id="${dataset.id}">
+            <td>
+                <div class="d-flex align-items-center">
+                    <i class="bi bi-file-earmark-text me-2 text-muted"></i>
+                    <strong>${dataset.name}</strong>
+                </div>
+            </td>
+            <td>
+                <span class="badge bg-${typeBadge}">${dataset.type}</span>
+            </td>
+            <td>
+                <span class="fw-bold">${dataset.size}</span>
+                <small class="text-muted ms-1">seqs</small>
+            </td>
+            <td>
+                <span class="text-muted">${lengthRange}</span>
+            </td>
+            <td>
+                <span class="text-muted">${createdDate}</span>
+            </td>
+            <td>
+                <div class="btn-group btn-group-sm" role="group">
+                    <button class="btn btn-outline-primary" onclick="previewDataset('${dataset.id}')" title="Preview">
+                        <i class="bi bi-eye"></i>
+                    </button>
+                    <button class="btn btn-outline-success" onclick="downloadDataset('${dataset.id}')" title="Download">
+                        <i class="bi bi-download"></i>
+                    </button>
+                    <button class="btn btn-outline-danger" onclick="deleteDataset('${dataset.id}', '${dataset.name}')" title="Delete">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </div>
+            </td>
+        </tr>
+    `;
+}
+
+// Apply filters
+function applyFilters() {
+    const nameFilter = document.getElementById('filter-name').value.toLowerCase();
+    const sizeFilter = parseInt(document.getElementById('filter-size').value) || 0;
+    const sortBy = document.getElementById('sort-by').value;
+    
+    filteredDatasets = datasets.filter(dataset => {
+        const matchesName = dataset.name.toLowerCase().includes(nameFilter);
+        const matchesSize = dataset.size >= sizeFilter;
+        
+        return matchesName && matchesSize;
+    });
+    
+    // Sort datasets
+    filteredDatasets.sort((a, b) => {
+        switch (sortBy) {
+            case 'name':
+                return a.name.localeCompare(b.name);
+            case 'created_at':
+                return new Date(b.created_at) - new Date(a.created_at);
+            case 'size':
+                return b.size - a.size;
+            default:
+                return 0;
+        }
+    });
+    
+    renderDatasets();
+}
+
+// Upload modal functions
+function openUploadModal() {
+    document.getElementById('upload-modal').classList.add('show');
+}
+
+function closeUploadModal() {
+    document.getElementById('upload-modal').classList.remove('show');
+    document.getElementById('upload-form').reset();
+}
+
+// Upload dataset
+async function uploadDataset(event) {
+    event.preventDefault();
+    
+    const name = document.getElementById('upload-name').value;
+    const fileInput = document.getElementById('upload-file');
+    const file = fileInput.files[0];
+    
+    if (!file) {
+        showError('Please select a FASTA file to upload');
+        return;
+    }
+    
+    const submitBtn = event.target.querySelector('button[type="submit"]');
+    const originalText = submitBtn.innerHTML;
+    submitBtn.innerHTML = '<i class="bi bi-arrow-clockwise spin"></i> Uploading...';
+    submitBtn.disabled = true;
+    
+    try {
+        const formData = new FormData();
+        formData.append('name', name);
+        formData.append('file', file);
+        
+        const response = await fetch('/api/datasets/upload', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+            showSuccess(result.message || 'Dataset uploaded successfully!');
+            closeUploadModal();
+            refreshDatasets();
+            
+            // Reset form
+            document.getElementById('upload-form').reset();
+        } else {
+            showError(result.detail || 'Upload failed');
+        }
+    } catch (error) {
+        console.error('Upload error:', error);
+        showError('Upload failed: ' + error.message);
+    } finally {
+        submitBtn.innerHTML = originalText;
+        submitBtn.disabled = false;
+    }
+}
+
+// Generate modal functions
+let currentGenerateType = 'synthetic';
+let currentTaskId = null;
+let statusInterval = null;
+
+function openGenerateModal() {
+    document.getElementById('generate-modal').classList.add('show');
+    updateGenerateParams();
+}
+
+function closeGenerateModal() {
+    document.getElementById('generate-modal').classList.remove('show');
+    // Reset forms
+    document.getElementById('gen-name').value = '';
+    document.getElementById('ncbi-name').value = '';
+    // Stop status polling if running
+    if (statusInterval) {
+        clearInterval(statusInterval);
+        statusInterval = null;
+    }
+    // Hide status
+    document.getElementById('generation-status').style.display = 'none';
+    // Reset button
+    const btn = document.getElementById('generate-start-btn');
+    btn.innerHTML = '<i class="bi bi-play-circle"></i> Start Generation';
+    btn.disabled = false;
+}
+
+function switchGenerateType(type) {
+    currentGenerateType = type;
+    
+    const syntheticBtn = document.getElementById('synthetic-tab-btn');
+    const ncbiBtn = document.getElementById('ncbi-tab-btn');
+    const syntheticForm = document.getElementById('synthetic-generate-form');
+    const ncbiForm = document.getElementById('ncbi-generate-form');
+    
+    if (type === 'synthetic') {
+        syntheticBtn.classList.remove('outline');
+        syntheticBtn.classList.add('primary');
+        ncbiBtn.classList.remove('primary');
+        ncbiBtn.classList.add('outline');
+        syntheticForm.style.display = 'block';
+        ncbiForm.style.display = 'none';
+    } else {
+        ncbiBtn.classList.remove('outline');
+        ncbiBtn.classList.add('primary');
+        syntheticBtn.classList.remove('primary');
+        syntheticBtn.classList.add('outline');
+        syntheticForm.style.display = 'none';
+        ncbiForm.style.display = 'block';
+    }
+}
+
+function updateGenerateParams() {
+    const method = document.getElementById('gen-method').value;
+    const container = document.getElementById('method-params-content');
+    
+    let html = '';
+    
+    switch (method) {
+        case 'random':
+            html = '<p><strong>Random Method:</strong> Generates completely random sequences using the selected alphabet.</p>';
+            break;
+            
+        case 'noise':
+            html = `
+                <div class="filter-group">
+                    <label for="noise-rate">Noise Rate</label>
+                    <input type="number" id="noise-rate" min="0" max="1" step="0.01" value="0.1">
+                    <small>Probability of noise per position (0.0-1.0)</small>
+                </div>
+                <div class="filter-group">
+                    <label for="base-sequence">Base Sequence (Optional)</label>
+                    <input type="text" id="base-sequence" placeholder="Leave empty to auto-generate">
+                    <small>Center sequence for noise generation</small>
+                </div>
+            `;
+            break;
+            
+        case 'clustered':
+            html = `
+                <div class="filter-group">
+                    <label for="num-clusters">Number of Clusters</label>
+                    <input type="number" id="num-clusters" min="1" max="10" value="2">
+                    <small>Number of sequence clusters to generate</small>
+                </div>
+                <div class="filter-group">
+                    <label for="cluster-distance">Cluster Distance</label>
+                    <input type="number" id="cluster-distance" min="0" max="1" step="0.01" value="0.2">
+                    <small>Distance between cluster centers (0.0-1.0)</small>
+                </div>
+            `;
+            break;
+            
+        case 'mutations':
+            html = `
+                <div class="filter-group">
+                    <label for="mutation-rate">Mutation Rate</label>
+                    <input type="number" id="mutation-rate" min="0" max="1" step="0.01" value="0.1">
+                    <small>Probability of mutation per position (0.0-1.0)</small>
+                </div>
+                <div class="filter-group">
+                    <label for="mutation-base">Base Sequence (Optional)</label>
+                    <input type="text" id="mutation-base" placeholder="Leave empty to auto-generate">
+                    <small>Base sequence for mutations</small>
+                </div>
+            `;
+            break;
+    }
+    
+    container.innerHTML = html;
+}
+
+async function startGeneration() {
+    // Prevent multiple simultaneous generations
+    const btn = document.getElementById('generate-start-btn');
+    if (btn.disabled) {
+        console.warn('Generation already in progress');
+        return;
+    }
+    
+    try {
+        btn.innerHTML = '<i class="bi bi-three-dots" style="animation: pulse 1.5s ease-in-out infinite;"></i> Generating...';
+        btn.disabled = true;
+        
+        let data;
+        let endpoint;
+        
+        if (currentGenerateType === 'synthetic') {
+            data = {
+                name: document.getElementById('gen-name').value,
+                method: document.getElementById('gen-method').value,
+                n: parseInt(document.getElementById('gen-sequences').value),
+                length: parseInt(document.getElementById('gen-length').value),
+                alphabet: document.getElementById('gen-alphabet').value,
+                seed: document.getElementById('gen-seed').value ? parseInt(document.getElementById('gen-seed').value) : null
+            };
+            
+            // Add method-specific parameters
+            const method = data.method;
+            if (method === 'noise') {
+                const noiseRate = document.getElementById('noise-rate');
+                const baseSeq = document.getElementById('base-sequence');
+                if (noiseRate) data.noise_rate = parseFloat(noiseRate.value);
+                if (baseSeq && baseSeq.value) data.base_sequence = baseSeq.value;
+            } else if (method === 'clustered') {
+                const numClusters = document.getElementById('num-clusters');
+                const clusterDist = document.getElementById('cluster-distance');
+                if (numClusters) data.num_clusters = parseInt(numClusters.value);
+                if (clusterDist) data.cluster_distance = parseFloat(clusterDist.value);
+            } else if (method === 'mutations') {
+                const mutRate = document.getElementById('mutation-rate');
+                const mutBase = document.getElementById('mutation-base');
+                if (mutRate) data.mutation_rate = parseFloat(mutRate.value);
+                if (mutBase && mutBase.value) data.base_sequence = mutBase.value;
+            }
+            
+            endpoint = '/api/datasets/generate/synthetic';
+        } else {
+            data = {
+                name: document.getElementById('ncbi-name').value,
+                query: document.getElementById('ncbi-query').value,
+                db: document.getElementById('ncbi-database').value,
+                max_sequences: parseInt(document.getElementById('ncbi-max-sequences').value)
+            };
+            
+            const minLength = document.getElementById('ncbi-min-length').value;
+            const maxLength = document.getElementById('ncbi-max-length').value;
+            if (minLength) data.min_length = parseInt(minLength);
+            if (maxLength) data.max_length = parseInt(maxLength);
+            
+            endpoint = '/api/datasets/generate/ncbi';
+        }
+        
+        const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+            currentTaskId = result.data.task_id;
+            showGenerationStatus();
+            startStatusPolling();
+        } else {
+            throw new Error(result.detail || 'Generation failed');
+        }
+        
+    } catch (error) {
+        console.error('Generation error:', error);
+        showError('Failed to start generation: ' + error.message);
+        
+        const btn = document.getElementById('generate-start-btn');
+        btn.innerHTML = '<i class="bi bi-play-circle"></i> Start Generation';
+        btn.disabled = false;
+    }
+}
+
+function showGenerationStatus() {
+    document.getElementById('generation-status').style.display = 'block';
+}
+
+function startStatusPolling() {
+    // Clear any existing interval first
+    if (statusInterval) {
+        clearInterval(statusInterval);
+        statusInterval = null;
+    }
+    
+    statusInterval = setInterval(async () => {
+        try {
+            const response = await fetch(`/api/datasets/generation/${currentTaskId}/status`);
+            const status = await response.json();
+            
+            document.getElementById('generation-message').textContent = status.message;
+            document.getElementById('generation-progress').style.width = status.progress + '%';
+            
+            if (status.status === 'completed') {
+                clearInterval(statusInterval);
+                statusInterval = null;
+                showSuccess('Dataset generated successfully!');
+                closeGenerateModal();
+                refreshDatasets();
+            } else if (status.status === 'failed') {
+                clearInterval(statusInterval);
+                statusInterval = null;
+                showError('Generation failed: ' + (status.error || 'Unknown error'));
+                
+                const btn = document.getElementById('generate-start-btn');
+                btn.innerHTML = '<i class="bi bi-play-circle"></i> Start Generation';
+                btn.disabled = false;
+            }
+            
+        } catch (error) {
+            console.error('Status polling error:', error);
+            clearInterval(statusInterval);
+            statusInterval = null;
+            showError('Failed to get generation status');
+            
+            const btn = document.getElementById('generate-start-btn');
+            btn.innerHTML = '<i class="bi bi-play-circle"></i> Start Generation';
+            btn.disabled = false;
+        }
+    }, 1000);
+}
+
+// Preview dataset
+async function previewDataset(datasetId) {
+    try {
+        const response = await fetch(`/api/datasets/${datasetId}/preview`);
+        const data = await response.json();
+        
+        if (response.ok) {
+            document.getElementById('preview-title').textContent = `Preview: ${data.info.name}`;
+            
+            document.getElementById('preview-stats').innerHTML = `
+                <div class="dataset-stats">
+                    <div class="stat-item">
+                        <span class="stat-icon">📊</span>
+                        <span class="stat-value">${data.info.size}</span> sequences
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-icon">📏</span>
+                        <span class="stat-value">${data.info.uniform_lengths ? data.info.max_length : data.info.min_length + '-' + data.info.max_length}</span> bp
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-icon">🧬</span>
+                        <span class="stat-value">${data.info.alphabet}</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-icon">🎯</span>
+                        <span class="stat-value">${(data.info.diversity * 100).toFixed(1)}%</span> diversity
+                    </div>
+                </div>
+            `;
+            
+            let previewText = '';
+            data.sample_sequences.forEach((seq, index) => {
+                previewText += `>sequence_${index}\n${seq}\n`;
+            });
+            
+            if (data.sample_sequences.length < data.total_sequences) {
+                previewText += `\n... and ${data.total_sequences - data.sample_sequences.length} more sequences`;
+            }
+            
+            document.getElementById('preview-sequences').textContent = previewText;
+            document.getElementById('preview-modal').classList.add('show');
+        } else {
+            showError(data.detail || 'Failed to load preview');
+        }
+    } catch (error) {
+        console.error('Preview error:', error);
+        showError('Failed to load preview');
+    }
+}
+
+function closePreviewModal() {
+    document.getElementById('preview-modal').classList.remove('show');
+}
+
+// Download dataset
+async function downloadDataset(datasetId) {
+    try {
+        const response = await fetch(`/api/datasets/${datasetId}/download`);
+        
+        if (response.ok) {
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${datasetId}.fasta`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+            
+            showSuccess('Dataset downloaded successfully');
+        } else {
+            const error = await response.json();
+            showError(error.detail || 'Download failed');
+        }
+    } catch (error) {
+        console.error('Download error:', error);
+        showError('Download failed');
+    }
+}
+
+// Delete dataset
+async function deleteDataset(datasetId, datasetName) {
+    if (!confirm(`Are you sure you want to delete dataset "${datasetName}"? This action cannot be undone.`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/datasets/${datasetId}`, {
+            method: 'DELETE'
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+            showSuccess(result.message);
+            refreshDatasets();
+        } else {
+            showError(result.detail || 'Delete failed');
+        }
+    } catch (error) {
+        console.error('Delete error:', error);
+        showError('Delete failed');
+    }
+}
+
+// Refresh datasets
+function refreshDatasets() {
+    document.getElementById('datasets-container').innerHTML = `
+        <div class="loading-spinner">
+            <i class="bi bi-arrow-clockwise spin"></i>
+            <p>Loading datasets...</p>
+        </div>
+    `;
+    loadDatasets();
+}
+
+// Utility functions
+function showSuccess(message) {
+    // Simple toast notification (you can enhance this)
+    alert('✅ ' + message);
+}
+
+function showError(message) {
+    // Simple error notification (you can enhance this)
+    alert('❌ ' + message);
+}
+
+// CSS animations
+const style = document.createElement('style');
+style.textContent = `
+    .spin {
+        animation: spin 1s linear infinite;
+    }
+    
+    @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
+    }
+    
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+`;
+document.head.appendChild(style);
+</script>
+{% endblock %}

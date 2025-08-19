@@ -227,7 +227,7 @@ class AbstractExportPort(ABC):
 
 class AbstractStore(ABC):
     """Interface ABC para persistência de execuções."""
-    
+
     @abstractmethod
     def record_execution_start(
         self,
@@ -244,7 +244,7 @@ class AbstractStore(ABC):
     ) -> None:
         """Registra início de execução."""
         pass
-    
+
     @abstractmethod
     def record_execution_end(
         self,
@@ -255,7 +255,7 @@ class AbstractStore(ABC):
     ) -> None:
         """Registra fim de execução."""
         pass
-    
+
     @abstractmethod
     def get_completed_repetitions(
         self, task_id: str, dataset_id: str, algorithm: str

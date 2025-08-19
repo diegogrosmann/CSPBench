@@ -125,3 +125,9 @@ class SecurityValidator:
 
         extension = Path(filename).suffix.lower()
         return extension in SecurityConfig.ALLOWED_EXTENSIONS
+
+
+# Convenience functions for easy import
+def sanitize_filename(filename: str) -> str:
+    """Sanitize filename using SecurityValidator."""
+    return SecurityValidator.sanitize_filename(filename)

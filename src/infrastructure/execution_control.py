@@ -20,6 +20,7 @@ from src.infrastructure.logging_config import get_logger
 
 class ExecutionStatus(Enum):
     """Status de execução."""
+
     RUNNING = "running"
     PAUSED = "paused"
     CANCELED = "canceled"
@@ -27,13 +28,14 @@ class ExecutionStatus(Enum):
 
 class ExecutionLimitError(Exception):
     """Raised when execution limits are exceeded."""
+
     pass
 
 
 class ExecutionController:
     """
     Controla recursos, timeouts e status para execução de tarefas.
-    
+
     Responsabilidades:
     - Aplicar limites de CPU e memória
     - Gerenciar timeouts (per-item e total-batch)
@@ -41,7 +43,11 @@ class ExecutionController:
     - Monitorar recursos durante execução
     """
 
-    def __init__(self, resources: ResourcesConfig | None = None, check_control: Callable[[], str] | None = None):
+    def __init__(
+        self,
+        resources: ResourcesConfig | None = None,
+        check_control: Callable[[], str] | None = None,
+    ):
         """
         Initialize execution controller.
 
@@ -92,7 +98,9 @@ class ExecutionController:
         # Monitor thread
         self._monitor_thread = None
         self._stop_monitoring = threading.Event()
-        self._current_workers = self._max_workers  # Track current active workers for memory control
+        self._current_workers = (
+            self._max_workers
+        )  # Track current active workers for memory control
 
         self._logger.info(
             f"[EXECUTION] Controller initialized - "
@@ -115,7 +123,7 @@ class ExecutionController:
     def internal_jobs(self) -> int:
         """
         Get internal jobs for algorithm parallelization.
-        
+
         Returns internal_jobs limited by current memory constraints.
         When memory forces reduced workers, algorithms should use proportional internal parallelism.
         """
@@ -144,8 +152,13 @@ class ExecutionController:
     @classmethod
     def from_config(cls, config: dict[str, Any]) -> "ExecutionController":
         """Create ExecutionController from configuration dictionary."""
-        from src.domain.config import ResourcesConfig, CPUConfig, MemoryConfig, TimeoutsConfig
-        
+        from src.domain.config import (
+            ResourcesConfig,
+            CPUConfig,
+            MemoryConfig,
+            TimeoutsConfig,
+        )
+
         # Reconstruct ResourcesConfig from dictionary
         cpu_cfg = None
         if "cpu" in config:
@@ -154,26 +167,28 @@ class ExecutionController:
                 exclusive_cores=config["cpu"].get("exclusive_cores", False),
                 internal_jobs=config["cpu"].get("internal_jobs", 1),
             )
-        
+
         memory_cfg = None
         if "memory" in config:
             memory_cfg = MemoryConfig(
                 max_memory_gb=config["memory"].get("max_memory_gb")
             )
-        
+
         timeouts_cfg = None
         if "timeouts" in config:
             timeouts_cfg = TimeoutsConfig(
                 timeout_per_item=config["timeouts"].get("timeout_per_algorithm", 3600),
-                timeout_total_batch=config["timeouts"].get("timeout_total_batch", 86400),
+                timeout_total_batch=config["timeouts"].get(
+                    "timeout_total_batch", 86400
+                ),
             )
-        
+
         resources = ResourcesConfig(
             cpu=cpu_cfg,
             memory=memory_cfg,
             timeouts=timeouts_cfg,
         )
-        
+
         return cls(resources=resources)
 
     @property
@@ -193,15 +208,15 @@ class ExecutionController:
     def check_status(self) -> ExecutionStatus:
         """
         Check current execution status.
-        
+
         Returns:
             Current execution status
         """
         if not self._check_control:
             return ExecutionStatus.RUNNING
-        
+
         status_str = self._check_control()
-        
+
         if status_str == "canceled":
             return ExecutionStatus.CANCELED
         elif status_str == "paused":
@@ -212,19 +227,19 @@ class ExecutionController:
     def wait_for_continue(self) -> ExecutionStatus:
         """
         Wait while paused, return when status changes.
-        
+
         Returns:
             New execution status (RUNNING or CANCELED)
         """
         while self.check_status() == ExecutionStatus.PAUSED:
             time.sleep(0.3)
-        
+
         return self.check_status()
 
     def check_batch_timeout(self) -> None:
         """
         Check if total batch timeout has been exceeded.
-        
+
         Raises:
             ExecutionLimitError: If batch timeout exceeded
         """
@@ -238,11 +253,13 @@ class ExecutionController:
 
     def _force_cleanup_on_timeout(self) -> None:
         """Force cleanup and termination of all processes when batch timeout is reached."""
-        self._logger.warning("[EXECUTION] Batch timeout reached - forcing cleanup of all processes")
-        
+        self._logger.warning(
+            "[EXECUTION] Batch timeout reached - forcing cleanup of all processes"
+        )
+
         # Stop monitoring
         self._stop_monitoring.set()
-        
+
         # Terminate all registered processes
         terminated_count = 0
         for process in self._active_processes:
@@ -256,31 +273,35 @@ class ExecutionController:
                     except psutil.TimeoutExpired:
                         # Force kill if not terminated
                         process.kill()
-                        self._logger.warning(f"[EXECUTION] Force killed process {process.pid}")
+                        self._logger.warning(
+                            f"[EXECUTION] Force killed process {process.pid}"
+                        )
             except (psutil.NoSuchProcess, psutil.AccessDenied):
                 pass
-                
+
         if terminated_count > 0:
-            self._logger.warning(f"[EXECUTION] Terminated {terminated_count} active processes due to batch timeout")
-        
+            self._logger.warning(
+                f"[EXECUTION] Terminated {terminated_count} active processes due to batch timeout"
+            )
+
         # Clear the list
         self._active_processes.clear()
 
     def get_cpu_affinity(self) -> Optional[List[int]]:
         """
         Calculate CPU affinity based on exclusive_cores setting.
-        
+
         Returns:
             List of CPU cores to use for algorithm processes, or None if no restriction
         """
         if not self._exclusive_cores:
             return None
-            
+
         try:
             total_cores = psutil.cpu_count()
             if total_cores <= 1:
                 return [0]  # Only one core available
-            
+
             # Exclude core 0 for main process when exclusive_cores is enabled
             # Algorithm processes use cores 1 to max_workers
             return list(range(1, min(total_cores, self._max_workers + 1)))
@@ -297,14 +318,16 @@ class ExecutionController:
             total_cores = psutil.cpu_count()
             if total_cores <= 1:
                 return  # Nothing to do with single core
-                
+
             main_process = psutil.Process()
             main_process.cpu_affinity([0])  # Force main application to core 0
             self._logger.info(
                 f"[EXECUTION] Main application restricted to core 0 (exclusive_cores=True)"
             )
         except (psutil.NoSuchProcess, psutil.AccessDenied, PermissionError) as e:
-            self._logger.warning(f"[EXECUTION] Cannot apply main process CPU affinity: {e}")
+            self._logger.warning(
+                f"[EXECUTION] Cannot apply main process CPU affinity: {e}"
+            )
 
     def apply_cpu_limits(self, process: Optional[psutil.Process] = None) -> None:
         """
@@ -319,12 +342,10 @@ class ExecutionController:
         try:
             # Apply CPU affinity if exclusive_cores is enabled
             cpu_affinity = self.get_cpu_affinity()
-            
+
             if cpu_affinity:
                 available_cpus = list(range(psutil.cpu_count()))
-                valid_affinity = [
-                    cpu for cpu in cpu_affinity if cpu in available_cpus
-                ]
+                valid_affinity = [cpu for cpu in cpu_affinity if cpu in available_cpus]
                 if valid_affinity:
                     process.cpu_affinity(valid_affinity)
                     self._logger.info(
@@ -371,11 +392,13 @@ class ExecutionController:
 
         except (ImportError, OSError, ValueError) as e:
             self._logger.warning(f"[EXECUTION] Cannot apply memory limit: {e}")
-            
+
         # Always start preventive memory monitoring
         self._start_preventive_memory_monitor(process)
 
-    def _start_preventive_memory_monitor(self, process: Optional[psutil.Process] = None) -> None:
+    def _start_preventive_memory_monitor(
+        self, process: Optional[psutil.Process] = None
+    ) -> None:
         """Start preventive memory monitoring thread that reduces workers instead of killing process."""
         if not self._max_memory_gb:
             return
@@ -388,7 +411,7 @@ class ExecutionController:
             max_memory_bytes = self._max_memory_gb * 1024 * 1024 * 1024
             warning_threshold = 0.85  # 85% of limit
             critical_threshold = 0.95  # 95% of limit
-            
+
             while not self._stop_monitoring.is_set():
                 try:
                     memory_info = process.memory_info()
@@ -415,10 +438,15 @@ class ExecutionController:
                                 f"({current_memory / (1024**3):.2f}GB / {self._max_memory_gb}GB). "
                                 f"Reducing workers: {old_workers} → {self._current_workers}"
                             )
-                    elif memory_usage_ratio < 0.5 and self._current_workers < self._max_workers:
+                    elif (
+                        memory_usage_ratio < 0.5
+                        and self._current_workers < self._max_workers
+                    ):
                         # Memory usage low: Can safely increase workers back
                         old_workers = self._current_workers
-                        self._current_workers = min(self._max_workers, self._current_workers * 2)
+                        self._current_workers = min(
+                            self._max_workers, self._current_workers * 2
+                        )
                         self._logger.info(
                             f"[EXECUTION] Memory usage normalized {memory_usage_ratio:.1%}. "
                             f"Increasing workers: {old_workers} → {self._current_workers}"
@@ -448,9 +476,7 @@ class ExecutionController:
             timeout_seconds = self._timeout_per_item
 
         def timeout_handler(signum, frame):
-            raise TimeoutError(
-                f"Item execution exceeded {timeout_seconds} seconds"
-            )
+            raise TimeoutError(f"Item execution exceeded {timeout_seconds} seconds")
 
         # Set alarm for timeout
         old_handler = signal.signal(signal.SIGALRM, timeout_handler)
@@ -467,7 +493,7 @@ class ExecutionController:
     def create_worker_config(self) -> Dict[str, Any]:
         """
         Create configuration for worker processes.
-        
+
         Returns:
             Configuration dictionary for ProcessPool workers
         """
@@ -475,11 +501,9 @@ class ExecutionController:
             "cpu": {
                 "max_workers": self._current_workers,  # Use current workers (considering memory limits)
                 "exclusive_cores": self._exclusive_cores,
-                "affinity": self.get_cpu_affinity()
+                "affinity": self.get_cpu_affinity(),
             },
-            "memory": {
-                "max_memory_gb": self._max_memory_gb
-            },
+            "memory": {"max_memory_gb": self._max_memory_gb},
             "timeouts": {
                 "timeout_per_algorithm": self._timeout_per_item,
                 "timeout_total_batch": self._timeout_total_batch,

@@ -74,9 +74,9 @@ class CSPAlgorithm(ABC):
 
         # Monitoring integration
         self._algorithm_monitor = None
-        
+
         # Configure random generator with seed
-        self.seed = params.get('seed', None)
+        self.seed = params.get("seed", None)
         self._setup_random_generator()
 
     def set_algorithm_monitor(self, monitor) -> None:
@@ -125,11 +125,13 @@ class CSPAlgorithm(ABC):
     def _setup_random_generator(self) -> None:
         """Configure random generator with provided seed."""
         import random
+
         if self.seed is not None:
             self.rng = random.Random(self.seed)
             # Configure numpy if available
             try:
                 import numpy as np
+
                 np.random.seed(self.seed)
             except ImportError:
                 pass

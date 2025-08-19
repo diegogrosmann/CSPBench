@@ -1,472 +1,781 @@
 /**
- * Execution Monitor Component
- * 
- * Real-time monitoring and progress tracking for algorithm execution
+ * Real-time Execution Monitor Component
+ * Displays active executions with real-time updates
  */
 
 class ExecutionMonitor {
-    constructor(container, options = {}) {
-        this.container = typeof container === 'string' ? document.querySelector(container) : container;
-        this.options = {
-            updateInterval: 1000,
-            showLogs: true,
-            showProgress: true,
-            showMetrics: true,
-            autoScroll: true,
-            onComplete: () => {},
-            onError: () => {},
-            ...options
-        };
+    constructor(containerId) {
+        this.containerId = containerId;
+        this.executions = new Map(); // work_id -> execution data
+        this.updateInterval = null;
+        this.selectedWorkId = null;
+        this.currentFilter = 'all'; // Track current filter
         
-        this.executionId = null;
-        this.status = 'idle';
-        this.startTime = null;
-        this.progress = 0;
-        this.logs = [];
-        this.metrics = {};
-        this.updateTimer = null;
+        // Initialize API client and WebSocket client
+        this.apiClient = null;
+        this.wsClient = null;
         
-        this.init();
+        // Bind methods
+        this.initialize = this.initialize.bind(this);
+        this.loadActiveExecutions = this.loadActiveExecutions.bind(this);
+        this.renderExecutions = this.renderExecutions.bind(this);
+        this.renderExecutionTable = this.renderExecutionTable.bind(this);
+        this.handleWebSocketMessage = this.handleWebSocketMessage.bind(this);
+        this.showExecutionDetails = this.showExecutionDetails.bind(this);
+        this.showExecutionResults = this.showExecutionResults.bind(this);
+        this.showLogs = this.showLogs.bind(this);
+        this.showConnectionStatus = this.showConnectionStatus.bind(this);
+        this.showError = this.showError.bind(this);
+        this.showModal = this.showModal.bind(this);
+        this.renderExecutionCard = this.renderExecutionCard.bind(this);
+        this.updateExecutionCard = this.updateExecutionCard.bind(this);
+        this.renderExecutionDetailsModal = this.renderExecutionDetailsModal.bind(this);
+        this.renderExecutionResultsModal = this.renderExecutionResultsModal.bind(this);
+        this.getStatusColor = this.getStatusColor.bind(this);
+        this.getStatusIcon = this.getStatusIcon.bind(this);
+        this.getTimeAgo = this.getTimeAgo.bind(this);
+        this.handleExecutionClick = this.handleExecutionClick.bind(this);
+        this.handleFilterChange = this.handleFilterChange.bind(this);
+        this.filterExecutions = this.filterExecutions.bind(this);
+        this.isActiveStatus = this.isActiveStatus.bind(this);
+        this.downloadFile = this.downloadFile.bind(this);
     }
-
-    init() {
-        this.container.classList.add('execution-monitor');
-        this.render();
-    }
-
-    render() {
-        this.container.innerHTML = `
-            <div class="execution-header">
-                <div class="execution-status">
-                    <span class="status-indicator ${this.status}" id="status-indicator"></span>
-                    <span class="status-text" id="status-text">${this.getStatusText()}</span>
-                </div>
-                
-                <div class="execution-time" id="execution-time">
-                    ${this.getExecutionTime()}
-                </div>
-                
-                <div class="execution-actions">
-                    <button class="btn btn-danger" id="cancel-btn" ${this.status !== 'running' ? 'disabled' : ''}>
-                        Cancel
-                    </button>
-                    <button class="btn btn-outline" id="download-logs" ${this.logs.length === 0 ? 'disabled' : ''}>
-                        Download Logs
-                    </button>
-                </div>
-            </div>
+    
+    async initialize() {
+        console.log('Initializing Execution Monitor...');
+        
+        try {
+            // Initialize API client and WebSocket client
+            this.apiClient = new APIClient();
+            this.wsClient = new WebSocketClient();
             
-            ${this.options.showProgress ? this.renderProgress() : ''}
-            ${this.options.showMetrics ? this.renderMetrics() : ''}
-            ${this.options.showLogs ? this.renderLogs() : ''}
-        `;
-        
-        this.setupEventListeners();
+            // Setup WebSocket connection
+            this.wsClient.on('connected', () => {
+                console.log('Execution Monitor: WebSocket connected');
+                this.showConnectionStatus('connected');
+            });
+            
+            this.wsClient.on('disconnected', () => {
+                console.log('Execution Monitor: WebSocket disconnected');
+                this.showConnectionStatus('disconnected');
+            });
+            
+            this.wsClient.on('work_update', this.handleWebSocketMessage);
+            
+            await this.wsClient.connect();
+            
+            // Initial load
+            await this.loadActiveExecutions();
+            
+            // Setup filter change listener
+            const filterSelect = document.getElementById('status-filter');
+            if (filterSelect) {
+                filterSelect.addEventListener('change', this.handleFilterChange);
+            }
+            
+            // Setup periodic refresh (fallback for WebSocket)
+            this.updateInterval = setInterval(() => {
+                this.loadActiveExecutions();
+            }, 30000); // Every 30 seconds
+            
+            console.log('Execution Monitor initialized successfully');
+            
+        } catch (error) {
+            console.error('Error initializing Execution Monitor:', error);
+            this.showError('Failed to initialize execution monitor: ' + error.message);
+        }
     }
-
-    renderProgress() {
+    
+    async loadActiveExecutions() {
+        try {
+            console.log('Loading active executions...');
+            
+            const response = await this.apiClient.request('/api/monitoring/active-executions');
+            const data = response.executions || [];
+            
+            // Update executions map
+            this.executions.clear();
+            data.forEach(execution => {
+                this.executions.set(execution.work_id, execution);
+                
+                // Subscribe to updates for running executions
+                if (execution.status === 'running' && this.wsClient.isConnected()) {
+                    this.wsClient.subscribeToWork(execution.work_id);
+                }
+            });
+            
+            this.renderExecutions();
+            
+        } catch (error) {
+            console.error('Error loading active executions:', error);
+            this.showError('Failed to load executions: ' + error.message);
+        }
+    }
+    
+    renderExecutions() {
+        const container = document.getElementById(this.containerId);
+        if (!container) {
+            console.error('Execution monitor container not found:', this.containerId);
+            return;
+        }
+        
+        const allExecutions = Array.from(this.executions.values());
+        const filteredExecutions = this.filterExecutions(allExecutions);
+        
+        if (allExecutions.length === 0) {
+            container.innerHTML = `
+                <div class="no-executions">
+                    <i class="bi bi-inbox"></i>
+                    <h5>No executions found</h5>
+                    <p class="text-muted">Execute a batch to see monitoring data here</p>
+                </div>
+            `;
+            return;
+        }
+        
+        container.innerHTML = this.renderExecutionTable(filteredExecutions, allExecutions.length);
+    }
+    
+    renderExecutionTable(executions, totalCount) {
+        const filterSelect = document.getElementById('status-filter');
+        const currentFilter = filterSelect ? filterSelect.value : 'all';
+        
+        if (executions.length === 0) {
+            return `
+                <div class="no-executions">
+                    <i class="bi bi-filter"></i>
+                    <h5>No executions match the current filter</h5>
+                    <p class="text-muted">Try changing the filter or check back later</p>
+                    <p class="small text-muted">Total executions: ${totalCount}</p>
+                </div>
+            `;
+        }
+        
+        const tableRows = executions.map(execution => {
+            const statusColor = this.getStatusColor(execution.status);
+            const statusIcon = this.getStatusIcon(execution.status);
+            const createdAt = new Date(execution.created_at);
+            const timeAgo = this.getTimeAgo(createdAt);
+            const isActive = this.isActiveStatus(execution.status);
+            
+            return `
+                <tr data-work-id="${execution.work_id}" 
+                    onclick="executionMonitor.handleExecutionClick('${execution.work_id}', '${execution.status}')"
+                    title="Click to ${isActive ? 'monitor execution' : 'view results'}">
+                    <td class="work-id-cell">${execution.work_id}</td>
+                    <td>
+                        <span class="status-badge ${execution.status}">
+                            <i class="bi bi-${statusIcon} status-icon"></i>
+                            ${execution.status.charAt(0).toUpperCase() + execution.status.slice(1)}
+                        </span>
+                    </td>
+                    <td class="time-cell" title="${createdAt.toLocaleString()}">
+                        ${createdAt.toLocaleString()}
+                    </td>
+                    <td class="time-cell" title="${new Date(execution.last_modified).toLocaleString()}">
+                        ${new Date(execution.last_modified).toLocaleString()}
+                    </td>
+                    <td>
+                        <div class="d-flex gap-1">
+                            <button class="btn btn-outline-primary btn-sm" 
+                                    onclick="event.stopPropagation(); window.open('/execution/${execution.work_id}', '_blank')"
+                                    title="Detailed monitoring">
+                                <i class="bi bi-graph-up"></i>
+                            </button>
+                            
+                            ${isActive ? `
+                                <button class="btn btn-outline-info btn-sm" 
+                                        onclick="event.stopPropagation(); executionMonitor.showExecutionDetails('${execution.work_id}')"
+                                        title="Quick view">
+                                    <i class="bi bi-eye"></i>
+                                </button>
+                            ` : `
+                                <button class="btn btn-outline-success btn-sm" 
+                                        onclick="event.stopPropagation(); executionMonitor.showExecutionResults('${execution.work_id}')"
+                                        title="View results">
+                                    <i class="bi bi-file-earmark-text"></i>
+                                </button>
+                            `}
+                            
+                            ${execution.log_files && execution.log_files.length > 0 ? `
+                                <button class="btn btn-outline-secondary btn-sm" 
+                                        onclick="event.stopPropagation(); executionMonitor.showLogs('${execution.work_id}')"
+                                        title="View logs">
+                                    <i class="bi bi-file-text"></i>
+                                </button>
+                            ` : ''}
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+        
         return `
-            <div class="progress-section">
-                <div class="progress-header">
-                    <h4>Progress</h4>
-                    <span class="progress-percentage" id="progress-percentage">${this.progress}%</span>
-                </div>
-                
-                <div class="progress-bar">
-                    <div class="progress-fill" id="progress-fill" style="width: ${this.progress}%"></div>
-                </div>
-                
-                <div class="progress-details">
-                    <div class="progress-info" id="progress-info">
-                        ${this.getProgressInfo()}
+            <table class="table executions-table">
+                <thead>
+                    <tr>
+                        <th>Work ID</th>
+                        <th>Status</th>
+                        <th>Started</th>
+                        <th>Last Modified</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${tableRows}
+                </tbody>
+            </table>
+            <div class="d-flex justify-content-between align-items-center px-3 py-2 bg-light">
+                <small class="text-muted">
+                    Showing ${executions.length} of ${totalCount} executions
+                    ${currentFilter !== 'all' ? `(filtered by: ${currentFilter})` : ''}
+                </small>
+                <small class="text-muted">
+                    <i class="bi bi-info-circle me-1"></i>
+                    Click row to ${this.isActiveStatus('running') ? 'monitor' : 'view results'}
+                </small>
+            </div>
+        `;
+    }
+    
+    filterExecutions(executions) {
+        const filterSelect = document.getElementById('status-filter');
+        const filter = filterSelect ? filterSelect.value : this.currentFilter;
+        
+        switch (filter) {
+            case 'active':
+                return executions.filter(ex => this.isActiveStatus(ex.status));
+            case 'running':
+                return executions.filter(ex => ex.status === 'running');
+            case 'finished':
+                return executions.filter(ex => ex.status === 'finished');
+            case 'failed':
+                return executions.filter(ex => ex.status === 'failed');
+            default:
+                return executions;
+        }
+    }
+    
+    isActiveStatus(status) {
+        return ['running', 'paused', 'starting'].includes(status);
+    }
+    
+    handleFilterChange(event) {
+        this.currentFilter = event.target.value;
+        this.renderExecutions();
+    }
+    
+    handleExecutionClick(workId, status) {
+        if (this.isActiveStatus(status)) {
+            // Navigate to monitoring view
+            this.showExecutionDetails(workId);
+        } else {
+            // Navigate to results view
+            this.showExecutionResults(workId);
+        }
+    }
+    
+    renderExecutionCard(execution) {
+        const statusColor = this.getStatusColor(execution.status);
+        const statusIcon = this.getStatusIcon(execution.status);
+        
+        const createdAt = new Date(execution.created_at);
+        const timeAgo = this.getTimeAgo(createdAt);
+        
+        return `
+            <div class="col-md-6 col-lg-4 mb-3">
+                <div class="card h-100 execution-card" data-work-id="${execution.work_id}">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <small class="text-muted">${execution.work_id}</small>
+                        <span class="badge bg-${statusColor}">
+                            <i class="bi bi-${statusIcon} me-1"></i>${execution.status}
+                        </span>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-2">
+                            <small class="text-muted">Started: ${timeAgo}</small>
+                        </div>
+                        
+                        ${execution.status === 'running' ? `
+                            <div class="mb-2">
+                                <div class="progress" style="height: 6px;">
+                                    <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                                         style="width: 100%"></div>
+                                </div>
+                            </div>
+                        ` : ''}
+                        
+                        <div class="d-flex justify-content-between align-items-center">
+                            <button class="btn btn-outline-primary btn-sm" 
+                                    onclick="executionMonitor.showExecutionDetails('${execution.work_id}')">
+                                <i class="bi bi-eye me-1"></i>Details
+                            </button>
+                            
+                            ${execution.log_files && execution.log_files.length > 0 ? `
+                                <button class="btn btn-outline-info btn-sm" 
+                                        onclick="executionMonitor.showLogs('${execution.work_id}')">
+                                    <i class="bi bi-file-text me-1"></i>Logs
+                                </button>
+                            ` : ''}
+                        </div>
                     </div>
                 </div>
             </div>
         `;
     }
-
-    renderMetrics() {
+    
+    getStatusColor(status) {
+        const colors = {
+            'running': 'primary',
+            'finished': 'success',
+            'failed': 'danger',
+            'cancelled': 'secondary',
+            'unknown': 'warning'
+        };
+        return colors[status] || 'secondary';
+    }
+    
+    getStatusIcon(status) {
+        const icons = {
+            'running': 'play-circle',
+            'finished': 'check-circle',
+            'failed': 'x-circle',
+            'cancelled': 'stop-circle',
+            'unknown': 'question-circle'
+        };
+        return icons[status] || 'circle';
+    }
+    
+    getTimeAgo(date) {
+        const now = new Date();
+        const diffMs = now - date;
+        const diffMins = Math.floor(diffMs / 60000);
+        const diffHours = Math.floor(diffMins / 60);
+        const diffDays = Math.floor(diffHours / 24);
+        
+        if (diffMins < 1) return 'Just now';
+        if (diffMins < 60) return `${diffMins}m ago`;
+        if (diffHours < 24) return `${diffHours}h ago`;
+        return `${diffDays}d ago`;
+    }
+    
+    handleWebSocketMessage(data) {
+        console.log('Received WebSocket message:', data);
+        
+        if (data.work_id) {
+            // Update execution in map
+            this.executions.set(data.work_id, data);
+            
+            // Update display
+            this.updateExecutionCard(data.work_id, data);
+        }
+    }
+    
+    updateExecutionCard(workId, execution) {
+        const card = document.querySelector(`[data-work-id="${workId}"]`);
+        if (card) {
+            // Re-render executions to update the display
+            this.renderExecutions();
+        }
+    }
+    
+    async showExecutionDetails(workId) {
+        console.log('Showing execution details for:', workId);
+        this.selectedWorkId = workId;
+        
+        try {
+            // Load detailed execution data
+            const execution = await this.apiClient.request(`/api/monitoring/execution/${workId}`);
+            
+            // Show modal with details
+            this.showModal('Execution Monitoring', this.renderExecutionDetailsModal(execution));
+            
+        } catch (error) {
+            console.error('Error loading execution details:', error);
+            this.showError('Failed to load execution details: ' + error.message);
+        }
+    }
+    
+    async showExecutionResults(workId) {
+        console.log('Showing execution results for:', workId);
+        this.selectedWorkId = workId;
+        
+        try {
+            // Load detailed execution data
+            const execution = await this.apiClient.request(`/api/monitoring/execution/${workId}`);
+            
+            // Show modal with results and download options
+            this.showModal('Execution Results', this.renderExecutionResultsModal(execution));
+            
+        } catch (error) {
+            console.error('Error loading execution results:', error);
+            this.showError('Failed to load execution results: ' + error.message);
+        }
+    }
+    
+    renderExecutionDetailsModal(execution) {
+        const metrics = execution.metrics || {};
+        
         return `
-            <div class="metrics-section">
-                <h4>Real-time Metrics</h4>
-                <div class="metrics-grid" id="metrics-grid">
-                    ${this.renderMetricsGrid()}
+            <div class="execution-details">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Basic Information</h6>
+                        <table class="table table-sm">
+                            <tr>
+                                <td><strong>Work ID:</strong></td>
+                                <td><code>${execution.work_id}</code></td>
+                            </tr>
+                            <tr>
+                                <td><strong>Status:</strong></td>
+                                <td>
+                                    <span class="badge bg-${this.getStatusColor(execution.status)}">
+                                        ${execution.status}
+                                    </span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><strong>Created:</strong></td>
+                                <td>${new Date(execution.created_at).toLocaleString()}</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Duration:</strong></td>
+                                <td>${metrics.duration ? Math.round(metrics.duration) + 's' : 'N/A'}</td>
+                            </tr>
+                        </table>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Files & Output</h6>
+                        <table class="table table-sm">
+                            <tr>
+                                <td><strong>File Count:</strong></td>
+                                <td>${metrics.file_count || 0}</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Total Size:</strong></td>
+                                <td>${metrics.total_size_mb || 0} MB</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Output Path:</strong></td>
+                                <td><code>${execution.output_path}</code></td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+                
+                <div class="mt-3">
+                    <h6>Recent Log Output</h6>
+                    <pre class="bg-dark text-light p-3 rounded" style="max-height: 300px; overflow-y: auto;"><code>${execution.latest_log || 'No log content available'}</code></pre>
+                </div>
+                
+                <div class="mt-3 d-flex gap-2">
+                    <button class="btn btn-outline-info" onclick="executionMonitor.showLogs('${execution.work_id}')">
+                        <i class="bi bi-file-text me-1"></i>View Full Logs
+                    </button>
+                    <button class="btn btn-outline-primary" onclick="executionMonitor.loadActiveExecutions()">
+                        <i class="bi bi-arrow-clockwise me-1"></i>Refresh
+                    </button>
                 </div>
             </div>
         `;
     }
-
-    renderMetricsGrid() {
-        if (Object.keys(this.metrics).length === 0) {
-            return '<div class="no-metrics">No metrics available yet...</div>';
-        }
-
-        return Object.entries(this.metrics).map(([key, value]) => `
-            <div class="metric-card">
-                <div class="metric-label">${this.formatMetricName(key)}</div>
-                <div class="metric-value">${this.formatMetricValue(value)}</div>
-            </div>
-        `).join('');
-    }
-
-    renderLogs() {
+    
+    renderExecutionResultsModal(execution) {
+        const metrics = execution.metrics || {};
+        const files = execution.files || {};
+        
         return `
-            <div class="logs-section">
-                <div class="logs-header">
-                    <h4>Execution Logs</h4>
-                    <div class="logs-controls">
-                        <label class="checkbox-label">
-                            <input type="checkbox" id="auto-scroll" ${this.options.autoScroll ? 'checked' : ''} />
-                            Auto-scroll
-                        </label>
-                        <button class="btn btn-outline btn-small" id="clear-logs" ${this.logs.length === 0 ? 'disabled' : ''}>
-                            Clear
+            <div class="execution-results">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Execution Summary</h6>
+                        <table class="table table-sm">
+                            <tr>
+                                <td><strong>Work ID:</strong></td>
+                                <td><code>${execution.work_id}</code></td>
+                            </tr>
+                            <tr>
+                                <td><strong>Final Status:</strong></td>
+                                <td>
+                                    <span class="badge bg-${this.getStatusColor(execution.status)}">
+                                        <i class="bi bi-${this.getStatusIcon(execution.status)} me-1"></i>
+                                        ${execution.status.charAt(0).toUpperCase() + execution.status.slice(1)}
+                                    </span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><strong>Completed:</strong></td>
+                                <td>${new Date(execution.last_modified).toLocaleString()}</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Duration:</strong></td>
+                                <td>${metrics.duration ? Math.round(metrics.duration) + 's' : 'N/A'}</td>
+                            </tr>
+                        </table>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Output Statistics</h6>
+                        <table class="table table-sm">
+                            <tr>
+                                <td><strong>Files Generated:</strong></td>
+                                <td>${metrics.file_count || 0}</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Total Size:</strong></td>
+                                <td>${metrics.total_size_mb || 0} MB</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Output Directory:</strong></td>
+                                <td><code>${execution.output_path}</code></td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+                
+                <div class="mt-3">
+                    <h6>Output Files</h6>
+                    <div class="row">
+                        ${files.outputs && files.outputs.length > 0 ? `
+                            <div class="col-md-6">
+                                <h6 class="small">Result Files</h6>
+                                <div class="list-group list-group-flush">
+                                    ${files.outputs.map(file => `
+                                        <div class="list-group-item d-flex justify-content-between align-items-center">
+                                            <span class="font-monospace small">${file.split('/').pop()}</span>
+                                            <button class="btn btn-outline-primary btn-sm" 
+                                                    onclick="executionMonitor.downloadFile('${file}')"
+                                                    title="Download file">
+                                                <i class="bi bi-download"></i>
+                                            </button>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>
+                        ` : ''}
+                        
+                        ${files.logs && files.logs.length > 0 ? `
+                            <div class="col-md-6">
+                                <h6 class="small">Log Files</h6>
+                                <div class="list-group list-group-flush">
+                                    ${files.logs.map(file => `
+                                        <div class="list-group-item d-flex justify-content-between align-items-center">
+                                            <span class="font-monospace small">${file.split('/').pop()}</span>
+                                            <div class="btn-group" role="group">
+                                                <button class="btn btn-outline-info btn-sm" 
+                                                        onclick="executionMonitor.showLogs('${execution.work_id}')"
+                                                        title="View logs">
+                                                    <i class="bi bi-eye"></i>
+                                                </button>
+                                                <button class="btn btn-outline-primary btn-sm" 
+                                                        onclick="executionMonitor.downloadFile('${file}')"
+                                                        title="Download file">
+                                                    <i class="bi bi-download"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>
+                        ` : ''}
+                        
+                        ${files.all && files.all.length > 0 && (!files.outputs || files.outputs.length === 0) && (!files.logs || files.logs.length === 0) ? `
+                            <div class="col-12">
+                                <h6 class="small">All Files</h6>
+                                <div class="list-group list-group-flush">
+                                    ${files.all.map(file => `
+                                        <div class="list-group-item d-flex justify-content-between align-items-center">
+                                            <span class="font-monospace small">${file.split('/').pop()}</span>
+                                            <button class="btn btn-outline-primary btn-sm" 
+                                                    onclick="executionMonitor.downloadFile('${file}')"
+                                                    title="Download file">
+                                                <i class="bi bi-download"></i>
+                                            </button>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>
+                        ` : ''}
+                    </div>
+                    
+                    ${(!files.outputs || files.outputs.length === 0) && (!files.logs || files.logs.length === 0) && (!files.all || files.all.length === 0) ? `
+                        <div class="text-center text-muted py-3">
+                            <i class="bi bi-file-earmark-x display-4"></i>
+                            <p class="mt-2">No output files available</p>
+                        </div>
+                    ` : ''}
+                </div>
+                
+                <div class="mt-3 d-flex gap-2">
+                    <button class="btn btn-outline-success" onclick="executionMonitor.downloadAllFiles('${execution.work_id}')">
+                        <i class="bi bi-download me-1"></i>Download All Files
+                    </button>
+                    <button class="btn btn-outline-info" onclick="executionMonitor.showLogs('${execution.work_id}')">
+                        <i class="bi bi-file-text me-1"></i>View Logs
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+    
+    async downloadFile(filePath) {
+        try {
+            // Create a temporary link and trigger download
+            const response = await fetch(`/api/files/download?path=${encodeURIComponent(filePath)}`);
+            
+            if (!response.ok) {
+                throw new Error('Failed to download file');
+            }
+            
+            const blob = await response.blob();
+            const fileName = filePath.split('/').pop();
+            
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+            
+        } catch (error) {
+            console.error('Error downloading file:', error);
+            this.showError('Failed to download file: ' + error.message);
+        }
+    }
+    
+    async downloadAllFiles(workId) {
+        try {
+            // Request a zip of all files for this execution
+            const response = await fetch(`/api/files/download-zip/${workId}`);
+            
+            if (!response.ok) {
+                throw new Error('Failed to create download archive');
+            }
+            
+            const blob = await response.blob();
+            const fileName = `execution_${workId}_results.zip`;
+            
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+            
+        } catch (error) {
+            console.error('Error downloading all files:', error);
+            this.showError('Failed to download files: ' + error.message);
+        }
+    }
+    
+    async showLogs(workId) {
+        console.log('Showing logs for execution:', workId);
+        
+        try {
+            const response = await this.apiClient.request(`/api/monitoring/execution/${workId}/logs?lines=200`);
+            
+            this.showModal('Execution Logs', `
+                <div class="logs-viewer">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h6 class="mb-0">Work ID: <code>${workId}</code></h6>
+                        <span class="text-muted">Showing last ${response.showing_lines} lines</span>
+                    </div>
+                    <pre class="bg-dark text-light p-3 rounded" style="height: 400px; overflow-y: auto;"><code>${response.logs || 'No log content available'}</code></pre>
+                    <div class="mt-2">
+                        <button class="btn btn-outline-primary btn-sm" onclick="executionMonitor.showLogs('${workId}')">
+                            <i class="bi bi-arrow-clockwise me-1"></i>Refresh
                         </button>
                     </div>
                 </div>
-                
-                <div class="logs-container" id="logs-container">
-                    ${this.renderLogEntries()}
-                </div>
-            </div>
-        `;
-    }
-
-    renderLogEntries() {
-        if (this.logs.length === 0) {
-            return '<div class="no-logs">No logs yet...</div>';
-        }
-
-        return this.logs.map(log => `
-            <div class="log-entry ${log.level}" data-timestamp="${log.timestamp}">
-                <span class="log-time">${this.formatLogTime(log.timestamp)}</span>
-                <span class="log-level">${log.level.toUpperCase()}</span>
-                <span class="log-message">${this.escapeHtml(log.message)}</span>
-            </div>
-        `).join('');
-    }
-
-    setupEventListeners() {
-        // Cancel button
-        document.getElementById('cancel-btn')?.addEventListener('click', () => {
-            this.cancelExecution();
-        });
-
-        // Download logs
-        document.getElementById('download-logs')?.addEventListener('click', () => {
-            this.downloadLogs();
-        });
-
-        // Auto-scroll toggle
-        document.getElementById('auto-scroll')?.addEventListener('change', (e) => {
-            this.options.autoScroll = e.target.checked;
-        });
-
-        // Clear logs
-        document.getElementById('clear-logs')?.addEventListener('click', () => {
-            this.clearLogs();
-        });
-    }
-
-    startExecution(executionData) {
-        this.executionId = executionData.id || Date.now().toString();
-        this.status = 'running';
-        this.startTime = new Date();
-        this.progress = 0;
-        this.logs = [];
-        this.metrics = {};
-        
-        this.addLog('info', `Starting execution of ${executionData.algorithm} on ${executionData.dataset}`);
-        this.addLog('info', `Parameters: ${JSON.stringify(executionData.params, null, 2)}`);
-        
-        this.render();
-        this.startPolling();
-    }
-
-    startPolling() {
-        if (this.updateTimer) {
-            clearInterval(this.updateTimer);
-        }
-        
-        this.updateTimer = setInterval(() => {
-            this.updateStatus();
-        }, this.options.updateInterval);
-    }
-
-    stopPolling() {
-        if (this.updateTimer) {
-            clearInterval(this.updateTimer);
-            this.updateTimer = null;
-        }
-    }
-
-    async updateStatus() {
-        if (!this.executionId || this.status !== 'running') {
-            this.stopPolling();
-            return;
-        }
-
-        try {
-            const response = await window.apiClient.getExecutionStatus(this.executionId);
-            this.handleStatusUpdate(response);
+            `);
+            
         } catch (error) {
-            console.error('Failed to update execution status:', error);
-            this.addLog('error', `Failed to get status update: ${error.message}`);
+            console.error('Error loading logs:', error);
+            this.showError('Failed to load logs: ' + error.message);
         }
     }
-
-    handleStatusUpdate(data) {
-        // Update progress
-        if (data.progress !== undefined) {
-            this.updateProgress(data.progress, data.progressMessage);
+    
+    showConnectionStatus(status) {
+        const statusElement = document.getElementById('ws-status');
+        if (statusElement) {
+            if (status === 'connected') {
+                statusElement.className = 'badge bg-success me-2';
+                statusElement.innerHTML = '<i class="bi bi-wifi me-1"></i>Live';
+            } else {
+                statusElement.className = 'badge bg-warning me-2';
+                statusElement.innerHTML = '<i class="bi bi-wifi-off me-1"></i>Offline';
+            }
         }
-
-        // Update metrics
-        if (data.metrics) {
-            this.updateMetrics(data.metrics);
+    }
+    
+    showModal(title, content) {
+        // Create or update modal
+        let modal = document.getElementById('execution-details-modal');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'execution-details-modal';
+            modal.className = 'modal fade';
+            modal.innerHTML = `
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title"></h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body"></div>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
         }
-
-        // Add new logs
-        if (data.logs && Array.isArray(data.logs)) {
-            data.logs.forEach(log => {
-                this.addLog(log.level, log.message, log.timestamp);
+        
+        modal.querySelector('.modal-title').textContent = title;
+        modal.querySelector('.modal-body').innerHTML = content;
+        
+        // Ensure close button works
+        const closeButton = modal.querySelector('.btn-close');
+        if (closeButton) {
+            closeButton.addEventListener('click', () => {
+                const bsModal = bootstrap.Modal.getInstance(modal);
+                if (bsModal) {
+                    bsModal.hide();
+                }
             });
         }
-
-        // Check if completed
-        if (data.status === 'completed') {
-            this.handleCompletion(data.result);
-        } else if (data.status === 'failed') {
-            this.handleError(data.error);
-        }
+        
+        const bsModal = new bootstrap.Modal(modal);
+        bsModal.show();
     }
-
-    updateProgress(progress, message = '') {
-        this.progress = Math.max(0, Math.min(100, progress));
-        
-        const progressFill = document.getElementById('progress-fill');
-        const progressPercentage = document.getElementById('progress-percentage');
-        const progressInfo = document.getElementById('progress-info');
-        
-        if (progressFill) progressFill.style.width = `${this.progress}%`;
-        if (progressPercentage) progressPercentage.textContent = `${this.progress}%`;
-        if (progressInfo && message) progressInfo.textContent = message;
-    }
-
-    updateMetrics(newMetrics) {
-        this.metrics = { ...this.metrics, ...newMetrics };
-        
-        const metricsGrid = document.getElementById('metrics-grid');
-        if (metricsGrid) {
-            metricsGrid.innerHTML = this.renderMetricsGrid();
-        }
-    }
-
-    addLog(level, message, timestamp = null) {
-        const logEntry = {
-            level: level.toLowerCase(),
-            message,
-            timestamp: timestamp || new Date().toISOString()
-        };
-        
-        this.logs.push(logEntry);
-        
-        // Update logs container
-        const logsContainer = document.getElementById('logs-container');
-        if (logsContainer) {
-            const logElement = document.createElement('div');
-            logElement.className = `log-entry ${logEntry.level}`;
-            logElement.dataset.timestamp = logEntry.timestamp;
-            logElement.innerHTML = `
-                <span class="log-time">${this.formatLogTime(logEntry.timestamp)}</span>
-                <span class="log-level">${logEntry.level.toUpperCase()}</span>
-                <span class="log-message">${this.escapeHtml(logEntry.message)}</span>
+    
+    showError(message) {
+        const container = document.getElementById(this.containerId);
+        if (container) {
+            container.innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="bi bi-exclamation-triangle me-2"></i>
+                    ${message}
+                </div>
             `;
-            
-            logsContainer.appendChild(logElement);
-            
-            // Auto-scroll if enabled
-            if (this.options.autoScroll) {
-                logElement.scrollIntoView({ behavior: 'smooth' });
-            }
-        }
-        
-        // Update clear button state
-        const clearBtn = document.getElementById('clear-logs');
-        if (clearBtn) clearBtn.disabled = false;
-        
-        // Update download button state
-        const downloadBtn = document.getElementById('download-logs');
-        if (downloadBtn) downloadBtn.disabled = false;
-    }
-
-    handleCompletion(result) {
-        this.status = 'completed';
-        this.progress = 100;
-        this.stopPolling();
-        
-        this.addLog('success', 'Execution completed successfully!');
-        if (result) {
-            this.addLog('info', `Best string: ${result.best_string}`);
-            this.addLog('info', `Max distance: ${result.max_distance}`);
-            if (result.metadata) {
-                this.addLog('info', `Metadata: ${JSON.stringify(result.metadata, null, 2)}`);
-            }
-        }
-        
-        this.updateStatusIndicator();
-        this.options.onComplete(result);
-    }
-
-    handleError(error) {
-        this.status = 'failed';
-        this.stopPolling();
-        
-        this.addLog('error', `Execution failed: ${error}`);
-        this.updateStatusIndicator();
-        this.options.onError(error);
-    }
-
-    async cancelExecution() {
-        if (!this.executionId || this.status !== 'running') return;
-        
-        try {
-            await window.apiClient.cancelExecution(this.executionId);
-            this.status = 'cancelled';
-            this.stopPolling();
-            this.addLog('warning', 'Execution cancelled by user');
-            this.updateStatusIndicator();
-        } catch (error) {
-            this.addLog('error', `Failed to cancel execution: ${error.message}`);
         }
     }
-
-    updateStatusIndicator() {
-        const indicator = document.getElementById('status-indicator');
-        const statusText = document.getElementById('status-text');
-        const cancelBtn = document.getElementById('cancel-btn');
+    
+    destroy() {
+        console.log('Destroying Execution Monitor...');
         
-        if (indicator) indicator.className = `status-indicator ${this.status}`;
-        if (statusText) statusText.textContent = this.getStatusText();
-        if (cancelBtn) cancelBtn.disabled = this.status !== 'running';
-        
-        // Update execution time
-        const timeEl = document.getElementById('execution-time');
-        if (timeEl) timeEl.textContent = this.getExecutionTime();
-    }
-
-    getStatusText() {
-        const statusTexts = {
-            idle: 'Ready',
-            running: 'Running',
-            completed: 'Completed',
-            failed: 'Failed',
-            cancelled: 'Cancelled'
-        };
-        return statusTexts[this.status] || 'Unknown';
-    }
-
-    getExecutionTime() {
-        if (!this.startTime) return 'Not started';
-        
-        const elapsed = Date.now() - this.startTime.getTime();
-        const seconds = Math.floor(elapsed / 1000);
-        const minutes = Math.floor(seconds / 60);
-        const hours = Math.floor(minutes / 60);
-        
-        if (hours > 0) {
-            return `${hours}h ${minutes % 60}m ${seconds % 60}s`;
-        } else if (minutes > 0) {
-            return `${minutes}m ${seconds % 60}s`;
-        } else {
-            return `${seconds}s`;
-        }
-    }
-
-    getProgressInfo() {
-        if (this.status === 'idle') return 'Waiting to start...';
-        if (this.status === 'running') return `${this.progress}% complete`;
-        if (this.status === 'completed') return 'Execution completed successfully';
-        if (this.status === 'failed') return 'Execution failed';
-        if (this.status === 'cancelled') return 'Execution cancelled';
-        return '';
-    }
-
-    formatMetricName(name) {
-        return name.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-    }
-
-    formatMetricValue(value) {
-        if (typeof value === 'number') {
-            return value % 1 === 0 ? value.toString() : value.toFixed(3);
-        }
-        return String(value);
-    }
-
-    formatLogTime(timestamp) {
-        return new Date(timestamp).toLocaleTimeString();
-    }
-
-    escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    }
-
-    downloadLogs() {
-        if (this.logs.length === 0) return;
-        
-        const logText = this.logs.map(log => 
-            `[${log.timestamp}] ${log.level.toUpperCase()}: ${log.message}`
-        ).join('\n');
-        
-        const blob = new Blob([logText], { type: 'text/plain' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `execution-logs-${this.executionId || 'unknown'}.txt`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-    }
-
-    clearLogs() {
-        this.logs = [];
-        const logsContainer = document.getElementById('logs-container');
-        if (logsContainer) {
-            logsContainer.innerHTML = '<div class="no-logs">No logs yet...</div>';
+        if (this.updateInterval) {
+            clearInterval(this.updateInterval);
         }
         
-        const clearBtn = document.getElementById('clear-logs');
-        if (clearBtn) clearBtn.disabled = true;
-        
-        const downloadBtn = document.getElementById('download-logs');
-        if (downloadBtn) downloadBtn.disabled = true;
-    }
-
-    reset() {
-        this.stopPolling();
-        this.executionId = null;
-        this.status = 'idle';
-        this.startTime = null;
-        this.progress = 0;
-        this.logs = [];
-        this.metrics = {};
-        this.render();
-    }
-
-    getExecutionData() {
-        return {
-            id: this.executionId,
-            status: this.status,
-            startTime: this.startTime,
-            progress: this.progress,
-            logs: this.logs,
-            metrics: this.metrics
-        };
+        if (this.wsClient) {
+            this.wsClient.disconnect();
+        }
     }
 }
 
-// Export para uso global
-window.ExecutionMonitor = ExecutionMonitor;
+// Export for global use
+if (typeof window !== 'undefined') {
+    window.ExecutionMonitor = ExecutionMonitor;
+}

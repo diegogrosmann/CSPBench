@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""
+""" 
 CSPBench Main Entry Point - Hexagonal Architecture
 
 Features:
@@ -49,12 +49,11 @@ sys.path.insert(0, str(Path(__file__).parent))
 # Initialize logging system early using environment variables
 try:
     from src.infrastructure.logging_config import LoggerConfig
-    
+
     LoggerConfig.initialize()
     logger = LoggerConfig.get_logger("CSPBench.Main")
     logger.info("Sistema de logging inicializado com sucesso")
     logger.info("Iniciando CSPBench - modo principal")
-    print("✅ Sistema de logging inicializado com sucesso")
 except Exception as e:
     print(f"⚠️  Aviso: falha ao inicializar logging: {e}")
     # Continue execution even if logging fails
@@ -66,6 +65,7 @@ try:  # noqa: WPS501
     if logger:
         logger.debug("Carregando pacote de algoritmos via auto-discovery")
     import algorithms  # noqa: F401
+
     if logger:
         logger.info("Pacote 'algorithms' carregado com sucesso")
 except Exception as _e:  # noqa: BLE001
@@ -120,10 +120,10 @@ def main(args: Optional[list] = None):
 
     if args is None:
         args = sys.argv[1:]
-        
+
     if logger:
         logger.info(f"Ponto de entrada programático iniciado com argumentos: {args}")
-        
+
     try:
         _dispatch_args(args)
         if logger:
@@ -144,7 +144,6 @@ def main(args: Optional[list] = None):
         if logger:
             logger.error(f"Erro inesperado na execução: {e}", exc_info=True)
         sys.exit(1)
-
 
 if __name__ == "__main__":
     import sys
