@@ -1,21 +1,17 @@
 """CLI Commands Registration Module
 
-Centraliza registro de comandos. Adicionado comando `pipeline run` para novo orquestrador.
+Centraliza registro de comandos usando ExecutionManager unificado.
 """
 
 import os
-import json
 from pathlib import Path
 
 import typer
 
 from src.domain.config import load_cspbench_config
-from src.application.services.pipeline_service import PipelineService
-from src.application.work.manager import get_work_manager
-from src.presentation.display.terminal_monitor import TerminalMonitor
-from src.infrastructure.monitoring.monitor_interface import LoggingMonitor, NoOpMonitor
-from src.infrastructure.logging_config import setup_logging_from_env, get_logger
-import logging
+from src.domain.work import WorkStatus
+from src.application.services.execution_manager import ExecutionManager
+from src.infrastructure.logging_config import  get_logger
 
 # Create module logger
 command_logger = get_logger("CSPBench.CLI.Commands")
@@ -32,76 +28,91 @@ def register_commands(app: typer.Typer) -> None:
         batch: Path = typer.Argument(
             ..., exists=True, readable=True, help="Batch YAML file"
         ),
-        monitor: str = typer.Option(
-            "terminal",
-            help="Monitor type: 'none' (no monitoring), 'terminal' (visual terminal monitor), 'log' (logging monitor)",
-        ),
     ):
-        """Submete pipeline (experiment|optimization|sensitivity) ao WorkManager.
+        """Execute pipeline using unified ExecutionManager.
 
-        Usa PipelineService para orquestrar execução assíncrona e registra WorkItem via WorkManager.
+        Uses ExecutionManager for consistent execution workflow between CLI and Web.
         """
         try:
-            typer.echo(f"🚀 Submetendo pipeline: batch={batch}")
+            typer.echo(f"🚀 Executando: batch={batch}")
             config = load_cspbench_config(batch)
-            wm = get_work_manager()
 
-            # Configurar monitor baseado na opção escolhida
-            display_monitor = None
-            if monitor == "terminal":
-                display_monitor = TerminalMonitor()
-                typer.echo("📊 Monitor de terminal ativado")
-            elif monitor == "log":
-                # Configurar logging para arquivo usando variáveis de ambiente
-                setup_logging_from_env()
-                logger = get_logger("CSPBench.Pipeline")
-                display_monitor = LoggingMonitor(logger)
-                typer.echo("📝 Monitor de log ativado")
-            elif monitor == "none":
-                display_monitor = NoOpMonitor()
-                typer.echo("🔇 Monitor desabilitado")
-                command_logger.info("Monitor desabilitado")
-            else:
-                error_msg = f"❌ Tipo de monitor inválido: {monitor}"
-                typer.echo(error_msg)
-                typer.echo("💡 Opções válidas: 'none', 'terminal', 'log'")
-                command_logger.error(f"Tipo de monitor inválido: {monitor}")
-                raise typer.Exit(1)
+            extra = {
+                "origin": "cli",
+                "batch_file": str(batch)
+            }
+            execution_manager = ExecutionManager()
 
-            wid = PipelineService.run(config, monitor=display_monitor)
+            work_id = execution_manager.execute(
+                config=config,
+                extra=extra
+            )
 
-            item = wm.get(wid)
-            if not item:
-                typer.echo("❌ Falha ao registrar WorkItem")
-                raise typer.Exit(1)
-            typer.echo(f"🆔 work_id={wid} status={item['status']}")
-
-            typer.echo(f"⏳ Aguardando o término...")
-            final_status = wm.wait_until_terminal(wid)
-            typer.echo(f"✅ Status final: {final_status}")
-
+            typer.echo(f"🆔 work_id={work_id} executando em segundo plano")
+            typer.echo(f"✅ Trabalho submetido com sucesso")
+            typer.echo(f"💡 Use 'cspbench work status {work_id}' para acompanhar o progresso")
+            
         except Exception as e:  # noqa: BLE001
             typer.echo(f"❌ Erro: {e}")
             raise typer.Exit(1)
 
-    # --- Subcomandos para WorkManager ---
-    work_app = typer.Typer(help="Gerencia WorkItems em execução")
+    # --- Work management commands ---
+    work_app = typer.Typer(help="Gerencia WorkItems usando WorkService")
 
     @work_app.command("restart")
     def work_restart(work_id: str):
-        wm = get_work_manager()
-        if wm.restart(work_id):
+        """Restart a work item using WorkService."""
+        from application.services.work_service import get_work_service
+        
+        work_service = get_work_service()
+        if work_service.restart(work_id):
             typer.echo("🔁 Restarted (queued)")
         else:
             typer.echo("❌ Não foi possível reiniciar (estado inválido?)")
             raise typer.Exit(1)
 
+    @work_app.command("list")
+    def work_list():
+        """List all work items using WorkService."""
+        from application.services.work_service import get_work_service
+        
+        work_service = get_work_service()
+        items = work_service.list()
+        
+        if not items:
+            typer.echo("📭 Nenhum trabalho encontrado")
+            return
+            
+        typer.echo("📋 Lista de trabalhos:")
+        for item in items:
+            status = item.get("status", "unknown")
+            work_id = item.get("work_id", item.get("id", "unknown"))
+            typer.echo(f"  • {work_id}: {status}")
+
+    @work_app.command("status")
+    def work_status(work_id: str):
+        """Get work item status using WorkService."""
+        from application.services.work_service import get_work_service
+        
+        work_service = get_work_service()
+        details = work_service.get(work_id)
+        
+        if not details:
+            typer.echo(f"❌ Trabalho {work_id} não encontrado")
+            raise typer.Exit(1)
+            
+        typer.echo(f"📊 Status do trabalho {work_id}:")
+        typer.echo(f"  Status: {details.get('status', 'unknown')}")
+        typer.echo(f"  Criado: {details.get('created_at', 'unknown')}")
+        typer.echo(f"  Atualizado: {details.get('updated_at', 'unknown')}")
+        if details.get("error"):
+            typer.echo(f"  Erro: {details['error']}")
+
     app.add_typer(work_app, name="work")
 
     @app.command()
-    def algorithms():  # thin wrapper
-        """List available algorithms (delegated)."""
-        """Lista algoritmos registrados retornando exit code lógico."""
+    def algorithms():
+        """List available algorithms."""
         try:
             from src.domain.algorithms import global_registry  # lazy import
 
@@ -121,7 +132,7 @@ def register_commands(app: typer.Typer) -> None:
         port: int = typer.Option(None, "--port", "-p", help="Port to bind to"),
         dev: bool = typer.Option(None, "--dev", help="Run in development mode"),
     ) -> None:
-        """Start the web interface (delegated)."""
+        """Start the web interface."""
         try:
             host = host if host is not None else os.getenv("WEB_HOST", "0.0.0.0")
             port = int(port) if port is not None else int(os.getenv("WEB_PORT", "8000"))
@@ -143,7 +154,7 @@ def register_commands(app: typer.Typer) -> None:
             try:
                 import uvicorn  # type: ignore
 
-                # Importa aplicação para registrar rotas
+                # Import application to register routes
                 from src.presentation.web.app import app as web_app  # noqa: F401
             except ImportError as e:  # noqa: BLE001
                 typer.echo("❌ Web dependencies not installed: %s" % e)

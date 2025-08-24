@@ -6,12 +6,11 @@ pela camada de infraestrutura seguindo o padrão de arquitetura hexagonal.
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Protocol, runtime_checkable, Callable
+from typing import Any, Dict, Iterable, List, Optional, Protocol, runtime_checkable, Callable
 
+from src.domain.work import WorkItem
 from src.domain import CSPAlgorithm, Dataset
 from src.domain.config import AlgParams, ResourcesConfig, SystemConfig
-from src.infrastructure.monitoring.monitor_interface import Monitor
-
 
 class AlgorithmRegistry(Protocol):
     """Port para registry de algoritmos."""
@@ -142,7 +141,6 @@ class ExecutionEngine(Protocol):
         dataset_obj: Dataset,
         alg: AlgParams,
         resources: ResourcesConfig | None,
-        monitor: Monitor | None = None,
         system_config: SystemConfig | None = None,
         check_control: Callable[[], str] | None = None,
         store: Any = None,
@@ -274,10 +272,42 @@ class AbstractExecutionEngine(ABC):
         dataset_obj: Dataset,
         alg: AlgParams,
         resources: ResourcesConfig | None,
-        monitor: Monitor | None = None,
         system_config: SystemConfig | None = None,
         check_control: Callable[[], str] | None = None,
         store: AbstractStore | None = None,
     ) -> Dict[str, Any]:
         """Executa uma tarefa específica."""
         pass
+
+
+class WorkRepository(ABC):
+    """Porta (abstração) para armazenar WorkItems.
+    """
+
+    @abstractmethod
+    def add(self, item: WorkItem) -> None:
+        """Persiste o novo WorkItem.
+        Deve falhar se id já existir (opcional: sobrescrever).
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def get(self, work_id: str) -> Optional[WorkItem]:
+        """Retorna WorkItem ou None se não encontrado."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def list(self) -> Iterable[WorkItem]:
+        """Lista todos os WorkItems."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def update(self, item: WorkItem) -> None:
+        """Atualiza WorkItem existente (no-op se não existir)."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def remove(self, work_id: str) -> None:
+        """Remove WorkItem se existir (idempotente)."""
+        raise NotImplementedError
+

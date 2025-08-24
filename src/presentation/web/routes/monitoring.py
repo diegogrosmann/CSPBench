@@ -9,8 +9,8 @@ import os
 import glob
 from pathlib import Path
 
-from src.application.work.global_manager import get_global_work_manager
-from src.application.work.manager import WorkManager
+from application.services.work_service import get_work_service
+from application.work.work_manager import WorkManager
 from src.presentation.web.websocket_manager import connection_manager
 from src.infrastructure.logging_config import get_logger
 
@@ -19,7 +19,7 @@ router = APIRouter()
 
 
 @router.get("/api/monitoring/active-executions")
-async def get_active_executions(work_manager: WorkManager = Depends(get_global_work_manager)):
+async def get_active_executions(work_manager: WorkManager = Depends(get_work_service)):
     """Get list of active executions"""
     try:
         # Get active work items from work manager
@@ -146,7 +146,7 @@ async def get_active_executions(work_manager: WorkManager = Depends(get_global_w
 
 
 @router.get("/api/monitoring/execution/{work_id}/detailed")
-async def get_execution_detailed(work_id: str, work_manager: WorkManager = Depends(get_global_work_manager)):
+async def get_execution_detailed(work_id: str, work_manager: WorkManager = Depends(get_work_service)):
     """Get detailed execution information including task progress and trials"""
     try:
         work_dir = Path("outputs") / work_id
@@ -552,7 +552,7 @@ async def get_execution_details(work_id: str, execution_id: str):
 
 
 @router.get("/api/monitoring/execution/{work_id}")
-async def get_execution_details(work_id: str, work_manager: WorkManager = Depends(get_global_work_manager)):
+async def get_execution_details(work_id: str, work_manager: WorkManager = Depends(get_work_service)):
     """Get detailed information about a specific execution"""
     try:
         # Check if work directory exists
@@ -840,9 +840,9 @@ async def get_work_monitor(work_id: str):
     - se ausente, tenta ler `WorkStateStore` (state.db) e retorna metadados
     """
     try:
-        from src.application.work.global_manager import get_global_work_manager
+        from application.services.work_service import get_work_service
 
-        wm = get_global_work_manager()
+        wm = get_work_service()
         mon = None
         try:
             mon = wm.get_registered_monitor(work_id)

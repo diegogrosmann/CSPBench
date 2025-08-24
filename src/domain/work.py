@@ -1,33 +1,34 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass
 from enum import Enum
 import time
 from typing import Any, Dict, Optional
 
 from .config import CSPBenchConfig
 
-
+ 
 class WorkStatus(str, Enum):
+    """Standardized work execution statuses across the entire system."""
     QUEUED = "queued"
-    RUNNING = "running"
+    RUNNING = "running" 
     PAUSED = "paused"
     CANCELED = "canceled"
-    FINISHED = "finished"
-    ERROR = "error"
+    COMPLETED = "completed"  # Changed from FINISHED to COMPLETED for clarity
+    FAILED = "failed"        # Changed from ERROR to FAILED for clarity
 
 
 _ALLOWED: dict[WorkStatus, set[WorkStatus]] = {
     WorkStatus.QUEUED: {WorkStatus.RUNNING, WorkStatus.CANCELED},
     WorkStatus.RUNNING: {
         WorkStatus.PAUSED,
-        WorkStatus.FINISHED,
-        WorkStatus.ERROR,
+        WorkStatus.COMPLETED,  # Updated
+        WorkStatus.FAILED,     # Updated
         WorkStatus.CANCELED,
     },
     WorkStatus.PAUSED: {WorkStatus.RUNNING, WorkStatus.CANCELED},
-    WorkStatus.FINISHED: {WorkStatus.QUEUED},
-    WorkStatus.ERROR: {WorkStatus.QUEUED},
+    WorkStatus.COMPLETED: {WorkStatus.QUEUED},  # Updated
+    WorkStatus.FAILED: {WorkStatus.QUEUED},     # Updated
     WorkStatus.CANCELED: {WorkStatus.QUEUED},
 }
 
@@ -62,11 +63,11 @@ class WorkItem:
         return self._set_status(WorkStatus.RUNNING)
 
     def mark_finished(self) -> bool:
-        ok = self._set_status(WorkStatus.FINISHED)
+        ok = self._set_status(WorkStatus.COMPLETED)
         return ok
 
     def mark_error(self, error: str) -> bool:
-        ok = self._set_status(WorkStatus.ERROR)
+        ok = self._set_status(WorkStatus.FAILED)
         if ok:
             self.error = error
         return ok
@@ -82,8 +83,8 @@ class WorkItem:
 
     def restart(self) -> bool:
         if self.status not in (
-            WorkStatus.FINISHED,
-            WorkStatus.ERROR,
+            WorkStatus.COMPLETED,
+            WorkStatus.FAILED,
             WorkStatus.CANCELED,
         ):
             return False
@@ -105,6 +106,10 @@ class WorkItem:
             except:
                 config_name = "Unknown"
         
+        # Get origin and batch_file from extra
+        origin = self.extra.get("origin") if self.extra else None
+        batch_file = self.extra.get("batch_file") if self.extra else None
+        
         return {
             "work_id": self.id,
             "status": self.status.value,
@@ -113,9 +118,13 @@ class WorkItem:
             "output_path": self.output_path,
             "error": self.error,
             "config_name": config_name,
-            "progress": self.extra.get("progress"),
-            # Include extra data without nesting issues
-            **{k: v for k, v in self.extra.items() if k != "config" and isinstance(v, (str, int, float, bool, type(None)))}
+            "origin": origin,
+            "batch_file": batch_file,
+            "progress": self.extra.get("progress") if self.extra else None,
+            # Include extra data without nesting issues (excluding origin and batch_file)
+            **{k: v for k, v in (self.extra or {}).items() 
+               if k not in ("config", "origin", "batch_file", "progress") 
+               and isinstance(v, (str, int, float, bool, type(None)))}
         }
     
     def _format_timestamp(self, timestamp: float) -> str:

@@ -1,31 +1,28 @@
 """
 Batch Execution API Routes
-Provides REST endpoints for batch execution management with global WorkManager.
+Provides REST endpoints for batch execution management using unified ExecutionManager.
 """
 
 import logging
 import os
-import threading
-import yaml
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Optional
 
 from fastapi import APIRouter, HTTPException, BackgroundTasks
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from src.application.services.pipeline_service import PipelineService
+from src.application.services.execution_manager import ExecutionManager
+from src.domain.work import WorkStatus
 from src.presentation.display.web_monitor import WebMonitor
-from src.application.work.global_manager import (
-    get_global_work_manager,
-    submit_work,
-    get_work_status,
+from application.services.work_service import (
+    get_work_service,
     get_work_details,
     list_all_work,
     control_work,
 )
-from src.domain.config import CSPBenchConfig, load_cspbench_config
+from src.domain.config import load_cspbench_config
 
 from ..core.batch_execution_models import (
     BatchExecutionRequest,
@@ -43,53 +40,13 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/batch", tags=["batch-execution"])
 
 
-def _execute_batch_work(work_id: str, config: CSPBenchConfig) -> None:
-    """
-    Execute batch work in background thread using global WorkManager.
-    
-    Args:
-        work_id: Work item identifier
-        config: Batch configuration to execute
-    """
-    try:
-        logger.info(f"Starting batch execution for work_id: {work_id}")
-        
-        # Mark work as running in global WorkManager
-        manager = get_global_work_manager()
-        success = manager.mark_running(work_id)
-        if not success:
-            logger.error(f"Failed to mark work {work_id} as running")
-            return
-        
-        # Execute using PipelineService with WebMonitor (backend always uses web monitor)
-        pipeline_service = PipelineService()
-        web_monitor = WebMonitor()
-        results = pipeline_service.run(config, monitor=web_monitor)
-        
-        logger.info(f"Batch execution completed for work_id: {work_id}")
-        logger.debug(f"Results: {results}")
-        
-        # Mark as finished
-        manager.mark_finished(work_id)
-        
-    except Exception as e:
-        logger.error(f"Batch execution failed for work_id {work_id}: {e}", exc_info=True)
-        
-        # Mark as error in global WorkManager
-        try:
-            manager = get_global_work_manager()
-            manager.mark_error(work_id, str(e))
-        except Exception as cleanup_error:
-            logger.error(f"Failed to mark work {work_id} as error: {cleanup_error}")
-
-
 @router.post("/execute", response_model=BatchExecutionResponse)
 async def execute_batch(
     request: BatchExecutionRequest,
     background_tasks: BackgroundTasks
 ) -> BatchExecutionResponse:
     """
-    Execute batch configuration with global WorkManager persistence.
+    Execute batch configuration using unified ExecutionManager.
     
     Args:
         request: Batch execution request with batch file path
@@ -129,25 +86,159 @@ async def execute_batch(
                 detail=f"Failed to load configuration: {e}"
             )
         
-        # Submit work to global WorkManager
-        # Do not propagate monitor choice from client; backend always uses the web monitor
+        # Use ExecutionManager with async mode
+        execution_manager = ExecutionManager()
+        web_monitor = WebMonitor()  # TODO: Pass session info if needed
         extra_data = {
             "description": f"Web execution of {request.batch_file}",
-            "batch_file": request.batch_file
+            "batch_file": request.batch_file,
+            "origin": "web"
         }
         
-        work_id, work_details = submit_work(config=config, extra=extra_data)
+        work_id = execution_manager.execute(
+            config=config,
+            monitor=web_monitor,
+            mode="async",
+            extra=extra_data
+        )
+        
         logger.info(f"Work submitted with ID: {work_id}")
         
-        # Start background execution
-        background_tasks.add_task(_execute_batch_work, work_id, config)
+        # Get work details for response
+        work_details = get_work_details(work_id)
+        
+        return BatchExecutionResponse(
+            work_id=work_id,
+            status=WorkStatus.QUEUED.value,
+            message="Batch execution started successfully",
+            submitted_at=datetime.now(),
+            output_path=work_details.get("output_path")
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error in batch execution: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Internal server error: {e}"
+        )
+
+import logging
+import os
+import threading
+import yaml
+from datetime import datetime
+from pathlib import Path
+from typing import Dict, Any, Optional
+
+from fastapi import APIRouter, HTTPException, BackgroundTasks
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel
+
+from src.application.services.execution_manager import ExecutionManager
+from src.presentation.display.web_monitor import WebMonitor
+from src.application.work.global_manager import (
+    get_global_work_manager,
+    get_work_status,
+    get_work_details,
+    list_all_work,
+    control_work,
+)
+from src.domain.config import CSPBenchConfig, load_cspbench_config
+
+from ..core.batch_execution_models import (
+    BatchExecutionRequest,
+    BatchExecutionResponse,
+    BatchStatusResponse,
+    BatchResultsResponse,
+    BatchListResponse,
+    BatchControlResponse,
+)
+
+# Get logger
+logger = logging.getLogger(__name__)
+
+# Create router
+router = APIRouter(prefix="/api/batch", tags=["batch-execution"])
+
+
+@router.post("/execute", response_model=BatchExecutionResponse)
+async def execute_batch(
+    request: BatchExecutionRequest,
+    background_tasks: BackgroundTasks
+) -> BatchExecutionResponse:
+    """
+    Execute batch configuration with unified ExecutionManager.
+    
+    Args:
+        request: Batch execution request with batch file path
+        background_tasks: FastAPI background tasks
+        
+    Returns:
+        Batch execution response with work_id and status
+    """
+    try:
+        logger.info(f"Received batch execution request for file: {request.batch_file}")
+        
+        # Get batch directory and construct full path
+        batch_dir = Path(os.getenv("BATCH_DIRECTORY", "./batches"))
+        batch_path = batch_dir / request.batch_file
+        
+        # Validate file exists and is readable
+        if not batch_path.exists():
+            raise HTTPException(
+                status_code=404,
+                detail=f"Batch file not found: {request.batch_file}"
+            )
+        
+        if not batch_path.is_file():
+            raise HTTPException(
+                status_code=400,
+                detail=f"Path is not a file: {request.batch_file}"
+            )
+        
+        # Load configuration using the same function as CLI
+        try:
+            config = load_cspbench_config(batch_path)
+            logger.info(f"Loaded batch configuration: {config.metadata.name}")
+        except Exception as e:
+            logger.error(f"Config loading error: {e}")
+            raise HTTPException(
+                status_code=400,
+                detail=f"Failed to load configuration: {e}"
+            )
+        
+        # Create WebMonitor for this execution
+        web_monitor = WebMonitor()
+        
+        # Use ExecutionManager for unified orchestration
+        execution_manager = ExecutionManager()
+        extra_data = {
+            "description": f"Web execution of {request.batch_file}",
+            "batch_file": request.batch_file,
+            "origin": "web"
+        }
+        
+        # Execute in async mode (returns work_id immediately)
+        work_id = execution_manager.execute(
+            config=config,
+            monitor=web_monitor,
+            mode="async",
+            extra=extra_data
+        )
+        
+        logger.info(f"Work submitted with ID: {work_id}")
+        
+        # Get work details for response
+        work_details = get_work_details(work_id)
         
         return BatchExecutionResponse(
             work_id=work_id,
             status="queued",
             message="Batch execution started successfully",
             submitted_at=datetime.now(),
-            output_path=work_details.get("output_path")
+            output_path=work_details.get("output_path") if work_details else None
         )
         
     except HTTPException:
@@ -226,7 +317,7 @@ async def get_batch_results(work_id: str) -> BatchResultsResponse:
             )
         
         # Check if work is completed
-        if work_details["status"] not in ["completed", "failed"]:
+        if work_details["status"] not in [WorkStatus.COMPLETED.value, WorkStatus.FAILED.value]:
             raise HTTPException(
                 status_code=409,
                 detail=f"Work item is not completed (status: {work_details['status']})"

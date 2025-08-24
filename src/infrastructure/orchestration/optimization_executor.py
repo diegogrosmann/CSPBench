@@ -1,122 +1,60 @@
-"""OptimizationExecutor: random sampler inicial.
-Assume task.parameters descreve espaços {param: {type: 'int'|'float'|'choice', low, high, choices}} e config.trials.
-"""
+"""OptimizationExecutor: simplified executor for optimization tasks."""
 
 from __future__ import annotations
 
-import random
-import time
 from typing import Any, Callable
 
-from src.domain.config import AlgParams, OptimizationTask, ResourcesConfig, SystemConfig
+from src.application.ports.repositories import AbstractExecutionEngine, AbstractStore
+from src.domain.config import OptimizationTask, ResourcesConfig, SystemConfig, AlgParams
 from src.domain.dataset import Dataset
-from src.infrastructure.monitoring.monitor_interface import Monitor, NoOpMonitor
-from src.application.ports.repositories import AbstractExecutionEngine
+from src.infrastructure.logging_config import get_logger
 from .algorithm_runner import run_algorithm
+
+logger = get_logger("CSPBench.OptimizationExecutor")
 
 
 class OptimizationExecutor(AbstractExecutionEngine):
-    def run(
-        self,
-        task: OptimizationTask,
-        dataset_obj: Dataset,
-        alg: AlgParams,
-        resources: ResourcesConfig | None,
-        monitor: Monitor | None = None,
-        system_config: SystemConfig | None = None,
-        check_control: Callable[[], str] | None = None,
-        store=None,
-    ) -> dict[str, Any]:
-        """Run random search optimization trials for a given algorithm/dataset pair."""
-        monitor = monitor or NoOpMonitor()
-        trials = int(task.config.get("trials", 10) if task.config else 10)
+    def __init__(self, store: AbstractStore | None = None):
+        self.store = store
 
-        # Extract global_seed from system_config
-        global_seed = None
-        if system_config and hasattr(system_config, "global_seed"):
-            global_seed = system_config.global_seed
+    def run(self, task: OptimizationTask, dataset_obj: Dataset, alg: AlgParams, resources: ResourcesConfig | None, work_id: str | None = None, system_config: SystemConfig | None = None, check_control: Callable[[], str] | None = None, store: AbstractStore | None = None) -> dict[str, Any]:
+        """Executa uma tentativa simplificada de otimização."""
+        store = store or self.store
 
-        rng = random.Random(global_seed)
-
-        # Extract data from Dataset object
         strings = dataset_obj.sequences
         alphabet = dataset_obj.alphabet
-        dataset_id = getattr(
-            dataset_obj,
-            "id",
-            f"ds_{__import__('hashlib').md5(''.join(strings).encode()).hexdigest()[:8]}",
-        )
+        params = dict(getattr(task, "params", {}) or {})
 
-        param_space = task.parameters or {}
-        best = float("inf")
-        best_params: dict[str, Any] = {}
+        unit_id = f"{task.id}:{getattr(dataset_obj, 'id', None)}:{getattr(task, 'name', 'opt')}"
+        
+        if store and work_id:
+            store.unit_started(work_id, unit_id, {"sequencia": 0})
 
-        for t in range(trials):
-            if check_control:
-                status = check_control()
-                if status == "canceled":
-                    monitor.log("warning", "Optimization canceled", {"task": task.id})
-                    break
-                while status == "paused":
-                    time.sleep(0.3)
-                    status = check_control()
-                    if status == "canceled":
-                        monitor.log(
-                            "warning", "Optimization canceled", {"task": task.id}
-                        )
-                        break
-                if status == "canceled":
-                    break
-            unit_id = f"{task.id}:{dataset_id}:{alg.name}:trial{t}"
-            monitor.unit_started(unit_id, {"trial": t})
-            sample_params = dict(alg.params)
-            for pname, spec in param_space.items():
-                if not spec:
-                    continue
-                ptype = spec.get("type")
-                if ptype == "int":
-                    sample_params[pname] = rng.randint(
-                        spec.get("low", 0), spec.get("high", 10)
-                    )
-                elif ptype == "float":
-                    sample_params[pname] = rng.uniform(
-                        spec.get("low", 0.0), spec.get("high", 1.0)
-                    )
-                elif ptype == "choice":
-                    sample_params[pname] = rng.choice(spec.get("choices", [0]))
+        if store:
+            try:
+                store.record_execution_start(
+                    unit_id=unit_id,
+                    task_id=task.id,
+                    dataset_id=getattr(dataset_obj, 'id', None),
+                    algorithm=getattr(task, "algorithm", getattr(alg, "name", "algorithm")),
+                    mode="optimization",
+                    sequencia=0,
+                    params=params
+                )
+            except Exception:
+                pass
+
+        try:
+            result = run_algorithm(getattr(task, "algorithm", getattr(alg, "name", "algorithm")), strings, alphabet, params)
+            if store and work_id:
+                store.unit_finished(work_id, unit_id, result)
             if store:
                 try:
-                    store.record_execution_start(
-                        unit_id=unit_id,
-                        task_id=task.id,
-                        dataset_id=dataset_id,
-                        algorithm=alg.name,
-                        mode="optimization",
-                        trial=t,
-                        params=sample_params,
-                    )
-                except Exception:  # noqa: BLE001
+                    store.record_execution_end(unit_id, result.get("status", "ok"), result, result.get("objective"))
+                except Exception:
                     pass
-            res = run_algorithm(alg.name, strings, alphabet, sample_params)
-            if res.get("status") == "ok" and res.get("objective", float("inf")) < best:
-                best = res["objective"]
-                best_params = sample_params
-            monitor.unit_finished(unit_id, res)
-            if store:
-                try:
-                    store.record_execution_end(
-                        unit_id, res.get("status", "ok"), res, res.get("objective")
-                    )
-                except Exception:  # noqa: BLE001
-                    pass
-
-        summary = {
-            "status": "completed" if trials > 0 else "failed",
-            "trials": trials,
-            "best_objective": best,
-            "best_params": best_params,
-        }
-        monitor.log(
-            "info", "OptimizationExecutor finished", {**summary, "task": task.id}
-        )
-        return summary
+            return {"status": "completed", "result": result}
+        except Exception as exc:
+            if store and work_id:
+                store.error(work_id, unit_id, exc)
+            return {"status": "error", "error": str(exc)}

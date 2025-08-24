@@ -7,32 +7,36 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import sqlite3
 import threading
 import time
 from pathlib import Path
-from typing import Any, List, Optional
+from typing import List, Optional
 
-from src.domain.config import CSPBenchConfig
+from application.ports.repositories import WorkRepository
 from src.domain.work import WorkItem, WorkStatus
-from .repository import WorkRepository
 
 logger = logging.getLogger(__name__)
 
 
-class PersistentWorkRepository(WorkRepository):
+class WorkServicePersistence(WorkRepository):
     """
     SQLite-based persistent work repository for global WorkManager state.
     Ensures data persists across FastAPI requests and application restarts.
     """
 
-    def __init__(self, db_path: str | Path = "data/work_manager.db"):
+    def __init__(self):
         """
         Initialize persistent repository with SQLite database.
         
         Args:
-            db_path: Path to SQLite database file
+            db_path: Path to SQLite database file. If None, uses WORK_DB_PATH environment variable
+                    or defaults to "data/work_manager.db"
         """
+        if db_path is None:
+            db_path = os.getenv("WORK_DB_PATH", "data/work_manager.db")
+        
         self.db_path = Path(db_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         
@@ -59,22 +63,9 @@ class PersistentWorkRepository(WorkRepository):
                     created_at REAL NOT NULL,
                     updated_at REAL NOT NULL,
                     output_path TEXT,
-                    error TEXT,
-                    config_json TEXT NOT NULL,
-                    extra_json TEXT DEFAULT '{}'
+                    extra_json TEXT DEFAULT '{}',     
+                    error TEXT                  
                 )
-            """)
-            
-            # Index for status queries
-            cursor.execute("""
-                CREATE INDEX IF NOT EXISTS idx_work_status 
-                ON work_items(status)
-            """)
-            
-            # Index for timestamp queries  
-            cursor.execute("""
-                CREATE INDEX IF NOT EXISTS idx_work_created 
-                ON work_items(created_at)
             """)
             
             self._conn.commit()
@@ -105,22 +96,15 @@ class PersistentWorkRepository(WorkRepository):
 
     def _row_to_work_item(self, row: sqlite3.Row) -> WorkItem:
         """Convert database row to WorkItem."""
-        config_dict = json.loads(row["config_json"])
         extra_dict = json.loads(row["extra_json"] or "{}")
         
-        # Handle config reconstruction safely
-        config = None
-        if config_dict:
-            try:
-                # Try to reconstruct CSPBenchConfig from dict
-                config = CSPBenchConfig(**config_dict)
-            except Exception:
-                # If reconstruction fails, keep as dict or None
-                config = config_dict if isinstance(config_dict, dict) else None
+        # Keep batch_file in extra dict if it exists in the row
+        if "batch_file" in row.keys() and row["batch_file"]:
+            extra_dict["batch_file"] = row["batch_file"]
         
         return WorkItem(
             id=row["id"],
-            config=config,
+            config=None,  # No longer store config in database
             status=WorkStatus(row["status"]),
             created_at=row["created_at"],
             updated_at=row["updated_at"],
@@ -131,26 +115,9 @@ class PersistentWorkRepository(WorkRepository):
 
     def _work_item_to_params(self, item: WorkItem) -> tuple:
         """Convert WorkItem to database parameters."""
-        # Convert config to JSON-serializable dict safely
-        config_dict = {}
-        if item.config is not None:
-            try:
-                # Extract only basic metadata for storage
-                if hasattr(item.config, 'metadata'):
-                    metadata = item.config.metadata
-                    config_dict = {
-                        "name": getattr(metadata, 'name', 'Unknown'),
-                        "description": getattr(metadata, 'description', ''),
-                        "author": getattr(metadata, 'author', ''),
-                        "version": getattr(metadata, 'version', ''),
-                        "creation_date": getattr(metadata, 'creation_date', ''),
-                        "tags": getattr(metadata, 'tags', [])
-                    }
-                else:
-                    config_dict = {"type": str(type(item.config)), "name": "Unknown"}
-            except Exception as e:
-                logger.warning(f"Failed to serialize config: {e}")
-                config_dict = {"type": str(type(item.config)), "name": "Unknown", "error": str(e)}
+        # Keep batch_file in extra dict, don't extract it
+        extra_dict = item.extra.copy() if item.extra else {}
+        batch_file = extra_dict.get("batch_file")  # Get but don't remove
         
         return (
             item.id,
@@ -158,9 +125,9 @@ class PersistentWorkRepository(WorkRepository):
             item.created_at,
             item.updated_at,
             item.output_path,
-            item.error,
-            json.dumps(config_dict, ensure_ascii=False),
-            json.dumps(item.extra, ensure_ascii=False)
+            batch_file,
+            json.dumps(extra_dict, ensure_ascii=False),
+            item.error
         )
 
     def add(self, item: WorkItem) -> None:
@@ -168,8 +135,8 @@ class PersistentWorkRepository(WorkRepository):
         params = self._work_item_to_params(item)
         self._execute("""
             INSERT INTO work_items 
-            (id, status, created_at, updated_at, output_path, error, config_json, extra_json)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            (id, status, created_at, updated_at, output_path, extra_json, error)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
         """, params)
 
     def get(self, work_id: str) -> Optional[WorkItem]:
@@ -189,7 +156,7 @@ class PersistentWorkRepository(WorkRepository):
         self._execute("""
             UPDATE work_items 
             SET status=?, created_at=?, updated_at=?, output_path=?, error=?, 
-                config_json=?, extra_json=?
+                extra_json=?
             WHERE id=?
         """, update_params)
 

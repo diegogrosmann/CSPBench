@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 from typing import Any
+from application.services.work_service import get_work_service
+from infrastructure.persistence.work_state_persistence import WorkStatePersistence
 from src.domain.config import (
     CSPBenchConfig,
     ExperimentTask,
@@ -11,11 +13,8 @@ from src.domain.config import (
 )
 from src.domain.dataset import Dataset
 
-from src.infrastructure.monitoring.monitor_interface import Monitor
-from src.infrastructure.persistence.work_state_store import WorkStateStore
 from src.infrastructure.execution_control import ExecutionController
 from src.infrastructure.logging_config import get_logger
-from src.application.work.manager import get_work_manager
 from src.application.services.dataset_service import load_dataset
 from src.application.ports.repositories import ExecutionEngine
 
@@ -30,12 +29,11 @@ logger = get_logger("CSPBench.PipelineRunner")
 
 
 class PipelineRunner:
-    def __init__(self, monitor: Monitor, work_id: str, store: WorkStateStore):
-        self.monitor = monitor
+    def __init__(self, work_id: str, store: WorkStatePersistence):
         self.work_id = work_id
         self.store = store
         self.current_state = self.load_pipeline_state() if work_id else None
-        self.wm = get_work_manager()
+        self.wm = get_work_service()
         self.execution_controller: ExecutionController | None = None
 
         logger.info(f"PipelineRunner inicializado para work_id: {work_id}")
@@ -108,18 +106,17 @@ class PipelineRunner:
         self.save_current_state(
             task_idx, dataset_idx, preset_idx, alg_idx, config, "paused"
         )
-        self.monitor.log(
-            "info",
-            f"Pipeline paused at: task {task_idx}, dataset {dataset_idx}, preset {preset_idx}, algorithm {alg_idx} - process will exit",
-            {"work_id": self.work_id, "paused": True},
-        )
-        return  # Sair da execução
+        return
 
     def run(self, config: CSPBenchConfig) -> None:
         logger.info("Iniciando execução do pipeline")
         logger.info(
             f"Configuração: {len(config.tasks.items)} tarefas do tipo {config.tasks.type}"
         )
+
+        # Log pipeline start
+        if self.store and self.work_id:
+            self.store.pipeline_started(self.work_id, config)
 
         # Create ExecutionController with resources and control function
         self.execution_controller = ExecutionController(
@@ -134,11 +131,7 @@ class PipelineRunner:
                 and self.current_state.get("pipeline_status") == "paused"
             ):
                 logger.info("Estado pausado detectado - retomando execução")
-                self.monitor.log(
-                    "info",
-                    "Resuming paused pipeline from saved state",
-                    {"work_id": self.work_id, "resumed": True},
-                )
+
                 # Determinar índices de retomada
                 start_task = self.current_state["current_task_index"]
                 start_dataset = self.current_state["current_dataset_index"]
@@ -147,19 +140,6 @@ class PipelineRunner:
 
                 logger.info(
                     f"Retomando do ponto: task={start_task}, dataset={start_dataset}, preset={start_preset}, algorithm={start_algorithm}"
-                )
-
-                self.monitor.log(
-                    "info",
-                    f"Resuming from: task {start_task}, dataset {start_dataset}, preset {start_preset}, algorithm {start_algorithm}",
-                    {
-                        "resumed_state": {
-                            "task": start_task,
-                            "dataset": start_dataset,
-                            "preset": start_preset,
-                            "algorithm": start_algorithm,
-                        }
-                    },
                 )
 
                 # Atualizar status para running
@@ -180,6 +160,8 @@ class PipelineRunner:
 
         except Exception as e:
             logger.error(f"Erro durante execução do pipeline: {e}", exc_info=True)
+            if self.store and self.work_id:
+                self.store.log(self.work_id, "error", f"Pipeline error: {e}", {"error_type": e.__class__.__name__})
             raise
         finally:
             # Cleanup execution controller
@@ -205,7 +187,6 @@ class PipelineRunner:
         tasks = tasks_group.items
 
         logger.info(f"Total de tarefas a processar: {len(tasks)}")
-        self.monitor.pipeline_started(config.metadata.name, len(tasks))
 
         # Loop principal unificado
         for task_idx, task in enumerate(tasks):
@@ -219,10 +200,11 @@ class PipelineRunner:
                 logger.warning(
                     f"Pipeline cancelado antes do início da tarefa {task.id}"
                 )
-                self.monitor.log(
-                    "warning", "Pipeline canceled before task start", {"task": task.id}
-                )
                 break
+
+            # Log task start
+            if self.store and self.work_id:
+                self.store.task_started(self.work_id, task.id, {"type": task.type, "index": task_idx})
 
             # Verificar pause no início de cada task
             if self.work_id and self._check_control() == "paused":
@@ -237,7 +219,6 @@ class PipelineRunner:
                 return
 
             logger.debug(f"Iniciando execução da tarefa: {task.name}")
-            self.monitor.task_started(task.id, {"type": task.type, "name": task.name})
 
             dataset_start = start_dataset if task_idx == start_task else 0
             for dataset_idx, dataset in enumerate(task.datasets):
@@ -297,11 +278,8 @@ class PipelineRunner:
                             return
 
                         if self._check_control() == "canceled":
-                            self.monitor.log(
-                                "warning",
-                                "Pipeline canceled mid-execution",
-                                {"task": task.id},
-                            )
+                            if self.store and self.work_id:
+                                self.store.log(self.work_id, "warning", "Pipeline canceled mid-execution", {"task": task.id})
                             break
 
                         # Salvar estado atual antes da execução
@@ -316,13 +294,15 @@ class PipelineRunner:
                     else:
                         continue
                     break
-            self.monitor.task_finished(task.id, {"status": "ok"})
+            
+            # Log task finish
+            if self.store and self.work_id:
+                self.store.task_finished(self.work_id, task.id, {"status": "ok"})
 
         # Pipeline completado - limpar estado
         if self.store and self.work_id:
             self.store.clear_pipeline_state(self.work_id)
-
-        self.monitor.pipeline_finished(True)
+            self.store.pipeline_finished(self.work_id, True)
 
     def _process_dataset(self, dataset) -> Dataset:
         """Processa um dataset (cache ou gera novo)."""
@@ -331,11 +311,13 @@ class PipelineRunner:
         # Verificar cache primeiro
         if self.store and dataset_id and self.store.has_dataset(dataset_id):
             strings: list[str] = self.store.get_dataset_strings(dataset_id)
-            self.monitor.log(
-                "info",
-                f"Using cached dataset: {dataset_id} ({len(strings)} sequences)",
-                {"dataset_id": dataset_id, "cached": True},
-            )
+            if self.store and self.work_id:
+                self.store.log(
+                    self.work_id,
+                    "info",
+                    f"Using cached dataset: {dataset_id} ({len(strings)} sequences)",
+                    {"dataset_id": dataset_id, "cached": True},
+                )
             # Create Dataset object from cached strings
             dataset_name = getattr(dataset, "name", "cached_dataset")
             dataset_obj = Dataset(name=dataset_name, sequences=strings)
@@ -353,7 +335,8 @@ class PipelineRunner:
                 if hasattr(dataset, "name") and not hasattr(dataset_obj, "name"):
                     dataset_obj.name = dataset.name
             except Exception as e:
-                self.monitor.error(f"dataset:{getattr(dataset, 'id', 'unknown')}", e)
+                if self.store and self.work_id:
+                    self.store.error(self.work_id, f"dataset:{getattr(dataset, 'id', 'unknown')}", e)
                 dataset_name = getattr(dataset, "name", "error_dataset")
                 dataset_obj = Dataset(name=dataset_name, sequences=[])
                 if hasattr(dataset, "id"):
@@ -365,17 +348,21 @@ class PipelineRunner:
                     self.store.persist_complete_dataset(
                         dataset, dataset_obj.sequences, parameters
                     )
-                    self.monitor.log(
-                        "info",
-                        f"Cached new dataset: {dataset_id} ({len(dataset_obj.sequences)} sequences)",
-                        {"dataset_id": dataset_id, "cached": False},
-                    )
+                    if self.store and self.work_id:
+                        self.store.log(
+                            self.work_id,
+                            "info",
+                            f"Cached new dataset: {dataset_id} ({len(dataset_obj.sequences)} sequences)",
+                            {"dataset_id": dataset_id, "cached": False},
+                        )
             except Exception as e:
-                self.monitor.log(
-                    "warning",
-                    f"Failed to cache dataset {dataset_id}: {e}",
-                    {"dataset_id": dataset_id, "error": str(e)},
-                )
+                if self.store and self.work_id:
+                    self.store.log(
+                        self.work_id,
+                        "warning",
+                        f"Failed to cache dataset {dataset_id}: {e}",
+                        {"dataset_id": dataset_id, "error": str(e)},
+                    )
 
         return dataset_obj
 
@@ -404,7 +391,7 @@ class PipelineRunner:
                 dataset_obj=dataset_obj,
                 alg=alg,
                 resources=config.resources,
-                monitor=self.monitor,
+                work_id=self.work_id,
                 system_config=config.system,
                 check_control=check_control,
                 store=self.store,
@@ -414,7 +401,8 @@ class PipelineRunner:
             if result and self.store and self.work_id:
                 try:
                     # Results are already stored by the execution engines
-                    self.monitor.log(
+                    self.store.log(
+                        self.work_id,
                         "info",
                         f"Algorithm execution completed for {alg.name}",
                         {
@@ -428,7 +416,8 @@ class PipelineRunner:
                         },
                     )
                 except Exception as e:
-                    self.monitor.log(
+                    self.store.log(
+                        self.work_id,
                         "warning",
                         f"Failed to log result for {alg.name}: {e}",
                         {"algorithm": alg.name, "error": str(e)},
@@ -439,15 +428,17 @@ class PipelineRunner:
         except KeyboardInterrupt:
             raise
         except Exception as e:
-            self.monitor.log(
-                "error",
-                f"Failed to execute {alg.name}: {str(e)}",
-                {
-                    "algorithm": alg.name,
-                    "dataset": (
-                        dataset_obj.id if hasattr(dataset_obj, "id") else "unknown"
-                    ),
-                    "error": str(e),
-                },
-            )
+            if self.store and self.work_id:
+                self.store.log(
+                    self.work_id,
+                    "error",
+                    f"Failed to execute {alg.name}: {str(e)}",
+                    {
+                        "algorithm": alg.name,
+                        "dataset": (
+                            dataset_obj.id if hasattr(dataset_obj, "id") else "unknown"
+                        ),
+                        "error": str(e),
+                    },
+                )
             return None

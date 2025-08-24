@@ -11,8 +11,8 @@ from typing import Any, Optional
 
 from fastapi import FastAPI
 
-from src.application.work.manager import WorkManager
-from src.application.work.persistent_repository import PersistentWorkRepository
+from application.work.work_manager import WorkManager
+from infrastructure.persistence.persistent_repository import PersistentWorkRepository
 
 # Global state
 _global_work_manager: Optional[WorkManager] = None

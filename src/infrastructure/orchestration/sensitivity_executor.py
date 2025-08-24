@@ -11,7 +11,6 @@ from typing import Any, Callable
 
 from src.domain.config import AlgParams, SensitivityTask, ResourcesConfig, SystemConfig
 from src.domain.dataset import Dataset
-from src.infrastructure.monitoring.monitor_interface import Monitor, NoOpMonitor
 from src.application.ports.repositories import AbstractExecutionEngine
 from .algorithm_runner import run_algorithm
 
@@ -23,13 +22,12 @@ class SensitivityExecutor(AbstractExecutionEngine):
         dataset_obj: Dataset,
         alg: AlgParams,
         resources: ResourcesConfig | None,
-        monitor: Monitor | None = None,
+        work_id: str | None = None,
         system_config: SystemConfig | None = None,
         check_control: Callable[[], str] | None = None,
         store=None,
     ) -> dict[str, Any]:
         """Run simple parameter sampling to estimate rough sensitivity via variance."""
-        monitor = monitor or NoOpMonitor()
         base_params = dict(alg.params)
 
         # Extract data from Dataset object
@@ -51,30 +49,40 @@ class SensitivityExecutor(AbstractExecutionEngine):
         samples = int(task.config.get("samples", 16) if task.config else 16)
         results: list[dict[str, Any]] = []
 
+        if store and work_id:
+            store.log(work_id, "info", f"Starting sensitivity analysis: {alg.name}", {
+                "task": task.id, "dataset": dataset_id, "samples": samples
+            })
+
         for i in range(samples):
             if check_control:
                 status = check_control()
                 if status == "canceled":
-                    monitor.log("warning", "Sensitivity canceled", {"task": task.id})
+                    if store and work_id:
+                        store.log(work_id, "warning", "Sensitivity canceled", {"task": task.id})
                     break
+
                 while status == "paused":
                     time.sleep(0.3)
                     status = check_control()
                     if status == "canceled":
-                        monitor.log(
-                            "warning", "Sensitivity canceled", {"task": task.id}
-                        )
+                        if store and work_id:
+                            store.log(work_id, "warning", "Sensitivity canceled", {"task": task.id})
                         break
                 if status == "canceled":
                     break
+
             unit_id = f"{task.id}:{dataset_id}:{alg.name}:sample{i}"
-            monitor.unit_started(unit_id, {"sample": i})
+            if store and work_id:
+                store.unit_started(work_id, unit_id, {"sequencia": i})
+
             sample_params = dict(base_params)
             for pname, spec in param_space.items():
                 if not spec:
                     continue
                 if "low" in spec and "high" in spec:
                     sample_params[pname] = rng.uniform(spec["low"], spec["high"])
+
             if store:
                 try:
                     store.record_execution_start(
@@ -83,24 +91,21 @@ class SensitivityExecutor(AbstractExecutionEngine):
                         dataset_id=dataset_id,
                         algorithm=alg.name,
                         mode="sensitivity",
-                        sample=i,
+                        sequencia=i,
                         params=sample_params,
                     )
                 except Exception:  # noqa: BLE001
                     pass
+
             res = run_algorithm(alg.name, strings, alphabet, sample_params)
-            monitor.unit_finished(unit_id, res)
-            results.append(
-                {
-                    "params": sample_params,
-                    "objective": res.get("objective", float("inf")),
-                }
-            )
+            if store and work_id:
+                store.unit_finished(work_id, unit_id, res)
+
+            results.append({"params": sample_params, "objective": res.get("objective", float("inf"))})
+
             if store:
                 try:
-                    store.record_execution_end(
-                        unit_id, res.get("status", "ok"), res, res.get("objective")
-                    )
+                    store.record_execution_end(unit_id, res.get("status", "ok"), res, res.get("objective"))
                 except Exception:  # noqa: BLE001
                     pass
 
@@ -111,13 +116,7 @@ class SensitivityExecutor(AbstractExecutionEngine):
             # Placeholder: each param gets same share currently if variance >0
             param_scores[pname] = var_all
 
-        monitor.log(
-            "info",
-            "SensitivityExecutor finished",
-            {"task": task.id, "samples": samples},
-        )
-        return {
-            "status": "completed" if samples > 0 else "failed",
-            "samples": samples,
-            "param_scores": param_scores,
-        }
+        if store and work_id:
+            store.log(work_id, "info", "SensitivityExecutor finished", {"task": task.id, "samples": samples})
+
+        return {"status": "completed" if samples > 0 else "failed", "samples": samples, "param_scores": param_scores}

@@ -9,8 +9,6 @@ Apenas uma função pública: load_dataset(cfg) -> Dataset
 
 from __future__ import annotations
 
-from typing import Any, Dict
-
 from src.application.services.dataset_generator import SyntheticDatasetGenerator
 from src.infrastructure.external.dataset_entrez import EntrezDatasetDownloader
 from src.domain import Dataset

@@ -13,8 +13,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
-# Import global WorkManager lifespan
-from src.application.work.global_manager import work_manager_lifespan
+# Import WorkService lifespan
+from application.services.work_service import work_service_lifespan
 
 Limiter = None
 _rate_limit_exceeded_handler = None
@@ -43,7 +43,7 @@ app = FastAPI(
     version="1.0.0",
     docs_url=None,  # Disable API docs
     redoc_url=None,  # Disable ReDoc
-    lifespan=work_manager_lifespan  # Add global WorkManager lifecycle
+    lifespan=work_service_lifespan  # Add WorkService lifecycle
 )
 
 # Middleware
