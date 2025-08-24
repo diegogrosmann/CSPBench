@@ -14,22 +14,28 @@ class Dataset:
     Dataset entity representing a set of strings for CSP.
 
     Attributes:
+        id: Unique dataset identifier (required)
         sequences: List of dataset strings
         metadata: Dataset metadata (size, origin, etc.)
         name: Optional dataset name for identification
     """
 
     def __init__(
-        self, name: str, sequences: List[str] = [], alphabet: Optional[str] = None
+        self, id: str, name: str, sequences: List[str] = [], alphabet: Optional[str] = None
     ):
         """
         Initialize a dataset with sequences.
 
         Args:
+            id: Unique dataset identifier (required)
             sequences: List of strings
             alphabet: Optional alphabet. If None, will be inferred from sequences
             name: Optional dataset name for identification
         """
+        if not id:
+            raise ValueError("Dataset id is required and cannot be empty")
+        
+        self.id = id
         self.sequences = sequences
         self._alphabet = alphabet
         self.name = name
@@ -172,6 +178,7 @@ class Dataset:
             dict: Dictionary representation
         """
         metadata = self.get_statistics()
+        metadata["id"] = self.id
         if self.name:
             metadata["name"] = self.name
         return {"sequences": self.sequences.copy(), "metadata": metadata}
@@ -189,7 +196,12 @@ class Dataset:
         """
         alphabet = data.get("metadata", {}).get("alphabet")
         name = data.get("metadata", {}).get("name", "unnamed_dataset")
-        return cls(name=name, sequences=data["sequences"], alphabet=alphabet)
+        dataset_id = data.get("metadata", {}).get("id")
+        
+        if not dataset_id:
+            raise ValueError("Dataset id is required in metadata")
+        
+        return cls(id=dataset_id, name=name, sequences=data["sequences"], alphabet=alphabet)
 
     def add_sequence(self, sequence: str) -> None:
         """
@@ -243,8 +255,9 @@ class Dataset:
         """
         filtered_sequences = [seq for seq in self.sequences if seq[position] == pattern]
         filtered_name = f"{self.name}_filtered" if self.name else "filtered_dataset"
+        filtered_id = f"{self.id}_filtered"
         return Dataset(
-            name=filtered_name, sequences=filtered_sequences, alphabet=self._alphabet
+            id=filtered_id, name=filtered_name, sequences=filtered_sequences, alphabet=self._alphabet
         )
 
     def get_sequences(self) -> List[str]:

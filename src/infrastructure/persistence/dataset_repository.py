@@ -52,10 +52,11 @@ class FileDatasetRepository:
 
         params: dict[str, Any] = {"file_path": file_path}
 
-        # Use filename without extension as default name
+        # Use filename without extension as default name and id
         dataset_name = file_path.stem
+        dataset_id = f"file_{dataset_name}"
 
-        return Dataset(name=dataset_name, sequences=sequences), params
+        return Dataset(id=dataset_id, name=dataset_name, sequences=sequences), params
 
     @staticmethod
     def list_available(base_path: str | None = None) -> List[str]:

@@ -5,8 +5,16 @@ Domain module containing the core business logic for CSPBench.
 Implements algorithms, metrics, and data entities without external dependencies.
 """
 
-from .algorithms import Algorithm, CSPAlgorithm, global_registry, register_algorithm
+from .algorithms import CSPAlgorithm, global_registry, register_algorithm
 from .dataset import Dataset
+from .distance import (
+    DistanceCalculator,
+    HammingDistanceCalculator,
+    LevenshteinDistanceCalculator,
+    create_distance_calculator,
+)
+from .work import WorkStatus, WorkItem
+
 from .errors import (
     AlgorithmError,
     AlgorithmExecutionError,
@@ -30,35 +38,26 @@ from .errors import (
     SensitivityConfigurationError,
     SensitivityExecutionError,
 )
-from .metrics import (
-    DistanceCalculator,
-    QualityEvaluator,
-    average_distance,
-    consensus_strength,
-    diversity_metric,
-    hamming_distance,
-    max_distance,
-    median_distance,
-    solution_quality,
-)
 
 __all__ = [
     # Algorithms
     "CSPAlgorithm",
-    "Algorithm",
     "register_algorithm",
     "global_registry",
-    # Metrics
-    "hamming_distance",
-    "max_distance",
-    "average_distance",
-    "median_distance",
+    # Distance calculators
+    "DistanceCalculator",
+    "HammingDistanceCalculator",
+    "LevenshteinDistanceCalculator",
+    "create_distance_calculator",
+    # Work entities
+    "WorkStatus",
+    "WorkItem",
+    # Metrics and quality evaluation
     "diversity_metric",
     "consensus_strength",
     "solution_quality",
-    "DistanceCalculator",
     "QualityEvaluator",
-    # Dataset
+    # Datasets
     "Dataset",
     "SyntheticDatasetGenerator",
     # Errors

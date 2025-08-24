@@ -7,12 +7,16 @@ import uuid
 from pathlib import Path
 from typing import Any, Optional
 
-from application.ports.repositories import WorkRepository
+from src.infrastructure.persistence.work_service_persistence import (
+    WorkServicePersistence,
+)
 from src.domain.config import CSPBenchConfig
 from src.domain.work import WorkItem, WorkStatus
+from src.domain.status import BaseStatus
+
 
 class WorkManager:
-    def __init__(self, repository: WorkRepository):
+    def __init__(self, repository: WorkServicePersistence):
         self._repo = repository
         self._lock = threading.RLock()
 
@@ -25,16 +29,15 @@ class WorkManager:
 
     # --- public API ---
     def submit(
-        self, *, 
-        config: CSPBenchConfig, extra: dict[str, Any] | None = None
-    ) -> tuple[str, dict[str, Any]]:
+        self, *, config: CSPBenchConfig, extra: dict[str, Any] | None = None
+    ) -> str:
         with self._lock:
             wid = self._new_id()
             work_dir = Path(os.environ.get("OUTPUT_BASE_DIRECTORY", "results")) / wid
             item = WorkItem(
                 id=wid,
                 config=config,
-                status=WorkStatus.QUEUED,
+                status=BaseStatus.QUEUED,
                 created_at=self._now(),
                 updated_at=self._now(),
                 output_path=str(work_dir),
@@ -42,17 +45,16 @@ class WorkManager:
             )
             self._repo.add(item)
 
-            # Return ID
             return wid
 
-    def get(self, work_id: str) -> WorkItem | None:
+    def get(self, work_id: str) -> dict[str, Any] | None:
         with self._lock:
             item = self._repo.get(work_id)
-            return item if item else None
+            return item.to_dict() if item else None
 
-    def list(self) -> list[WorkItem]:
+    def list(self) -> list[dict[str, Any]]:
         with self._lock:
-            return [w for w in self._repo.list()]
+            return [w.to_dict() for w in self._repo.list()]
 
     def get_status(self, work_id: str) -> Optional[str]:
         with self._lock:
@@ -141,18 +143,18 @@ class WorkManager:
         """
         start = self._now()
         last_status: Optional[str] = None
-        terminal = {
-            WorkStatus.COMPLETED.value,
-            WorkStatus.FAILED.value,
-            WorkStatus.CANCELED.value,
-        }
+        terminal_statuses = [
+            BaseStatus.COMPLETED.value,
+            BaseStatus.FAILED.value,
+            BaseStatus.CANCELED.value,
+        ]
 
         while True:
             status = self.get_status(work_id)
             if status is None:
                 return None
             last_status = status
-            if status in terminal:
+            if status in terminal_statuses:
                 return status
 
             if timeout is not None and (self._now() - start) >= timeout:

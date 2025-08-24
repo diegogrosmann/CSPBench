@@ -20,7 +20,7 @@ class TestDatasetCreation:
 
     def test_create_empty_dataset(self):
         """Test creating an empty dataset."""
-        dataset = Dataset(name="test")
+        dataset = Dataset(id="test_id", name="test")
 
         assert dataset.sequences == []
         assert dataset.size == 0
@@ -30,7 +30,7 @@ class TestDatasetCreation:
     def test_create_dataset_with_sequences(self):
         """Test creating a dataset with sequences."""
         sequences = ["ACGT", "ATGT", "GCGT"]
-        dataset = Dataset(name="test", sequences=sequences)
+        dataset = Dataset(id="test_id", name="test", sequences=sequences)
 
         assert dataset.sequences == sequences
         assert dataset.size == 3
@@ -41,7 +41,7 @@ class TestDatasetCreation:
         """Test creating a dataset with explicit alphabet."""
         sequences = ["ACG", "ATG", "GCG"]
         alphabet = "ACGT"
-        dataset = Dataset(name="test", sequences=sequences, alphabet=alphabet)
+        dataset = Dataset(id="test_id", name="test", sequences=sequences, alphabet=alphabet)
 
         assert dataset.alphabet == alphabet
         assert dataset.validate()
@@ -55,12 +55,12 @@ class TestDatasetCreation:
             ValueError,
             match="Invalid dataset: sequences contain characters not in alphabet",
         ):
-            Dataset(name="test", sequences=sequences, alphabet=alphabet)
+            Dataset(id="test_id", name="test", sequences=sequences, alphabet=alphabet)
 
     def test_create_dataset_mixed_case(self):
         """Test dataset with mixed case sequences."""
         sequences = ["acgtACGT", "ATGTatgt", "GcGtCgCt"]
-        dataset = Dataset(name="test", sequences=sequences)
+        dataset = Dataset(id="test_id", name="test", sequences=sequences)
 
         # Should preserve case
         assert dataset.sequences == sequences
@@ -72,21 +72,24 @@ class TestDatasetProperties:
 
     def test_size_property(self):
         """Test size property."""
-        assert Dataset([]).size == 0
-        assert Dataset(name="test", sequences=["A"]).size == 1
-        assert Dataset(name="test", sequences=["A", "T", "G"]).size == 3
+        # Empty dataset cannot be created without id
+        with pytest.raises(TypeError):
+            Dataset([])
+        
+        assert Dataset(id="test_id", name="test", sequences=["A"]).size == 1
+        assert Dataset(id="test_id2", name="test", sequences=["A", "T", "G"]).size == 3
 
     def test_length_property_uniform(self):
         """Test length property with uniform sequences."""
         sequences = ["ACGT", "ATGT", "GCGT"]
-        dataset = Dataset(name="test", sequences=sequences)
+        dataset = Dataset(id="test_id", name="test", sequences=sequences)
 
         assert dataset.max_length == 4
 
     def test_length_property_non_uniform(self):
         """Test length property with non-uniform sequences."""
         sequences = ["ACG", "ATGT", "GCGTACG"]  # lengths 3, 4, 7
-        dataset = Dataset(name="test", sequences=sequences)
+        dataset = Dataset(id="test_id", name="test", sequences=sequences)
 
         # Should return max length for non-uniform
         assert dataset.max_length == 7
@@ -94,14 +97,14 @@ class TestDatasetProperties:
     def test_alphabet_inference(self):
         """Test alphabet inference from sequences."""
         sequences = ["ACGT", "CGTA", "TACG"]
-        dataset = Dataset(name="test", sequences=sequences)
+        dataset = Dataset(id="test_id", name="test", sequences=sequences)
 
         # Should be sorted
         assert dataset.alphabet == "ACGT"
 
     def test_alphabet_inference_empty(self):
         """Test alphabet inference with empty dataset."""
-        dataset = Dataset([])
+        dataset = Dataset(id="test_id", name="test", sequences=[])
         assert dataset.alphabet == ""
 
     def test_alphabet_explicit_vs_inferred(self):
@@ -109,11 +112,11 @@ class TestDatasetProperties:
         sequences = ["ACG", "ATG"]
 
         # Inferred
-        dataset1 = Dataset(name="test", sequences=sequences)
+        dataset1 = Dataset(id="test_id", name="test", sequences=sequences)
         assert dataset1.alphabet == "ACGT"
 
         # Explicit (different order)
-        dataset2 = Dataset(name="test", sequences=sequences, alphabet="TAGC")
+        dataset2 = Dataset(id="test_id", name="test", sequences=sequences, alphabet="TAGC")
         assert dataset2.alphabet == "TAGC"
 
 
@@ -123,7 +126,7 @@ class TestDatasetStatistics:
     def test_get_statistics_basic(self):
         """Test basic statistics calculation."""
         sequences = ["ACGT", "ATGT", "GCGT"]
-        dataset = Dataset(name="test", sequences=sequences)
+        dataset = Dataset(id="test_id", name="test", sequences=sequences)
 
         stats = dataset.get_statistics()
 
@@ -143,7 +146,7 @@ class TestDatasetStatistics:
     def test_get_statistics_non_uniform(self):
         """Test statistics with non-uniform lengths."""
         sequences = ["AC", "ATGT", "GCGTAC"]
-        dataset = Dataset(name="test", sequences=sequences)
+        dataset = Dataset(id="test_id", name="test", sequences=sequences)
 
         stats = dataset.get_statistics()
 
@@ -155,7 +158,7 @@ class TestDatasetStatistics:
 
     def test_get_statistics_single_sequence(self):
         """Test statistics with single sequence."""
-        dataset = Dataset(name="test", sequences=["ACGTACGT"])
+        dataset = Dataset(id="test_id", name="test", sequences=["ACGTACGT"])
 
         stats = dataset.get_statistics()
 
@@ -164,7 +167,7 @@ class TestDatasetStatistics:
 
     def test_get_statistics_identical_sequences(self):
         """Test statistics with identical sequences."""
-        dataset = Dataset(name="test", sequences=["ACGT", "ACGT", "ACGT"])
+        dataset = Dataset(id="test_id", name="test", sequences=["ACGT", "ACGT", "ACGT"])
 
         stats = dataset.get_statistics()
 
@@ -176,7 +179,7 @@ class TestDatasetManipulation:
 
     def test_add_sequence(self):
         """Test adding sequences to dataset."""
-        dataset = Dataset(name="test", sequences=["ACGT"])
+        dataset = Dataset(id="test_id", name="test", sequences=["ACGT"])
 
         dataset.add_sequence("ATGT")
 
@@ -185,7 +188,7 @@ class TestDatasetManipulation:
 
     def test_add_sequence_invalid_alphabet(self):
         """Test adding sequence with invalid character."""
-        dataset = Dataset(name="test", sequences=["ACGT"], alphabet="ACGT")
+        dataset = Dataset(id="test_id", name="test", sequences=["ACGT"], alphabet="ACGT")
 
         with pytest.raises(
             ValueError, match="Sequence contains characters not in alphabet"
@@ -195,7 +198,7 @@ class TestDatasetManipulation:
     def test_remove_sequence(self):
         """Test removing sequences by index."""
         sequences = ["ACGT", "ATGT", "GCGT"]
-        dataset = Dataset(name="test", sequences=sequences)
+        dataset = Dataset(id="test_id", name="test", sequences=sequences)
 
         removed = dataset.remove_sequence(1)
 
@@ -205,7 +208,7 @@ class TestDatasetManipulation:
 
     def test_remove_sequence_invalid_index(self):
         """Test removing with invalid index."""
-        dataset = Dataset(name="test", sequences=["ACGT"])
+        dataset = Dataset(id="test_id", name="test", sequences=["ACGT"])
 
         with pytest.raises(IndexError, match="Index out of range"):
             dataset.remove_sequence(5)
@@ -216,7 +219,7 @@ class TestDatasetManipulation:
     def test_filter_by_pattern(self):
         """Test filtering sequences by pattern."""
         sequences = ["ACGT", "ATGT", "GCGT", "ATAT"]
-        dataset = Dataset(name="test", sequences=sequences)
+        dataset = Dataset(id="test_id", name="test", sequences=sequences)
 
         filtered = dataset.filter_by_pattern("A", 0)  # First position is A
 
@@ -230,7 +233,7 @@ class TestDatasetSerialization:
     def test_to_dict(self):
         """Test converting dataset to dictionary."""
         sequences = ["ACGT", "ATGT"]
-        dataset = Dataset(name="test", sequences=sequences)
+        dataset = Dataset(id="test_id", name="test", sequences=sequences)
 
         data = dataset.to_dict()
 
@@ -241,7 +244,7 @@ class TestDatasetSerialization:
 
     def test_from_dict(self):
         """Test creating dataset from dictionary."""
-        data = {"sequences": ["ACGT", "ATGT"], "metadata": {"alphabet": "ACGT"}}
+        data = {"sequences": ["ACGT", "ATGT"], "metadata": {"alphabet": "ACGT", "id": "test_id"}}
 
         dataset = Dataset.from_dict(data)
 
@@ -250,7 +253,7 @@ class TestDatasetSerialization:
 
     def test_from_dict_without_metadata(self):
         """Test creating dataset from dict without metadata."""
-        data = {"sequences": ["ACGT", "ATGT"]}
+        data = {"sequences": ["ACGT", "ATGT"], "metadata": {"id": "test_id"}}
 
         dataset = Dataset.from_dict(data)
 
@@ -258,7 +261,7 @@ class TestDatasetSerialization:
 
     def test_round_trip_serialization(self):
         """Test full serialization round trip."""
-        original = Dataset(name="test", sequences=["ACGT", "ATGT", "GCGT"])
+        original = Dataset(id="test_id_unique", name="test", sequences=["ACGT", "ATGT", "GCGT"])
 
         data = original.to_dict()
         reconstructed = Dataset.from_dict(data)
@@ -271,14 +274,14 @@ class TestDatasetValidation:
 
     def test_validate_valid_dataset(self):
         """Test validation of valid dataset."""
-        dataset = Dataset(name="test", sequences=["ACGT", "ATGT"], alphabet="ACGT")
+        dataset = Dataset(id="test_id", name="test", sequences=["ACGT", "ATGT"], alphabet="ACGT")
 
         assert dataset.validate() is True
 
     def test_validate_no_alphabet_specified(self):
         """Test validation when no alphabet is specified."""
         dataset = Dataset(
-            name="test", sequences=["ACGT", "ATGX"]
+            id="test_id", name="test", sequences=["ACGT", "ATGX"]
         )  # X not in inferred alphabet
 
         # Should still be valid as no explicit alphabet constraint
@@ -287,7 +290,7 @@ class TestDatasetValidation:
     def test_validate_with_explicit_alphabet(self):
         """Test validation with explicit alphabet constraint."""
         sequences = ["ACGT", "ATGT"]
-        dataset = Dataset(sequences, alphabet="ACGT")
+        dataset = Dataset(id="test_id", name="test", sequences=sequences, alphabet="ACGT")
 
         assert dataset.validate() is True
 
@@ -298,7 +301,7 @@ class TestDatasetUtilityMethods:
     def test_get_sequences(self):
         """Test getting copy of sequences."""
         sequences = ["ACGT", "ATGT"]
-        dataset = Dataset(name="test", sequences=sequences)
+        dataset = Dataset(id="test_id", name="test", sequences=sequences)
 
         copied_sequences = dataset.get_sequences()
 
@@ -308,7 +311,7 @@ class TestDatasetUtilityMethods:
     def test_get_sequences_modification(self):
         """Test that modifying returned sequences doesn't affect original."""
         sequences = ["ACGT", "ATGT"]
-        dataset = Dataset(name="test", sequences=sequences)
+        dataset = Dataset(id="test_id", name="test", sequences=sequences)
 
         copied_sequences = dataset.get_sequences()
         copied_sequences.append("GCGT")
@@ -321,7 +324,7 @@ class TestDatasetEdgeCases:
 
     def test_empty_sequences_list(self):
         """Test creating dataset with empty sequences list."""
-        dataset = Dataset(name="test", sequences=[])
+        dataset = Dataset(id="test_id", name="test", sequences=[])
 
         assert dataset.size == 0
         assert dataset.max_length == 0
@@ -329,7 +332,7 @@ class TestDatasetEdgeCases:
 
     def test_sequences_with_empty_strings(self):
         """Test dataset with empty string sequences."""
-        dataset = Dataset(name="test", sequences=["", "", ""])
+        dataset = Dataset(id="test_id", name="test", sequences=["", "", ""])
 
         assert dataset.size == 3
         assert dataset.max_length == 0
@@ -338,7 +341,7 @@ class TestDatasetEdgeCases:
     def test_mixed_empty_and_non_empty_sequences(self):
         """Test dataset with mix of empty and non-empty sequences."""
         sequences = ["", "ACGT", "", "AT"]
-        dataset = Dataset(name="test", sequences=sequences)
+        dataset = Dataset(id="test_id", name="test", sequences=sequences)
 
         assert dataset.size == 4
         assert dataset.max_length == 4  # Max length
@@ -347,7 +350,7 @@ class TestDatasetEdgeCases:
     def test_unicode_sequences(self):
         """Test dataset with unicode characters."""
         sequences = ["αβγδ", "αγβδ"]
-        dataset = Dataset(name="test", sequences=sequences)
+        dataset = Dataset(id="test_id", name="test", sequences=sequences)
 
         assert dataset.size == 2
         assert dataset.max_length == 4
@@ -356,7 +359,7 @@ class TestDatasetEdgeCases:
     def test_numeric_sequences(self):
         """Test dataset with numeric characters."""
         sequences = ["0123", "0213", "1023"]
-        dataset = Dataset(name="test", sequences=sequences)
+        dataset = Dataset(id="test_id", name="test", sequences=sequences)
 
         assert dataset.size == 3
         assert dataset.max_length == 4

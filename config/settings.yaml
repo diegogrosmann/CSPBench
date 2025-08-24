@@ -71,3 +71,20 @@ system:
   global_seed: null                   # int|null: Global seed that replaces all algorithm and dataset seeds
                                       # When set, substitutes ALL seed parameters throughout configuration
                                       # null = use individual seeds, int = override all with this value
+  
+  seed_increment: true                # bool: Whether to increment seeds for each repetition
+                                      # When true, each repetition uses incremented seeds:
+                                      # - If global_seed is set: repetition_1: global_seed+1, repetition_2: global_seed+2, etc.
+                                      # - If global_seed is null: increments individual algorithm seeds
+                                      # This ensures different seeds while maintaining reproducibility
+                                      # false = all repetitions use the same seeds
+  
+  # Distance calculation method
+  distance_method: "hamming"          # string: Method for distance calculation
+                                      # "hamming" = Hamming distance (current implementation)
+                                      # Future: "levenshtein", "edit", "custom"
+  
+  # Distance calculation cache
+  enable_distance_cache: true         # bool: Enable caching for distance calculations
+                                      # true = cache results for better performance
+                                      # false = calculate distances every time (uses less memory)

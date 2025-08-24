@@ -107,7 +107,7 @@ algorithms:
       - "Baseline"                    # Baseline algorithm (simplest)
       - "BLF-GA"                      # Block-based Genetic Algorithm (main)
       - "CSC"                         # Closest String with Constraints
-      - "H³-CSP"                      # Heuristic Closest String Problem
+      - "H2-CSP"                       # Heuristic Closest String Problem
       - "DP-CSP"                      # Dynamic Programming CSP
     
     # Algorithm-specific parameters
@@ -121,68 +121,66 @@ algorithms:
       
       # === BLF-GA - Block-based Genetic Algorithm ===
       "BLF-GA":
-        # Population Parameters
-        pop_size: 1.5                 # int|float: Population size (fixed int or n multiplier)
-                                      # Examples: 100 (fixed), 1.5 (1.5*n), 2.0 (2*n)
-        min_pop_size: 20              # int: Minimum population size threshold
-        max_gens: 100                 # int: Maximum number of generations (30-500)
-        max_time: 1200.0              # float: Maximum execution time in seconds
+        # --- POPULATION PARAMETERS ---
+        pop_size: 1.5                 # int|float: Population size (fixed int or multiplier >=1 applied to n)
+        min_pop_size: 20              # int: Minimum population size after multiplier resolution
         seed: null                    # int|null: Seed for reproducibility (null = random)
-        
-        # Genetic Operators
-        cross_prob: 0.9               # float: Crossover probability (0.6-0.95)
-        mut_prob: 0.1                 # float: Mutation probability (0.01-0.3)
-        elite_rate: 0.05              # float: Elitism rate (0.01-0.15)
-        
-        # Block Parameters (BLF-GA specific)
-        initial_blocks: 0.2           # float: Initial block proportion (0.1-0.5)
+
+        # --- BLOCK PARAMETERS (LEARNING) ---
+        initial_blocks: 0.2           # int|float: Initial blocks (int fixed or proportion 0<≤1 of L)
         min_block_len: 1              # int: Minimum block length
-        rediv_freq: 10                # int: Redivision frequency (5-25)
-        
-        # Diversity and Immigration
-        immigrant_freq: 10            # int: Immigration frequency (10-30)
-        immigrant_ratio: 0.2          # float: Immigration rate (0.1-0.3)
-        diversity_threshold: 0.4      # float: Diversity threshold for adaptive mutation (0-1)
-        
-        # Operator Methods
-        crossover_type: "one_point"   # string: Crossover method (original parameter name)
-                                      # "one_point", "uniform", "blend_blocks"
-        mutation_type: "multi"        # string: Mutation method (original parameter name)
-                                      # "multi", "inversion", "transposition"
-        mutation_multi_n: 2          # int: Number of mutations for multi-mutation method
-        tournament_k: 2               # int: Tournament size for tournament selection
-        refinement_type: "greedy"     # string: Local refinement method (original parameter name)
-                                      # "greedy", "swap", "insertion", "2opt"
-        refine_elites: "best"         # string: Which elites to refine ("all", "best")
-        refine_iter_limit: 100        # int: Maximum iterations per refinement
-        
-        # Adaptive Mutation Parameters
-        mutation_adapt_N: 10          # int: Generations to detect convergence for adaptive mutation
-        mutation_adapt_factor: 2.0    # float: Temporary mutation increase factor
-        mutation_adapt_duration: 5    # int: Duration of mutation increase in generations
-        
-        # Niching Parameters
-        niching: false                # bool: Enable niching for diversity preservation
-        niching_radius: 3             # int: Minimum distance between solutions in niche
-        
-        # Stopping and Restart Criteria
-        no_improve_patience: 0.2      # float: Patience without improvement (0.1-0.5)
-                                      # Proportion of generations without improvement before stopping
-        restart_patience: 20          # int: Generations without improvement for partial restart
-        restart_ratio: 0.3            # float: Proportion of population to restart (0.1-0.5)
-        disable_elitism_gens: 5       # int: Disable elitism every N generations to prevent convergence
+        rediv_freq: 10                # int: Block redivision frequency (generations)
+
+        # --- GENETIC OPERATORS ---
+        cross_prob: 0.9               # float: Crossover probability (0.6–0.95)
+        crossover_type: "one_point"   # one_point | uniform | blend_blocks
+        mut_prob: 0.1                 # float: Base mutation probability (0.01–0.3)
+        mutation_type: "multi"        # multi | inversion | transposition
+        mutation_multi_n: 2           # int: Positions mutated in multi mutation
+        elite_rate: 0.05              # float: Elite preservation rate (0.01–0.1 typical)
+        tournament_k: 2               # int: Tournament size (selection pressure)
+
+        # --- DIVERSITY & IMMIGRATION ---
+        immigrant_freq: 10            # int: Generations interval for immigrant injection (0=disabled)
+        immigrant_ratio: 0.2          # float: Proportion of population replaced by immigrants
+        diversity_threshold: 0.4      # float: Diversity (normalized) threshold to trigger adaptive mutation
+
+        # --- ADAPTIVE MUTATION ---
+        mutation_adapt_N: 10          # int: Generations of stagnation/diversity check window
+        mutation_adapt_factor: 2.0    # float: Multiplier when adaptive mutation activates
+        mutation_adapt_duration: 5    # int: Generations the boosted mutation persists
+
+        # --- NICHING (OPTIONAL) ---
+        niching: false                # bool: Enable niching diversity mechanism
+        niching_radius: 3             # int: Minimum Hamming distance between kept individuals
+
+        # --- LOCAL REFINEMENT ---
+        refinement_type: "greedy"     # greedy | swap | insertion | 2opt
+        refine_elites: "best"         # best | all
+        refine_iter_limit: 100        # int: Iteration limit per elite refinement
+
+        # --- STOPPING & RESTART CRITERIA ---
+        max_gens: 100                 # int: Maximum generations
+        max_time: 1200.0              # float: Time limit (seconds)
+        no_improve_patience: 0.2      # int|float: Patience (int gens or proportion of max_gens)
+        restart_patience: 20          # int: Stagnation gens before partial restart
+        restart_ratio: 0.3            # float: Proportion of population randomly restarted
+        disable_elitism_gens: 5       # int: Every N gens disable elitism for diversity
       
       # === CSC - Closest String with Constraints ===
       "CSC":
-        min_d: 2                      # int: Initial minimum distance (1-5)
-        d_factor: 0.75                # float: Distance increment factor (0.5-1.0)
-        min_blocks: 4                 # int: Minimum number of blocks (2-8)
-        max_blocks: 8                 # int: Maximum number of blocks (4-16)
-        n_div: 6                      # int: Divisor for number of sequences
-        l_div: 25                     # int: Divisor for block length (10-50)
-      
-      # === H³-CSP - Heuristic Closest String Problem ===
-      "H³-CSP":
+        min_d: 2                            # int: Initial minimum distance (1-5)
+        d_factor: 0.75                      # float: Distance increment factor (0.5-1.0)
+        min_blocks: 4                       # int: Minimum number of blocks (2-8)
+        max_blocks: 8                       # int: Maximum number of blocks (4-16)
+        n_div: 6                            # int: Divisor for number of sequences
+        l_div: 25                           # int: Divisor for block length (10-50)
+        max_candidates: 5000                # int: Maximum number of candidates generated by recombination
+        local_search_max_iterations: 50     # int: Maximum iterations for local search
+        candidate_eval_batch: 200           # int: Batch size for candidate evaluation progress
+
+      # === H2-CSP - Heuristic Closest String Problem ===
+      "H2-CSP":
         # Block Division Parameters
         auto_blocks: true             # bool: Use automatic block division (√L method)
                                       # true = automatic, false = manual
@@ -203,7 +201,6 @@ algorithms:
         
         # Refinement Parameters
         local_iters: 3                # int: Local search iterations (1-5)
-        local_search_iters: 3         # int: Alias for local_iters (compatibility)
         
         # Execution Control
         max_time: 300                 # int: Maximum execution time in seconds
@@ -215,15 +212,14 @@ algorithms:
       
       # === DP-CSP - Dynamic Programming CSP ===
       "DP-CSP":
-        max_d: null                   # int|null: Maximum distance considered (3-10)
-                                      # High values greatly increase execution time
-                                      # null = use baseline distance as reference
-        warn_threshold: 9             # int: Sequence limit for warning (actual default is 9)
-                                      # Above this value, the algorithm may be very slow
-        max_time: 300                 # int: Maximum execution time in seconds
+        max_d: null                   # int|null: Maximum distance considered; null = baseline distance
+                                      # Larger values increase execution time exponentially
+        complexity_abort_threshold: 2000000000  # int: Abort if (d+1)^n exceeds this value (default 2e9)
         seed: null                    # int|null: Seed for reproducibility
-  
-  # You can add multiple algorithms:
+        search_strategy: "linear"     # string: Search strategy for DP-CSP
+                                      # "linear" = linear search over d (implemented)
+                                      # "binary" = binary search over d (not implemented)
+                                      
   - id: "aggressive_csc"              # string: Unique configuration ID
     name: "Aggressive CSC Configuration"                        # string: Descriptive name
     description: "Aggressive parameters for CSC algorithm"      # string: Detailed description
@@ -261,19 +257,20 @@ experiment:
       datasets:
         - "dataset_test"
         - "dataset_file"
+#        - "dataset_ncbi"
       algorithms:
         - "default_config"
         - "aggressive_csc"
-      repetitions: 5                  # int: Number of repetitions per combination (1-10 recommended)
+      repetitions: 30                 # int: Number of repetitions per combination (1-10 recommended)
                                       # Each dataset+algorithm combination will be executed N times
     # You can add multiple executions:
     - name: "Complete Experiment"
-      datasets: 
-      #  - "dataset_ncbi"
+      datasets:
+        - "dataset_test"
         - "dataset_file"
-      algorithms: 
+      algorithms:
         - "aggressive_csc"
-      repetitions: 4
+      repetitions: 20
 
 # =====================================================================
 # SECTION 5B: SPECIFIC CONFIGURATION - OPTIMIZATION
@@ -503,9 +500,9 @@ resources:
   # CPU limitations
   cpu:
     # Do not use the same cores as the main application during tests
-    exclusive_cores: false             # bool: If true, tests do not share cores with the main app
-    max_workers: Null                 # int|null: Maximum number of cores to use (null = all available)
-    internal_jobs: 4                  # int: Maximum internal parallel jobs per algorithm
+    exclusive_cores: false            # bool: If true, tests do not share cores with the main app
+    max_workers: 1                    # int|null: Maximum number of cores to use (null = all available)
+    internal_jobs: 1                  # int: Maximum internal parallel jobs per algorithm
                                       # Controls internal algorithm parallelism (threads/processes)
                                       # Suggested value: 4 for CPUs with 8+ cores
                                       # Relation: max_workers × internal_jobs ≤ CPU_cores
@@ -531,3 +528,20 @@ system:
   global_seed: null                   # int|null: Global seed that replaces all algorithm and dataset seeds
                                       # When set, substitutes ALL seed parameters throughout configuration
                                       # null = use individual seeds, int = override all with this value
+  
+  seed_increment: true                # bool: Whether to increment seeds for each repetition
+                                      # When true, each repetition uses incremented seeds:
+                                      # - If global_seed is set: repetition_1: global_seed+1, repetition_2: global_seed+2, etc.
+                                      # - If global_seed is null: increments individual algorithm seeds
+                                      # This ensures different seeds while maintaining reproducibility
+                                      # false = all repetitions use the same seeds
+  
+  # Distance calculation method
+  distance_method: "hamming"          # string: Method for distance calculation
+                                      # "hamming" = Hamming distance (current implementation)
+                                      # Future: "levenshtein", "edit", "custom"
+  
+  # Distance calculation cache
+  enable_distance_cache: true         # bool: Enable caching for distance calculations
+                                      # true = cache results for better performance
+                                      # false = calculate distances every time (uses less memory)

@@ -27,12 +27,13 @@ async def get_dataset_manager_page(request: Request):
 async def redirect_old_dataset_manager(request: Request):
     """Redirect old dataset-manager URL to new dataset/manage."""
     from fastapi.responses import RedirectResponse
+
     return RedirectResponse(url="/dataset/manage", status_code=301)
 
 
 @router.get("/dataset-generator", response_class=HTMLResponse)
 async def get_dataset_generator_page(request: Request):
-    """Dataset generator page.""" 
+    """Dataset generator page."""
     return templates.TemplateResponse("dataset_generator.html", {"request": request})
 
 
@@ -51,10 +52,9 @@ async def get_monitoring_page(request: Request):
 @router.get("/execution/{work_id}", response_class=HTMLResponse)
 async def get_execution_detail_page(request: Request, work_id: str):
     """Detailed execution monitoring page."""
-    return templates.TemplateResponse("execution_detail.html", {
-        "request": request,
-        "work_id": work_id
-    })
+    return templates.TemplateResponse(
+        "execution_detail.html", {"request": request, "work_id": work_id}
+    )
 
 
 @router.get("/batch/manage", response_class=HTMLResponse)

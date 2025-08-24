@@ -9,24 +9,24 @@ maximum distance to a set of input strings.
 MODULE ARCHITECTURE:
 ===================
 1. Diversity Measurement:
-   - Calculation of average Hamming distance between individuals
-   - Population convergence monitoring
+    - Calculation of average Hamming distance between individuals
+    - Population convergence monitoring
 
 2. Mutation Operators:
-   - Multi-point mutation: Randomly changes multiple positions
-   - Inversion mutation: Inverts string segments
-   - Transposition mutation: Moves segments to other positions
+    - Multi-point mutation: Randomly changes multiple positions
+    - Inversion mutation: Inverts string segments
+    - Transposition mutation: Moves segments to other positions
 
 3. Crossover Operators:
-   - One-point crossover: Exchanges suffixes between parents
-   - Uniform crossover: Combines genes position by position
-   - Block crossover: Exchanges structural segments
+    - One-point crossover: Exchanges suffixes between parents
+    - Uniform crossover: Combines genes position by position
+    - Block crossover: Exchanges structural segments
 
 4. Local Refinement:
-   - Greedy search: Position-by-position optimization
-   - Swap refinement: Permutes positions to improve fitness
-   - Insertion refinement: Moves small segments
-   - 2-opt refinement: Inverts segments for optimization
+    - Greedy search: Position-by-position optimization
+    - Swap refinement: Permutes positions to improve fitness
+    - Insertion refinement: Moves small segments
+    - 2-opt refinement: Inverts segments for optimization
 
 ALGORITHMIC STRATEGIES:
 ======================
@@ -41,48 +41,6 @@ USE CASES:
 - String optimization in alignment problems
 - Genetic variability analysis
 - Distance-based clustering problems
-
-USAGE EXAMPLE:
-=============
-```python
-from algorithms.blf_ga.ops.genetic_ops import (
-    mutate_multi, crossover_one_point, refine_greedy, mean_hamming_distance
-)
-
-# Initial population
-pop = ["ACGT", "ATGT", "ACCT"]
-strings = ["ACGT", "ATGT", "ACCT", "AGGT"]
-
-# Diversity measurement
-diversity = mean_hamming_distance(pop)
-
-# Mutation
-mutated = mutate_multi("ACGT", "ACGT", random.Random(42), n=1)
-
-# Crossover
-child1, child2 = crossover_one_point("ACGT", "ATGT", random.Random(42))
-
-# Refinamento local
-refined = refine_greedy("ACGT", strings)
-```
-
-LIMITAÇÕES:
-===========
-- Assume que todas as strings têm o mesmo comprimento
-- Alguns operadores podem ser computacionalmente intensivos para strings muito longas
-- O refinamento local pode ficar preso em ótimos locais
-- A eficiência depende da qualidade da população inicial
-
-DEPENDÊNCIAS:
-============
-- numpy: Para cálculos matriciais eficientes
-- random: Para operações estocásticas
-- src.utils.distance: Para cálculo de distâncias entre strings
-
-TIPOS UTILIZADOS:
-================
-- String: Alias para str (representação de um indivíduo)
-- Population: Lista de strings (representação da população)
 """
 
 import random
@@ -98,7 +56,7 @@ Population = list[String]
 # =============================================================================
 
 
-def mean_hamming_distance(pop: Population) -> float:
+def mean_hamming_distance(pop: Population, distance_func=None) -> float:
     """
     Calculate the average Hamming distance between all pairs of individuals in the population.
 
@@ -108,44 +66,54 @@ def mean_hamming_distance(pop: Population) -> float:
     of the search space, while low diversity may indicate premature convergence.
 
     ALGORITHMIC STRATEGY:
-    - Uses NumPy broadcasting to efficiently calculate all pairwise distances
-    - Considers only the upper triangle of the distance matrix (avoids duplication)
+    - Uses standardized distance calculation method when provided
+    - Falls back to direct calculation only if no distance function provided
+    - Considers only unique pairs to avoid duplication
     - Complexity: O(n²·m) where n is population size and m is string length
 
     Args:
         pop (Population): List of individuals (strings) in the population
+        distance_func: Distance calculation function (should be HammingDistanceCalculator.distance)
 
     Returns:
         float: Average Hamming distance between all pairs.
                Returns 0.0 if population has fewer than 2 individuals.
 
     Examples:
+        >>> from src.domain.distance import HammingDistanceCalculator
         >>> pop = ["ACGT", "ATGT", "GCGT"]
-        >>> mean_hamming_distance(pop)  # Differences at positions 1 and 0
+        >>> mean_hamming_distance(pop, HammingDistanceCalculator.distance)
         1.3333333333333333
 
         >>> pop = ["AAAA", "AAAA"]  # Homogeneous population
-        >>> mean_hamming_distance(pop)
+        >>> mean_hamming_distance(pop, HammingDistanceCalculator.distance)
         0.0
 
     Note:
         - Assumes all strings have the same length
         - Useful for monitoring genetic algorithm convergence
         - Values close to 0 indicate converged population
+        - Uses standardized distance calculation when available
     """
     if len(pop) < 2:
         return 0.0
 
-    # Convert strings to NumPy matrix for efficient processing
+    # Use standardized distance calculation if provided
+    if distance_func is not None:
+        total_distance = 0.0
+        total_pairs = 0
+
+        for i in range(len(pop)):
+            for j in range(i + 1, len(pop)):
+                total_distance += distance_func(pop[i], pop[j])
+                total_pairs += 1
+
+        return total_distance / total_pairs if total_pairs > 0 else 0.0
+
+    # Fallback to direct calculation (for backward compatibility)
     arr = np.array([list(ind) for ind in pop])
-
-    # Calculate pairwise distances using broadcasting
-    # arr[:, None, :] creates an extra dimension for element-wise comparison
     dists = np.sum(arr[:, None, :] != arr[None, :, :], axis=2)
-
-    # Take only upper triangle (avoid counting each pair twice)
     iu = np.triu_indices(len(pop), 1)
-
     return np.mean(dists[iu])
 
 
@@ -477,35 +445,35 @@ def crossover_blend_blocks(
 # =============================================================================
 
 
-def refine_greedy(ind: String, strings: list[String]) -> String:
+def refine_greedy(ind: String, strings: list[String], max_distance_func=None) -> String:
     """
-    Aplica refinamento local guloso posição por posição.
+    Aplica refinamento local greedy posição por posição.
 
-    Este operador implementa uma busca local gulosa que examina cada posição
-    da string e tenta todos os símbolos do alfabeto, escolhendo aquele que
-    minimiza a distância máxima. O processo é repetido até que não haja mais
-    melhorias possíveis.
+    Este refinador testa cada posição da string, experimentando todos os
+    símbolos do alfabeto e mantendo aquele que produz melhor fitness.
+    É um método de busca local que garante melhoria monotônica.
 
     ESTRATÉGIA ALGORÍTMICA:
-    - Extrai alfabeto das strings de referência
-    - Para cada posição, testa todos os símbolos do alfabeto
-    - Escolhe o símbolo que resulta no menor fitness (distância máxima)
-    - Repete o processo até convergência (sem melhorias)
-    - Usa abordagem gulosa (primeira melhoria encontrada)
+    - Itera sobre cada posição da string
+    - Para cada posição, testa todos os símbolos do alfabeto extraído das strings
+    - Mantém a alteração que resulta no melhor fitness (menor distância máxima)
+    - Repete até que nenhuma posição possa ser melhorada
+    - Usa greedy: aceita a primeira melhoria encontrada
 
     Args:
         ind (String): Indivíduo a ser refinado
         strings (list[String]): Lista de strings de referência para cálculo do fitness
+        max_distance_func: Function to calculate max distance (should accept individual and strings)
 
     Returns:
-        String: Indivíduo refinado com fitness local ótimo
+        String: Indivíduo refinado através de busca greedy posição por posição
 
     Examples:
         >>> strings = ["ACGT", "ATGT", "AGGT"]
-        >>> refine_greedy("AAAA", strings)
+        >>> refine_greedy("AAAA", strings, some_max_distance_func)
         'ACGT'  # Refinado para minimizar distância máxima
 
-        >>> refine_greedy("ACGT", ["ACGT", "ACGT"])
+        >>> refine_greedy("ACGT", ["ACGT", "ACGT"], some_max_distance_func)
         'ACGT'  # Já é ótimo, não há mudança
 
     Note:
@@ -513,8 +481,14 @@ def refine_greedy(ind: String, strings: list[String]) -> String:
         - Pode ficar preso em ótimos locais
         - Complexidade O(k * n * |Σ|) onde k é número de iterações, n é comprimento, |Σ| é tamanho do alfabeto
         - Muito eficaz para refinamento final de soluções
+        - Uses standardized distance calculation when available
     """
-    from src.domain.metrics import max_distance
+    if max_distance_func is None:
+        # Fallback for backward compatibility
+        from src.domain.distance import HammingDistanceCalculator
+
+        distance_calc = HammingDistanceCalculator(strings)
+        max_distance_func = distance_calc.max_distance
 
     # Extrai alfabeto das strings de referência
     alphabet = set()
@@ -523,7 +497,7 @@ def refine_greedy(ind: String, strings: list[String]) -> String:
     alphabet = sorted(alphabet)
 
     best_ind = ind
-    best_fitness = max_distance(best_ind, strings)
+    best_fitness = max_distance_func(best_ind)
     improved = True
 
     # Continua até não haver melhoria
@@ -541,7 +515,7 @@ def refine_greedy(ind: String, strings: list[String]) -> String:
                 if char != original_char:
                     current[pos] = char
                     test_ind = "".join(current)
-                    test_fitness = max_distance(test_ind, strings)
+                    test_fitness = max_distance_func(test_ind)
 
                     # Se encontrou melhoria, atualiza
                     if test_fitness < best_fitness:
@@ -557,7 +531,7 @@ def refine_greedy(ind: String, strings: list[String]) -> String:
     return best_ind
 
 
-def refine_swap(ind: String, strings: list[String]) -> String:
+def refine_swap(ind: String, strings: list[String], max_distance_func=None) -> String:
     """
     Aplica refinamento local por troca de posições.
 
@@ -593,10 +567,15 @@ def refine_swap(ind: String, strings: list[String]) -> String:
         - Útil quando a ordem dos símbolos importa mais que sua identidade
         - Pode ser combinado com outros operadores de refinamento
     """
-    from src.domain.metrics import max_distance
+    if max_distance_func is None:
+        # Fallback for backward compatibility
+        from src.domain.distance import HammingDistanceCalculator
+
+        distance_calc = HammingDistanceCalculator(strings)
+        max_distance_func = distance_calc.max_distance
 
     best_ind = ind
-    best_fitness = max_distance(best_ind, strings)
+    best_fitness = max_distance_func(best_ind)
     current = list(best_ind)
     L = len(current)
 
@@ -606,7 +585,7 @@ def refine_swap(ind: String, strings: list[String]) -> String:
             # Troca posições i e j
             current[i], current[j] = current[j], current[i]
             test_ind = "".join(current)
-            test_fitness = max_distance(test_ind, strings)
+            test_fitness = max_distance_func(test_ind)
 
             # Se melhorou, mantém a troca
             if test_fitness < best_fitness:
@@ -619,7 +598,9 @@ def refine_swap(ind: String, strings: list[String]) -> String:
     return best_ind
 
 
-def refine_insertion(ind: String, strings: list[String]) -> String:
+def refine_insertion(
+    ind: String, strings: list[String], max_distance_func=None
+) -> String:
     """
     Aplica refinamento local por inserção/remoção de segmentos.
 
@@ -654,11 +635,17 @@ def refine_insertion(ind: String, strings: list[String]) -> String:
         - Complexidade O(n³) onde n é o comprimento da string
         - Útil para reorganizar estruturas locais
         - Trabalha com segmentos pequenos para evitar disrupção excessiva
+        - Uses standardized distance calculation when available
     """
-    from src.domain.metrics import max_distance
+    if max_distance_func is None:
+        # Fallback for backward compatibility
+        from src.domain.distance import HammingDistanceCalculator
+
+        distance_calc = HammingDistanceCalculator(strings)
+        max_distance_func = distance_calc.max_distance
 
     best_ind = ind
-    best_fitness = max_distance(best_ind, strings)
+    best_fitness = max_distance_func(best_ind)
     current = list(best_ind)
     L = len(current)
 
@@ -678,7 +665,7 @@ def refine_insertion(ind: String, strings: list[String]) -> String:
                 # Verifica se mantém comprimento original
                 if len(new_current) == L:
                     test_ind = "".join(new_current)
-                    test_fitness = max_distance(test_ind, strings)
+                    test_fitness = max_distance_func(test_ind)
 
                     # Se melhorou, atualiza
                     if test_fitness < best_fitness:
@@ -689,7 +676,7 @@ def refine_insertion(ind: String, strings: list[String]) -> String:
     return best_ind
 
 
-def refine_2opt(ind: String, strings: list[String]) -> String:
+def refine_2opt(ind: String, strings: list[String], max_distance_func=None) -> String:
     """
     Aplica refinamento local usando estratégia 2-opt.
 
@@ -724,11 +711,17 @@ def refine_2opt(ind: String, strings: list[String]) -> String:
         - Complexidade O(n²) por iteração, pode ter múltiplas iterações
         - Útil para reorganizar estruturas invertidas
         - Pode encontrar soluções que outras buscas locais não conseguem
+        - Uses standardized distance calculation when available
     """
-    from src.domain.metrics import max_distance
+    if max_distance_func is None:
+        # Fallback for backward compatibility
+        from src.domain.distance import HammingDistanceCalculator
+
+        distance_calc = HammingDistanceCalculator(strings)
+        max_distance_func = distance_calc.max_distance
 
     best_ind = ind
-    best_fitness = max_distance(best_ind, strings)
+    best_fitness = max_distance_func(best_ind)
     current = list(best_ind)
     L = len(current)
     improved = True
@@ -743,7 +736,7 @@ def refine_2opt(ind: String, strings: list[String]) -> String:
                 # Inverte segmento de i a j-1
                 new_current = current[:i] + current[i:j][::-1] + current[j:]
                 test_ind = "".join(new_current)
-                test_fitness = max_distance(test_ind, strings)
+                test_fitness = max_distance_func(test_ind)
 
                 # Se melhorou, atualiza e marca melhoria
                 if test_fitness < best_fitness:

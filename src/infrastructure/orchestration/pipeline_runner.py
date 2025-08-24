@@ -1,9 +1,17 @@
 """PipelineRunner com suporte a controle (pause/cancel/resume) via WorkManager."""
 
 from __future__ import annotations
-from typing import Any
-from application.services.work_service import get_work_service
-from infrastructure.persistence.work_state_persistence import WorkStatePersistence
+import time
+from typing import Any, Dict
+from src.domain.status import BaseStatus
+from src.infrastructure.persistence.work_state.wrappers.combination_scoped import (
+    CombinationScopedPersistence,
+)
+from src.application.services.work_service import get_work_service
+from src.infrastructure.persistence.work_state import (
+    WorkStatePersistence,
+    WorkScopedPersistence,
+)
 from src.domain.config import (
     CSPBenchConfig,
     ExperimentTask,
@@ -22,147 +30,64 @@ from .experiment_executor import ExperimentExecutor
 from .optimization_executor import OptimizationExecutor
 from .sensitivity_executor import SensitivityExecutor
 
-import time
-
 # Create module logger
 logger = get_logger("CSPBench.PipelineRunner")
 
 
 class PipelineRunner:
-    def __init__(self, work_id: str, store: WorkStatePersistence):
-        self.work_id = work_id
-        self.store = store
-        self.current_state = self.load_pipeline_state() if work_id else None
-        self.wm = get_work_service()
+    def __init__(self, work_store: WorkScopedPersistence):
+        self.work_store: WorkScopedPersistence = work_store
+        self.work_id = work_store.work_id
         self.execution_controller: ExecutionController | None = None
+        self.datasets_cache: dict[str, Dataset] = {}
 
-        logger.info(f"PipelineRunner inicializado para work_id: {work_id}")
-        if self.current_state:
-            logger.info(
-                f"Estado do pipeline carregado: {self.current_state.get('pipeline_status', 'unknown')}"
-            )
-        else:
-            logger.info("Nenhum estado anterior encontrado - pipeline novo")
+        logger.info(f"PipelineRunner inicializado para work_id: {self.work_id}")
 
-    def _check_control(self) -> str:
+    def _check_control(self) -> bool:
         """Verifica status de controle do pipeline (running/paused/canceled)."""
-        if not self.work_id:
-            return "running"
-        status = self.wm.get_status(self.work_id)
-        current_status = status or "running"
-        logger.debug(f"Status de controle verificado: {current_status}")
-        return current_status
-
-    def load_pipeline_state(self) -> dict[str, Any] | None:
-        """Carrega estado salvo do pipeline."""
-        if not self.store or not self.work_id:
-            logger.debug("Nenhuma store ou work_id disponível para carregar estado")
-            return None
-
-        logger.debug(
-            f"Tentando carregar estado do pipeline para work_id: {self.work_id}"
-        )
-        state = self.store.load_pipeline_state(self.work_id)
-
-        if state:
-            logger.info(f"Estado do pipeline carregado com sucesso: {state.keys()}")
-        else:
-            logger.info("Nenhum estado de pipeline encontrado")
-
-        return state
-
-    def save_current_state(
-        self,
-        task_idx: int,
-        dataset_idx: int,
-        preset_idx: int,
-        alg_idx: int,
-        config: CSPBenchConfig,
-        status: str = "running",
-    ) -> None:
-        """Salva estado atual no banco."""
-        if not self.store or not self.work_id:
-            return
-
-        self.store.save_pipeline_state(
-            work_id=self.work_id,
-            task_index=task_idx,
-            dataset_index=dataset_idx,
-            preset_index=preset_idx,
-            algorithm_index=alg_idx,
-            status=status,
-            config=config,
-        )
-
-    def pause_and_exit(
-        self,
-        task_idx: int,
-        dataset_idx: int,
-        preset_idx: int,
-        alg_idx: int,
-        config: CSPBenchConfig,
-    ) -> None:
-        """Pausa pipeline e encerra processo."""
-        self.save_current_state(
-            task_idx, dataset_idx, preset_idx, alg_idx, config, "paused"
-        )
-        return
+        status = self.work_store.get_work_status()
+        if status != BaseStatus.RUNNING:
+            logger.debug(f"Status alterado para {status}. Saindo!")
+            return False
+        return True
 
     def run(self, config: CSPBenchConfig) -> None:
-        logger.info("Iniciando execução do pipeline")
+        """Executa o pipeline seguindo o novo fluxo reorganizado."""
+        logger.info("Iniciando execução do pipeline reorganizado")
         logger.info(
             f"Configuração: {len(config.tasks.items)} tarefas do tipo {config.tasks.type}"
         )
 
-        # Log pipeline start
-        if self.store and self.work_id:
-            self.store.pipeline_started(self.work_id, config)
-
-        # Create ExecutionController with resources and control function
-        self.execution_controller = ExecutionController(
-            resources=config.resources, check_control=self._check_control
-        )
-        logger.info("ExecutionController criado com sucesso")
-
         try:
-            # Verificar se deve retomar de estado pausado
-            if (
-                self.current_state
-                and self.current_state.get("pipeline_status") == "paused"
-            ):
-                logger.info("Estado pausado detectado - retomando execução")
+            self.work_store.update_work_status(BaseStatus.RUNNING)
 
-                # Determinar índices de retomada
-                start_task = self.current_state["current_task_index"]
-                start_dataset = self.current_state["current_dataset_index"]
-                start_preset = self.current_state["current_preset_index"]
-                start_algorithm = self.current_state["current_algorithm_index"]
-
-                logger.info(
-                    f"Retomando do ponto: task={start_task}, dataset={start_dataset}, preset={start_preset}, algorithm={start_algorithm}"
-                )
-
-                # Atualizar status para running
-                if self.store and self.work_id:
-                    self.store.update_pipeline_status(self.work_id, "running")
-                    logger.debug("Status do pipeline atualizado para 'running'")
-            else:
-                # Iniciar do começo
-                start_task = start_dataset = start_preset = start_algorithm = 0
-                logger.info("Iniciando pipeline do começo")
-
-            # Executar pipeline unificado
-            logger.info("Iniciando execução unificada do pipeline")
-            self._execute_pipeline(
-                config, start_task, start_dataset, start_preset, start_algorithm
+            # Create ExecutionController with resources and control function
+            self.execution_controller = ExecutionController(
+                resources=config.resources, check_control=self._check_control
             )
+            logger.info("ExecutionController criado com sucesso")
+
+            # Fase 1: Gerar todos os datasets primeiro
+            logger.info("=== FASE 1: Gerando datasets ===")
+            self._generate_all_datasets(config)
+
+            # Fase 2: Gerar todas as combinações
+            logger.info("=== FASE 2: Gerando combinações ===")
+            self._generate_pipeline_combinations(config)
+
+            # Fase 3: Executar combinações
+            logger.info("=== FASE 3: Executando combinações ===")
+            status = self._execute_combinations(config)
+
             logger.info("Pipeline executado com sucesso")
+            self.work_store.update_work_status(status)
 
         except Exception as e:
             logger.error(f"Erro durante execução do pipeline: {e}", exc_info=True)
-            if self.store and self.work_id:
-                self.store.log(self.work_id, "error", f"Pipeline error: {e}", {"error_type": e.__class__.__name__})
-            raise
+            if self.work_store:
+                self.work_store.work_error(e)
+                self.work_store.update_work_status(BaseStatus.FAILED, error=str(e))
+            raise e
         finally:
             # Cleanup execution controller
             if self.execution_controller:
@@ -170,275 +95,302 @@ class PipelineRunner:
                 self.execution_controller.cleanup()
                 logger.info("Pipeline finalizado e recursos liberados")
 
-    def _execute_pipeline(
-        self,
-        config: CSPBenchConfig,
-        start_task: int = 0,
-        start_dataset: int = 0,
-        start_preset: int = 0,
-        start_algorithm: int = 0,
-    ) -> None:
-        """Executa pipeline a partir dos índices especificados."""
+    def _generate_all_datasets(self, config: CSPBenchConfig) -> None:
+        """Fase 1: Gera todos os datasets necessários."""
+        # Coletar todos os dataset IDs únicos utilizados nas tasks
+        used_dataset_ids = set()
+
+        for task in config.tasks.items:
+            # task.datasets agora é List[str] contendo IDs de datasets
+            used_dataset_ids.update(task.datasets)
+
         logger.info(
-            f"Iniciando _execute_pipeline com índices: task={start_task}, dataset={start_dataset}, preset={start_preset}, algorithm={start_algorithm}"
+            f"Encontrados {len(used_dataset_ids)} dataset IDs únicos utilizados: {sorted(used_dataset_ids)}"
         )
 
-        tasks_group: TasksGroup = config.tasks
-        tasks = tasks_group.items
+        # Verificar se todos os IDs referenciados existem na configuração
+        missing_datasets = used_dataset_ids - set(config.datasets.keys())
+        if missing_datasets:
+            raise ValueError(
+                f"Dataset IDs referenciados mas não definidos: {sorted(missing_datasets)}"
+            )
 
-        logger.info(f"Total de tarefas a processar: {len(tasks)}")
+        # Processar cada dataset utilizado
+        for dataset_id in sorted(used_dataset_ids):
 
-        # Loop principal unificado
-        for task_idx, task in enumerate(tasks):
-            if task_idx < start_task:
-                logger.debug(f"Pulando tarefa {task_idx} (já processada)")
-                continue  # Pular tasks já processadas
+            logger.info(f"Processando dataset: {dataset_id}")
 
-            logger.info(f"Processando tarefa {task_idx}: {task.id} ({task.type})")
+            try:
+                # Obter a configuração do dataset do dicionário config.datasets
+                dataset_config = config.datasets[dataset_id]
+                self._process_dataset(dataset_config)
 
-            if self.work_id and self._check_control() == "canceled":
-                logger.warning(
-                    f"Pipeline cancelado antes do início da tarefa {task.id}"
+                logger.info(
+                    f"Dataset {dataset_id} processado."
                 )
+
+            except Exception as e:
+                logger.error(f"Erro ao processar dataset {dataset_id}: {e}")
+                raise
+
+    def _generate_pipeline_combinations(self, config: CSPBenchConfig) -> None:
+        """Fase 2: Gera todas as combinações possíveis do pipeline."""
+        try:
+            requeued = self.work_store.init_combination()
+            if requeued:
+                logger.info(
+                    "Combinações em andamento/pausadas/canceladas reiniciadas para 'queued'. Verificando novas combinações..."
+                )
+
+            # Sempre gerar combinações: tanto para casos novos quanto para adicionar novas após reset
+            combinations = []
+
+            for task in config.tasks.items:
+                total_sequences = None
+
+                if isinstance(task, ExperimentTask):
+                    total_sequences = task.repetitions
+                elif isinstance(task, OptimizationTask):
+                    total_sequences = task.config.trial
+                elif isinstance(task, SensitivityTask):
+                    total_sequences = task.config.samples
+
+                # task.datasets agora é List[str] contendo IDs de datasets
+                for dataset_id in task.datasets:
+
+                    # task.algorithms agora é List[str] contendo IDs de algorithm presets
+                    for preset_id in task.algorithms:
+                        # Obter o preset do dicionário config.algorithms
+                        preset = config.algorithms.get(preset_id)
+                        if not preset:
+                            self.work_store.preset_error(
+                                preset_id, "Algorithm não encontrado na configuração"
+                            )
+                            logger.warning(
+                                f"Algorithm preset '{preset_id}' não encontrado na configuração"
+                            )
+                            continue
+
+                        for alg in preset.items:
+                            combination = {
+                                "task_id": task.id,
+                                "dataset_id": dataset_id,
+                                "preset_id": preset_id,
+                                "algorithm_id": alg.name,
+                                "mode": task.type,
+                                "total_sequences": total_sequences,
+                            }
+                            combinations.append(combination)
+
+            logger.info(f"Geradas {len(combinations)} combinações para processamento")
+
+            # Submeter todas as combinações (INSERT OR IGNORE garante que duplicatas sejam ignoradas)
+            if combinations:
+                inserted_count = self.work_store.submit_combinations(combinations)
+                logger.info(f"{inserted_count} novas combinações inseridas no banco")
+            else:
+                logger.warning("Nenhuma combinação válida foi gerada")
+        except Exception as e:
+            self.work_store.combination_error("N/A", e)
+            raise e
+
+    def _execute_combinations(self, config: CSPBenchConfig) -> BaseStatus:
+        """Fase 3: Executa todas as combinações pendentes."""
+        if not self.work_store:
+            logger.error("Work store não disponível para execução")
+            return BaseStatus.FAILED
+
+        execution_statuses = []  # Lista para armazenar os status das execuções
+
+        while True:
+            # Se controle indicar que não está mais em RUNNING, parar
+            if not self._check_control():
                 break
 
-            # Log task start
-            if self.store and self.work_id:
-                self.store.task_started(self.work_id, task.id, {"type": task.type, "index": task_idx})
+            # Obter próxima combinação pendente
+            combination = self.work_store.get_next_pending_combination()
+            if not combination:
+                logger.info("Todas as combinações foram processadas")
+                break
 
-            # Verificar pause no início de cada task
-            if self.work_id and self._check_control() == "paused":
-                logger.info(f"Pipeline pausado no início da tarefa {task.id}")
-                self.pause_and_exit(
-                    task_idx,
-                    0 if task_idx > start_task else start_dataset,
-                    0,
-                    0,
-                    config,
-                )
-                return
+            work_combination = CombinationScopedPersistence(
+                self.work_store.store,  # store base
+                combination["id"],
+            )
 
-            logger.debug(f"Iniciando execução da tarefa: {task.name}")
+            # Executar combinação e armazenar o status
+            status = self._execute_single_combination(combination, config, work_combination)
+            execution_statuses.append(status)
 
-            dataset_start = start_dataset if task_idx == start_task else 0
-            for dataset_idx, dataset in enumerate(task.datasets):
-                if task_idx == start_task and dataset_idx < dataset_start:
-                    continue  # Pular datasets já processadas
+        # Verificar a lista de status e determinar o resultado final
+        if not execution_statuses:
+            # Nenhuma combinação foi executada
+            return BaseStatus.COMPLETED
 
-                # Verificar pause antes de cada dataset
-                if self.work_id and self._check_control() == "paused":
-                    self.pause_and_exit(task_idx, dataset_idx, 0, 0, config)
-                    return
+        # Se existe falha, retorna falha
+        if BaseStatus.FAILED in execution_statuses:
+            return BaseStatus.FAILED
 
-                dataset_obj = self._process_dataset(dataset)
+        # Se existe erro, retorna erro
+        if BaseStatus.ERROR in execution_statuses:
+            return BaseStatus.ERROR
 
-                preset_start = (
-                    start_preset
-                    if (task_idx == start_task and dataset_idx == start_dataset)
-                    else 0
-                )
-                for preset_idx, preset in enumerate(task.algorithms):
-                    if (
-                        task_idx == start_task
-                        and dataset_idx == start_dataset
-                        and preset_idx < preset_start
-                    ):
-                        continue  # Pular presets já processados
+        # Se todos completos, retorna completo
+        if all(status == BaseStatus.COMPLETED for status in execution_statuses):
+            return BaseStatus.COMPLETED
 
-                    # Verificar pause antes de cada preset
-                    if self.work_id and self._check_control() == "paused":
-                        self.pause_and_exit(
-                            task_idx, dataset_idx, preset_idx, 0, config
-                        )
-                        return
+        # Se outra coisa, retorna erro
+        return BaseStatus.ERROR
 
-                    alg_start = (
-                        start_algorithm
-                        if (
-                            task_idx == start_task
-                            and dataset_idx == start_dataset
-                            and preset_idx == start_preset
-                        )
-                        else 0
-                    )
-                    for alg_idx, alg in enumerate(preset.items):
-                        if (
-                            task_idx == start_task
-                            and dataset_idx == start_dataset
-                            and preset_idx == start_preset
-                            and alg_idx < alg_start
-                        ):
-                            continue  # Pular algoritmos já processados
+    def _execute_single_combination(
+        self,
+        combination: dict[str, Any],
+        config: CSPBenchConfig,
+        work_combination: CombinationScopedPersistence,
+    ) -> BaseStatus:
+        """Executa uma única combinação."""
+        task_id = combination["task_id"]
+        dataset_id = combination["dataset_id"]
+        preset_id = combination["preset_id"]
+        algorithm_id = combination["algorithm_id"]
 
-                        # Verificar pause antes de cada algorithm
-                        if self.work_id and self._check_control() == "paused":
-                            self.pause_and_exit(
-                                task_idx, dataset_idx, preset_idx, alg_idx, config
-                            )
-                            return
+        logger.info(
+            f"Executando combinação: {task_id}/{dataset_id}/{preset_id}/{algorithm_id}"
+        )
 
-                        if self._check_control() == "canceled":
-                            if self.store and self.work_id:
-                                self.store.log(self.work_id, "warning", "Pipeline canceled mid-execution", {"task": task.id})
-                            break
+        try:
+            # Marcar como running
+            work_combination.update_combination_status(BaseStatus.RUNNING)
 
-                        # Salvar estado atual antes da execução
-                        self.save_current_state(
-                            task_idx, dataset_idx, preset_idx, alg_idx, config
-                        )
+            # Encontrar objetos de configuração
+            task = self._find_task(config, task_id)
+            if not task:
+                raise ValueError(f"Task não encontrada: {task_id}")
 
-                        # Executar algoritmo
-                        self._execute_algorithm(
-                            task, alg, dataset_obj, config, self._check_control
-                        )
-                    else:
-                        continue
-                    break
-            
-            # Log task finish
-            if self.store and self.work_id:
-                self.store.task_finished(self.work_id, task.id, {"status": "ok"})
+            alg = self._find_algorithm(config, preset_id, algorithm_id)
+            if not alg:
+                raise ValueError(f"Algoritmo não encontrado: {algorithm_id}")
 
-        # Pipeline completado - limpar estado
-        if self.store and self.work_id:
-            self.store.clear_pipeline_state(self.work_id)
-            self.store.pipeline_finished(self.work_id, True)
+            dataset_obj = self.datasets_cache.get(dataset_id)
+            if not dataset_obj:
+                raise ValueError(f"Dataset não encontrado no cache: {dataset_id}")
 
-    def _process_dataset(self, dataset) -> Dataset:
+            # Executar algoritmo
+            status = self._execute_algorithm(
+                work_combination, task, alg, dataset_obj, config
+            )
+
+            work_combination.update_combination_status(status)
+
+            logger.info(
+                f"Combinação {task_id}/{dataset_id}/{preset_id}/{algorithm_id} concluída: {status}"
+            )
+
+            return status
+
+        except Exception as e:
+            logger.error(f"Erro na execução da combinação: {e}")
+            work_combination.update_combination_status(BaseStatus.FAILED)
+            work_combination.record_error(e)
+            if self.work_store:
+                self.work_store.algorithm_error(algorithm_id, e)
+            return BaseStatus.FAILED
+
+    def _execute_algorithm(
+        self, work_combination, task, alg, dataset_obj, config
+    ) -> BaseStatus:
+        """Execute a single algorithm with proper result capture."""
+        try:
+
+            engine: ExecutionEngine = self._get_executor(work_combination, config, task)
+
+            result_status = engine.run(
+                task=task,
+                dataset_obj=dataset_obj,
+                alg=alg,
+            )
+
+            return result_status
+
+        except KeyboardInterrupt:
+            raise
+        except Exception as e:
+            raise e
+
+    def _process_dataset(self, dataset_config) -> None:
         """Processa um dataset (cache ou gera novo)."""
-        dataset_id = getattr(dataset, "id", None)
+        dataset_id = getattr(dataset_config, "id", None)
 
         # Verificar cache primeiro
-        if self.store and dataset_id and self.store.has_dataset(dataset_id):
-            strings: list[str] = self.store.get_dataset_strings(dataset_id)
-            if self.store and self.work_id:
-                self.store.log(
-                    self.work_id,
-                    "info",
-                    f"Using cached dataset: {dataset_id} ({len(strings)} sequences)",
-                    {"dataset_id": dataset_id, "cached": True},
-                )
-            # Create Dataset object from cached strings
-            dataset_name = getattr(dataset, "name", "cached_dataset")
-            dataset_obj = Dataset(name=dataset_name, sequences=strings)
-            if hasattr(dataset, "id"):
-                dataset_obj.id = dataset.id
-            return dataset_obj
-        else:
+        if (
+            self.work_store
+            and dataset_id
+            and self.work_store.store.has_dataset(dataset_id)
+        ):
+            try:
+                dataset_obj = self.work_store.get_dataset(dataset_id)
+                if dataset_obj is None or not dataset_obj.sequences:
+                    logger.warning(
+                        f"Dataset {dataset_id} encontrado no cache, mas está vazio"
+                    )
+                else:
+                    self.datasets_cache[dataset_id] = dataset_obj
+                    return
+            except Exception as e:
+                logger.warning(f"Erro ao carregar dataset do cache {dataset_id}: {e}")
+
+        # Sem cache ou dataset vazio, gerar novo
+        try:
             # Gerar/carregar dataset normalmente
-            resolver, parameters = load_dataset(dataset)
-            try:
-                # Return the Dataset object directly instead of just strings
-                dataset_obj = resolver
-                if hasattr(dataset, "id") and not hasattr(dataset_obj, "id"):
-                    dataset_obj.id = dataset.id
-                if hasattr(dataset, "name") and not hasattr(dataset_obj, "name"):
-                    dataset_obj.name = dataset.name
-            except Exception as e:
-                if self.store and self.work_id:
-                    self.store.error(self.work_id, f"dataset:{getattr(dataset, 'id', 'unknown')}", e)
-                dataset_name = getattr(dataset, "name", "error_dataset")
-                dataset_obj = Dataset(name=dataset_name, sequences=[])
-                if hasattr(dataset, "id"):
-                    dataset_obj.id = dataset.id
+            logger.info(f"Gerando dataset: {dataset_id}")
+            resolver, params = load_dataset(dataset_config)
 
-            # Persistir dataset completo para cache futuro
-            try:
-                if self.store and dataset_id and dataset_obj.sequences:
-                    self.store.persist_complete_dataset(
-                        dataset, dataset_obj.sequences, parameters
-                    )
-                    if self.store and self.work_id:
-                        self.store.log(
-                            self.work_id,
-                            "info",
-                            f"Cached new dataset: {dataset_id} ({len(dataset_obj.sequences)} sequences)",
-                            {"dataset_id": dataset_id, "cached": False},
-                        )
-            except Exception as e:
-                if self.store and self.work_id:
-                    self.store.log(
-                        self.work_id,
-                        "warning",
-                        f"Failed to cache dataset {dataset_id}: {e}",
-                        {"dataset_id": dataset_id, "error": str(e)},
-                    )
+            meta = {
+                "batch_params": dataset_config if dataset_config else {},
+                "dataset_params": params if params else {},
+                "dataset_statistics": resolver.get_statistics() if resolver else {}
+            }
 
-        return dataset_obj
+            self.work_store.submit_dataset(id= dataset_id, dataset_obj=resolver, meta=meta)
+            self.datasets_cache[dataset_id] = resolver
 
-    def _get_executor(self, task) -> ExecutionEngine:
+        except Exception as e:
+            logger.error(f"Erro ao gerar/salvar dataset {dataset_id}: {e}")
+            if self.work_store:
+                self.work_store.dataset_error(dataset_id, e)
+            raise ValueError(f"Erro ao gerar/salvar dataset {dataset_id}: {e}")
+
+    def _find_task(self, config: CSPBenchConfig, task_id: str):
+        """Encontra uma task pelo ID."""
+        for task in config.tasks.items:
+            if task.id == task_id:
+                return task
+        return None
+
+    def _find_algorithm(
+        self, config: CSPBenchConfig, preset_id: str, algorithm_id: str
+    ):
+        """Encontra um algoritmo dentro de um preset usando a nova estrutura."""
+        preset = config.algorithms.get(preset_id)
+        if not preset:
+            return None
+
+        for alg in preset.items:
+            if alg.name == algorithm_id:
+                return alg
+        return None
+
+    def _get_executor(self, work_combination, batch_config, task) -> ExecutionEngine:
         """Factory method para obter engine de execução apropriada baseada no tipo da task."""
         if isinstance(task, ExperimentTask):
-            return ExperimentExecutor()
+            return ExperimentExecutor(
+                combination_store=work_combination,
+                execution_controller=self.execution_controller,
+                batch_config=batch_config,
+            )
         elif isinstance(task, OptimizationTask):
             return OptimizationExecutor()
         elif isinstance(task, SensitivityTask):
             return SensitivityExecutor()
         else:
             raise ValueError(f"Tipo de task não suportado: {type(task)}")
-
-    def _execute_algorithm(self, task, alg, dataset_obj, config, check_control):
-        """Execute a single algorithm with proper result capture."""
-        try:
-            engine = self._get_executor(task)
-
-            # Pass ExecutionController to the execution engine if it has the attribute
-            if hasattr(engine, "execution_controller"):
-                engine.execution_controller = self.execution_controller
-
-            result = engine.run(
-                task=task,
-                dataset_obj=dataset_obj,
-                alg=alg,
-                resources=config.resources,
-                work_id=self.work_id,
-                system_config=config.system,
-                check_control=check_control,
-                store=self.store,
-            )
-
-            # Store result in database if available
-            if result and self.store and self.work_id:
-                try:
-                    # Results are already stored by the execution engines
-                    self.store.log(
-                        self.work_id,
-                        "info",
-                        f"Algorithm execution completed for {alg.name}",
-                        {
-                            "algorithm": alg.name,
-                            "dataset": (
-                                dataset_obj.id
-                                if hasattr(dataset_obj, "id")
-                                else "unknown"
-                            ),
-                            "status": result.get("status", "unknown"),
-                        },
-                    )
-                except Exception as e:
-                    self.store.log(
-                        self.work_id,
-                        "warning",
-                        f"Failed to log result for {alg.name}: {e}",
-                        {"algorithm": alg.name, "error": str(e)},
-                    )
-
-            return result
-
-        except KeyboardInterrupt:
-            raise
-        except Exception as e:
-            if self.store and self.work_id:
-                self.store.log(
-                    self.work_id,
-                    "error",
-                    f"Failed to execute {alg.name}: {str(e)}",
-                    {
-                        "algorithm": alg.name,
-                        "dataset": (
-                            dataset_obj.id if hasattr(dataset_obj, "id") else "unknown"
-                        ),
-                        "error": str(e),
-                    },
-                )
-            return None

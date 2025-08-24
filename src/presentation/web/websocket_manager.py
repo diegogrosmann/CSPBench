@@ -7,6 +7,7 @@ The implementation is intentionally minimal: it does not start a server or
 manage real socket objects, but keeps an in-memory registry that other parts
 of the application can use to register/unregister connections if needed.
 """
+
 from typing import Dict, List, Any
 import asyncio
 

@@ -99,7 +99,7 @@ CONSTANT_VALUE = 42         # UPPER_SNAKE_CASE
 **OBRIGATÓRIO:**
 - ✅ Plugins via `@register_algorithm`
 - ✅ Configuração via arquivos YAML/ENV
-- ✅ Internacionalização (código em inglês)
+- ✅ Internacionalização (código, comentarios e documentação em inglês)
 - ✅ Testes para mudanças
 - ✅ Tipagem estática (type hints)
 

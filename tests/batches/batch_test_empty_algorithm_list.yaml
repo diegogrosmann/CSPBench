@@ -1,0 +1,76 @@
+# ===================================================================
+# TESTE: Lista Vazia - algorithms: [] (lista vazia)
+# ===================================================================
+metadata:
+  name: "Test Empty Algorithm List"
+  description: "Teste com lista de algoritmos vazia"
+  author: "Test"
+  version: "1.0"
+  creation_date: "2025-01-24"
+  tags: ["test", "empty_list"]
+
+datasets:
+  - id: dataset_test
+    name: "Test Dataset"
+    type: "synthetic"
+    parameters:
+      mode: "random"
+      n: 5
+      L: 10
+      alphabet: "ACGT"
+      seed: 42
+
+algorithms:
+  - id: "test_empty_algorithm_list"
+    name: "Configuration with Empty Algorithm List"
+    description: "Testing configuration with explicitly empty algorithms list"
+    algorithms: []  # Lista explicitamente vazia
+    
+    algorithm_params:
+      "Baseline":
+        tie_break: "lex"
+      "BLF-GA":
+        pop_size: 20
+        max_gens: 50
+        seed: 42
+      "CSC":
+        min_d: 2
+        d_factor: 0.75
+
+task:
+  type: "experiment"
+
+experiment:
+  tasks:
+    - name: "Test Empty Algorithm List"
+      datasets:
+        - "dataset_test"
+      algorithms:
+        - "test_empty_algorithm_list"
+      repetitions: 1
+
+output:
+  logging: true
+  results:
+    formats:
+      csv: false
+      json: true
+      parquet: false
+      pickle: false
+    partial_results: false
+
+resources:
+  cpu:
+    exclusive_cores: false
+    max_workers: 1
+    internal_jobs: 1
+  memory:
+    max_memory_gb: null
+  timeouts:
+    timeout_per_item: 60
+    timeout_total_batch: 300
+
+system:
+  global_seed: null
+  distance_method: "hamming"
+  enable_distance_cache: true

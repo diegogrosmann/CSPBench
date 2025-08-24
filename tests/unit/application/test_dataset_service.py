@@ -18,6 +18,7 @@ def test_load_dataset_synthetic(tmp_path):
     ) as gen:
         gen.return_value = (
             Dataset(
+                id="test_dataset_id",
                 sequences=["AAAAA", "AAAAT", "AAATA"],
                 alphabet="AT",
                 name="test_dataset",
@@ -38,7 +39,7 @@ def test_load_dataset_file(tmp_path):
         "src.application.services.dataset_service.FileDatasetRepository.load"
     ) as loader:
         loader.return_value = (
-            Dataset(sequences=["ACGT", "ATGT"], name="test-file"),
+            Dataset(id="test_file_id", sequences=["ACGT", "ATGT"], name="test-file"),
             {"file_path": str(fasta)},
         )
         ds, params = load_dataset(cfg)
@@ -54,7 +55,7 @@ def test_load_dataset_entrez():
         "src.application.services.dataset_service.EntrezDatasetDownloader.download"
     ) as dl:
         dl.return_value = (
-            Dataset(sequences=["ACGT", "ATGT"], name="test_dataset"),
+            Dataset(id="test_entrez_id", sequences=["ACGT", "ATGT"], name="test_dataset"),
             {"term": "cox1", "n": 2},
         )
         ds, params = load_dataset(cfg)

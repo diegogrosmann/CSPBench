@@ -247,8 +247,8 @@ class ExecutionMonitor {
                 return executions.filter(ex => this.isActiveStatus(ex.status));
             case 'running':
                 return executions.filter(ex => ex.status === 'running');
-            case 'finished':
-                return executions.filter(ex => ex.status === 'finished');
+            case 'completed':
+                return executions.filter(ex => ex.status === 'completed');
             case 'failed':
                 return executions.filter(ex => ex.status === 'failed');
             default:
@@ -327,7 +327,7 @@ class ExecutionMonitor {
     getStatusColor(status) {
         const colors = {
             'running': 'primary',
-            'finished': 'success',
+            'completed': 'success',
             'failed': 'danger',
             'cancelled': 'secondary',
             'unknown': 'warning'
@@ -338,7 +338,7 @@ class ExecutionMonitor {
     getStatusIcon(status) {
         const icons = {
             'running': 'play-circle',
-            'finished': 'check-circle',
+            'completed': 'check-circle',
             'failed': 'x-circle',
             'cancelled': 'stop-circle',
             'unknown': 'question-circle'

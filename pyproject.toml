@@ -122,10 +122,12 @@ addopts = [
     "--strict-markers",
     "--strict-config",
     "--cov=src",
+    "--cov=algorithms",  # incluir algoritmos externos ao src
     "--cov-report=term-missing",
     "--cov-report=html",
 ]
-testpaths = ["tests"]
+# Inclui também testes de plugins em algorithms/*/tests
+testpaths = ["tests", "algorithms/*/tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
@@ -155,7 +157,7 @@ module = [
 ignore_missing_imports = true
 
 [tool.coverage.run]
-source = ["src"]
+source = ["src", "algorithms"]
 omit = [
     "*/tests/*",
     "*/test_*",

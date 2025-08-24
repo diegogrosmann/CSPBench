@@ -16,14 +16,7 @@ import psutil
 
 from src.domain.config import ResourcesConfig
 from src.infrastructure.logging_config import get_logger
-
-
-class ExecutionStatus(Enum):
-    """Status de execução."""
-
-    RUNNING = "running"
-    PAUSED = "paused"
-    CANCELED = "canceled"
+from src.domain.status import BaseStatus
 
 
 class ExecutionLimitError(Exception):
@@ -205,7 +198,7 @@ class ExecutionController:
         """Get elapsed time since batch start."""
         return time.time() - self._batch_start_time
 
-    def check_status(self) -> ExecutionStatus:
+    def check_status(self) -> BaseStatus:
         """
         Check current execution status.
 
@@ -213,25 +206,25 @@ class ExecutionController:
             Current execution status
         """
         if not self._check_control:
-            return ExecutionStatus.RUNNING
+            return BaseStatus.RUNNING
 
         status_str = self._check_control()
 
         if status_str == "canceled":
-            return ExecutionStatus.CANCELED
+            return BaseStatus.CANCELED
         elif status_str == "paused":
-            return ExecutionStatus.PAUSED
+            return BaseStatus.PAUSED
         else:
-            return ExecutionStatus.RUNNING
+            return BaseStatus.RUNNING
 
-    def wait_for_continue(self) -> ExecutionStatus:
+    def wait_for_continue(self) -> BaseStatus:
         """
         Wait while paused, return when status changes.
 
         Returns:
             New execution status (RUNNING or CANCELED)
         """
-        while self.check_status() == ExecutionStatus.PAUSED:
+        while self.check_status() == BaseStatus.PAUSED:
             time.sleep(0.3)
 
         return self.check_status()

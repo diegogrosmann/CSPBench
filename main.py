@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-""" 
+"""
 CSPBench Main Entry Point - Hexagonal Architecture
 
 Features:
@@ -144,6 +144,7 @@ def main(args: Optional[list] = None):
         if logger:
             logger.error(f"Erro inesperado na execução: {e}", exc_info=True)
         sys.exit(1)
+
 
 if __name__ == "__main__":
     import sys

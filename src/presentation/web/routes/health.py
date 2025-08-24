@@ -21,6 +21,7 @@ router = APIRouter(prefix="/health", tags=["health"])
 
 class HealthStatus(BaseModel):
     """Health status model."""
+
     status: str
     version: str = "0.1.0"
 
@@ -31,15 +32,15 @@ def get_version():
         # Try to get version from pyproject.toml
         project_root = Path(__file__).parent.parent.parent.parent.parent
         pyproject_path = project_root / "pyproject.toml"
-        
+
         if pyproject_path.exists():
-            with open(pyproject_path, 'r') as f:
+            with open(pyproject_path, "r") as f:
                 content = f.read()
-                for line in content.split('\n'):
-                    if line.strip().startswith('version ='):
-                        version = line.split('=')[1].strip().strip('"\'')
+                for line in content.split("\n"):
+                    if line.strip().startswith("version ="):
+                        version = line.split("=")[1].strip().strip("\"'")
                         return f"v{version}"
-        
+
         # Fallback to environment variable or default
         return os.getenv("CSPBENCH_VERSION", "v0.1.0")
     except Exception:
@@ -52,7 +53,7 @@ async def health_check():
     try:
         algorithms_loaded = len(global_registry)
         version = get_version()
-        
+
         return HealthStatus(status="healthy", version=version)
     except Exception as e:
         logger.error(f"Health check failed: {e}")
@@ -106,7 +107,7 @@ async def get_system_status():
     """Get system status for UI display."""
     try:
         algorithms_count = len(global_registry)
-        
+
         # Determine system status based on available components
         if algorithms_count > 0:
             status = "Online"
@@ -114,7 +115,7 @@ async def get_system_status():
         else:
             status = "Degraded"
             status_type = "warning"
-            
+
         return {
             "status": status,
             "status_type": status_type,
@@ -138,7 +139,7 @@ async def get_system_version():
     try:
         version = get_version()
         python_version = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
-        
+
         return {
             "version": version,
             "python_version": python_version,

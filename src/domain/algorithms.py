@@ -6,9 +6,30 @@ including abstract interfaces, algorithm registry, and genetic operators.
 Free from external dependencies following hexagonal architecture.
 """
 
-import random
 from abc import ABC, abstractmethod
-from typing import Any, Callable, Optional
+from typing import Any, Dict, Optional, TYPE_CHECKING, TypedDict
+
+from .distance import DistanceCalculator
+from .monitoring import AlgorithmMonitor
+
+
+# =============================================================================
+# ALGORITHM RESULT TYPES
+# =============================================================================
+class AlgorithmResult(TypedDict):
+    """
+    Complete algorithm result type.
+
+    This represents the full structured result returned by CSP algorithms.
+    """
+
+    success: bool  # Whether the algorithm completed successfully
+    center_string: str  # The center string solution
+    max_distance: int  # Maximum distance from center to input strings
+    parameters: Dict[str, Any]  # Algorithm parameters used
+    error: str | None  # Error message if any
+    metadata: Dict[str, Any]  # Detailed execution metadata
+
 
 # =============================================================================
 # ALGORITHM REGISTRY
@@ -42,85 +63,116 @@ class CSPAlgorithm(ABC):
 
     # Required class attributes
     name: str
-    default_params: dict
-    is_deterministic: bool = False
+    default_params: dict = {}  # Default empty dict to ensure it exists
     supports_internal_parallel: bool = False
 
-    @abstractmethod
-    def __init__(self, strings: list[str], alphabet: str, **params):
+    def __init__(
+        self,
+        strings: list[str],
+        alphabet: str,
+        distance_calculator: DistanceCalculator,
+        monitor: Optional[AlgorithmMonitor] = None,
+        seed: Optional[int] = None,
+        internal_jobs: int = 1,
+        store: Any | None = None,  # adaptador simples usado nos testes legado
+        **params,
+    ):
         """
-        Initialize algorithm with strings and alphabet.
+        Initialize algorithm with strings, alphabet, and dependencies.
 
         Args:
             strings: List of dataset strings
             alphabet: Used alphabet
+            distance_calculator: Distance calculator instance
+            monitor: AlgorithmMonitor para progresso/avisos/erros (opcional)
+            global_seed: Global seed that overrides local seeds
+            internal_jobs: Number of internal parallel jobs (default: 1)
             **params: Algorithm-specific parameters
         """
         self.strings = strings
         self.alphabet = alphabet
+        # Se 'store' for passado (contrato legado dos testes de algoritmos), criamos
+        # um adaptador leve para o protocolo AlgorithmMonitor. Isso permite que
+        # os algoritmos usem self._monitor.on_progress / on_warning enquanto os
+        # testes capturam via store.report_algorithm_progress / store.warning.
+
         self.params = {**self.default_params, **params}
-        self.progress_callback: Optional[Callable[[str, float], None]] = None
-        self.warning_callback: Optional[Callable[[str], None]] = None
+
+        if monitor is None and store is not None:
+
+            class _StoreMonitor:
+                def __init__(self, _store):
+                    self._store = _store
+
+                # Compatível com AlgorithmMonitor
+                def on_progress(
+                    self, progress: float, message: str, /, **data: Any
+                ) -> None:  # pragma: no cover - simples
+                    rap = getattr(self._store, "report_algorithm_progress", None)
+                    if callable(rap):
+                        try:
+                            rap(progress, message, **data)
+                        except Exception:
+                            pass
+
+                def on_warning(
+                    self, message: str, /, **data: Any
+                ) -> None:  # pragma: no cover - simples
+                    warn = getattr(self._store, "warning", None)
+                    if callable(warn):
+                        try:
+                            warn(message)
+                        except Exception:
+                            pass
+
+                def on_error(
+                    self, message: str, exc: Exception | None = None, /, **data: Any
+                ) -> None:  # pragma: no cover - simples
+                    # Reaproveita warning caso exista
+                    self.on_warning(f"ERROR: {message}")
+
+                def is_cancelled(self) -> bool:  # pragma: no cover - simples
+                    chk = getattr(self._store, "is_cancelled", None)
+                    if callable(chk):
+                        try:
+                            return bool(chk())
+                        except Exception:
+                            return False
+                    return False
+
+            monitor = _StoreMonitor(store)
+
+        self._monitor = monitor
 
         # Resource control
-        self.internal_jobs = params.get("internal_jobs", 1)
+        self.internal_jobs = internal_jobs
 
-        # History settings
-        self.save_history = params.get("save_history", False)
-        self.history_frequency = params.get(
-            "history_frequency", 1
-        )  # Every N iterations
-        self.history = []
-
-        # Monitoring integration
-        self._algorithm_monitor = None
+        # Use provided distance calculator
+        self._distance_calc = distance_calculator
 
         # Configure random generator with seed
-        self.seed = params.get("seed", None)
+        self.seed = seed
         self._setup_random_generator()
 
-    def set_algorithm_monitor(self, monitor) -> None:
-        """Set algorithm monitor for enhanced tracking."""
-        self._algorithm_monitor = monitor
-
-        # Auto-configure callbacks if monitor is available
-        if monitor:
-            self.set_progress_callback(monitor.create_progress_callback())
-            self.set_warning_callback(monitor.create_warning_callback())
-
-    def set_progress_callback(self, callback: Callable[[str, float], None]) -> None:
-        """Set callback to report algorithm progress."""
-        self.progress_callback = callback
-
-    def set_warning_callback(self, callback: Callable[[str], None]) -> None:
-        """Set callback to report algorithm warnings."""
-        self.warning_callback = callback
-
-    def _report_progress(self, message: str, progress: float = 0.0) -> None:
-        """Report progress if callback is defined."""
-        if self.progress_callback:
-            self.progress_callback(message, progress)
-
-    def _report_warning(self, message: str) -> None:
-        """Report warning if callback is defined."""
-        if self.warning_callback:
-            self.warning_callback(message)
-
-    def _save_history_entry(self, iteration: int, **data) -> None:
+    def __getattr__(self, name: str):
         """
-        Save an entry in history if enabled.
+        Delegate attribute access to the distance calculator if the attribute
+        is not found in the CSPAlgorithm instance.
 
         Args:
-            iteration: Current iteration number
-            **data: Current state data (fitness, best solution, etc.)
-        """
-        if self.save_history and (iteration % self.history_frequency == 0):
-            entry = {"iteration": iteration, "timestamp": self._get_timestamp(), **data}
-            self.history.append(entry)
+            name: Name of the attribute to access
 
-            # Report to monitor if available
-            if self._algorithm_monitor:
-                self._algorithm_monitor.report_history_entry(iteration, **data)
+        Returns:
+            The attribute from the distance calculator instance
+        """
+        if hasattr(self._distance_calc, name):
+            return getattr(self._distance_calc, name)
+        elif self._monitor and hasattr(self._monitor, name):
+            return getattr(self._monitor, name)
+        else:
+            raise AttributeError(
+                f"'{self.__class__.__name__}' object has no attribute '{name}'"
+            )
 
     def _setup_random_generator(self) -> None:
         """Configure random generator with provided seed."""
@@ -144,257 +196,35 @@ class CSPAlgorithm(ABC):
 
         return time.time()
 
-    def get_history(self) -> list[dict]:
-        """Return execution history."""
-        return self.history.copy()
+    # ------------------------------------------------------------------
+    # Helper de aviso usado pelos algoritmos concretos (_report_warning)
+    # ------------------------------------------------------------------
+    def _report_warning(self, message: str, /, **data: Any) -> None:
+        """Encapsula emissão de aviso sem depender rigidamente do monitor.
 
-    def clear_history(self) -> None:
-        """Clear current history."""
-        self.history.clear()
+        Os algoritmos chamam self._report_warning(...) para registrar avisos
+        sem precisar verificar existência de _monitor. Aqui garantimos que
+        nenhuma exceção se propague dessa camada.
+        """
+        try:  # pragma: no branch - caminho simples
+            if self._monitor and hasattr(self._monitor, "on_warning"):
+                self._monitor.on_warning(message, **data)
+        except Exception:  # pragma: no cover - segurança
+            pass
 
     @abstractmethod
-    def run(self) -> tuple[str, int, dict[str, Any]]:
+    def run(self) -> AlgorithmResult:
         """
         Execute algorithm and return structured result.
 
         Returns:
-            tuple: (center_string, max_distance, metadata)
-                metadata should contain:
-                - history: List of states during execution (if enabled)
-                - iterations: Total number of iterations
-                - convergence_data: Convergence data (if applicable)
-                - other algorithm-specific information
+            AlgorithmResult: Dictionary containing:
+                - center_string: The center string solution
+                - max_distance: Maximum distance from center to input strings
+                - parameters: Algorithm parameters used
+                - metadata: Detailed execution metadata
         """
 
-    def set_params(self, **params) -> None:
-        """Set new parameters for the algorithm."""
-        self.params.update(params)
-
-    def get_metadata(self) -> dict[str, Any]:
-        """Return algorithm metadata."""
-        return {
-            "name": self.name,
-            "params": self.params.copy(),
-            "is_deterministic": self.is_deterministic,
-            "supports_internal_parallel": self.supports_internal_parallel,
-            "input_size": len(self.strings),
-            "string_length": len(self.strings[0]) if self.strings else 0,
-            "alphabet_size": len(self.alphabet),
-        }
-
-
-class Algorithm(ABC):
-    """Legacy interface for compatibility with existing code."""
-
-    @abstractmethod
-    def __init__(self, strings: list[str], alphabet: str):
-        """Initialize legacy algorithm."""
-        self.strings = strings
-        self.alphabet = alphabet
-
-    @abstractmethod
-    def solve(self) -> str:
-        """Solve CSP problem returning center string."""
-
-
-# =============================================================================
-# GENETIC OPERATORS
-# =============================================================================
-
-String = str
-Population = list[String]
-
-
-def mean_hamming_distance(pop: Population) -> float:
-    """
-    Calculate average Hamming distance between all pairs of individuals.
-
-    Args:
-        pop: Population of strings
-
-    Returns:
-        float: Average distance between pairs
-    """
-    if len(pop) < 2:
-        return 0.0
-
-    total_distance = 0
-    total_pairs = 0
-
-    for i in range(len(pop)):
-        for j in range(i + 1, len(pop)):
-            distance = sum(c1 != c2 for c1, c2 in zip(pop[i], pop[j]))
-            total_distance += distance
-            total_pairs += 1
-
-    return total_distance / total_pairs if total_pairs > 0 else 0.0
-
-
-def mutate_multi(ind: str, alphabet: str, rng: random.Random, n: int = 2) -> str:
-    """
-    Perform multi-point mutation by changing up to n random positions.
-
-    Args:
-        ind: Original string
-        alphabet: Set of valid symbols
-        rng: Random number generator
-        n: Number of mutations to apply
-
-    Returns:
-        str: Mutated string
-    """
-    chars = list(ind)
-    L = len(chars)
-
-    for _ in range(n):
-        pos = rng.randint(0, L - 1)
-        old = chars[pos]
-
-        # Choose symbol different from current
-        available = [c for c in alphabet if c != old]
-        if available:
-            chars[pos] = rng.choice(available)
-
-    return "".join(chars)
-
-
-def mutate_inversion(ind: str, rng: random.Random) -> str:
-    """
-    Perform inversion mutation of a random segment.
-
-    Args:
-        ind: Original string
-        rng: Random number generator
-
-    Returns:
-        str: String with inverted segment
-    """
-    chars = list(ind)
-    L = len(chars)
-
-    if L < 2:
-        return ind
-
-    # Select two random points
-    i, j = sorted(rng.sample(range(L), 2))
-
-    # Invert segment between i and j
-    chars[i : j + 1] = chars[i : j + 1][::-1]
-
-    return "".join(chars)
-
-
-def crossover_one_point(
-    parent1: str, parent2: str, rng: random.Random
-) -> tuple[str, str]:
-    """
-    Perform one-point crossover between two parents.
-
-    Args:
-        parent1: First parent
-        parent2: Second parent
-        rng: Random number generator
-
-    Returns:
-        tuple: Two resulting children
-    """
-    L = len(parent1)
-    if L <= 1:
-        return parent1, parent2
-
-    # Select cut point
-    cut_point = rng.randint(1, L - 1)
-
-    # Create children by swapping suffixes
-    child1 = parent1[:cut_point] + parent2[cut_point:]
-    child2 = parent2[:cut_point] + parent1[cut_point:]
-
-    return child1, child2
-
-
-def crossover_uniform(
-    parent1: str, parent2: str, rng: random.Random, rate: float = 0.5
-) -> tuple[str, str]:
-    """
-    Perform uniform crossover between two parents.
-
-    Args:
-        parent1: First parent
-        parent2: Second parent
-        rng: Random number generator
-        rate: Exchange rate per position
-
-    Returns:
-        tuple: Two resulting children
-    """
-    chars1 = list(parent1)
-    chars2 = list(parent2)
-
-    for i in range(len(chars1)):
-        if rng.random() < rate:
-            chars1[i], chars2[i] = chars2[i], chars1[i]
-
-    return "".join(chars1), "".join(chars2)
-
-
-def refine_greedy(individual: str, strings: list[str]) -> str:
-    """
-    Greedy local refinement position by position.
-
-    Args:
-        individual: String to be refined
-        strings: Reference strings
-
-    Returns:
-        str: Refined string
-    """
-    chars = list(individual)
-    alphabet = set("".join(strings))
-
-    for pos in range(len(chars)):
-        current_char = chars[pos]
-        best_char = current_char
-        best_distance = _max_distance_to_strings(chars, strings)
-
-        # Test each symbol in alphabet
-        for symbol in alphabet:
-            if symbol != current_char:
-                chars[pos] = symbol
-                distance = _max_distance_to_strings(chars, strings)
-
-                if distance < best_distance:
-                    best_distance = distance
-                    best_char = symbol
-
-        chars[pos] = best_char
-
-    return "".join(chars)
-
-
-def _max_distance_to_strings(chars: list[str], strings: list[str]) -> int:
-    """
-    Calculate maximum distance from a candidate to set of strings.
-
-    Args:
-        chars: List of characters forming candidate string
-        strings: Reference strings
-
-    Returns:
-        int: Maximum distance
-    """
-    candidate = "".join(chars)
-    max_dist = 0
-
-    for string in strings:
-        dist = sum(c1 != c2 for c1, c2 in zip(candidate, string))
-        max_dist = max(max_dist, dist)
-
-    return max_dist
-
-
-# =============================================================================
-# SPECIFIC ALGORITHMS
-# =============================================================================
-
-# Specific algorithms have been moved to the algorithms/ folder
-# to be dynamically loaded as plug-ins
+    def get_actual_params(self) -> dict[str, Any]:
+        """Return actual parameters used (merged defaults and received)."""
+        return self.params.copy()

@@ -87,7 +87,8 @@ class EntrezDatasetDownloader:
 
         sequences, used_params = EntrezDatasetDownloader._fetch_sequences(params_dict)
 
-        return Dataset(name="entrez_dataset", sequences=sequences), used_params
+        dataset_id = getattr(params, "id", "entrez_dataset") if isinstance(params, EntrezDatasetConfig) else "entrez_dataset"
+        return Dataset(id=dataset_id, name="entrez_dataset", sequences=sequences), used_params
 
     @staticmethod
     def _config_to_params(config: EntrezDatasetConfig) -> Dict[str, Any]:

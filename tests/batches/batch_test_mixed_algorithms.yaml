@@ -1,0 +1,127 @@
+# ===================================================================
+# TESTE: Algoritmos Mistos - Mix de comentados e não comentados
+# ===================================================================
+metadata:
+  name: "Test Mixed Algorithms"
+  description: "Teste com algoritmos mistos para validar filtragem"
+  author: "Test"
+  version: "1.0"
+  creation_date: "2025-01-24"
+  tags: ["test", "mixed"]
+
+datasets:
+  - id: dataset_test_1
+    name: "Test Dataset 1"
+    type: "synthetic"
+    parameters:
+      mode: "random"
+      n: 5
+      L: 10
+      alphabet: "ACGT"
+      seed: 42
+  - id: dataset_test_2
+    name: "Test Dataset 2"
+    type: "synthetic"
+    parameters:
+      mode: "noise"
+      n: 5
+      L: 10
+      alphabet: "ACGT"
+      seed: 123
+
+algorithms:
+  - id: "config_mixed_1"
+    name: "Mixed Configuration 1"
+    description: "Primeiro preset com algoritmos mistos"
+    algorithms:
+      - "Baseline"                    # Habilitado
+#      - "BLF-GA"                      # Comentado
+      - "CSC"                         # Habilitado
+#      - "H2-CSP"                      # Comentado
+      - "DP-CSP"                      # Habilitado
+    
+    algorithm_params:
+      "Baseline":
+        tie_break: "random"
+      "BLF-GA":
+        pop_size: 30
+        max_gens: 100
+        seed: 42
+      "CSC":
+        min_d: 1
+        d_factor: 0.6
+      "H2-CSP":
+        auto_blocks: false
+        block_size: 3
+        seed: 42
+      "DP-CSP":
+        max_d: 2
+        seed: 42
+
+  - id: "config_mixed_2"
+    name: "Mixed Configuration 2"
+    description: "Segundo preset com diferentes algoritmos mistos"
+    algorithms:
+#      - "Baseline"                    # Comentado
+      - "BLF-GA"                      # Habilitado
+#      - "CSC"                         # Comentado
+      - "H2-CSP"                      # Habilitado
+#      - "DP-CSP"                      # Comentado
+    
+    algorithm_params:
+      "Baseline":
+        tie_break: "first"
+      "BLF-GA":
+        pop_size: 50
+        max_gens: 25
+        seed: 99
+      "CSC":
+        min_d: 3
+        d_factor: 0.8
+      "H2-CSP":
+        auto_blocks: true
+        beam_width: 16
+        seed: 99
+      "DP-CSP":
+        max_d: 1
+        seed: 99
+
+task:
+  type: "experiment"
+
+experiment:
+  tasks:
+    - name: "Test Mixed Configurations"
+      datasets:
+        - "dataset_test_1"
+        - "dataset_test_2"
+      algorithms:
+        - "config_mixed_1"
+        - "config_mixed_2"
+      repetitions: 2
+
+output:
+  logging: true
+  results:
+    formats:
+      csv: false
+      json: true
+      parquet: false
+      pickle: false
+    partial_results: false
+
+resources:
+  cpu:
+    exclusive_cores: false
+    max_workers: 1
+    internal_jobs: 1
+  memory:
+    max_memory_gb: null
+  timeouts:
+    timeout_per_item: 60
+    timeout_total_batch: 300
+
+system:
+  global_seed: null
+  distance_method: "hamming"
+  enable_distance_cache: true

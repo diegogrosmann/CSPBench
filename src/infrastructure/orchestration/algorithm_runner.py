@@ -3,11 +3,16 @@ Assume retorno (center, distance, metadata) para CSPAlgorithm.
 """
 
 from __future__ import annotations
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, Optional
 import time
 import traceback
-from src.domain.algorithms import global_registry, CSPAlgorithm
+import threading
+from src.domain.algorithms import global_registry, CSPAlgorithm, AlgorithmResult
+from src.domain.distance import DistanceCalculator
 from src.infrastructure.logging_config import get_logger
+from src.infrastructure.monitoring.persistence_monitor import PersistenceMonitor
+from src.infrastructure.execution_control import ExecutionController
+from src.domain.status import BaseStatus
 
 # Create module logger
 logger = get_logger("CSPBench.AlgorithmRunner")
@@ -21,14 +26,44 @@ def run_algorithm(
     algorithm_name: str,
     strings: list[str],
     alphabet: str,
-    params: Dict[str, Any],
+    distance_calculator: DistanceCalculator,
+    execution_controller: ExecutionController,
+    monitor: PersistenceMonitor,
+    seed: Optional[int] = None,
+    params: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
+    """Executa um algoritmo CSP com controle de timeout e monitoração persistente.
+
+    Args:
+        algorithm_name: Nome do algoritmo registrado.
+        strings: Lista de strings de entrada.
+        alphabet: Alfabeto utilizado.
+        distance_calculator: Calculadora de distância injetada.
+        execution_controller: Controller com limites e timeouts.
+        exec_persistence: Persistência escopo execução para registrar eventos.
+        seed: Semente opcional.
+        params: Parâmetros adicionais do algoritmo.
+
+    Returns:
+        dict com chaves:
+            status: BaseStatus (RUNNING/COMPLETED/CANCELED/ERROR/SKIPPED)
+            algorithm_result: AlgorithmResult | None
+            error: str | None
+            duration_s: float
+            timeout_triggered: bool
+            actual_params: dict
+    """
+    if params is None:
+        params = {}
+
     logger.info(f"Iniciando execução do algoritmo: {algorithm_name}")
     logger.debug(
         f"Parâmetros de entrada: strings={len(strings)}, alphabet='{alphabet}', params={params}"
     )
 
     t0 = time.time()
+    # Usado para propagação em bloco de exceção externo
+    error_message: str | None = None
     try:
         # Registry lookup with detailed logging
         logger.debug(f"Procurando algoritmo '{algorithm_name}' no registro global")
@@ -43,100 +78,142 @@ def run_algorithm(
 
         # Algorithm instantiation with detailed logging
         logger.debug(f"Criando instância do algoritmo com {len(strings)} strings")
-        alg: CSPAlgorithm = cls(strings, alphabet, **params)
+
+        # Remove 'seed' from params to avoid duplicate keyword argument
+        filtered_params = {k: v for k, v in params.items() if k != 'seed'}
+
+        alg: CSPAlgorithm = cls(
+            strings=strings,
+            alphabet=alphabet,
+            distance_calculator=distance_calculator,
+            monitor=monitor,
+            seed=seed,
+            internal_jobs=execution_controller.internal_jobs,
+            **filtered_params,
+        )
         logger.info(f"Instância do algoritmo '{algorithm_name}' criada com sucesso")
 
         # Algorithm execution with timing
         logger.info(f"Iniciando execução do algoritmo '{algorithm_name}'")
         start_time = time.time()
 
-        center, dist, meta = alg.run()
+        # Determinar timeout efetivo (prioridade params.max_time > controller.timeout_per_item)
+        max_time = float(params.get("max_time", 99999999))
+
+        algorithm_result: AlgorithmResult | None = None
+        timeout_triggered = False
+
+        def _target():
+            nonlocal algorithm_result, error_message
+            try:
+                algorithm_result = alg.run()
+            except Exception as run_exc:  # noqa: BLE001
+                error_message = f"Erro em execução de algoritmo: {run_exc}"
+                logger.error(error_message, exc_info=True)
+                if monitor:
+                    monitor.on_error(str(run_exc), run_exc)
+
+        thread = threading.Thread(
+            target=_target, name=f"Alg-{algorithm_name}", daemon=True
+        )
+        thread.start()
+
+        # Loop de espera com checagem de timeout e cancelamento
+        while thread.is_alive():
+            thread.join(timeout=1)
+            elapsed = time.time() - start_time
+            # Check external cancellation
+            status = execution_controller.check_status()
+            if status == BaseStatus.CANCELED:
+                if monitor:
+                    monitor.on_warning("Execução cancelada externamente")
+                timeout_triggered = False
+                monitor.cancel()
+                break
+            if elapsed > max_time:
+                timeout_triggered = True
+                if monitor:
+                    monitor.on_warning(
+                        f"Timeout atingido ({max_time}s) - solicitando cancelamento"
+                    )
+                    monitor.cancel()
+                break
+
+        # Se ainda vivo após timeout/cancel, não há forma segura de matar thread Python puro.
+        # Registramos estado como timeout; algoritmo deve checar monitor.is_cancelled periodicamente para finalizar.
+        if thread.is_alive():
+            logger.warning(
+                f"Thread de algoritmo '{algorithm_name}' ainda ativa após timeout/cancel - marcando estado como não finalizado"
+            )
 
         execution_time = time.time() - start_time
         total_duration = time.time() - t0
 
-        logger.info(f"Algoritmo '{algorithm_name}' executado com sucesso")
-        logger.info(
-            f"Resultado: distância={dist}, tempo_execução={execution_time:.3f}s, tempo_total={total_duration:.3f}s"
-        )
-        logger.debug(f"Centro encontrado: {center}")
-        logger.debug(f"Metadata: {meta}")
+        # Determinar status final
+        if timeout_triggered:
+            final_status = BaseStatus.CANCELED
+            if algorithm_result is None:
+                error_message = error_message or "Timeout atingido"
+        else:
+            controller_status = execution_controller.check_status()
+            if controller_status == BaseStatus.CANCELED:
+                final_status = BaseStatus.CANCELED
+            elif algorithm_result and algorithm_result.get("success"):
+                final_status = BaseStatus.COMPLETED
+            elif algorithm_result and not algorithm_result.get("success"):
+                final_status = BaseStatus.ERROR
+            else:
+                final_status = BaseStatus.ERROR
 
-        # Capture complete data with logging
-        algorithm_metadata = alg.get_metadata() if hasattr(alg, "get_metadata") else {}
-        execution_history = alg.get_history() if hasattr(alg, "get_history") else []
-        actual_params = getattr(alg, "params", params)
-
-        if algorithm_metadata:
-            logger.debug(
-                f"Metadata do algoritmo capturada: {len(algorithm_metadata)} campos"
-            )
-        if execution_history:
-            logger.debug(
-                f"Histórico de execução capturado: {len(execution_history)} entradas"
-            )
-
-        result = {
-            "status": "ok",
-            "objective": float(dist),  # padrão: distância int -> float
-            "center": center,
-            "distance": dist,
+        # Construir retorno simplificado
+        result_dict: Dict[str, Any] = {
+            "status": final_status,
+            "algorithm_result": algorithm_result,
+            "error": error_message,
             "duration_s": total_duration,
-            "metadata": meta,
-            # Extended data for complete storage
-            "algorithm_metadata": algorithm_metadata,
-            "execution_history": execution_history,
-            "actual_params": actual_params,
+            "execution_time_s": execution_time,
+            "timeout_triggered": timeout_triggered,
+            "actual_params":  algorithm_result.get('parameters', getattr(alg, "params", params)),
         }
 
-        logger.info(f"Execução do algoritmo '{algorithm_name}' finalizada com sucesso")
-        return result
+        # Log final amigável
+        if algorithm_result and algorithm_result.get("success"):
+            logger.info(
+                f"Algoritmo '{algorithm_name}' concluído: dist={algorithm_result['max_distance']}, tempo_exec={execution_time:.3f}s"
+            )
+        elif timeout_triggered:
+            logger.warning(
+                f"Algoritmo '{algorithm_name}' finalizado por timeout ({max_time}s) em {execution_time:.3f}s"
+            )
+        elif final_status == BaseStatus.CANCELED:
+            logger.warning(
+                f"Algoritmo '{algorithm_name}' cancelado externamente após {execution_time:.3f}s"
+            )
+        else:
+            logger.error(
+                f"Algoritmo '{algorithm_name}' finalizado com erro em {execution_time:.3f}s: {error_message}"
+            )
+
+        return result_dict
 
     except Exception as e:  # noqa: BLE001
         duration = time.time() - t0
+        try:
+            monitor.on_error(f"Erro inesperado na execução do algoritmo: {e}", e)
+        except Exception:
+            pass
 
-        # Detect specific cases that should be treated as warnings, not errors
-        error_message = str(e)
-        is_resource_limitation = (
-            "exceeds practical limit" in error_message
-            or "requires all strings to have the same length" in error_message
+        logger.error(
+            f"Erro na execução do algoritmo '{algorithm_name}': {e} ({e.__class__.__name__})"
         )
+        logger.debug("Traceback completo:", exc_info=True)
 
-        if is_resource_limitation:
-            # These are expected limitations, not programming errors
-            if "exceeds practical limit" in error_message:
-                log_msg = f"Algoritmo '{algorithm_name}' skipped: problema muito grande para recursos disponíveis"
-                user_friendly_msg = f"Dataset muito grande para {algorithm_name} - considere usar um dataset menor"
-            elif "requires all strings to have the same length" in error_message:
-                log_msg = f"Algoritmo '{algorithm_name}' skipped: dataset contém strings de tamanhos diferentes"
-                user_friendly_msg = f"Dataset incompatível com {algorithm_name} - strings devem ter o mesmo comprimento"
-
-            logger.warning(log_msg)
-            logger.info(f"Detalhes técnicos: {error_message}")
-        else:
-            # Genuine programming/runtime errors
-            error_msg = f"Erro na execução do algoritmo '{algorithm_name}': {e}"
-            user_friendly_msg = error_message
-            logger.error(error_msg)
-            logger.error(f"Tipo do erro: {e.__class__.__name__}")
-            logger.debug(f"Traceback completo:", exc_info=True)
-
-        error_result = {
-            "status": "skipped" if is_resource_limitation else "error",
-            "error_type": e.__class__.__name__,
-            "error_message": user_friendly_msg,
-            "technical_details": error_message,
-            "traceback": traceback.format_exc(limit=5),
+        return {
+            "status": BaseStatus.FAILED,
+            "algorithm_result": None,
+            "error": error_message or str(e),
             "duration_s": duration,
-            "objective": float("inf"),
-            # Extended data even for errors
-            "algorithm_metadata": {},
-            "execution_history": [],
+            "timeout_triggered": False,
             "actual_params": params,
+            "traceback": traceback.format_exc(limit=5),
         }
-
-        result_type = "skipped" if is_resource_limitation else "error"
-        logger.info(
-            f"Algoritmo '{algorithm_name}' finalizado com status '{result_type}' após {duration:.3f}s"
-        )
-        return error_result

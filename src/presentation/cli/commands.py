@@ -9,9 +9,9 @@ from pathlib import Path
 import typer
 
 from src.domain.config import load_cspbench_config
-from src.domain.work import WorkStatus
+from src.domain.status import BaseStatus
 from src.application.services.execution_manager import ExecutionManager
-from src.infrastructure.logging_config import  get_logger
+from src.infrastructure.logging_config import get_logger
 
 # Create module logger
 command_logger = get_logger("CSPBench.CLI.Commands")
@@ -28,30 +28,52 @@ def register_commands(app: typer.Typer) -> None:
         batch: Path = typer.Argument(
             ..., exists=True, readable=True, help="Batch YAML file"
         ),
+        no_monitor: bool = typer.Option(False, "--no-monitor", help="Disable progress monitoring interface"),
     ):
         """Execute pipeline using unified ExecutionManager.
 
         Uses ExecutionManager for consistent execution workflow between CLI and Web.
+        Automatically shows progress monitoring interface unless --no-monitor is used.
         """
         try:
             typer.echo(f"🚀 Executando: batch={batch}")
             config = load_cspbench_config(batch)
 
-            extra = {
-                "origin": "cli",
-                "batch_file": str(batch)
-            }
+            extra = {"origin": "cli", "batch_file": str(batch)}
             execution_manager = ExecutionManager()
 
-            work_id = execution_manager.execute(
-                config=config,
-                extra=extra
-            )
+            work_id = execution_manager.execute(config=config, extra=extra)
 
             typer.echo(f"🆔 work_id={work_id} executando em segundo plano")
             typer.echo(f"✅ Trabalho submetido com sucesso")
-            typer.echo(f"💡 Use 'cspbench work status {work_id}' para acompanhar o progresso")
+
+            if not no_monitor:
+                # Start progress monitoring
+                try:
+                    from src.presentation.cli.progress_monitor import ProgressMonitor
+                    import time
+                    
+                    # Wait a moment for work to start
+                    time.sleep(1)
+                    
+                    typer.echo("\n📊 Iniciando monitoramento de progresso...")
+                    typer.echo("💡 Pressione 'q' para sair do monitor e continuar executando em segundo plano")
+                    typer.echo("💡 Pressione 'c' para cancelar o trabalho")
+                    typer.echo("")
+                    
+                    monitor = ProgressMonitor(work_id)
+                    monitor.start()
+                        
+                except Exception as e:
+                    typer.echo(f"⚠️  Could not start monitor: {e}")
+                    typer.echo("🔄 Work continues running in background...")
             
+            # Wait for completion if not monitoring
+            if no_monitor:
+                from src.application.services.work_service import get_work_service
+                work_service = get_work_service()
+                work_service.wait_until_terminal(work_id)
+
         except Exception as e:  # noqa: BLE001
             typer.echo(f"❌ Erro: {e}")
             raise typer.Exit(1)
@@ -62,8 +84,8 @@ def register_commands(app: typer.Typer) -> None:
     @work_app.command("restart")
     def work_restart(work_id: str):
         """Restart a work item using WorkService."""
-        from application.services.work_service import get_work_service
-        
+        from src.application.services.work_service import get_work_service
+
         work_service = get_work_service()
         if work_service.restart(work_id):
             typer.echo("🔁 Restarted (queued)")
@@ -74,39 +96,41 @@ def register_commands(app: typer.Typer) -> None:
     @work_app.command("list")
     def work_list():
         """List all work items using WorkService."""
-        from application.services.work_service import get_work_service
-        
+        from src.application.services.work_service import get_work_service
+
         work_service = get_work_service()
         items = work_service.list()
-        
+
         if not items:
             typer.echo("📭 Nenhum trabalho encontrado")
             return
-            
+
         typer.echo("📋 Lista de trabalhos:")
         for item in items:
             status = item.get("status", "unknown")
-            work_id = item.get("work_id", item.get("id", "unknown"))
-            typer.echo(f"  • {work_id}: {status}")
+            wid = item.get("id", item.get("work_id", "unknown"))
+            typer.echo(f"  • {wid}: {status}")
 
     @work_app.command("status")
     def work_status(work_id: str):
         """Get work item status using WorkService."""
-        from application.services.work_service import get_work_service
-        
+        from src.application.services.work_service import get_work_service
+
         work_service = get_work_service()
         details = work_service.get(work_id)
-        
+
         if not details:
             typer.echo(f"❌ Trabalho {work_id} não encontrado")
             raise typer.Exit(1)
-            
+
         typer.echo(f"📊 Status do trabalho {work_id}:")
         typer.echo(f"  Status: {details.get('status', 'unknown')}")
         typer.echo(f"  Criado: {details.get('created_at', 'unknown')}")
         typer.echo(f"  Atualizado: {details.get('updated_at', 'unknown')}")
         if details.get("error"):
             typer.echo(f"  Erro: {details['error']}")
+
+
 
     app.add_typer(work_app, name="work")
 

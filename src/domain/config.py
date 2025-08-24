@@ -94,17 +94,25 @@ class AlgorithmsPresetConfig:
     items: List[AlgParamsConfig] = field(default_factory=list)
 
 
+# ----------------------------------------------------
+# Backward compatibility aliases (legacy naming)
+# Alguns testes/consumidores antigos podem referenciar
+# AlgorithmItemConfig ou ResultsFormatsConfig.
+# Mantemos aliases para evitar ImportError.
+AlgorithmItemConfig = AlgParamsConfig  # type: ignore
+
+
 # ====================================================
 # SECTION 5: TASKS (objetos) + GRUPOS
 # ====================================================
-# ---- Base Task (usa objetos) ----
+# ---- Base Task (usa IDs) ----
 @dataclass
 class TaskConfig:
     id: str
     name: str
     type: Literal["experiment", "optimization", "sensitivity"]
-    datasets: List[DatasetAny] = field(default_factory=list)
-    algorithms: List[AlgorithmsPresetConfig] = field(default_factory=list)
+    datasets: List[str] = field(default_factory=list)  # IDs dos datasets
+    algorithms: List[str] = field(default_factory=list)  # IDs dos algorithm presets
 
 
 # ---- Subtipos de Task ----
@@ -166,6 +174,10 @@ class ResultsFormats:
     pickle: bool
 
 
+# Alias de compatibilidade
+ResultsFormatsConfig = ResultsFormats  # type: ignore
+
+
 @dataclass
 class ResultsConfig:
     formats: ResultsFormats
@@ -212,6 +224,8 @@ class ResourcesConfig:
 @dataclass
 class SystemConfig:
     global_seed: Optional[int]
+    distance_method: Literal["hamming"] = "hamming"  # Método de cálculo de distância
+    enable_distance_cache: bool = True  # Habilita cache para otimização de performance
 
 
 # ====================================================
@@ -220,10 +234,209 @@ class SystemConfig:
 @dataclass
 class CSPBenchConfig:
     metadata: MetadataConfig
+    datasets: Dict[str, DatasetAny]
+    algorithms: Dict[str, AlgorithmsPresetConfig]
     tasks: TasksGroupConfig
     output: Optional[OutputConfig] = None
     resources: Optional[ResourcesConfig] = None
     system: Optional[SystemConfig] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Converte a configuração para um dicionário serializável."""
+        from dataclasses import asdict
+
+        return asdict(self)
+
+    def to_yaml(self, path: Optional[Union[str, Path]] = None) -> str:
+        """Converte a configuração para YAML.
+
+        Args:
+            path: Se fornecido, salva o YAML no arquivo especificado
+
+        Returns:
+            String YAML da configuração
+        """
+        data = self.to_dict()
+        yaml_str = yaml.dump(data, default_flow_style=False, allow_unicode=True)
+
+        if path:
+            Path(path).write_text(yaml_str, encoding="utf-8")
+
+        return yaml_str
+
+    def to_json(self, path: Optional[Union[str, Path]] = None, indent: int = 2) -> str:
+        """Converte a configuração para JSON.
+
+        Args:
+            path: Se fornecido, salva o JSON no arquivo especificado
+            indent: Número de espaços para indentação
+
+        Returns:
+            String JSON da configuração
+        """
+        import json
+
+        data = self.to_dict()
+        json_str = json.dumps(data, indent=indent, ensure_ascii=False)
+
+        if path:
+            Path(path).write_text(json_str, encoding="utf-8")
+
+        return json_str
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "CSPBenchConfig":
+        """Cria uma instância CSPBenchConfig a partir de um dicionário.
+
+        Args:
+            data: Dicionário com os dados da configuração
+
+        Returns:
+            Instância de CSPBenchConfig
+        """
+        from dataclasses import fields
+
+        # Função auxiliar para converter dicionários em dataclasses
+        def _convert_to_dataclass(target_class, value):
+            if value is None:
+                return None
+            if isinstance(value, dict):
+                field_types = {f.name: f.type for f in fields(target_class)}
+                kwargs = {}
+                for k, v in value.items():
+                    if k in field_types:
+                        field_type = field_types[k]
+                        # Handle Optional types
+                        if (
+                            hasattr(field_type, "__origin__")
+                            and field_type.__origin__ is Union
+                        ):
+                            # Get the non-None type from Optional[T]
+                            non_none_types = [
+                                t for t in field_type.__args__ if t is not type(None)
+                            ]
+                            if non_none_types:
+                                field_type = non_none_types[0]
+
+                        # Convert nested dataclasses
+                        if hasattr(field_type, "__dataclass_fields__"):
+                            kwargs[k] = _convert_to_dataclass(field_type, v)
+                        elif isinstance(v, list) and v:
+                            # Handle lists of dataclasses
+                            if hasattr(field_type, "__args__") and field_type.__args__:
+                                list_type = field_type.__args__[0]
+                                if hasattr(list_type, "__dataclass_fields__"):
+                                    kwargs[k] = [
+                                        _convert_to_dataclass(list_type, item)
+                                        for item in v
+                                    ]
+                                else:
+                                    kwargs[k] = v
+                            else:
+                                kwargs[k] = v
+                        else:
+                            kwargs[k] = v
+                return target_class(**kwargs)
+            return value
+
+        # Convert main fields
+        metadata = _convert_to_dataclass(MetadataConfig, data.get("metadata"))
+
+        # Convert datasets dictionary
+        datasets_data = data.get("datasets", {})
+        datasets = {}
+        if isinstance(datasets_data, dict):
+            for ds_id, ds_data in datasets_data.items():
+                if isinstance(ds_data, dict):
+                    ds_type = ds_data.get("type")
+                    if ds_type == "synthetic":
+                        datasets[ds_id] = _convert_to_dataclass(
+                            SyntheticDatasetConfig, ds_data
+                        )
+                    elif ds_type == "file":
+                        datasets[ds_id] = _convert_to_dataclass(
+                            FileDatasetConfig, ds_data
+                        )
+                    elif ds_type == "entrez":
+                        datasets[ds_id] = _convert_to_dataclass(
+                            EntrezDatasetConfig, ds_data
+                        )
+
+        # Convert algorithms dictionary
+        algorithms_data = data.get("algorithms", {})
+        algorithms = {}
+        if isinstance(algorithms_data, dict):
+            for alg_id, alg_data in algorithms_data.items():
+                if isinstance(alg_data, dict):
+                    algorithms[alg_id] = _convert_to_dataclass(
+                        AlgorithmsPresetConfig, alg_data
+                    )
+
+        # Handle tasks (need to determine the correct type)
+        tasks_data = data.get("tasks")
+        if tasks_data and isinstance(tasks_data, dict):
+            task_type = tasks_data.get("type")
+            if task_type == "experiment":
+                tasks = _convert_to_dataclass(ExperimentTasksConfig, tasks_data)
+            elif task_type == "optimization":
+                tasks = _convert_to_dataclass(OptimizationTasksConfig, tasks_data)
+            elif task_type == "sensitivity":
+                tasks = _convert_to_dataclass(SensitivityTasksConfig, tasks_data)
+            else:
+                tasks = _convert_to_dataclass(TasksGroupConfig, tasks_data)
+        else:
+            tasks = tasks_data
+
+        output = _convert_to_dataclass(OutputConfig, data.get("output"))
+        resources = _convert_to_dataclass(ResourcesConfig, data.get("resources"))
+        system = _convert_to_dataclass(SystemConfig, data.get("system"))
+
+        return cls(
+            metadata=metadata,
+            datasets=datasets,
+            algorithms=algorithms,
+            tasks=tasks,
+            output=output,
+            resources=resources,
+            system=system,
+        )
+
+    @classmethod
+    def from_yaml(cls, path: Union[str, Path]) -> "CSPBenchConfig":
+        """Carrega uma configuração a partir de um arquivo YAML.
+
+        Args:
+            path: Caminho para o arquivo YAML
+
+        Returns:
+            Instância de CSPBenchConfig
+        """
+        data = _load_yaml(path)
+        return cls.from_dict(data)
+
+    @classmethod
+    def from_json(cls, path: Union[str, Path]) -> "CSPBenchConfig":
+        """Carrega uma configuração a partir de um arquivo JSON.
+
+        Args:
+            path: Caminho para o arquivo JSON
+
+        Returns:
+            Instância de CSPBenchConfig
+        """
+        import json
+
+        p = Path(path)
+        if not p.exists():
+            raise BatchConfigurationError(f"JSON file not found: {p}")
+        try:
+            with p.open(encoding="utf-8") as fh:
+                data = json.load(fh)
+            if not isinstance(data, dict):
+                raise BatchConfigurationError(f"Root of JSON must be a mapping: {p}")
+            return cls.from_dict(data)
+        except Exception as e:
+            raise BatchConfigurationError(f"Failed loading JSON {p}: {e}") from e
 
 
 # ====================================================
@@ -351,18 +564,49 @@ def _parse_algorithm_presets(
         params_block = preset.get("algorithm_params", {}) or {}
         if not isinstance(params_block, dict):
             raise BatchConfigurationError("'algorithm_params' deve ser mapping")
-        for alg_name, params in params_block.items():
-            if params is None:
-                params = {}
-            if not isinstance(params, dict):
-                raise BatchConfigurationError(
-                    f"Parametros do algoritmo '{alg_name}' devem ser mapping"
-                )
-            # Aplicar global_seed se definido, sobrescrevendo seed existente
-            final_params = params.copy()
-            if global_seed is not None:
-                final_params["seed"] = global_seed
-            alg_params.append(AlgParamsConfig(name=alg_name, params=final_params))
+        
+        # Verificar se existe uma lista 'algorithms' que filtra quais algoritmos usar
+        algorithms_list = preset.get("algorithms", None)
+        
+        # Se existe a chave 'algorithms' (mesmo que vazia ou None), usar apenas os algoritmos listados
+        # Se não existe a chave 'algorithms', usar todos os algorithm_params (comportamento legacy)
+        if "algorithms" in preset:
+            # A chave 'algorithms' existe - filtrar por ela (mesmo que seja None ou vazia)
+            if algorithms_list is None:
+                algorithms_list = []  # Tratar None como lista vazia
+            
+            # Usar apenas algoritmos especificados na lista 'algorithms'
+            for alg_name in algorithms_list:
+                if alg_name not in params_block:
+                    raise BatchConfigurationError(
+                        f"Algoritmo '{alg_name}' listado em 'algorithms' mas não encontrado em 'algorithm_params'"
+                    )
+                params = params_block[alg_name]
+                if params is None:
+                    params = {}
+                if not isinstance(params, dict):
+                    raise BatchConfigurationError(
+                        f"Parametros do algoritmo '{alg_name}' devem ser mapping"
+                    )
+                # Aplicar global_seed se definido, sobrescrevendo seed existente
+                final_params = params.copy()
+                if global_seed is not None:
+                    final_params["seed"] = global_seed
+                alg_params.append(AlgParamsConfig(name=alg_name, params=final_params))
+        else:
+            # Usar todos os algoritmos em algorithm_params (comportamento antigo)
+            for alg_name, params in params_block.items():
+                if params is None:
+                    params = {}
+                if not isinstance(params, dict):
+                    raise BatchConfigurationError(
+                        f"Parametros do algoritmo '{alg_name}' devem ser mapping"
+                    )
+                # Aplicar global_seed se definido, sobrescrevendo seed existente
+                final_params = params.copy()
+                if global_seed is not None:
+                    final_params["seed"] = global_seed
+                alg_params.append(AlgParamsConfig(name=alg_name, params=final_params))
         result[pid] = AlgorithmsPresetConfig(
             id=pid,
             name=preset.get("name") or pid,
@@ -421,27 +665,24 @@ def _build_experiment_tasks(
             raise BatchConfigurationError(
                 f"Task '{tid}' sem algorithms (lista de ids de presets)"
             )
-        ds_objs = []
+        # Validate dataset and algorithm IDs exist
         for d_id in ds_ids:
             if d_id not in datasets:
                 raise BatchConfigurationError(
                     f"Dataset '{d_id}' não encontrado para task '{tid}'"
                 )
-            ds_objs.append(datasets[d_id])
-        preset_objs: List[AlgorithmsPresetConfig] = []
         for p_id in alg_ids:
             if p_id not in presets:
                 raise BatchConfigurationError(
                     f"Algorithms preset '{p_id}' não encontrado na task '{tid}'"
                 )
-            preset_objs.append(presets[p_id])
         repetitions = t.get("repetitions", 1)
         items.append(
             ExperimentTaskConfig(
                 id=tid,
                 name=name,
-                datasets=ds_objs,
-                algorithms=preset_objs,
+                datasets=ds_ids,
+                algorithms=alg_ids,
                 repetitions=repetitions,
             )
         )
@@ -495,20 +736,17 @@ def _build_optimization_tasks(
             )
             logger.debug(f"Task '{tid}': Chaves disponíveis: {list(t.keys())}")
             raise BatchConfigurationError(f"Optimization task '{tid}' sem algorithms")
-        ds_objs = []
+        # Validate dataset and algorithm IDs exist
         for d_id in ds_ids:
             if d_id not in datasets:
                 raise BatchConfigurationError(
                     f"Dataset '{d_id}' não encontrado para optimization '{tid}'"
                 )
-            ds_objs.append(datasets[d_id])
-        preset_objs: List[AlgorithmsPresetConfig] = []
         for p_id in alg_ids:
             if p_id not in presets:
                 raise BatchConfigurationError(
                     f"Algorithms preset '{p_id}' não encontrado em optimization '{tid}'"
                 )
-            preset_objs.append(presets[p_id])
         parameters = t.get("parameters", {}) or {}
         config = t.get("config") or {}
         study_name = t.get("study_name") or tid
@@ -516,8 +754,8 @@ def _build_optimization_tasks(
             OptimizationTaskConfig(
                 id=tid,
                 name=name,
-                datasets=ds_objs,
-                algorithms=preset_objs,
+                datasets=ds_ids,
+                algorithms=alg_ids,
                 parameters=parameters,
                 config=config,
                 study_name=study_name,
@@ -578,20 +816,17 @@ def _build_sensitivity_tasks(
             )
             logger.debug(f"Task '{tid}': Chaves disponíveis: {list(t.keys())}")
             raise BatchConfigurationError(f"Sensitivity task '{tid}' sem algorithms")
-        ds_objs = []
+        # Validate dataset and algorithm IDs exist
         for d_id in ds_ids:
             if d_id not in datasets:
                 raise BatchConfigurationError(
                     f"Dataset '{d_id}' não encontrado para sensitivity '{tid}'"
                 )
-            ds_objs.append(datasets[d_id])
-        preset_objs: List[AlgorithmsPresetConfig] = []
         for p_id in alg_ids:
             if p_id not in presets:
                 raise BatchConfigurationError(
                     f"Algorithms preset '{p_id}' não encontrado em sensitivity '{tid}'"
                 )
-            preset_objs.append(presets[p_id])
         parameters = t.get("parameters", {}) or {}
         config = t.get("config") or {}
         method = t.get("method", "morris")
@@ -599,8 +834,8 @@ def _build_sensitivity_tasks(
             SensitivityTaskConfig(
                 id=tid,
                 name=name,
-                datasets=ds_objs,
-                algorithms=preset_objs,
+                datasets=ds_ids,
+                algorithms=alg_ids,
                 parameters=parameters,
                 config=config,
                 method=method,
@@ -682,7 +917,11 @@ def _build_system(
     merged = _deep_merge(settings.get("system", {}), batch.get("system", {}))
     if not merged:
         return None
-    return SystemConfig(global_seed=merged.get("global_seed"))
+    return SystemConfig(
+        global_seed=merged.get("global_seed"),
+        distance_method=merged.get("distance_method", "hamming"),
+        enable_distance_cache=merged.get("enable_distance_cache", True),
+    )
 
 
 def load_cspbench_config(
@@ -749,6 +988,8 @@ def load_cspbench_config(
 
     return CSPBenchConfig(
         metadata=metadata,
+        datasets=datasets,
+        algorithms=presets,
         tasks=tasks_group,  # type: ignore[arg-type]
         output=output_cfg,
         resources=resources_cfg,

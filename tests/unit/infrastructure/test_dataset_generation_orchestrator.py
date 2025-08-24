@@ -24,7 +24,7 @@ def test_orchestrator_synthetic_flow(tmp_path):
                 with patch(
                     "src.application.services.dataset_generator.SyntheticDatasetGenerator.generate_random",
                     return_value=(
-                        Dataset(["ACGTA", "ACGTT", "ACGTC"], alphabet="ACGT"),
+                        Dataset(id="test_dataset", name="test", sequences=["ACGTA", "ACGTT", "ACGTC"], alphabet="ACGT"),
                         {},
                     ),
                 ):

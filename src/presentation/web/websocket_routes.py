@@ -6,6 +6,7 @@ Provides a minimal `/ws/{client_id}` endpoint that registers connections in the
 This implementation is intentionally small and robust for environments where a
 full-featured WebSocket frontend is optional.
 """
+
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from typing import Optional
 from datetime import datetime
@@ -16,7 +17,9 @@ router = APIRouter()
 
 
 @router.websocket("/ws/{client_id}")
-async def websocket_endpoint(websocket: WebSocket, client_id: str, token: Optional[str] = None):
+async def websocket_endpoint(
+    websocket: WebSocket, client_id: str, token: Optional[str] = None
+):
     """Accept a WebSocket connection and register it in connection_manager.
 
     The optional `token` query parameter is accepted for future auth checks but
@@ -24,7 +27,9 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str, token: Option
     """
     await websocket.accept()
     # Register connection with metadata
-    await connection_manager.register(client_id, {"connected_at": datetime.utcnow().isoformat(), "token": token})
+    await connection_manager.register(
+        client_id, {"connected_at": datetime.utcnow().isoformat(), "token": token}
+    )
 
     try:
         while True:

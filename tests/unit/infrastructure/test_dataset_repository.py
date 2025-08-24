@@ -24,7 +24,7 @@ class TestFileDatasetRepositoryBasic:
         """Test basic save and load operations."""
         # Create test dataset
         sequences = ["ACGTACGT", "ATGTACGT", "ACGTCCGT"]
-        dataset = Dataset(name="test_dataset", sequences=sequences)
+        dataset = Dataset(id="test_id", name="test_dataset", sequences=sequences)
 
         # Save dataset
         saved_path = FileDatasetRepository.save(dataset, "test_dataset", str(tmp_path))
@@ -48,7 +48,7 @@ class TestFileDatasetRepositoryBasic:
         """Test that save creates necessary directories."""
         nested_path = tmp_path / "datasets" / "subfolder"
         sequences = ["ACGT"]
-        dataset = Dataset(name="test_dataset", sequences=sequences)
+        dataset = Dataset(id="test_id", name="test_dataset", sequences=sequences)
 
         saved_path = FileDatasetRepository.save(dataset, "test", str(nested_path))
 
@@ -64,7 +64,7 @@ class TestFileDatasetRepositoryBasic:
 
     def test_save_empty_dataset(self, tmp_path):
         """Test saving empty dataset."""
-        dataset = Dataset(name="test_dataset", sequences=[])
+        dataset = Dataset(id="test_id", name="test_dataset", sequences=[])
 
         saved_path = FileDatasetRepository.save(dataset, "empty", str(tmp_path))
 
@@ -159,7 +159,7 @@ GCGTACGT
     def test_save_fasta_format(self, tmp_path):
         """Test that saved FASTA format is correct."""
         sequences = ["ACGTACGT", "ATGTACGT"]
-        dataset = Dataset(name="test_dataset", sequences=sequences)
+        dataset = Dataset(id="test_id", name="test_dataset", sequences=sequences)
 
         saved_path = FileDatasetRepository.save(dataset, "format_test", str(tmp_path))
 
@@ -337,7 +337,7 @@ WWSSKKM
     def test_save_dataset_with_special_sequences(self, tmp_path):
         """Test saving dataset with special characters."""
         sequences = ["ACGT-N", "WSKMR*"]
-        dataset = Dataset(name="test_dataset", sequences=sequences)
+        dataset = Dataset(id="test_id", name="test_dataset", sequences=sequences)
 
         saved_path = FileDatasetRepository.save(dataset, "special", str(tmp_path))
         loaded_dataset, params = FileDatasetRepository.load("special", str(tmp_path))
@@ -348,8 +348,8 @@ WWSSKKM
         """Test concurrent save/load operations."""
         sequences1 = ["ACGT"]
         sequences2 = ["TGCA"]
-        dataset1 = Dataset(name="test_dataset", sequences=sequences1)
-        dataset2 = Dataset(name="test_dataset", sequences=sequences2)
+        dataset1 = Dataset(id="test_id", name="test_dataset", sequences=sequences1)
+        dataset2 = Dataset(id="test_id", name="test_dataset", sequences=sequences2)
 
         # Save multiple datasets
         path1 = FileDatasetRepository.save(dataset1, "concurrent1", str(tmp_path))
@@ -396,7 +396,7 @@ class TestFileDatasetRepositoryBackwardCompatibility:
         )
 
         sequences = ["ACGT"]
-        dataset = Dataset(name="test_dataset", sequences=sequences)
+        dataset = Dataset(id="test_id", name="test_dataset", sequences=sequences)
 
         # Should work with alias
         saved_path = FastaDatasetRepository.save(dataset, "legacy", str(tmp_path))

@@ -6,11 +6,33 @@ pela camada de infraestrutura seguindo o padrão de arquitetura hexagonal.
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Iterable, List, Optional, Protocol, runtime_checkable, Callable
+from typing import (
+    Any,
+    Dict,
+    Iterable,
+    List,
+    Optional,
+    Protocol,
+    runtime_checkable,
+    Callable,
+)
 
+from src.domain.status import BaseStatus
+from src.infrastructure.execution_control import ExecutionController
+from src.infrastructure.persistence.work_state import WorkScopedPersistence
 from src.domain.work import WorkItem
 from src.domain import CSPAlgorithm, Dataset
-from src.domain.config import AlgParams, ResourcesConfig, SystemConfig
+from src.domain.config import (
+    AlgParams,
+    CSPBenchConfig,
+    ResourcesConfig,
+    SystemConfig,
+    TaskConfig,
+)
+from src.infrastructure.persistence.work_state.wrappers.combination_scoped import (
+    CombinationScopedPersistence,
+)
+
 
 class AlgorithmRegistry(Protocol):
     """Port para registry de algoritmos."""
@@ -135,16 +157,19 @@ class ExportPort(Protocol):
 class ExecutionEngine(Protocol):
     """Port para engines de execução de tarefas do pipeline."""
 
+    def __init__(
+        self,
+        combination_store: CombinationScopedPersistence,
+        execution_controller: ExecutionController,
+        batch_config: CSPBenchConfig,
+    ): ...
+
     def run(
         self,
-        task: Any,  # ExperimentTask | OptimizationTask | SensitivityTask
+        task: TaskConfig,
         dataset_obj: Dataset,
         alg: AlgParams,
-        resources: ResourcesConfig | None,
-        system_config: SystemConfig | None = None,
-        check_control: Callable[[], str] | None = None,
-        store: Any = None,
-    ) -> Dict[str, Any]:
+    ) -> BaseStatus:
         """
         Executa uma tarefa específica.
 
@@ -223,91 +248,25 @@ class AbstractExportPort(ABC):
         pass
 
 
-class AbstractStore(ABC):
-    """Interface ABC para persistência de execuções."""
-
-    @abstractmethod
-    def record_execution_start(
-        self,
-        *,
-        unit_id: str,
-        task_id: str,
-        dataset_id: str,
-        algorithm: str,
-        mode: str,
-        repetition: int | None = None,
-        trial: int | None = None,
-        sample: int | None = None,
-        params: Dict[str, Any] | None = None,
-    ) -> None:
-        """Registra início de execução."""
-        pass
-
-    @abstractmethod
-    def record_execution_end(
-        self,
-        unit_id: str,
-        status: str,
-        result: Dict[str, Any] | None,
-        objective: float | None,
-    ) -> None:
-        """Registra fim de execução."""
-        pass
-
-    @abstractmethod
-    def get_completed_repetitions(
-        self, task_id: str, dataset_id: str, algorithm: str
-    ) -> List[Dict[str, Any]]:
-        """Obtém repetições já completadas para resume."""
-        pass
-
-
 class AbstractExecutionEngine(ABC):
     """Interface ABC para engines de execução de tarefas."""
+
+    def __init__(
+        self,
+        combination_store: CombinationScopedPersistence,
+        execution_controller: ExecutionController,
+        batch_config: CSPBenchConfig,
+    ):
+        self._combination_store = combination_store
+        self._execution_controller = execution_controller
+        self._batch_config = batch_config
 
     @abstractmethod
     def run(
         self,
-        task: Any,
+        task: TaskConfig,
         dataset_obj: Dataset,
         alg: AlgParams,
-        resources: ResourcesConfig | None,
-        system_config: SystemConfig | None = None,
-        check_control: Callable[[], str] | None = None,
-        store: AbstractStore | None = None,
-    ) -> Dict[str, Any]:
+    ) -> BaseStatus:
         """Executa uma tarefa específica."""
         pass
-
-
-class WorkRepository(ABC):
-    """Porta (abstração) para armazenar WorkItems.
-    """
-
-    @abstractmethod
-    def add(self, item: WorkItem) -> None:
-        """Persiste o novo WorkItem.
-        Deve falhar se id já existir (opcional: sobrescrever).
-        """
-        raise NotImplementedError
-
-    @abstractmethod
-    def get(self, work_id: str) -> Optional[WorkItem]:
-        """Retorna WorkItem ou None se não encontrado."""
-        raise NotImplementedError
-
-    @abstractmethod
-    def list(self) -> Iterable[WorkItem]:
-        """Lista todos os WorkItems."""
-        raise NotImplementedError
-
-    @abstractmethod
-    def update(self, item: WorkItem) -> None:
-        """Atualiza WorkItem existente (no-op se não existir)."""
-        raise NotImplementedError
-
-    @abstractmethod
-    def remove(self, work_id: str) -> None:
-        """Remove WorkItem se existir (idempotente)."""
-        raise NotImplementedError
-

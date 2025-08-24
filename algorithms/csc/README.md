@@ -48,7 +48,7 @@ Parameter d = 2 (distance radius)
 └── Cluster 2: [CCGT] (isolated string)
 ```
 
-### Etapa 3: Consenso Local
+### Step 3: Local Consensus
 ```
 Cluster 1: [ACGT, AGCT, ATGT]
 ├── Posição 0: A,A,A → A (maioria)
@@ -61,7 +61,7 @@ Cluster 2: [CCGT]
 Resultado: CCGT (consenso trivial)
 ```
 
-### Etapa 4: Recombinação de Blocos
+### Step 4: Block Recombination
 ```
 Consensos: [ACGT, CCGT]
 Dividindo em n_blocks=2:
@@ -75,11 +75,11 @@ Candidatos por recombinação:
 └── "CC" + "GT" = "CCGT" (repetido)
 ```
 
-### Etapa 5: Avaliação e Busca Local
+### Step 5: Evaluation & Local Search
 ```
-Melhor candidato: ACGT (menor distância máxima)
-└── Busca local: testa melhorias posição-a-posição
-└── Resultado final: ACGT
+Best candidate: ACGT (lowest maximum distance)
+└── Local search: position-wise improvements
+└── Final result: ACGT
 ```
 
 ## 🔧 Parameters and Configuration
@@ -207,16 +207,16 @@ if not metadata['success']:
 ## ⚠️ Limitations
 
 ### Technical Limitations
-1. **Combinatorial Explosion**: k<sup>n_blocks</sup> candidates can be too many
-2. **Parameter Sensitivity**: d and n_blocks drastically affect results
-3. **Cluster Quality**: DBSCAN may fail with sparse data
-4. **Memory Overhead**: Stores all candidates simultaneously
+1. **Combinatorial Explosion**: ``|consensus|^{n_blocks}`` (mitigated by ``max_candidates``)
+2. **Parameter Sensitivity**: ``d`` and ``n_blocks`` directly shape search space
+3. **Cluster Quality Dependency**: Weak or noisy clustering reduces benefit
+4. **Candidate Memory Footprint**: All generated candidates kept before evaluation (consider streaming optimization in future)
 
 ### Practical Limitations
-1. **Unbalanced Datasets**: Clusters of very different sizes
-2. **Random Strings**: Without local structure, clustering is useless
-3. **Execution Time**: Can be slow compared to simple heuristics
-4. **Limited Determinism**: Dependent on DBSCAN implementation
+1. **Highly Unbalanced Datasets**: Single giant cluster negates diversification
+2. **Random Strings**: No local structure → almost pure fallback mode
+3. **Runtime vs Simple Heuristics**: Overhead of clustering + recombination
+4. **DBSCAN Determinism**: Deterministic here (no randomness) but distance scaling still impacts cluster outcomes
 
 
 
@@ -253,31 +253,30 @@ python main.py --algorithm CSC --dataset synthetic --d 2 --n_blocks 3
 - **Compatibility**: ✅ Works with batch processing and optimization
 
 ### Returned Metadata
-```python
-metadata = {
-    "iterations": 1,
-    "parameters_used": {"d": 2, "n_blocks": 2},
-    "center_found": "ACGT",
-    "success": True,
-    "fallback_used": False  # Only if success = False
-}
-```
+Important metadata keys (subset):
+* ``d`` / ``n_blocks`` / ``d_auto`` / ``n_blocks_auto``
+* ``n_clusters`` / ``fallback_used`` / ``degraded_mode``
+* ``candidates_generated`` / ``candidates_evaluated`` / ``candidates_truncated``
+* ``local_search_iterations`` / ``execution_time``
+* ``avg_distance`` / ``total_distance`` / ``best_candidate_initial_distance``
 
 ### Troubleshooting
 
 **Problem**: No clusters found
 ```
-Solution: Reduce parameter 'd' or check if strings are too different
+Cause: Radius d too small or strings mutually far.
+Action: Increase d or allow automatic parameter inference.
+Fallback: Global consensus + local search (see metadata.fallback_used=True)
 ```
 
-**Problem**: Too many candidates, slow execution
+**Problem**: Excessive runtime / many candidates
 ```
-Solution: Reduce 'n_blocks' or increase 'd' for larger clusters
+Action: Decrease n_blocks or lower max_candidates; alternatively increase d to merge clusters.
 ```
 
-**Problem**: Poor quality results
+**Problem**: Weak solution quality
 ```
-Solution: Manually adjust parameters or use different algorithm
+Action: Manually tune d; raise n_blocks slightly (trade-off); compare with Baseline algorithm.
 ```
 
 ---

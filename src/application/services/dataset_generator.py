@@ -51,7 +51,7 @@ class SyntheticDatasetGenerator:
             raise ValueError("alphabet não pode ser vazio")
         _rng = SyntheticDatasetGenerator._ensure_rng(seed, rng)
         seqs = ["".join(_rng.choice(alphabet) for _ in range(length)) for _ in range(n)]
-        ds = Dataset(name="synthetic_random", sequences=seqs, alphabet=alphabet)
+        ds = Dataset(id="synthetic_random", name="synthetic_random", sequences=seqs, alphabet=alphabet)
         params = {
             "generator": "generate_random",
             "n": n,
@@ -99,7 +99,7 @@ class SyntheticDatasetGenerator:
             return ch
 
         seqs = ["".join(mutate_char(ch) for ch in base_sequence) for _ in range(n)]
-        ds = Dataset(name="synthetic_noise", sequences=seqs, alphabet=alphabet)
+        ds = Dataset(id="synthetic_noise", name="synthetic_noise", sequences=seqs, alphabet=alphabet)
         params = {
             "generator": "generate_with_noise",
             "n": n,
@@ -192,7 +192,7 @@ class SyntheticDatasetGenerator:
         if effective_pad and effective_pad not in out_alphabet:
             out_alphabet = out_alphabet + effective_pad
 
-        ds = Dataset(name="synthetic_mutations", sequences=seqs, alphabet=out_alphabet)
+        ds = Dataset(id="synthetic_mutations", name="synthetic_mutations", sequences=seqs, alphabet=out_alphabet)
         params = {
             "generator": "generate_with_mutations",
             "n": n,
@@ -253,7 +253,7 @@ class SyntheticDatasetGenerator:
             s = "".join(_rng.choice(alphabet) if _rng.random() < p else ch for ch in c)
             seqs.append(s)
 
-        ds = Dataset(name="synthetic_clustered", sequences=seqs, alphabet=alphabet)
+        ds = Dataset(id="synthetic_clustered", name="synthetic_clustered", sequences=seqs, alphabet=alphabet)
         params = {
             "generator": "generate_clustered",
             "n": n,
@@ -277,6 +277,7 @@ class SyntheticDatasetGenerator:
         params_mode = getattr(cfg, "parameters_mode", {})
         base_rng = SyntheticDatasetGenerator._ensure_rng(seed, rng)
         dataset_name = getattr(cfg, "name", None)
+        dataset_id = getattr(cfg, "id", f"synthetic_{mode}")
 
         if mode == "random":
             ds, p = SyntheticDatasetGenerator.generate_random(
@@ -284,6 +285,7 @@ class SyntheticDatasetGenerator:
             )
             if dataset_name:
                 ds.name = dataset_name
+            ds.id = dataset_id
             p.update({"mode": mode, "config_seed": seed, "from_config": True})
             return ds, p
 
@@ -299,6 +301,7 @@ class SyntheticDatasetGenerator:
                 )
                 if dataset_name:
                     ds.name = dataset_name
+                ds.id = dataset_id
                 p.update({"mode": "random", "config_seed": seed, "from_config": True})
                 return ds, p
 
@@ -320,6 +323,7 @@ class SyntheticDatasetGenerator:
             )
             if dataset_name:
                 ds.name = dataset_name
+            ds.id = dataset_id
             p.update({"mode": mode, "config_seed": seed, "from_config": True})
             return ds, p
 
@@ -349,6 +353,7 @@ class SyntheticDatasetGenerator:
             )
             if dataset_name:
                 ds.name = dataset_name
+            ds.id = dataset_id
             p.update({"mode": mode, "config_seed": seed, "from_config": True})
             return ds, p
 
@@ -367,6 +372,7 @@ class SyntheticDatasetGenerator:
             )
             if dataset_name:
                 ds.name = dataset_name
+            ds.id = dataset_id
             p.update({"mode": mode, "config_seed": seed, "from_config": True})
             return ds, p
 
