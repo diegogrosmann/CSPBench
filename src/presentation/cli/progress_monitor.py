@@ -6,7 +6,7 @@ import curses
 import time
 import signal
 import sys
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import List, Optional
 
@@ -19,22 +19,17 @@ from src.infrastructure.persistence.work_state.queries import (
 
 
 class ProgressMonitor:
-    """Real-time progress monitor using curses."""
+    """Real-time progress monitor using curses, htop-style."""
     
     def __init__(self, work_id: str):
-        """Initialize monitor.
-        
-        Args:
-            work_id: Work ID to monitor
-        """
+        """Initialize monitor."""
         from src.application.services.work_service import get_work_service
         
         self.work_id = work_id
         self.work_service = get_work_service()
         self.running = True
-        self.refresh_interval = 2  # seconds
+        self.refresh_interval = 0.1  # seconds
         
-        # Find state database path
         work_details = self.work_service.get(work_id)
         if not work_details or not work_details.get("output_path"):
             raise ValueError(f"Work {work_id} not found or has no output path")
@@ -44,350 +39,293 @@ class ProgressMonitor:
             raise ValueError(f"State database not found at {state_db_path}")
             
         self.queries = WorkStateQueries(str(state_db_path))
-        
+        self.start_time = time.time()
+        self.scroll_pos = 0
+        self.executions: List[ExecutionDetail] = []
+        self.logs: List[dict] = []
+
     def signal_handler(self, signum, frame):
         """Handle Ctrl+C gracefully."""
         self.running = False
-    
-    def format_progress_bar(self, current: int, total: int, width: int = 25, show_percentage: bool = True) -> str:
-        """Create a beautiful text progress bar with colors."""
-        if total == 0:
-            return "█" * width + " 0/0  0%"
+
+    def format_progress_bar(self, progress: float, width: int) -> str:
+        """Creates a text-based progress bar."""
+        filled_len = int(width * progress)
+        bar = '█' * filled_len + '─' * (width - filled_len)
+        return f"[{bar}] {progress:.1%}"
+
+    def format_execution_time(self, elapsed_seconds: float) -> str:
+        """Format execution time as mm:ss.mmm"""
+        total_ms = int(elapsed_seconds * 1000)
+        minutes = total_ms // 60000
+        seconds = (total_ms % 60000) // 1000
+        milliseconds = total_ms % 1000
         
-        progress = current / total
-        filled = int(width * progress)
-        
-        # Use different characters for better visual appeal
-        complete_char = "█"
-        partial_char = "▓"
-        empty_char = "░"
-        
-        # Create smooth progress bar
-        bar = complete_char * filled + empty_char * (width - filled)
-        percentage = int(progress * 100)
-        
-        if show_percentage:
-            return f"{bar} {current:,}/{total:,} ({percentage:3d}%)"
+        if minutes > 0:
+            return f"{minutes:02d}:{seconds:02d}.{milliseconds:03d}"
         else:
-            return f"{bar} {current:,}/{total:,}"
-    
-    def draw_header(self, stdscr, progress: ProgressSummary, y_pos: int) -> int:
-        """Draw an enhanced header with overall progress."""
-        height, width = stdscr.getmaxyx()
+            return f"{seconds:02d}.{milliseconds:03d}s"
+
+    def draw_header(self, stdscr, progress: ProgressSummary, work_status: str):
+        """Draws the header with summary information."""
+        h, w = stdscr.getmaxyx()
+        if h < 5: return 0
+
+        # Line 1: Work Info
+        uptime = timedelta(seconds=int(time.time() - self.start_time))
+        work_info = f"Work: {self.work_id}  Status: {work_status.upper()}  Uptime: {uptime}"
+        stdscr.addstr(0, 1, work_info.ljust(w - 2), curses.color_pair(4) | curses.A_BOLD)
+
+        # Line 2: Global Progress
+        glob_prog = progress.global_progress
+        glob_label = f"Overall Progress: {progress.global_execution['Finished']}/{progress.global_execution['Total']}"
         
-        # Title with decorative border
-        title = f"🚀 CSPBench Progress Monitor"
-        work_info = f"Work ID: {self.work_id[:12]}{'...' if len(self.work_id) > 12 else ''}"
+        # Calculate available width for progress bar
+        available_width = w - len(glob_label) - 10  # Reserve space for label + padding
+        bar_width = max(10, min(40, available_width))  # Between 10-40 chars, but fit screen
         
-        stdscr.addstr(y_pos, (width - len(title)) // 2, title, curses.A_BOLD | curses.color_pair(4))
+        glob_bar = self.format_progress_bar(glob_prog, bar_width)
+        
+        stdscr.addstr(1, 1, glob_label, curses.A_BOLD)
+        if len(glob_label) + len(glob_bar) + 4 <= w - 2:
+            stdscr.addstr(1, len(glob_label) + 2, glob_bar, curses.color_pair(3))
+        else:
+            # If still too long, show on next line
+            stdscr.addstr(2, 3, glob_bar, curses.color_pair(3))
+            # Adjust return value to account for extra line
+            return 7
+
+        # Line 3-4: Hierarchical Progress in aligned columns
+        tasks = progress.tasks
+        dsets = progress.datasets
+        cfgs = progress.configs
+        algs = progress.algorithms
+        
+        task_running_count = 1 if tasks.get('Running') else 0
+        dset_running_count = 1 if dsets.get('Running') else 0
+        cfg_running_count = 1 if cfgs.get('Running') else 0
+        alg_running_count = 1 if algs.get('Running') else 0
+
+        # Calculate column widths for alignment
+        col1_width = w // 2 - 2  # Half screen minus padding
+        col2_width = w - col1_width - 4  # Remaining width
+
+        # Line 3: Task and Dataset
+        task_str = f"Task: {tasks.get('Running', '-') or '-'} ({tasks['Finished'] + task_running_count}/{tasks['Total']})"
+        dset_str = f"Dataset: {dsets.get('Running', '-') or '-'} ({dsets['Finished'] + dset_running_count}/{dsets['Total']})"
+        
+        stdscr.addstr(2, 1, task_str[:col1_width].ljust(col1_width))
+        stdscr.addstr(2, col1_width + 2, dset_str[:col2_width])
+        
+        # Line 4: Config and Algorithm
+        cfg_str = f"Config: {cfgs.get('Running', '-') or '-'} ({cfgs['Finished'] + cfg_running_count}/{cfgs['Total']})"
+        alg_str = f"Algorithm: {algs.get('Running', '-') or '-'} ({algs['Finished'] + alg_running_count}/{algs['Total']})"
+        
+        stdscr.addstr(3, 1, cfg_str[:col1_width].ljust(col1_width))
+        stdscr.addstr(3, col1_width + 2, alg_str[:col2_width])
+        
+        # Line 5: Current Combination Description
+        combo = progress.current_combination_details
+        if combo:
+            exec_info = progress.execution
+            current_seq = exec_info['Finished'] + exec_info['Running']
+            total_seq = exec_info['Total']
+            combo_desc = f"Running combination: {combo['task_id']} > {combo['dataset_id']} > {combo['preset_id']}. Sequences: {current_seq}/{total_seq}"
+            stdscr.addstr(4, 1, combo_desc.ljust(w-2)[:w-2], curses.A_BOLD)
+
+        # Line 6: Execution Table Header
+        header = f"{'SEQ':<5} {'ALGORITHM':<20} {'PROGRESS':<25} {'TIME':<10} {'DETAILS'}"
+        stdscr.addstr(5, 0, header.ljust(w), curses.color_pair(5) | curses.A_REVERSE)
+        
+        return 6
+
+    def draw_executions_list(self, stdscr, y_pos: int):
+        """Draws the list of running executions."""
+        h, w = stdscr.getmaxyx()
+        max_rows = h - y_pos - 1
+
+        for i in range(max_rows):
+            exec_idx = self.scroll_pos + i
+            if exec_idx >= len(self.executions):
+                break
+            
+            exec_detail = self.executions[exec_idx]
+            
+            seq = exec_detail.sequencia
+            algo = exec_detail.algorithm_id[:19]
+            
+            progress_bar = self.format_progress_bar(exec_detail.progress, 15)
+            
+            if exec_detail.finished_at and exec_detail.started_at:
+                elapsed_time = exec_detail.finished_at - exec_detail.started_at
+            elif exec_detail.started_at:
+                elapsed_time = time.time() - exec_detail.started_at
+            else:
+                elapsed_time = 0
+            time_str = self.format_execution_time(elapsed_time)
+            
+            details = (exec_detail.progress_message or '')[:w - 65]
+
+            line = f"{seq:<5} {algo:<20} {progress_bar:<25} {time_str:<10} {details}"
+            
+            color = curses.color_pair(3)
+            if exec_detail.status == 'running':
+                color = curses.color_pair(3) if exec_detail.progress > 0 else curses.color_pair(2)
+            elif exec_detail.status in ('failed', 'error'):
+                color = curses.color_pair(1)
+            elif exec_detail.status == 'completed':
+                color = curses.color_pair(4) # Cyan for completed
+
+            stdscr.addstr(y_pos + i, 0, line.ljust(w)[:w], color)
+
+    def draw_footer(self, stdscr):
+        """Draws the footer with controls and status."""
+        h, w = stdscr.getmaxyx()
+        if h <= 1: return
+        
+        controls = "Q:Quit C:Cancel"
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        
+        footer_text = f"{controls}".ljust(w - len(timestamp) - 1) + timestamp
+        stdscr.addstr(h - 1, 0, footer_text, curses.color_pair(5) | curses.A_REVERSE)
+
+    def draw_log_panel(self, stdscr, y_pos: int, max_height: int):
+        """Draws a small panel with recent error and warning logs."""
+        h, w = stdscr.getmaxyx()
+        if max_height <= 1 or not self.logs: 
+            return
+
+        # Small panel header
+        title = " Recent Events "
+        stdscr.addstr(y_pos, 0, "┌" + "─" * (len(title)) + "┐" + "─" * (w - len(title) - 3), curses.color_pair(5))
+        stdscr.addstr(y_pos, 1, title, curses.color_pair(5) | curses.A_REVERSE)
         y_pos += 1
-        stdscr.addstr(y_pos, (width - len(work_info)) // 2, work_info, curses.color_pair(5))
-        y_pos += 2
-        
-        # Overall progress bar
-        overall_bar = self.format_progress_bar(
-            progress.global_execution["Finished"],
-            progress.global_execution["Total"],
-            width - 20,
-            True
-        )
-        overall_label = "Overall Progress:"
-        stdscr.addstr(y_pos, 2, overall_label, curses.A_BOLD)
-        stdscr.addstr(y_pos, len(overall_label) + 3, overall_bar, curses.color_pair(3))
-        y_pos += 2
-        
-        # Hierarchical progress in a nice table format
-        stdscr.addstr(y_pos, 0, "┌" + "─" * (width - 2) + "┐")
-        y_pos += 1
-        
-        # Headers
-        hierarchy_header = "│ Component      │ Current Status                                        │"
-        stdscr.addstr(y_pos, 0, hierarchy_header[:width], curses.A_BOLD)
-        y_pos += 1
-        
-        stdscr.addstr(y_pos, 0, "├" + "─" * 15 + "┼" + "─" * (width - 18) + "┤")
-        y_pos += 1
-        
-        # Task row
-        current_task = progress.tasks.get("Running", "") or ""
-        task_line = f"│ 📋 Task        │ {current_task:<{width-20}} │"
-        stdscr.addstr(y_pos, 0, task_line[:width])
-        y_pos += 1
-        
-        # Dataset row  
-        current_dataset = progress.datasets.get("Running", "") or ""
-        dataset_line = f"│ 📊 Dataset     │ {current_dataset:<{width-20}} │"
-        stdscr.addstr(y_pos, 0, dataset_line[:width])
-        y_pos += 1
-        
-        # Config row
-        current_config = progress.configs.get("Running", "") or ""
-        config_line = f"│ ⚙️  Config      │ {current_config:<{width-20}} │"
-        stdscr.addstr(y_pos, 0, config_line[:width])
-        y_pos += 1
-        
-        # Algorithm row
-        current_algorithm = progress.algorithms.get("Running", "") or ""
-        algorithm_line = f"│ 🔬 Algorithm   │ {current_algorithm:<{width-20}} │"
-        stdscr.addstr(y_pos, 0, algorithm_line[:width])
-        y_pos += 1
-        
-        # Sequence row
-        current_sequence = (progress.execution.get("Finished", 0)
-                            + progress.execution.get("Running", 0))
-        total_sequences = progress.execution.get("Total", 0)
-        seq_progress = f"{current_sequence}/{total_sequences}"
-        sequence_line = f"│ 🔄 Sequences   │ {seq_progress:<{width-20}} │"
-        stdscr.addstr(y_pos, 0, sequence_line[:width])
-        y_pos += 1
-        
-        stdscr.addstr(y_pos, 0, "└" + "─" * (width - 2) + "┘")
-        y_pos += 2
-        
-        return y_pos
-    
-    def draw_execution_table(self, stdscr, executions: List[ExecutionDetail], warnings: List[dict], y_pos: int) -> int:
-        """Draw an enhanced execution table."""
-        height, width = stdscr.getmaxyx()
-        
-        if not executions:
-            no_exec_msg = "📝 No active executions at the moment"
-            stdscr.addstr(y_pos, (width - len(no_exec_msg)) // 2, no_exec_msg, curses.color_pair(5))
-            return y_pos + 2
-        
-        # Table title
-        table_title = "🔄 Active Executions"
-        stdscr.addstr(y_pos, 2, table_title, curses.A_BOLD | curses.color_pair(4))
-        y_pos += 2
-        
-        # Table header with enhanced design
-        table_width = min(width - 2, 90)
-        
-        stdscr.addstr(y_pos, 0, "┌" + "─" * (table_width - 2) + "┐")
-        y_pos += 1
-        
-        header_line = f"│ SEQ │ Unit ID      │ Progress                    │ Details                 │"
-        stdscr.addstr(y_pos, 0, header_line[:table_width], curses.A_BOLD)
-        y_pos += 1
-        
-        stdscr.addstr(y_pos, 0, "├" + "─" * (table_width - 2) + "┤")
-        y_pos += 1
-        
-        # Execution rows with enhanced formatting
-        max_rows = min(len(executions), (height - y_pos - 8))
-        
-        for i, exec_detail in enumerate(executions[:max_rows]):
-            if y_pos >= height - 6:
+
+        # Show only the most recent 2 entries
+        for i, log_entry in enumerate(self.logs[:min(max_height - 1, 2)]):
+            if y_pos >= h - 1:
                 break
                 
-            # Main execution row
-            progress_value = int(exec_detail.progress * 100) if exec_detail.progress else 0
-            progress_bar = self.format_progress_bar(progress_value, 100, 15, False)
+            log_time = datetime.fromtimestamp(log_entry['timestamp']).strftime('%H:%M:%S')
             
-            seq_str = f"{exec_detail.sequencia:3d}"
-            unit_id_short = exec_detail.unit_id[:12] if exec_detail.unit_id else "Unknown"
-            
-            # Status emoji
-            status_emoji = "🟢" if exec_detail.status == "running" else "⏸️"
-            
-            # Combination info  
-            combo_info = f"{exec_detail.algorithm_id[:8]}..."
-            
-            main_line = f"│ {seq_str} │ {unit_id_short:<12} │ {progress_bar:<27} │ {status_emoji} {combo_info:<19} │"
-            stdscr.addstr(y_pos, 0, main_line[:table_width])
-            y_pos += 1
-            
-            # Progress message line (if exists)
-            if exec_detail.progress_message and y_pos < height - 5:
-                msg = exec_detail.progress_message[:table_width-20] if len(exec_detail.progress_message) > table_width-20 else exec_detail.progress_message
-                progress_msg_line = f"│     │ Progress: {msg:<{table_width-15}} │"
-                stdscr.addstr(y_pos, 0, progress_msg_line[:table_width], curses.color_pair(5))
-                y_pos += 1
-            
-            # Add warnings for this execution
-            exec_warnings = [w for w in warnings if w.get('unit_id') == exec_detail.unit_id]
-            for warning in exec_warnings[:1]:  # Show only first warning per execution
-                if y_pos < height - 4:
-                    warning_msg = warning.get('message', 'Unknown warning')[:table_width-20]
-                    warning_line = f"│     │ ⚠️  {warning_msg:<{table_width-15}} │"
-                    stdscr.addstr(y_pos, 0, warning_line[:table_width], curses.color_pair(2))
-                    y_pos += 1
-            
-            # Separator line between executions  
-            if i < len(executions[:max_rows]) - 1 and y_pos < height - 4:
-                stdscr.addstr(y_pos, 0, "├" + "─" * (table_width - 2) + "┤")
-                y_pos += 1
-        
-        # Table bottom
-        if y_pos < height - 3:
-            stdscr.addstr(y_pos, 0, "└" + "─" * (table_width - 2) + "┘")
-            y_pos += 1
-        
-        return y_pos + 1
-    
-    def draw_errors(self, stdscr, errors: List[ErrorSummary], y_pos: int) -> int:
-        """Draw enhanced error section."""
-        height, width = stdscr.getmaxyx()
-        
-        if errors and y_pos < height - 2:
-            error_title = "❌ Recent Errors"
-            stdscr.addstr(y_pos, 2, error_title, curses.A_BOLD | curses.color_pair(1))
-            y_pos += 1
-            
-            for i, error in enumerate(errors[:3]):  # Show only first 3 errors
-                if y_pos >= height - 1:
-                    break
-                    
-                error_prefix = f"  🔸 Unit {error.unit_id[:8]}:"
-                error_msg = error.error_message
-                max_msg_len = width - len(error_prefix) - 5
-                
-                if len(error_msg) > max_msg_len:
-                    error_msg = error_msg[:max_msg_len-3] + "..."
-                
-                full_error = f"{error_prefix} {error_msg}"
-                stdscr.addstr(y_pos, 0, full_error[:width-1], curses.color_pair(1))
-                y_pos += 1
-        
-        return y_pos
-    
-    def draw_footer(self, stdscr, y_pos: int):
-        """Draw enhanced footer with controls."""
-        height, width = stdscr.getmaxyx()
-        
-        if y_pos < height - 1:
-            # Controls and timestamp
-            controls = "⌨️  Controls: [Q]uit | [C]ancel Work"
-            timestamp = datetime.now().strftime("🕐 %H:%M:%S")
-            refresh_info = "🔄 Auto-refresh: 2s"
-            
-            # Center the footer info
-            footer_content = f"{controls} | {refresh_info} | {timestamp}"
-            
-            if len(footer_content) <= width - 1:
-                stdscr.addstr(height - 1, (width - len(footer_content)) // 2, footer_content, curses.color_pair(5))
+            if log_entry['type'] == 'error':
+                color = curses.color_pair(1)
+                icon = "✗"
             else:
-                # Truncate if too long
-                stdscr.addstr(height - 1, 0, footer_content[:width-1], curses.color_pair(5))
-    
+                color = curses.color_pair(2)
+                icon = "!"
+            
+            # Truncate message to fit width
+            max_msg_len = w - 15  # Reserve space for time and icon
+            message = log_entry['message']
+            if len(message) > max_msg_len:
+                message = message[:max_msg_len-3] + "..."
+            
+            line = f"│ {icon} [{log_time}] {message}"
+            stdscr.addstr(y_pos + i, 0, line.ljust(w)[:w], color)
+
     def run(self, stdscr):
         """Main monitoring loop."""
-        # Setup curses
-        curses.curs_set(0)  # Hide cursor
-        stdscr.nodelay(1)   # Non-blocking input
-        stdscr.timeout(100) # 100ms timeout for getch()
+        curses.curs_set(0)
+        stdscr.nodelay(1)
+        stdscr.timeout(50) # 50ms timeout for getch()
         
-        # Setup colors
         curses.start_color()
-        curses.init_pair(1, curses.COLOR_RED, curses.COLOR_BLACK)      # Errors
-        curses.init_pair(2, curses.COLOR_YELLOW, curses.COLOR_BLACK)   # Warnings
-        curses.init_pair(3, curses.COLOR_GREEN, curses.COLOR_BLACK)    # Success/Progress
-        curses.init_pair(4, curses.COLOR_CYAN, curses.COLOR_BLACK)     # Titles
-        curses.init_pair(5, curses.COLOR_BLUE, curses.COLOR_BLACK)     # Info text
+        curses.init_pair(1, curses.COLOR_RED, curses.COLOR_BLACK)
+        curses.init_pair(2, curses.COLOR_YELLOW, curses.COLOR_BLACK)
+        curses.init_pair(3, curses.COLOR_GREEN, curses.COLOR_BLACK)
+        curses.init_pair(4, curses.COLOR_CYAN, curses.COLOR_BLACK)
+        curses.init_pair(5, curses.COLOR_WHITE, curses.COLOR_BLUE)
         
         last_refresh = 0
         
         while self.running:
+            h, w = stdscr.getmaxyx()
             current_time = time.time()
             
-            # Check for user input
             key = stdscr.getch()
-            if key == ord('q') or key == 27:  # 'q' or ESC
+            if key in [ord('q'), ord('Q'), 27]:
                 break
-            elif key == ord('c') or key == ord('C'):  # 'c' to cancel
-                # Show enhanced confirmation dialog
-                stdscr.clear()
-                stdscr.addstr(0, 0, "┌" + "─" * 60 + "┐")
-                stdscr.addstr(1, 0, "│" + " " * 60 + "│")
-                stdscr.addstr(2, 0, f"│  ⚠️  Cancel work '{self.work_id[:20]}{'...' if len(self.work_id) > 20 else ''}'?" + " " * (35 - len(self.work_id[:20])) + "│")
-                stdscr.addstr(3, 0, "│" + " " * 60 + "│")
-                stdscr.addstr(4, 0, "│  Press [Y] to confirm cancellation or any other key    │")
-                stdscr.addstr(5, 0, "│  to continue monitoring...                             │")
-                stdscr.addstr(6, 0, "│" + " " * 60 + "│")
-                stdscr.addstr(7, 0, "└" + "─" * 60 + "┘")
-                stdscr.refresh()
-                
-                confirm_key = stdscr.getch()
-                while confirm_key == -1:  # Wait for input
-                    time.sleep(0.1)
-                    confirm_key = stdscr.getch()
-                
-                if confirm_key == ord('y') or confirm_key == ord('Y'):
-                    try:
-                        if self.work_service.cancel(self.work_id):
-                            stdscr.clear()
-                            stdscr.addstr(0, 0, "✅ Work cancelled successfully!", curses.color_pair(3))
-                            stdscr.addstr(1, 0, "Monitor will exit in 2 seconds...")
-                            stdscr.refresh()
-                            time.sleep(2)
-                            break
-                        else:
-                            stdscr.clear()
-                            stdscr.addstr(0, 0, "❌ Failed to cancel work", curses.color_pair(1))
-                            stdscr.addstr(1, 0, "Press any key to continue...")
-                            stdscr.refresh()
-                            stdscr.getch()
-                    except Exception as e:
-                        stdscr.clear()
-                        stdscr.addstr(0, 0, f"❌ Error cancelling work: {e}", curses.color_pair(1))
-                        stdscr.addstr(1, 0, "Press any key to continue...")
-                        stdscr.refresh()
-                        stdscr.getch()
-            
-            # Refresh data periodically
+            elif key in [ord('c'), ord('C')]:
+                self.handle_cancel(stdscr)
+            elif key == curses.KEY_UP:
+                self.scroll_pos = max(0, self.scroll_pos - 1)
+            elif key == curses.KEY_DOWN:
+                # Adjust scroll calculation for new layout
+                log_panel_height = 3 if self.logs else 0  # Fixed small size
+                max_scroll = max(0, len(self.executions) - (h - 6 - log_panel_height - 1))
+                self.scroll_pos = min(max_scroll, self.scroll_pos + 1)
+
             if current_time - last_refresh >= self.refresh_interval:
                 try:
-                    # Clear screen
                     stdscr.clear()
                     
-                    # Get fresh data
                     progress = self.queries.get_work_progress_summary(self.work_id)
                     if not progress:
                         stdscr.addstr(0, 0, f"Work '{self.work_id}' not found!", curses.color_pair(1))
-                        stdscr.addstr(1, 0, "Press 'q' to quit")
                         stdscr.refresh()
                         time.sleep(1)
                         continue
                     
-                    # Check work status - exit if no longer running
-                    work_status = self.queries.get_work_status(self.work_id)
-                    if work_status and work_status not in ['running', 'queued']:
-                        # Mapear valores para tela final
-                        finished = progress.global_execution["Finished"]
-                        total = progress.global_execution["Total"]
-                        overall_pct = progress.global_progress
-                        stdscr.clear()
-                        stdscr.addstr(0, 0, "┌" + "─" * 70 + "┐")
-                        stdscr.addstr(1, 0, "│" + " " * 70 + "│")
-                        stdscr.addstr(2, 0, f"│  🏁 Work completed with status: {work_status:<20}         │", curses.color_pair(3))
-                        stdscr.addstr(3, 0, "│" + " " * 70 + "│")
-                        stdscr.addstr(4, 0, f"│  📊 Final progress: {finished:,}/{total:,} executions completed" + " " * (70 - 45 - len(f"{finished:,}/{total:,}")) + "│")
-                        stdscr.addstr(5, 0, f"│  🎯 Overall success rate: {overall_pct:.1%}" + " " * (70 - 30 - len(f"{overall_pct:.1%}")) + "│")
-                        stdscr.addstr(6, 0, "│" + " " * 70 + "│")
-                        stdscr.addstr(7, 0, "│  Monitor will exit in 3 seconds... (press any key to exit now)  │")
-                        stdscr.addstr(8, 0, "│" + " " * 70 + "│")
-                        stdscr.addstr(9, 0, "└" + "─" * 70 + "┘")
-                        stdscr.refresh()
-                        
-                        # Wait 3 seconds or until key press
-                        for _ in range(30):  # 30 * 0.1s = 3s
-                            if stdscr.getch() != -1:  # Key pressed
-                                break
-                            time.sleep(0.1)
+                    work_status = self.queries.get_work_status(self.work_id) or 'unknown'
+                    if work_status not in ['running', 'queued']:
+                        self.show_final_screen(stdscr, work_status, progress)
                         break
                     
-                    executions = self.queries.get_running_executions_detail(self.work_id, limit=10)
-                    errors = self.queries.get_error_summary(self.work_id, limit=5)
-                    warnings = self.queries.get_execution_warnings(self.work_id, limit=10)
+                    # Fetch executions for the current combination
+                    current_combo_id = progress.current_combination_details.get('combination_id') if progress.current_combination_details else None
+                    if current_combo_id:
+                        old_executions_count = len(self.executions)
+                        self.executions = self.queries.get_combination_executions_detail(current_combo_id)
+                        new_executions_count = len(self.executions)
+                    else:
+                        old_executions_count = 0
+                        new_executions_count = 0
+                        self.executions = []
+
+                    # Fetch and combine logs
+                    errors = self.queries.get_error_summary(self.work_id, limit=2)
+                    warnings = self.queries.get_execution_warnings(self.work_id, limit=2)
                     
+                    logs = []
+                    for e in errors:
+                        logs.append({'type': 'error', 'timestamp': e.timestamp, 'message': f"Unit {e.unit_id[:8]}: {e.error_message}"})
+                    for w in warnings:
+                        logs.append({'type': 'warning', 'timestamp': w['timestamp'], 'message': f"Unit {(w.get('unit_id') or 'N/A')[:8]}: {w.get('message', 'Unknown warning')}"})
+                    self.logs = sorted(logs, key=lambda x: x.get('timestamp', 0), reverse=True)[:2]  # Keep only 2 most recent
+
+                    # Calculate layout - fixed small log panel
+                    log_panel_height = 3 if self.logs else 0 # 1 header + max 2 log lines
+                    exec_list_height = h - 6 - log_panel_height - 1  # header - logs - footer
+                    
+                    # Smart auto-scroll logic
+                    if exec_list_height > 0 and new_executions_count > 0:
+                        max_scroll = max(0, new_executions_count - exec_list_height)
+                        
+                        # Check if we were showing the last line before update
+                        was_at_bottom = (old_executions_count <= exec_list_height) or \
+                                       (self.scroll_pos >= max(0, old_executions_count - exec_list_height))
+                        
+                        # If new executions were added and we were at bottom, auto-scroll
+                        if new_executions_count > old_executions_count and was_at_bottom:
+                            self.scroll_pos = max_scroll
+                        elif self.scroll_pos > max_scroll:
+                            # Ensure scroll position is valid
+                            self.scroll_pos = max_scroll
+
                     # Draw interface
-                    y_pos = 0
-                    y_pos = self.draw_header(stdscr, progress, y_pos)
-                    y_pos = self.draw_execution_table(stdscr, executions, warnings, y_pos)
-                    y_pos = self.draw_errors(stdscr, errors, y_pos)
-                    self.draw_footer(stdscr, y_pos)
+                    y_pos = self.draw_header(stdscr, progress, work_status)
                     
-                    # Refresh screen
+                    if exec_list_height > 0:
+                        self.draw_executions_list(stdscr, y_pos)
+                    
+                    # Draw small log panel just above footer
+                    if self.logs:
+                        log_y_pos = h - 1 - log_panel_height
+                        self.draw_log_panel(stdscr, log_y_pos, log_panel_height)
+                    
+                    self.draw_footer(stdscr)
+                    
                     stdscr.refresh()
                     last_refresh = current_time
                     
@@ -398,24 +336,54 @@ class ProgressMonitor:
                     stdscr.refresh()
                     time.sleep(1)
             
-            # Small sleep to prevent high CPU usage
+            time.sleep(0.02)
+
+    def handle_cancel(self, stdscr):
+        """Shows a confirmation dialog for cancelling the work."""
+        h, w = stdscr.getmaxyx()
+        msg = f"Cancel work '{self.work_id}'? [Y/N]"
+        stdscr.addstr(h // 2, (w - len(msg)) // 2, msg, curses.color_pair(1) | curses.A_BOLD)
+        stdscr.refresh()
+        
+        confirm_key = -1
+        while confirm_key not in [ord('y'), ord('Y'), ord('n'), ord('N')]:
+            confirm_key = stdscr.getch()
             time.sleep(0.1)
+
+        if confirm_key in [ord('y'), ord('Y')]:
+            try:
+                self.work_service.cancel(self.work_id)
+            except Exception as e:
+                pass # Ignore errors, will be reflected in status
     
+    def show_final_screen(self, stdscr, status: str, progress: ProgressSummary):
+        """Displays a final summary screen when the work is done."""
+        stdscr.clear()
+        h, w = stdscr.getmaxyx()
+        
+        title = f"Work Finished with status: {status.upper()}"
+        finished = progress.global_execution["Finished"]
+        total = progress.global_execution["Total"]
+        final_progress = f"Final Progress: {finished}/{total} executions completed."
+        
+        stdscr.addstr(h//2 - 1, (w - len(title)) // 2, title, curses.color_pair(3) | curses.A_BOLD)
+        stdscr.addstr(h//2, (w - len(final_progress)) // 2, final_progress)
+        stdscr.addstr(h//2 + 2, (w - 30) // 2, "Monitor will exit in 3 seconds...")
+        stdscr.refresh()
+        
+        for _ in range(30):
+            if stdscr.getch() != -1: break
+            time.sleep(0.1)
+
     def start(self):
         """Start the monitor."""
-        # Setup signal handler
         signal.signal(signal.SIGINT, self.signal_handler)
-        
         try:
-            # Verify work exists
             if not self.queries.work_exists(self.work_id):
                 print(f"Error: Work '{self.work_id}' not found!")
                 return 1
-            
-            # Start curses interface
             curses.wrapper(self.run)
             return 0
-            
         except KeyboardInterrupt:
             return 0
         except Exception as e:
@@ -426,24 +394,19 @@ class ProgressMonitor:
 
 
 def main():
-    """CLI entry point - for backward compatibility."""
+    """CLI entry point."""
     import argparse
-    import sys
     
-    parser = argparse.ArgumentParser(description="CSPBench Progress Monitor")
+    parser = argparse.ArgumentParser(description="CSPBench Progress Monitor (htop-style)")
     parser.add_argument("work_id", help="Work ID to monitor")
-    parser.add_argument("--db", default="data/work_manager.db", help="Database path (deprecated, auto-detected)")
     
     args = parser.parse_args()
     
-    print("Note: Auto-detecting state database from work_service")
-    
     try:
-        # Start monitor
         monitor = ProgressMonitor(args.work_id)
         return monitor.start()
     except Exception as e:
-        print(f"Error: {e}")
+        print(f"Error: {e}", file=sys.stderr)
         return 1
 
 

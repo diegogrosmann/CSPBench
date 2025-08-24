@@ -39,8 +39,8 @@ datasets:
       mode: "random"
 
       # Parâmetros comuns
-      n: 10
-      L: 20
+      n: 100
+      L: 200
       alphabet: "ACGT"
       seed: 42
     # --- Modo "random": sem parâmetros adicionais ---
@@ -108,7 +108,7 @@ algorithms:
       - "BLF-GA"                      # Block-based Genetic Algorithm (main)
       - "CSC"                         # Closest String with Constraints
       - "H2-CSP"                       # Heuristic Closest String Problem
-      - "DP-CSP"                      # Dynamic Programming CSP
+#      - "DP-CSP"                      # Dynamic Programming CSP
     
     # Algorithm-specific parameters
   # For experiment: fixed values used directly
@@ -257,11 +257,11 @@ experiment:
       datasets:
         - "dataset_test"
         - "dataset_file"
-#        - "dataset_ncbi"
+        - "dataset_ncbi"
       algorithms:
         - "default_config"
         - "aggressive_csc"
-      repetitions: 30                 # int: Number of repetitions per combination (1-10 recommended)
+      repetitions: 5                 # int: Number of repetitions per combination (1-10 recommended)
                                       # Each dataset+algorithm combination will be executed N times
     # You can add multiple executions:
     - name: "Complete Experiment"
@@ -270,7 +270,7 @@ experiment:
         - "dataset_file"
       algorithms:
         - "aggressive_csc"
-      repetitions: 20
+      repetitions: 10
 
 # =====================================================================
 # SECTION 5B: SPECIFIC CONFIGURATION - OPTIMIZATION
@@ -502,7 +502,7 @@ resources:
     # Do not use the same cores as the main application during tests
     exclusive_cores: false            # bool: If true, tests do not share cores with the main app
     max_workers: 1                    # int|null: Maximum number of cores to use (null = all available)
-    internal_jobs: 1                  # int: Maximum internal parallel jobs per algorithm
+    internal_jobs: 4                  # int: Maximum internal parallel jobs per algorithm
                                       # Controls internal algorithm parallelism (threads/processes)
                                       # Suggested value: 4 for CPUs with 8+ cores
                                       # Relation: max_workers × internal_jobs ≤ CPU_cores

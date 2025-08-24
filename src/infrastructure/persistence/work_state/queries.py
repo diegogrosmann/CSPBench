@@ -16,6 +16,7 @@ class ExecutionDetail:
     unit_id: str
     combination_id: int
     sequencia: int
+    worker_id: Optional[str]
     status: str
     progress: float
     progress_message: Optional[str]
@@ -324,6 +325,79 @@ class WorkStateQueries:
             current_combination_details=dict(current_combo) if current_combo else None
         )
     
+    def get_combination_executions_detail(self, combination_id: int) -> List[ExecutionDetail]:
+        """Get detailed information about all executions for a specific combination."""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        
+        query = """
+            SELECT 
+                e.unit_id,
+                e.combination_id,
+                e.sequencia,
+                e.worker_id,
+                e.status,
+                e.started_at,
+                e.finished_at,
+                e.objective,
+                e.result_json,
+                c.task_id,
+                c.dataset_id,
+                c.preset_id,
+                c.algorithm_id,
+                c.mode,
+                c.total_sequences,
+                -- Get latest progress
+                (SELECT ep.progress 
+                 FROM execution_progress ep 
+                 WHERE ep.execution_id = e.id 
+                 ORDER BY ep.timestamp DESC LIMIT 1) as progress,
+                (SELECT ep.message 
+                 FROM execution_progress ep 
+                 WHERE ep.execution_id = e.id 
+                 ORDER BY ep.timestamp DESC LIMIT 1) as progress_message
+            FROM executions e
+            JOIN combinations c ON e.combination_id = c.id
+            WHERE e.combination_id = ?
+            ORDER BY e.sequencia ASC
+        """
+        
+        cursor.execute(query, (combination_id,))
+        rows = cursor.fetchall()
+        
+        results = []
+        for row in rows:
+            progress_message = row['progress_message']
+            if row['status'] == 'completed':
+                progress_message = f"Objective: {row['objective']}"
+            elif row['status'] in ('failed', 'error') and row['result_json']:
+                try:
+                    result_data = json.loads(row['result_json'])
+                    progress_message = result_data.get('error_message', 'Unknown error')
+                except (json.JSONDecodeError, TypeError):
+                    progress_message = 'Failed to parse error message'
+
+            results.append(ExecutionDetail(
+                unit_id=row['unit_id'],
+                combination_id=row['combination_id'],
+                sequencia=row['sequencia'] or 0,
+                worker_id=row['worker_id'],
+                status=row['status'],
+                progress=row['progress'] or 0.0,
+                progress_message=progress_message,
+                started_at=row['started_at'],
+                finished_at=row['finished_at'],
+                objective=row['objective'],
+                task_id=row['task_id'],
+                dataset_id=row['dataset_id'],
+                preset_id=row['preset_id'],
+                algorithm_id=row['algorithm_id'],
+                mode=row['mode'],
+                total_sequences=row['total_sequences'] or 0
+            ))
+        
+        return results
+
     def get_running_executions_detail(self, work_id: str, limit: int = 20) -> List[ExecutionDetail]:
         """Get detailed information about running executions."""
         conn = self._get_connection()
@@ -334,16 +408,11 @@ class WorkStateQueries:
                 e.unit_id,
                 e.combination_id,
                 e.sequencia,
+                e.worker_id,
                 e.status,
                 e.started_at,
                 e.finished_at,
                 e.objective,
-                c.task_id,
-                c.dataset_id,
-                c.preset_id,
-                c.algorithm_id,
-                c.mode,
-                c.total_sequences,
                 -- Get latest progress
                 (SELECT ep.progress 
                  FROM execution_progress ep 
@@ -369,6 +438,7 @@ class WorkStateQueries:
                 unit_id=row['unit_id'],
                 combination_id=row['combination_id'],
                 sequencia=row['sequencia'] or 0,
+                worker_id=row['worker_id'],
                 status=row['status'],
                 progress=row['progress'] or 0.0,
                 progress_message=row['progress_message'],

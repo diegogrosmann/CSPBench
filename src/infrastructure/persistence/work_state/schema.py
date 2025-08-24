@@ -54,6 +54,7 @@ SCHEMA_STATEMENTS = [
         unit_id TEXT UNIQUE NOT NULL,
         combination_id INTEGER,
         sequencia INTEGER,
+        worker_id TEXT,
         status TEXT CHECK(status IN ('queued', 'running', 'paused', 'canceled', 'completed', 'failed', 'error')),
         started_at REAL,
         finished_at REAL,

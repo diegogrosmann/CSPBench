@@ -131,16 +131,17 @@ class ExperimentExecutor(AbstractExecutionEngine):
 
         results: list[dict[str, Any]] = []
 
-        max_workers = self._execution_controller.get_worker_config().get(
-            "max_workers", 1
-        )
+        try:
+            max_workers = self._execution_controller.get_worker_config()["cpu"]["max_workers"]
+        except Exception:
+            max_workers = 1
 
         if max_workers > 1:
             # Execução paralela: submeter todas as tarefas de uma vez
             with ProcessPoolExecutor(max_workers=max_workers) as executor:
                 # Preparar todas as tarefas
                 futures = []
-                for r in range(repetitions):
+                for r in range(1, repetitions + 1):
                     if self._execution_controller.check_status() != BaseStatus.RUNNING:
                         break
 
@@ -180,7 +181,7 @@ class ExperimentExecutor(AbstractExecutionEngine):
 
         else:
             # Execução sequencial
-            for r in range(repetitions):
+            for r in range(1, repetitions + 1):
                 if self._execution_controller.check_status() != BaseStatus.RUNNING:
                     break
 
