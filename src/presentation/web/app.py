@@ -30,8 +30,7 @@ def get_remote_address(request):
 
 
 from .core.config import web_config
-from .routes import algorithms, datasets, health, pages, monitoring
-from . import websocket_routes
+from .routes import algorithms, datasets, health, pages
 
 # Get logger (logging is configured globally in main.py via LoggerConfig)
 logger = logging.getLogger(__name__)
@@ -71,12 +70,6 @@ app.include_router(algorithms.router, tags=["algorithms"])
 app.include_router(datasets.router, tags=["datasets"])
 app.include_router(health.router, tags=["health"])
 app.include_router(pages.router, tags=["pages"])
-app.include_router(monitoring.router, tags=["monitoring"])
-app.include_router(websocket_routes.router, tags=["websockets"])
-
-# Include progress monitoring routes
-from .routes import progress_monitor
-app.include_router(progress_monitor.router, tags=["progress-monitoring"])
 
 # Import and include batch routes
 from .routes import batches
@@ -93,34 +86,15 @@ from .routes import files
 
 app.include_router(files.router)
 
+# Import and include WebSocket routes
+from .websocket import routes as websocket_routes
 
-@app.get("/test-progress")
-async def test_progress_page():
-    """Serve test progress page for debugging."""
-    try:
-        with open("src/presentation/web/static/test-progress.html", "r") as f:
-            content = f.read()
-        return HTMLResponse(content=content)
-    except FileNotFoundError:
-        raise HTTPException(status_code=404, detail="Test progress page not found")
+app.include_router(websocket_routes.router)
 
+# Import and include monitoring routes
+from .routes import monitoring
 
-@app.get("/monitor")
-async def progress_monitor_page():
-    """Serve progress monitor page."""
-    try:
-        with open("src/presentation/web/templates/progress_monitor.html", "r") as f:
-            content = f.read()
-        return HTMLResponse(content=content)
-    except FileNotFoundError:
-        raise HTTPException(status_code=404, detail="Progress monitor page not found")
-
-
-# Remove old startup/shutdown events as they're replaced by lifespan
-# Global WorkManager is now managed by the lifespan context manager
-
-
-# Legacy endpoints removidos
+app.include_router(monitoring.router)
 
 
 # For uvicorn direct execution

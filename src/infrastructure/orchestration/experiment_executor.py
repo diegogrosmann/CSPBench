@@ -217,8 +217,11 @@ class ExperimentExecutor(AbstractExecutionEngine):
                     if self._execution_controller.check_status() != BaseStatus.RUNNING:
                         break
 
+                    # Construir unit_id padronizado: type:task:dataset:config:name:r
+                    config_id = getattr(self._combination_store, "_preset_id", None) or "default"
+                    config_id = str(config_id).replace(":", "_")
                     experiment_unit_id = (
-                        f"experiment:{task.id}:{dataset_id}:{alg.name}:{r}"
+                        f"experiment:{task.id}:{dataset_id}:{config_id}:{alg.name}:{r}"
                     )
 
                     ex = self._combination_store.get_executions(unit_id=experiment_unit_id)
@@ -277,7 +280,10 @@ class ExperimentExecutor(AbstractExecutionEngine):
                 if status != BaseStatus.RUNNING:
                     return status
 
-                experiment_unit_id = f"experiment:{task.id}:{dataset_id}:{alg.name}:{r}"
+                # Construir unit_id padronizado: type:task:dataset:config:name:r
+                config_id = getattr(self._combination_store, "_preset_id", None) or "default"
+                config_id = str(config_id).replace(":", "_")
+                experiment_unit_id = f"experiment:{task.id}:{dataset_id}:{config_id}:{alg.name}:{r}"
                 ex = self._combination_store.get_executions(unit_id=experiment_unit_id)
                 if ex and ex[0]["status"] in (
                     BaseStatus.COMPLETED.value, "completed", 

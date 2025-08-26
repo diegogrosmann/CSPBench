@@ -257,7 +257,7 @@ experiment:
       datasets:
         - "dataset_test"
         - "dataset_file"
-        - "dataset_ncbi"
+#        - "dataset_ncbi"
       algorithms:
         - "default_config"
         - "aggressive_csc"

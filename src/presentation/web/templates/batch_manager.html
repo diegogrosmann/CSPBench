@@ -555,12 +555,17 @@ class BatchManagerTabbed {
             const result = await this.apiClient.executeBatch(fileName, 'log');
             
             // Show success message
-            this.showAlert(`Batch "${fileName}" started successfully! Redirecting to monitoring...`, 'success');
-            
-            // Redirect to monitoring page with work_id after a short delay
-            setTimeout(() => {
-                window.location.href = `/monitoring?work_id=${result.work_id}`;
-            }, 2000);
+            this.showAlert(`Batch "${fileName}" iniciado! Redirecionando para progresso...`, 'success');
+
+            // Redirect to work progress page as requested
+            if (result && result.work_id) {
+                // Pequeno atraso opcional para o usuário ver o alerta
+                setTimeout(() => {
+                    window.location.href = `/monitor/work/${result.work_id}`;
+                }, 600);
+            } else {
+                console.warn('executeBatch returned no work_id, skipping redirect');
+            }
             
         } catch (error) {
             console.error('Error executing batch:', error);

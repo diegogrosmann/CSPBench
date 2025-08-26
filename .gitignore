@@ -10,9 +10,9 @@ __pycache__
 datasets/*
 !datasets/example.fasta
 
-outputs/*
-logs/*
+data/*
 
 # Ignore all files in batches, except examples
 batches/*
 !batches/TEMPLATE.yaml
+data/work_manager.db-shm

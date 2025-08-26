@@ -137,6 +137,41 @@ class ExecutionManager:
             logger.error(f"Failed to restart work {work_id}: {e}")
             return False
 
+    def resume(self, work_id: str) -> bool:
+        """Resume a paused work without resetting queued/completed progress.
+
+        Se o status atual for 'paused', o pipeline é reativado reaproveitando o estado existente
+        no banco (state.db). As combinações já concluídas permanecem concluídas e as em 'queued'
+        ou 'running'/interrompidas devem seguir conforme lógica do PipelineRunner (init_combination()).
+        """
+        try:
+            work_data = self._work_service.get(work_id)
+            if not work_data:
+                logger.error(f"Work item {work_id} not found for resume")
+                return False
+            status = work_data.get("status")
+            if status != BaseStatus.PAUSED.value:
+                logger.warning(f"Work {work_id} not in paused state (status={status}), resume aborted")
+                return False
+            work_item = WorkItem.from_dict(work_data)
+            config = work_item.config
+            if not config:
+                logger.error(f"No config found for work item {work_id} (resume)")
+                return False
+
+            # Apenas marcar running (sem reset de progresso) antes de thread
+            self._work_service.mark_running(work_id)
+            logger.info(f"Resuming work: {work_id}")
+
+            thread = threading.Thread(
+                target=self._execute_work, args=(work_id, config), daemon=True
+            )
+            thread.start()
+            return True
+        except Exception as e:
+            logger.error(f"Failed to resume work {work_id}: {e}")
+            return False
+
     def _execute_work(self, work_id: str, config: CSPBenchConfig) -> Dict[str, Any]:
         """
         Execute work item with monitoring and status updates using standardized BaseStatus.

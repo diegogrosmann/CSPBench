@@ -1,296 +1,273 @@
 """
-API routes for real-time monitoring and execution management
-Updated to work with the refactored system without monitor components.
+API routes for monitoring functionality.
 """
 
-from fastapi import APIRouter, HTTPException, Depends
-from typing import List, Dict, Any, Optional
-from datetime import datetime, timedelta
-import os
-import glob
-from pathlib import Path
-
+from typing import List, Dict, Any
+from fastapi import APIRouter, HTTPException
 from src.application.services.work_service import get_work_service
-from src.application.work.work_manager import WorkManager
-from src.domain.status import BaseStatus
-from src.presentation.web.websocket_manager import connection_manager
-from src.infrastructure.logging_config import get_logger
+from pathlib import Path
+from src.infrastructure.persistence.work_state.queries import WorkStateQueries
 
-# Get logger
-logger = get_logger(__name__)
-
-try:
-    from src.infrastructure.persistence.work_state.queries import WorkStateQueries
-except ImportError:
-    # Fallback if queries not available
-    WorkStateQueries = None
-
-logger = get_logger(__name__)
-router = APIRouter()
+router = APIRouter(prefix="/api/monitor", tags=["monitoring"])
 
 
-@router.get("/api/monitoring/list")
-async def list_works(work_manager: WorkManager = Depends(get_work_service)):
-    """Get list of all work items from database"""
+@router.get("/works")
+async def get_works() -> Dict[str, Any]:
+    """Get list of all works with status information."""
     try:
-        # Get all work items from the work manager
-        works = work_manager.list()
+        work_service = get_work_service()
+        works = work_service.list()
         
-        # Format for frontend
-        formatted_works = []
+        # Enrich with status information
+        enriched_works = []
         for work in works:
-            formatted_works.append({
-                "work_id": work.get("id", "unknown"),
+            work_data = {
+                "id": work["id"],
                 "status": work.get("status", "unknown"),
                 "created_at": work.get("created_at", 0),
                 "updated_at": work.get("updated_at", 0),
                 "output_path": work.get("output_path", ""),
+                "error": work.get("error", None),
                 "config_name": work.get("config", {}).get("metadata", {}).get("name", "Unknown"),
-                "description": work.get("extra", {}).get("description", ""),
-                "batch_file": work.get("extra", {}).get("batch_file", ""),
-                "origin": work.get("extra", {}).get("origin", "unknown")
-            })
+                "config_description": work.get("config", {}).get("metadata", {}).get("description", ""),
+                "config_author": work.get("config", {}).get("metadata", {}).get("author", ""),
+            }
+            enriched_works.append(work_data)
         
-        # Sort by creation time (newest first)
-        formatted_works.sort(key=lambda x: x["created_at"], reverse=True)
+        # Sort by creation date (newest first)
+        enriched_works.sort(key=lambda x: x["created_at"], reverse=True)
         
-        return formatted_works
-
+        return {
+            "works": enriched_works,
+            "total": len(enriched_works)
+        }
+        
     except Exception as e:
-        logger.error(f"Error listing works: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Failed to get works: {str(e)}")
 
 
-@router.get("/api/monitoring/work/{work_id}/status")
-async def get_work_status(work_id: str, work_manager: WorkManager = Depends(get_work_service)):
-    """Get work status and basic information"""
+@router.get("/work/{work_id}/status")
+async def get_work_status(work_id: str) -> Dict[str, Any]:
+    """Get detailed status of a specific work."""
     try:
-        work_item = work_manager.get(work_id)
-        if not work_item:
+        work_service = get_work_service()
+        work = work_service.get(work_id)
+        
+        if not work:
             raise HTTPException(status_code=404, detail=f"Work {work_id} not found")
         
         return {
             "work_id": work_id,
-            "status": work_item.get("status", "unknown"),
-            "created_at": work_item.get("created_at", 0),
-            "updated_at": work_item.get("updated_at", 0),
-            "error": work_item.get("error"),
-            "config_name": work_item.get("config", {}).get("metadata", {}).get("name", "Unknown"),
-            "description": work_item.get("extra", {}).get("description", ""),
+            "status": work.get("status", "unknown"),
+            "created_at": work.get("created_at", 0),
+            "updated_at": work.get("updated_at", 0),
+            "output_path": work.get("output_path", ""),
+            "error": work.get("error", None),
+            "config": work.get("config", {}),
         }
-
+        
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Error getting work status: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Failed to get work status: {str(e)}")
 
 
-# @router.get("/api/monitoring/work/{work_id}/progress")
-# async def get_work_progress(work_id: str, work_manager: WorkManager = Depends(get_work_service)):
-#     """Get detailed progress information for a work item"""
-#     try:
-#         # Get work item from database
-#         work_item = work_manager.get(work_id)
-#         if not work_item:
-#             raise HTTPException(status_code=404, detail=f"Work {work_id} not found")
-#         
-#         # Check if work state database exists for detailed progress
-#         work_output_path = work_item.get("output_path", "")
-#         state_db_path = Path(work_output_path) / "state.db" if work_output_path else None
-#         
-#         print(f"DEBUG State DB path: {state_db_path}")
-#         print(f"DEBUG State DB exists: {state_db_path.exists() if state_db_path else False}")
-#         print(f"DEBUG WorkStateQueries available: {WorkStateQueries is not None}")
-#         
-#         # Default progress data structure
-#         progress_data = {
-#             "work_id": work_id,
-#             "status": work_item.get("status", "unknown"),
-#             "updated_at": work_item.get("updated_at", 0),
-#             "error": work_item.get("error"),
-#             "progress_summary": {
-#                 "task": {"current": 0, "total": 1},
-#                 "dataset": {"current": 0, "total": 1}, 
-#                 "config": {"current": 0, "total": 1},
-#                 "algorithm": {"current": 0, "total": 1},
-#                 "sequence": {"current": 0, "total": 1}
-#             },
-#             "running_executions": [],
-#             "errors": [],
-#             "warnings": [],
-#             "console_output": []
-#         }
-#         
-#         # Simulate progress based on status for demo purposes
-#         status = work_item.get("status", "unknown")
-#         if status == "completed":
-#             progress_data["progress_summary"] = {
-#                 "task": {"current": 1, "total": 1},
-#                 "dataset": {"current": 1, "total": 1}, 
-#                 "config": {"current": 1, "total": 1},
-#                 "algorithm": {"current": 1, "total": 1},
-#                 "sequence": {"current": 1, "total": 1}
-#             }
-#         elif status == "running":
-#             progress_data["progress_summary"] = {
-#                 "task": {"current": 1, "total": 2},
-#                 "dataset": {"current": 1, "total": 1}, 
-#                 "config": {"current": 1, "total": 1},
-#                 "algorithm": {"current": 0, "total": 1},
-#                 "sequence": {"current": 50, "total": 100}
-#             }
-#         
-#         # If work state database exists and WorkStateQueries available, get detailed progress
-#         print(f"DEBUG Entering query section...")
-#         print(f"DEBUG WorkStateQueries check: {WorkStateQueries}")
-#         print(f"DEBUG state_db_path check: {state_db_path}")
-#         print(f"DEBUG state_db_path exists: {state_db_path.exists() if state_db_path else 'Path is None'}")
-#         
-#         if WorkStateQueries and state_db_path and state_db_path.exists():
-#             print(f"DEBUG Entering WorkStateQueries section...")
-#             try:
-#                 with WorkStateQueries(state_db_path) as queries:
-#                     if queries.work_exists(work_id):
-#                         # Get progress summary
-#                         summary = queries.get_work_progress_summary(work_id)
-#                         if summary:
-#                             progress_data["progress_summary"] = {
-#                                 "task": {"current": summary.tasks["Finished"], "total": summary.tasks["Total"]},
-#                                 "dataset": {"current": summary.datasets["Finished"], "total": summary.datasets["Total"]},
-#                                 "config": {"current": summary.configs["Finished"], "total": summary.configs["Total"]},
-#                                 "algorithm": {"current": summary.algorithms["Finished"], "total": summary.algorithms["Total"]},
-#                                 "sequence": {"current": summary.execution["Finished"], "total": summary.execution["Total"]}
-#                             }
-#                             progress_data["global_progress"] = summary.global_progress
-#                             progress_data["current_combination"] = summary.current_combination_details
-#                         
-#                         # Get running executions
-#                         running = queries.get_running_executions_detail(work_id, limit=20)
-#                         progress_data["running_executions"] = [
-#                             {
-#                                 "unit_id": exec.unit_id,
-#                                 "combination_id": exec.combination_id,
-#                                 "sequencia": exec.sequencia,
-#                                 "task_id": exec.task_id, 
-#                                 "dataset_id": exec.dataset_id,
-#                                 "preset_id": exec.preset_id,
-#                                 "algorithm_id": exec.algorithm_id,
-#                                 "progress": exec.progress,
-#                                 "progress_message": exec.progress_message,
-#                                 "started_at": exec.started_at,
-#                                 "formatted_time": datetime.fromtimestamp(exec.started_at).strftime("%H:%M:%S") if exec.started_at else "N/A"
-#                             }
-#                             for exec in running
-#                         ]
-#                         
-#                         # Get errors
-#                         errors = queries.get_error_summary(work_id, limit=10)
-#                         progress_data["errors"] = [
-#                             {
-#                                 "unit_id": error.unit_id,
-#                                 "error_type": error.error_type,
-#                                 "error_message": error.error_message,
-#                                 "timestamp": error.timestamp,
-#                                 "formatted_time": datetime.fromtimestamp(error.timestamp).strftime("%H:%M:%S") if error.timestamp else "N/A"
-#                             }
-#                             for error in errors
-#                         ]
-#                         
-#                         # Get warnings  
-#                         warnings = queries.get_execution_warnings(work_id, limit=10)
-#                         progress_data["warnings"] = [
-#                             {
-#                                 "message": warning.get("message", "Unknown warning"),
-#                                 "unit_id": warning.get("unit_id"),
-#                                 "timestamp": warning.get("timestamp"),
-#                                 "formatted_time": datetime.fromtimestamp(warning.get("timestamp")).strftime("%H:%M:%S") if warning.get("timestamp") else "N/A"
-#                             }
-#                             for warning in warnings
-#                         ]
-#                         
-#             except Exception as e:
-#                 logger.warning(f"Error reading state database for {work_id}: {e}")
-#         
-#         return progress_data
-# 
-#     except Exception as e:
-#         logger.error(f"Error getting work progress: {e}")
-#         raise HTTPException(status_code=500, detail=str(e))
-
-
-from pydantic import BaseModel
-
-# Add control request model
-class WorkControlRequest(BaseModel):
-    action: str
-
-
-@router.post("/api/monitoring/work/{work_id}/control")
-async def control_work(
-    work_id: str, 
-    request: WorkControlRequest,
-    work_manager: WorkManager = Depends(get_work_service)
-):
-    """Control work execution (pause, resume, cancel)"""
+@router.get("/work/{work_id}/database-status")
+async def get_work_database_status(work_id: str) -> Dict[str, Any]:
+    """Check if work database is ready for monitoring."""
     try:
-        action = request.action
+    # imports movidos para topo
+        
+        work_service = get_work_service()
+        work = work_service.get(work_id)
+        
+        if not work:
+            raise HTTPException(status_code=404, detail=f"Work {work_id} not found")
+        
+        db_path = Path(work["output_path"]) / "state.db"
+        
+        if not db_path.exists():
+            return {
+                "ready": False,
+                "reason": "database_not_created",
+                "message": "Database file not yet created"
+            }
+        
+        try:
+            with WorkStateQueries(db_path) as queries:
+                if not queries.work_exists(work_id):
+                    return {
+                        "ready": False,
+                        "reason": "work_not_in_database",
+                        "message": "Work not yet written to database"
+                    }
+                
+                # Check if there's meaningful progress data
+                progress = queries.get_work_progress_summary(work_id)
+                if not progress:
+                    return {
+                        "ready": False,
+                        "reason": "no_progress_data",
+                        "message": "No progress data available yet"
+                    }
+                
+                return {
+                    "ready": True,
+                    "reason": "ready",
+                    "message": "Database ready for monitoring"
+                }
+                
+        except Exception as db_error:
+            return {
+                "ready": False,
+                "reason": "database_error",
+                "message": f"Database error: {str(db_error)}"
+            }
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to check database status: {str(e)}")
+
+
+@router.post("/work/{work_id}/action/{action}")
+async def work_action(work_id: str, action: str) -> Dict[str, Any]:
+    """Perform action on work (pause, resume, cancel)."""
+    try:
+        work_service = get_work_service()
+        
         if action == "pause":
-            success = work_manager.pause(work_id)
+            success = work_service.pause(work_id)
         elif action == "resume":
-            success = work_manager.resume(work_id)
+            # Use ExecutionManager para retomar execução real
+            from src.application.services.execution_manager import ExecutionManager
+            exec_manager = ExecutionManager(work_service=work_service)
+            success = exec_manager.resume(work_id)
         elif action == "cancel":
-            success = work_manager.cancel(work_id)
+            success = work_service.cancel(work_id)
         else:
             raise HTTPException(status_code=400, detail=f"Invalid action: {action}")
         
         if not success:
-            raise HTTPException(status_code=404, detail=f"Work {work_id} not found or action failed")
-        
-        return {"success": True, "action": action, "work_id": work_id}
-
-    except Exception as e:
-        logger.error(f"Error controlling work {work_id}: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.get("/api/monitoring/terminal/{work_id}")
-async def get_terminal_output(work_id: str, work_manager: WorkManager = Depends(get_work_service)):
-    """Get terminal output for a work item."""
-    try:
-        from pathlib import Path
-        
-        # Get work item from work manager
-        work_item = work_manager.get(work_id)
-        if not work_item:
-            raise HTTPException(status_code=404, detail=f"Work {work_id} not found")
-        
-        # Try to read log files from the work output directory
-        work_output_path = work_item.get("output_path", "")
-        terminal_output = []
-        
-        if work_output_path:
-            output_dir = Path(work_output_path)
-            if output_dir.exists():
-                log_files = list(output_dir.glob("*.log"))
-                
-                # Read recent log content
-                for log_file in log_files:
-                    try:
-                        with open(log_file, "r") as f:
-                            lines = f.readlines()
-                            # Get last 100 lines
-                            recent_lines = lines[-100:] if len(lines) > 100 else lines
-                            terminal_output.extend([line.rstrip() for line in recent_lines])
-                    except Exception as file_error:
-                        logger.warning(f"Could not read log file {log_file}: {file_error}")
+            raise HTTPException(status_code=400, detail=f"Failed to {action} work {work_id}")
         
         return {
+            "success": True,
+            "action": action,
             "work_id": work_id,
-            "output": "\n".join(terminal_output) if terminal_output else "No log output available",
-            "timestamp": datetime.now()
+            "message": f"Work {action} executed successfully"
         }
-
+        
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error getting terminal output: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Failed to {action} work: {str(e)}")
+
+
+@router.get("/active-works")
+async def get_active_works() -> Dict[str, Any]:
+    """Get only active (running/queued) works."""
+    try:
+        work_service = get_work_service()
+        all_works = work_service.list()
+        
+        active_statuses = ["queued", "running"]
+        active_works = [
+            work for work in all_works 
+            if work.get("status", "unknown") in active_statuses
+        ]
+        
+        return {
+            "works": active_works,
+            "count": len(active_works)
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get active works: {str(e)}")
+
+
+@router.get("/work/{work_id}/combinations")
+async def list_work_combinations(work_id: str) -> Dict[str, Any]:
+    """Lista combinações de um work para popular filtros de execução."""
+    try:
+        work_service = get_work_service()
+        work = work_service.get(work_id)
+        if not work:
+            raise HTTPException(status_code=404, detail=f"Work {work_id} not found")
+        db_path = Path(work["output_path"]) / "state.db"
+        if not db_path.exists():
+            return {"combinations": [], "total": 0}
+        with WorkStateQueries(db_path) as queries:
+            if not queries.work_exists(work_id):
+                return {"combinations": [], "total": 0}
+            combos = queries.list_combinations(work_id)
+        return {"combinations": combos, "total": len(combos)}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to list combinations: {str(e)}")
+
+
+@router.get("/work/{work_id}/combinations/{combination_id}/executions")
+async def get_combination_executions(work_id: str, combination_id: int) -> Dict[str, Any]:
+    """Detalhes e estatísticas das execuções de uma combinação específica."""
+    try:
+        work_service = get_work_service()
+        work = work_service.get(work_id)
+        if not work:
+            raise HTTPException(status_code=404, detail=f"Work {work_id} not found")
+        db_path = Path(work["output_path"]) / "state.db"
+        if not db_path.exists():
+            raise HTTPException(status_code=404, detail="State database not found")
+        with WorkStateQueries(db_path) as queries:
+            if not queries.work_exists(work_id):
+                raise HTTPException(status_code=404, detail="Work not registered in state database")
+            # Verificar se combinação existe
+            combo_list = queries.list_combinations(work_id)
+            combo_map = {c["combination_id"]: c for c in combo_list}
+            combo = combo_map.get(combination_id)
+            if not combo:
+                raise HTTPException(status_code=404, detail=f"Combination {combination_id} not found for work {work_id}")
+            executions = queries.get_combination_executions_detail(combination_id)
+            # Agregar estatísticas
+            stats = {"Running": 0, "Completed": 0, "Queued": 0, "Failed": 0, "Total": combo.get("total_sequences") or 0}
+            exec_rows = []
+            for ex in executions:
+                status = ex.status
+                if status == "running":
+                    stats["Running"] += 1
+                elif status == "completed":
+                    stats["Completed"] += 1
+                elif status == "queued":
+                    stats["Queued"] += 1
+                elif status in ("failed", "error"):
+                    stats["Failed"] += 1
+                exec_rows.append({
+                    "unit_id": ex.unit_id,
+                    "combination_id": ex.combination_id,
+                    "sequencia": ex.sequencia,
+                    "status": ex.status,
+                    "progress": ex.progress,
+                    "progress_message": ex.progress_message,
+                    "started_at": ex.started_at,
+                    "finished_at": ex.finished_at,
+                    "objective": ex.objective,
+                    "task_id": ex.task_id,
+                    "dataset_id": ex.dataset_id,
+                    "preset_id": ex.preset_id,
+                    "algorithm_id": ex.algorithm_id,
+                    "mode": ex.mode,
+                    "total_sequences": ex.total_sequences,
+                })
+        return {
+            "work_id": work_id,
+            "combination_id": combination_id,
+            "combination": combo,
+            "stats": stats,
+            "executions": exec_rows,
+            "count": len(exec_rows)
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get executions: {str(e)}")

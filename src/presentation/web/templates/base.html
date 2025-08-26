@@ -134,14 +134,20 @@
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="/monitoring">
-                            <i class="bi bi-activity me-1"></i>Monitoring
+                        <a class="nav-link" href="/monitor/works">
+                            <i class="bi bi-speedometer2 me-1"></i>Monitor
                         </a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link" href="/results">
                             <i class="bi bi-download me-1"></i>Results
                         </a>
+                    </li>
+                    <li class="nav-item" id="activeWorksNotification" style="display: none;">
+                        <span class="nav-link text-warning">
+                            <i class="bi bi-play-circle-fill me-1"></i>
+                            <span id="activeWorksCount">0</span> Active
+                        </span>
                     </li>
                 </ul>
             </div>
@@ -205,6 +211,36 @@
         if (!window.apiClient && typeof window.APIClient !== 'undefined') {
             window.apiClient = new APIClient();
         }
+        
+        // Monitor active works for navigation notification
+        function updateActiveWorksNotification() {
+            if (window.apiClient) {
+                window.apiClient.request('/api/monitor/active-works')
+                    .then(response => {
+                        const count = response.count || 0;
+                        const notification = document.getElementById('activeWorksNotification');
+                        const countElement = document.getElementById('activeWorksCount');
+                        
+                        if (count > 0) {
+                            countElement.textContent = count;
+                            notification.style.display = 'block';
+                            notification.onclick = () => window.location.href = '/monitor/works';
+                            notification.style.cursor = 'pointer';
+                        } else {
+                            notification.style.display = 'none';
+                        }
+                    })
+                    .catch(error => {
+                        console.warn('Failed to get active works:', error);
+                    });
+            }
+        }
+        
+        // Update immediately and then every 10 seconds
+        document.addEventListener('DOMContentLoaded', () => {
+            updateActiveWorksNotification();
+            setInterval(updateActiveWorksNotification, 10000);
+        });
     </script>
     
     {% block extra_js %}{% endblock %}

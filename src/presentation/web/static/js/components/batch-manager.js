@@ -725,10 +725,17 @@ output:
             
             const response = await this.apiClient.executeBatch(filePath, 'log');
             
-            showAlert(`Batch execution started successfully! Work ID: ${response.work_id}`, 'success');
-            
-            // Refresh executions to show the new one
-            await this.refreshExecutions();
+            showAlert(`Batch iniciado! Redirecionando para progresso... (Work ID: ${response.work_id})`, 'success');
+
+            if (response && response.work_id) {
+                setTimeout(() => {
+                    window.location.href = `/monitor/work/${response.work_id}`;
+                }, 600);
+            } else {
+                console.warn('executeBatch response missing work_id, skipping redirect');
+                // Fallback: atualizar lista
+                await this.refreshExecutions();
+            }
             
         } catch (error) {
             console.error('Execution failed:', error);

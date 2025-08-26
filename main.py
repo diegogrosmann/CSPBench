@@ -74,6 +74,25 @@ except Exception as _e:  # noqa: BLE001
     print(error_msg)
     if logger:
         logger.warning(f"Falha ao carregar algoritmos: {_e}", exc_info=True)
+
+# Initialize WorkService and pause orphaned running work
+try:
+    if logger:
+        logger.debug("Inicializando WorkService global")
+    from src.application.services.work_service import initialize_work_service, pause_orphaned_running_work
+    
+    work_service = initialize_work_service()
+    pause_orphaned_running_work(work_service)
+    
+    if logger:
+        logger.info("WorkService inicializado e trabalhos órfãos pausados")
+except Exception as _e:  # noqa: BLE001
+    # Falha ao inicializar WorkService não deve impedir CLI básica
+    error_msg = f"⚠️  Aviso: não foi possível inicializar WorkService: {_e}"
+    print(error_msg)
+    if logger:
+        logger.warning(f"Falha ao inicializar WorkService: {_e}", exc_info=True)
+
 from src.presentation.cli.commands import register_commands
 from src.presentation.cli.interactive_menu import show_interactive_menu
 

@@ -1,0 +1,715 @@
+{% extends "base.html" %}
+
+{% block title %}Work Progress Monitor - CSPBench{% endblock %}
+
+{% block breadcrumb_items %}
+<li class="breadcrumb-item"><a href="/monitor/works" class="text-decoration-none"><i class="bi bi-speedometer2 me-1"></i>Work Monitor</a></li>
+<li class="breadcrumb-item active" aria-current="page"><i class="bi bi-activity me-1"></i>{{ work_id or 'work_id' }}</li>
+{% endblock %}
+
+{% block header %}{% endblock %}
+
+{% block extra_css %}
+<style>
+  .monitor-progress-bg { background: linear-gradient(135deg,#667eea 0%,#764ba2 100%); min-height: 100vh; padding: 2rem 0; }
+  .monitor-container { max-width: 1400px; margin: 0 auto; }
+  .monitor-card { background:#fff; border-radius:12px; box-shadow:0 4px 20px rgba(0,0,0,.08); margin-bottom:1.75rem; overflow:hidden; }
+  .monitor-card .card-header { background:#f8f9fa; border-bottom:1px solid #e5e7eb; font-weight:600; }
+  /* Painéis internos do resumo */
+  .summary-panel { background:#fff; border:1px solid #e5e7eb; border-radius:14px; padding:1.1rem 1.2rem; height:100%; display:flex; flex-direction:column; box-shadow:0 2px 6px rgba(0,0,0,.04); }
+  .summary-panel h6 { font-size:.8rem; text-transform:uppercase; letter-spacing:.6px; font-weight:600; color:#6c757d; margin:0 0 .85rem 0; display:flex; align-items:center; gap:.4rem; }
+  .summary-panel h6 i { font-size:.9rem; }
+  .summary-panel:not(.no-hover) { transition:box-shadow .25s ease, transform .25s ease; }
+  .summary-panel:not(.no-hover):hover { box-shadow:0 6px 18px rgba(0,0,0,.08); transform:translateY(-2px); }
+  /* Métricas */
+  .metric-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:.9rem; width:100%; }
+  .metric-box { background:linear-gradient(180deg,#fafbfc 0%,#f1f3f5 100%); border:1px solid #e5e7eb; border-radius:12px; padding:.75rem .85rem; display:flex; gap:.65rem; align-items:center; position:relative; overflow:hidden; }
+  .metric-box:before { content:""; position:absolute; inset:0; background:radial-gradient(circle at top left,rgba(102,126,234,.15),transparent 70%); pointer-events:none; }
+  .metric-icon { width:42px; height:42px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:1.1rem; }
+  .metric-value { font-size:1.25rem; font-weight:600; margin:0; }
+  .metric-label { font-size:.75rem; text-transform:uppercase; letter-spacing:.5px; margin:0; color:#6c757d }
+  .progress-slim { height:10px; border-radius:5px; }
+  .nav-tabs .nav-link { font-weight:500; }
+  .placeholder-box { border:2px dashed #ced4da; border-radius:10px; padding:2rem; text-align:center; color:#6c757d; }
+  .status-badge { font-size:.75rem; letter-spacing:.5px; }
+  .hierarchy-list { list-style:none; padding:0; margin:0; }
+  .hierarchy-list li { display:flex; justify-content:space-between; padding:.35rem .5rem; font-size:.85rem; border-radius:6px; }
+  .hierarchy-list li span { max-width:60%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .hierarchy-list li.active { background:#eef5ff; font-weight:600; }
+  .table-placeholder { min-height:240px; }
+  .event-log-placeholder { min-height:220px; }
+  .progress-ring-wrapper { width:140px; height:140px; position:relative; }
+  .progress-ring-wrapper .percent { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-weight:600; font-size:1.25rem; }
+  /* Scroll containers */
+  .scroll-y { max-height:260px; overflow-y:auto; }
+  .small-label { font-size:.65rem; text-transform:uppercase; letter-spacing:.5px; color:#6c757d; }
+  /* Ajustes responsivos */
+  @media (max-width: 1199.98px) {
+    .progress-ring-wrapper { width:120px; height:120px; }
+    .metric-value { font-size:1.1rem; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="monitor-progress-bg">
+  <div class="monitor-container">
+    <!-- Título -->
+    <div class="text-center text-white mb-5">
+      <h1 class="display-5 fw-bold mb-2"><i class="bi bi-activity me-3"></i>Work Progress Monitor</h1>
+      <p class="lead mb-0">Estrutura base (placeholder) para visualização incremental de progresso</p>
+    </div>
+
+    <!-- Resumo Global -->
+    <div class="monitor-card">
+      <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-3">
+        <div class="d-flex align-items-center gap-2">
+          <h5 class="mb-0"><i class="bi bi-graph-up me-2"></i>Resumo</h5>
+          <span class="badge bg-secondary status-badge" id="workStatusBadge">STATUS</span>
+          <span class="ms-3 small text-muted d-flex align-items-center" id="elapsedWrapper"><i class="bi bi-clock-history me-1"></i><span id="elapsedTime">--</span></span>
+        </div>
+        <div class="d-flex flex-wrap gap-2" id="workActions">
+          <!-- Botão Refresh removido -->
+          <div class="btn-group btn-group-sm" role="group">
+            <button class="btn btn-outline-warning" id="btnPause"><i class="bi bi-pause-fill me-1"></i>Pausar</button>
+            <button class="btn btn-outline-success d-none" id="btnResume"><i class="bi bi-play-fill me-1"></i>Retomar</button>
+            <button class="btn btn-outline-danger" id="btnCancel"><i class="bi bi-x-circle me-1"></i>Cancelar</button>
+          </div>
+          <a href="/monitor/works" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Voltar</a>
+        </div>
+      </div>
+      <div class="card-body">
+  <!-- Linha removida: Current Context movido para coluna direita -->
+        <div class="row g-4 align-items-stretch">
+          <!-- Hierarchy (agora à esquerda) -->
+          <div class="col-xl-4 d-flex">
+            <div class="summary-panel w-100" id="panelHierarchy">
+              <h6><i class="bi bi-diagram-3"></i>Hierarchy</h6>
+              <ul class="hierarchy-list mb-3 flex-grow-1" id="hierarchyList">
+                <li class="active"><span>Task</span><span id="taskProgress">0/0</span></li>
+                <li><span>Dataset</span><span id="datasetProgress">0/0</span></li>
+                <li><span>Config</span><span id="configProgress">0/0</span></li>
+                <li><span>Algorithm</span><span id="algorithmProgress">0/0</span></li>
+              </ul>
+              <!-- Current removido deste painel -->
+            </div>
+          </div>
+          <!-- Progress Ring (centro) simplificado -->
+          <div class="col-xl-4 d-flex">
+            <div class="summary-panel w-100 d-flex flex-column align-items-center justify-content-center" id="panelProgress">
+              <div class="progress-ring-wrapper mb-2">
+                <div class="percent" id="progressPercent">0%</div>
+                <svg width="140" height="140">
+                  <circle cx="70" cy="70" r="60" stroke="#e9ecef" stroke-width="12" fill="none" />
+                  <circle cx="70" cy="70" r="60" stroke="#667eea" stroke-width="12" fill="none" stroke-dasharray="0 999" stroke-linecap="round" id="progressCircle" />
+                </svg>
+              </div>
+              <div class="small text-muted" id="progressRatio">0/0</div>
+            </div>
+          </div>
+          <!-- Current Context (coluna direita) -->
+          <div class="col-xl-4 d-flex">
+            <div class="summary-panel w-100" id="panelCurrentContext">
+              <h6><i class="bi bi-compass"></i>Current Context</h6>
+              <ul class="hierarchy-list mb-0" id="currentContextList">
+                <li><span>Task</span><span id="currentTaskValue">—</span></li>
+                <li><span>Dataset</span><span id="currentDatasetValue">—</span></li>
+                <li><span>Config</span><span id="currentConfigValue">—</span></li>
+                <li><span>Algorithm</span><span id="currentAlgorithmValue">—</span></li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tabs Principal -->
+    <div class="monitor-card">
+      <div class="card-header">
+        <ul class="nav nav-tabs card-header-tabs" id="monitorTabs" role="tablist">
+          <li class="nav-item" role="presentation"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-overview" type="button" role="tab"><i class="bi bi-speedometer2 me-1"></i>Overview</button></li>
+          <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-executions" type="button" role="tab"><i class="bi bi-list-task me-1"></i>Executions</button></li>
+          <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-events" type="button" role="tab"><i class="bi bi-journal-text me-1"></i>Events</button></li>
+          <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-details" type="button" role="tab"><i class="bi bi-braces me-1"></i>Details</button></li>
+        </ul>
+      </div>
+      <div class="card-body tab-content">
+        <!-- Overview Tab -->
+        <div class="tab-pane fade show active" id="tab-overview" role="tabpanel">
+          <div class="placeholder-box">Overview placeholder (gráficos, KPIs, etc.)</div>
+        </div>
+        <!-- Executions Tab -->
+        <div class="tab-pane fade" id="tab-executions" role="tabpanel">
+          <div class="row g-2 mb-3 align-items-center">
+            <div class="col-lg-4 col-md-5">
+              <label class="form-label small text-uppercase fw-semibold text-muted mb-1 d-flex align-items-center"><i class="bi bi-filter-square me-1"></i>Combinação</label>
+              <div class="d-flex gap-2 align-items-center combo-filter-wrapper">
+                <select class="form-select form-select-sm" id="combinationSelect"></select>
+              </div>
+            </div>
+            <div class="col-lg-8 col-md-7">
+              <div class="row g-2" id="executionStats">
+                <div class="col-6 col-lg-3">
+                  <div class="border rounded p-2 text-center small">
+                    <div class="text-muted">Running</div>
+                    <div class="fw-bold" id="statRunning">0</div>
+                  </div>
+                </div>
+                <div class="col-6 col-lg-3">
+                  <div class="border rounded p-2 text-center small">
+                    <div class="text-muted">Completed</div>
+                    <div class="fw-bold text-success" id="statCompleted">0</div>
+                  </div>
+                </div>
+                <div class="col-6 col-lg-3">
+                  <div class="border rounded p-2 text-center small">
+                    <div class="text-muted">Queued</div>
+                    <div class="fw-bold text-info" id="statQueued">0</div>
+                  </div>
+                </div>
+                <div class="col-6 col-lg-3">
+                  <div class="border rounded p-2 text-center small">
+                    <div class="text-muted">Failed</div>
+                    <div class="fw-bold text-danger" id="statFailed">0</div>
+                  </div>
+                </div>
+                <div class="col-12 mt-2">
+                  <div class="progress" style="height:8px;">
+                    <div class="progress-bar" id="comboProgressBar" style="width:0%"></div>
+                  </div>
+                  <div class="d-flex justify-content-between small mt-1">
+                    <span id="comboProgressLabel">0/0</span>
+                    <span class="text-muted" id="comboMetaLabel">Total (repetições)</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="table-responsive table-placeholder border rounded" style="min-height:260px;">
+            <table class="table table-sm align-middle mb-0" id="executionsTable">
+              <thead class="table-light">
+                <tr>
+                  <th style="width:70px">#</th>
+                  <th>Status</th>
+                  <th style="width:160px">Progress</th>
+                  <th style="width:110px">Início</th>
+                  <th style="width:110px">Fim</th>
+                  <th>Mensagem</th>
+                </tr>
+              </thead>
+              <tbody id="executionsTableBody">
+                <tr><td colspan="6" class="text-center text-muted py-4"><i class="bi bi-inbox me-1"></i>Nenhuma execução</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <!-- Events Tab -->
+        <div class="tab-pane fade" id="tab-events" role="tabpanel">
+          <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+            <h6 class="mb-0"><i class="bi bi-journal-text me-2"></i>Event Log</h6>
+            <div class="btn-group btn-group-sm" role="group">
+              <button class="btn btn-outline-secondary" disabled>Auto-Scroll</button>
+              <button class="btn btn-outline-secondary" disabled>Clear</button>
+            </div>
+          </div>
+            <div class="event-log-placeholder border rounded p-3" id="eventLog">
+              <div class="text-center text-muted">No events (placeholder)</div>
+            </div>
+        </div>
+        <!-- Details Tab -->
+        <div class="tab-pane fade" id="tab-details" role="tabpanel">
+          <div class="placeholder-box" id="detailsJson">Raw data / JSON (placeholder)</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Placeholder -->
+    <div class="modal fade" id="executionModal" tabindex="-1" aria-labelledby="executionModalLabel" aria-hidden="true">
+      <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="executionModalLabel"><i class="bi bi-search me-2"></i>Execution Details</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <div class="placeholder-box py-5">Detalhes da execução (placeholder)</div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// === Dynamic Summary Implementation (Resumo) ===
+(() => {
+  const WORK_ID = '{{ work_id }}';
+  // Element refs
+  const els = {
+    statusBadge: document.getElementById('workStatusBadge'),
+    elapsed: document.getElementById('elapsedTime'),
+    // Hierarchy
+    taskProgress: document.getElementById('taskProgress'),
+    datasetProgress: document.getElementById('datasetProgress'),
+    configProgress: document.getElementById('configProgress'),
+    algorithmProgress: document.getElementById('algorithmProgress'),
+    // Current combination
+    currentTask: document.getElementById('currentTaskValue'),
+    currentDataset: document.getElementById('currentDatasetValue'),
+    currentConfig: document.getElementById('currentConfigValue'),
+    currentAlgorithm: document.getElementById('currentAlgorithmValue'),
+    // Progress ring
+    progressPercent: document.getElementById('progressPercent'),
+    progressCircle: document.getElementById('progressCircle'),
+    progressRatio: document.getElementById('progressRatio'),
+    // Execution metrics
+  // current context already mapped above; removed execution metrics list
+  comboSelect: document.getElementById('combinationSelect'),
+  // btnFollowCurrent removido
+  statRunning: document.getElementById('statRunning'),
+  statCompleted: document.getElementById('statCompleted'),
+  statQueued: document.getElementById('statQueued'),
+  statFailed: document.getElementById('statFailed'),
+  comboProgressBar: document.getElementById('comboProgressBar'),
+  comboProgressLabel: document.getElementById('comboProgressLabel'),
+  };
+
+  let workStatusCache = null; // holds created_at / updated_at for elapsed
+  let progressCache = null;   // full last progress summary
+  let ws = null;
+  let wsRetry = 0;
+  const CIRCUMFERENCE = 2 * Math.PI * 60; // r=60
+  let combinationsCache = [];
+  let selectedCombinationId = null; // explicit selection
+  let currentCombinationId = null;  // from progress snapshot
+  let followCurrent = true;
+  // botão seguir removido; followCurrent controlado apenas pela opção 'Corrente'
+  let latestExecutions = [];
+  let execRefreshTimer = null;
+
+  function fmtElapsed(seconds) {
+    if (!Number.isFinite(seconds) || seconds < 0) return '--';
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = Math.floor(seconds % 60);
+    const pad = (v) => String(v).padStart(2,'0');
+    if (h) return `${pad(h)}:${pad(m)}:${pad(s)}`;
+    return `${pad(m)}:${pad(s)}`;
+  }
+
+  async function fetchWorkStatus() {
+    try {
+      const resp = await fetch(`/api/monitor/work/${WORK_ID}/status`);
+      if (!resp.ok) return;
+      const data = await resp.json();
+      workStatusCache = data;
+      updateStatusBadge(data.status);
+      updateElapsed();
+  updateActionButtons(data.status);
+    } catch (_) { /* ignore */ }
+  }
+
+  function updateStatusBadge(status) {
+    if (!els.statusBadge) return;
+    const map = {
+      running: 'bg-primary',
+      queued: 'bg-info',
+      completed: 'bg-success',
+      failed: 'bg-danger',
+      error: 'bg-danger',
+      paused: 'bg-warning',
+      cancelled: 'bg-secondary'
+    };
+    // reset classes keeping base and status-badge
+    els.statusBadge.className = 'badge status-badge ' + (map[status] || 'bg-secondary');
+    els.statusBadge.textContent = status?.toUpperCase() || 'UNKNOWN';
+  }
+
+  function updateActionButtons(status){
+  const pauseBtn = document.getElementById('btnPause');
+  const resumeBtn = document.getElementById('btnResume');
+  const cancelBtn = document.getElementById('btnCancel');
+    if(!pauseBtn) return;
+    const terminal = ['completed','failed','error','cancelled'].includes(status);
+    // Toggle pause/resume visibility
+    if(status==='paused'){
+      pauseBtn.classList.add('d-none');
+      resumeBtn.classList.remove('d-none');
+    } else {
+      resumeBtn.classList.add('d-none');
+      pauseBtn.classList.remove('d-none');
+    }
+    pauseBtn.disabled = terminal || status==='paused';
+    resumeBtn.disabled = terminal || status!=='paused';
+    cancelBtn.disabled = terminal;
+  // No restart button anymore
+  }
+
+  async function postAction(action){
+  const btns = ['btnPause','btnResume','btnCancel'].map(id=>document.getElementById(id));
+    btns.forEach(b=>b && (b.disabled=true));
+    try {
+      const resp = await fetch(`/api/monitor/work/${WORK_ID}/action/${action}`, {method:'POST'});
+      if(!resp.ok){
+        console.warn('Action failed', action);
+      } else {
+        await fetchWorkStatus(); // refresh status
+      }
+    } catch(e){ console.warn('Action error',action,e);} finally { btns.forEach(b=>b && (b.disabled=false)); }
+  }
+
+  function updateElapsed() {
+    if (!workStatusCache || !els.elapsed) return;
+    const { created_at, updated_at, status } = workStatusCache;
+    if (!created_at) return;
+    const end = (status === 'completed' || status === 'failed' || status === 'error' || status === 'cancelled') ? updated_at : Date.now()/1000;
+    const elapsed = fmtElapsed(end - created_at);
+    els.elapsed.textContent = elapsed;
+  }
+
+  // Progress summary application
+  function applyProgress(progress) {
+    progressCache = progress; // store full object
+    try {
+      // Hierarchy counts (Finished/Total)
+      if (progress.tasks && els.taskProgress) {
+        const fin = progress.tasks.Finished || 0;
+        const runPlus = progress.tasks.Running ? 1 : 0; // Running contem id quando existe
+        els.taskProgress.textContent = `${fin + runPlus}/${progress.tasks.Total || 0}`;
+      }
+      if (progress.datasets && els.datasetProgress) {
+        const fin = progress.datasets.Finished || 0;
+        const runPlus = progress.datasets.Running ? 1 : 0;
+        els.datasetProgress.textContent = `${fin + runPlus}/${progress.datasets.Total || 0}`;
+      }
+      if (progress.configs && els.configProgress) {
+        const fin = progress.configs.Finished || 0;
+        const runPlus = progress.configs.Running ? 1 : 0;
+        els.configProgress.textContent = `${fin + runPlus}/${progress.configs.Total || 0}`;
+      }
+      if (progress.algorithms && els.algorithmProgress) {
+        const fin = progress.algorithms.Finished || 0;
+        const runPlus = progress.algorithms.Running ? 1 : 0;
+        els.algorithmProgress.textContent = `${fin + runPlus}/${progress.algorithms.Total || 0}`;
+      }
+
+      // Current combination context
+      const cur = progress.current_combination_details || {};
+      if (els.currentTask) els.currentTask.textContent = cur.task_id || '—';
+      if (els.currentDataset) els.currentDataset.textContent = cur.dataset_id || '—';
+      if (els.currentConfig) els.currentConfig.textContent = cur.preset_id || '—';
+      if (els.currentAlgorithm) els.currentAlgorithm.textContent = cur.algorithm_id || '—';
+  currentCombinationId = cur.combination_id || null;
+  maybeAutoFollowCombination();
+
+      // Global progress ring
+      const gp = progress.global_progress || 0;
+      const pct = Math.round(gp * 100);
+      if (els.progressPercent) els.progressPercent.textContent = pct + '%';
+      if (els.progressCircle) {
+        const dash = (gp * CIRCUMFERENCE).toFixed(2);
+        els.progressCircle.setAttribute('stroke-dasharray', `${dash} ${CIRCUMFERENCE}`);
+      }
+      if (progress.global_execution && els.progressRatio) {
+        const f = progress.global_execution.Finished || 0;
+        const t = progress.global_execution.Total || 0;
+        els.progressRatio.textContent = `${f}/${t}`;
+      }
+
+      // Execution metrics (current combination execution status)
+  // execution metrics (Finished/Running/Queued/Total) no longer displayed
+    } catch (err) {
+      console.warn('Failed to apply progress summary', err);
+    }
+  }
+
+  const CURRENT_OPTION_VALUE = '__current__';
+  function maybeAutoFollowCombination(){
+    if(!followCurrent) return;
+    // Quando seguindo, effective selection é currentCombinationId
+    renderExecutionsForCurrentSelection();
+  }
+
+  async function loadCombinations(){
+    try {
+      const resp = await fetch(`/api/monitor/work/${WORK_ID}/combinations`);
+      if(!resp.ok) return;
+      const data = await resp.json();
+      combinationsCache = data.combinations || [];
+      updateCombinationSelectUI();
+    } catch(e){ console.warn('Failed load combinations', e); }
+  }
+
+  function updateCombinationSelectUI(){
+    if(!els.comboSelect) return;
+    const sel = els.comboSelect;
+    const prev = sel.value;
+    sel.innerHTML = '';
+    // opção Corrente
+    const optCurrent = document.createElement('option');
+    optCurrent.value = CURRENT_OPTION_VALUE;
+    optCurrent.textContent = 'Corrente';
+    sel.appendChild(optCurrent);
+  // opção placeholder removida
+    combinationsCache.forEach(c => {
+      const o = document.createElement('option');
+      o.value = c.combination_id;
+      o.textContent = `${c.task_id}/${c.dataset_id}/${c.preset_id}/${c.algorithm_id} (#${c.combination_id})`;
+      if(!followCurrent && selectedCombinationId && String(c.combination_id) === String(selectedCombinationId)) o.selected = true;
+      sel.appendChild(o);
+    });
+    if(followCurrent){
+      sel.value = CURRENT_OPTION_VALUE;
+    } else if(prev && [...sel.options].some(o=>o.value===prev)) {
+      sel.value = prev;
+    }
+  }
+
+  function getEffectiveSelectedCombinationId(){
+    if(followCurrent) return currentCombinationId;
+    return selectedCombinationId;
+  }
+  function renderExecutionsForCurrentSelection(){
+    const eff = getEffectiveSelectedCombinationId();
+    if(!eff){
+      renderExecutions([],{Running:0,Completed:0,Queued:0,Failed:0,Total:0});
+      return;
+    }
+    if(!followCurrent && currentCombinationId && !idsEqual(eff,currentCombinationId)){
+      // mostrando combinação arbitrária; latestExecutions já deve conter dados retornados de set_combination
+      const stats = computeExecutionStats(latestExecutions);
+      renderExecutions(latestExecutions, stats, true);
+      return;
+    }
+    const stats = computeExecutionStats(latestExecutions);
+    renderExecutions(latestExecutions, stats);
+  }
+
+  function computeExecutionStats(rows){
+    const stats = {Running:0,Completed:0,Queued:0,Failed:0,Total:0};
+    // Total = total_sequences da combinação (se algum row possui)
+    if(rows.length){ stats.Total = rows[0].total_sequences || 0; }
+    rows.forEach(r=>{
+      if(r.status==='running') stats.Running++;
+      else if(r.status==='completed') stats.Completed++;
+      else if(r.status==='queued') stats.Queued++;
+      else if(r.status==='failed' || r.status==='error') stats.Failed++;
+    });
+    return stats;
+  }
+
+  function renderExecutions(rows, stats, notCurrent=false){
+    if(els.statRunning) els.statRunning.textContent = stats.Running || 0;
+    if(els.statCompleted) els.statCompleted.textContent = stats.Completed || 0;
+    if(els.statQueued) els.statQueued.textContent = stats.Queued || 0;
+    if(els.statFailed) els.statFailed.textContent = stats.Failed || 0;
+    const tot = stats.Total || 0;
+    const done = (stats.Completed||0) + (stats.Failed||0);
+    if(els.comboProgressBar){
+      const pct = tot? Math.round( (done / tot) * 100 ):0;
+      els.comboProgressBar.style.width = pct + '%';
+      els.comboProgressBar.textContent = pct + '%';
+    }
+    if(els.comboProgressLabel) els.comboProgressLabel.textContent = `${done}/${tot}`;
+    const tbody = document.getElementById('executionsTableBody');
+    if(!tbody) return;
+    tbody.innerHTML='';
+    if(!rows.length){
+      if(notCurrent){
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4"><i class="bi bi-exclamation-circle me-1"></i>Sem dados: combinação não é a corrente</td></tr>';
+      } else {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4"><i class="bi bi-inbox me-1"></i>Nenhuma execução</td></tr>';
+      }
+      return;
+    }
+    rows.forEach(r=>{
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td class="text-muted">${r.sequencia}</td>
+        <td>${formatStatusBadge(r.status)}</td>
+        <td><div class="progress" style="height:6px;"><div class="progress-bar" style="width:${Math.round((r.progress||0)*100)}%"></div></div></td>
+        <td>${r.started_at? formatTime(r.started_at):'—'}</td>
+        <td>${r.finished_at? formatTime(r.finished_at):'—'}</td>
+        <td class="small">${escapeHtml(r.progress_message||'')}</td>`;
+      tbody.appendChild(tr);
+    });
+  }
+
+  function formatStatusBadge(status){
+    const map = {running:'primary',completed:'success',queued:'info',failed:'danger',error:'danger',paused:'warning'};
+    const cls = map[status] || 'secondary';
+    return `<span class="badge bg-${cls} small">${(status||'').toUpperCase()}</span>`;
+  }
+  function formatTime(ts){
+    // ts em segundos epoch
+    const d = new Date(ts*1000);
+    return d.toLocaleTimeString();
+  }
+  function escapeHtml(str){
+    return str.replace(/[&<>'"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;","\"":"&quot;"}[c]));
+  }
+
+  function mergePartialProgress(partial) {
+    if (!progressCache) {
+      // If we haven't received a full snapshot yet, ignore partial
+      return;
+    }
+    // Deep merge only top-level dictionaries we expect
+    const keys = ['tasks','datasets','configs','algorithms','execution','global_execution','current_combination_details','global_progress'];
+    for (const k of keys) {
+      if (partial[k] !== undefined) {
+        if (typeof partial[k] === 'object' && partial[k] !== null && !Array.isArray(partial[k]) && typeof progressCache[k] === 'object') {
+          progressCache[k] = { ...progressCache[k], ...partial[k] };
+        } else {
+          progressCache[k] = partial[k];
+        }
+      }
+    }
+    applyProgress(progressCache);
+  }
+
+  function initWebSocket() {
+    try {
+      const scheme = location.protocol === 'https:' ? 'wss' : 'ws';
+  // Endpoint correto conforme routes: /ws/work/{work_id}
+  const url = `${scheme}://${location.host}/ws/work/${WORK_ID}`;
+      ws = new WebSocket(url);
+      ws.onopen = () => { 
+        wsRetry = 0; 
+        // Dispara refresh inicial para garantir execuções correntes logo no começo
+        try { if(followCurrent) ws.send(JSON.stringify({action:'refresh_executions'})); } catch(_){}
+      }; // reset retries
+      ws.onmessage = (evt) => {
+        try {
+          const msg = JSON.parse(evt.data);
+          if (msg.type === 'snapshot' && msg.payload?.progress) {
+            applyProgress(msg.payload.progress);
+            if(msg.payload.executions){
+              latestExecutions = msg.payload.executions;
+              // Snapshot sempre refere-se à combinação corrente
+              if(followCurrent){ selectedCombinationId = currentCombinationId; }
+              renderExecutionsForCurrentSelection();
+            }
+            if(msg.payload.combinations){
+              combinationsCache = msg.payload.combinations;
+              updateCombinationSelectUI();
+            }
+          } else if (msg.type === 'update') {
+            const candidate = msg.payload?.progress || msg.payload?.update?.progress || msg.update?.progress || msg.progress;
+            if (candidate) mergePartialProgress(candidate);
+            const execs = msg.payload?.executions || msg.update?.executions;
+            if(execs){
+              const combId = msg.payload?.executions_combination_id || msg.update?.executions_combination_id;
+              if(combId !== undefined && combId !== null){
+                // Execuções para combinação arbitrária
+                if(selectedCombinationId && String(selectedCombinationId)===String(combId)){
+                  latestExecutions = execs;
+                  const stats = computeExecutionStats(latestExecutions);
+                  renderExecutions(latestExecutions, stats, currentCombinationId && String(currentCombinationId)!==String(combId));
+                }
+              } else {
+                // Assume combinação corrente
+                latestExecutions = execs;
+                if(followCurrent){ selectedCombinationId = currentCombinationId; }
+                renderExecutionsForCurrentSelection();
+              }
+            }
+          }
+        } catch (e) { /* ignore parse errors */ }
+      };
+      ws.onclose = () => scheduleReconnect();
+      ws.onerror = () => { try { ws.close(); } catch(_){} };
+    } catch (err) {
+      scheduleReconnect();
+    }
+  }
+
+  function scheduleReconnect() {
+    if (wsRetry > 6) return; // stop after some attempts
+    const delay = Math.min(10000, 500 * Math.pow(2, wsRetry++));
+    setTimeout(initWebSocket, delay);
+  }
+
+  // Periodic elapsed updater
+  setInterval(updateElapsed, 1000);
+
+  // Initial bootstrap
+  fetchWorkStatus();
+  initWebSocket();
+  loadCombinations();
+  startExecutionsAutoRefresh();
+
+  els.comboSelect?.addEventListener('change', e=>{
+    const val = e.target.value;
+    if(val === CURRENT_OPTION_VALUE){
+      followCurrent = true;
+      selectedCombinationId = null;
+      if(ws && ws.readyState===1 && currentCombinationId){
+        try { ws.send(JSON.stringify({action:'refresh_executions'})); } catch(_){ }
+      }
+      renderExecutionsForCurrentSelection();
+      return;
+    }
+    followCurrent = false;
+    selectedCombinationId = val || null;
+    if(selectedCombinationId){
+      if(ws && ws.readyState===1){
+        try { ws.send(JSON.stringify({action:'set_combination', combination_id: selectedCombinationId})); } catch(_){ }
+      }
+      renderExecutions([], {Running:0,Completed:0,Queued:0,Failed:0,Total:0}, currentCombinationId && !idsEqual(currentCombinationId, selectedCombinationId));
+    } else {
+      renderExecutions([],{Running:0,Completed:0,Queued:0,Failed:0,Total:0});
+    }
+  });
+
+  function startExecutionsAutoRefresh(){
+    if(execRefreshTimer) clearInterval(execRefreshTimer);
+    execRefreshTimer = setInterval(()=>{
+      if(ws && ws.readyState===1){
+        try {
+          if(selectedCombinationId && currentCombinationId && !idsEqual(selectedCombinationId,currentCombinationId)){
+            ws.send(JSON.stringify({action:'set_combination', combination_id: selectedCombinationId}));
+          } else if(selectedCombinationId && currentCombinationId && idsEqual(selectedCombinationId,currentCombinationId)) {
+            ws.send(JSON.stringify({action:'refresh_executions'}));
+          } else if(followCurrent && currentCombinationId) {
+            ws.send(JSON.stringify({action:'refresh_executions'}));
+          }
+        } catch(_){ }
+      }
+    }, 1500);
+  }
+
+  // Bind action buttons
+  // Botão refresh removido
+  document.getElementById('btnPause')?.addEventListener('click', e=>{ e.preventDefault(); postAction('pause'); });
+  document.getElementById('btnResume')?.addEventListener('click', e=>{ e.preventDefault(); postAction('resume'); });
+  document.getElementById('btnCancel')?.addEventListener('click', e=>{ e.preventDefault(); if(confirm('Cancelar este work?')) postAction('cancel'); });
+  // restart removed
+
+  // Fallback polling for progress if no snapshot after some time (optional minimal)
+  setTimeout(async () => {
+    if (!progressCache) {
+      // Attempt one-time HTTP check if a database-ready endpoint exists
+      try {
+        const readyResp = await fetch(`/api/monitor/work/${WORK_ID}/database-status`);
+        if (readyResp.ok) {
+          const ready = await readyResp.json();
+          if (!ready.ready) return; // still not ready
+          // (NOTE) No direct REST endpoint for summary; relying on WS only.
+        }
+      } catch (_) {}
+    }
+  }, 4000);
+  function idsEqual(a,b){
+    if(a==null || b==null) return false;
+    return String(a)===String(b);
+  }
+})();
+</script>
+{% endblock %}

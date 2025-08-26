@@ -43,24 +43,19 @@ async def get_batch_manager_page(request: Request):
     return templates.TemplateResponse("batch_manager.html", {"request": request})
 
 
-@router.get("/monitoring", response_class=HTMLResponse)
-async def get_monitoring_page(request: Request):
-    """General monitoring dashboard page."""
-    return templates.TemplateResponse("monitoring.html", {"request": request})
+@router.get("/monitor/works", response_class=HTMLResponse)
+async def get_works_monitor_page(request: Request):
+    """Works monitor list page."""
+    return templates.TemplateResponse("monitor_works.html", {"request": request})
 
 
-@router.get("/execution/{work_id}", response_class=HTMLResponse)
-async def get_execution_detail_page(request: Request, work_id: str):
-    """Detailed execution monitoring page."""
-    return templates.TemplateResponse(
-        "execution_detail.html", {"request": request, "work_id": work_id}
-    )
-
-
-@router.get("/batch/manage", response_class=HTMLResponse)
-async def get_batch_manager_page(request: Request):
-    """Batch management page."""
-    return templates.TemplateResponse("batch_manager.html", {"request": request})
+@router.get("/monitor/work/{work_id}", response_class=HTMLResponse)
+async def get_work_progress_page(request: Request, work_id: str):
+    """Work progress monitor page."""
+    return templates.TemplateResponse("monitor_progress.html", {
+        "request": request, 
+        "work_id": work_id
+    })
 
 
 @router.get("/results", response_class=HTMLResponse)

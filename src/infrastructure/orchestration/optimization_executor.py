@@ -422,7 +422,10 @@ class OptimizationExecutor(AbstractExecutionEngine):
                 trial = study.ask()
                 trial_params = self._generate_trial_params(trial, optimization_params)
                 
-                optimization_unit_id = f"optimization:{task.id}:{dataset_id}:{alg.name}:trial_{trial.number}"
+                # Construir unit_id padronizado: type:task:dataset:config:name:trial_X
+                config_id = getattr(self._combination_store, "_preset_id", None) or "default"
+                config_id = str(config_id).replace(":", "_")
+                optimization_unit_id = f"optimization:{task.id}:{dataset_id}:{config_id}:{alg.name}:{trial.number}"
                 
                 # Check if this trial already exists and is completed
                 ex = self._combination_store.get_executions(unit_id=optimization_unit_id)
@@ -500,7 +503,10 @@ class OptimizationExecutor(AbstractExecutionEngine):
             trial = study.ask()
             trial_params = self._generate_trial_params(trial, optimization_params)
             
-            optimization_unit_id = f"optimization:{task.id}:{dataset_id}:{alg.name}:trial_{trial.number}"
+            # Construir unit_id padronizado: type:task:dataset:config:name:trial_X
+            config_id = getattr(self._combination_store, "_preset_id", None) or "default"
+            config_id = str(config_id).replace(":", "_")
+            optimization_unit_id = f"optimization:{task.id}:{dataset_id}:{config_id}:{alg.name}:{trial.number}"
             
             # Check if this trial already exists and is completed
             ex = self._combination_store.get_executions(unit_id=optimization_unit_id)

@@ -1,0 +1,19 @@
+🔧 Inicializando CSPBench... aguarde, carregando módulos e configurações.
+🌐 Starting CSPBench Web Interface...
+🖥️  Host: 0.0.0.0
+🔌 Port: 8000
+🛠️  Mode: Production
+📜 Log Level: info
+📈 Access Log: Enabled
+
+🚀 Web interface starting at http://0.0.0.0:8000
+🔗 Open the link in your browser
+⏹️  Press Ctrl+C to stop the server
+INFO:     Started server process [91880]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     ('127.0.0.1', 60782) - "WebSocket /ws/work/a75df2eddeca" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:33484 - "GET /api/monitor/active-works HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41928 - "GET /api/monitor/active-works HTTP/1.1" 200 OK

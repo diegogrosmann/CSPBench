@@ -1,0 +1,446 @@
+{% extends "base.html" %}
+
+{% block title %}Work Monitor - CSPBench{% endblock %}
+
+{% block extra_css %}
+<style>
+    .work-card {
+        transition: all 0.3s ease;
+        border-left: 4px solid transparent;
+    }
+    
+    .work-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    }
+    
+    .work-card.status-running {
+        border-left-color: #28a745;
+    }
+    
+    .work-card.status-queued {
+        border-left-color: #ffc107;
+    }
+    
+    .work-card.status-completed {
+        border-left-color: #007bff;
+    }
+    
+    .work-card.status-failed,
+    .work-card.status-error {
+        border-left-color: #dc3545;
+    }
+    
+    .work-card.status-cancelled {
+        border-left-color: #6c757d;
+    }
+    
+    .status-badge {
+        font-size: 0.75rem;
+        padding: 0.25rem 0.5rem;
+    }
+    
+    .work-actions {
+        opacity: 0;
+        transition: opacity 0.3s ease;
+    }
+    
+    .work-card:hover .work-actions {
+        opacity: 1;
+    }
+    
+    .refresh-indicator {
+        animation: spin 1s linear infinite;
+    }
+    
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+    
+    .auto-refresh-controls {
+        background: rgba(0, 123, 255, 0.1);
+        border: 1px solid rgba(0, 123, 255, 0.2);
+        border-radius: 0.375rem;
+        padding: 0.75rem;
+    }
+</style>
+{% endblock %}
+
+{% block breadcrumb %}
+<nav aria-label="breadcrumb" class="mb-4">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="/">Home</a></li>
+        <li class="breadcrumb-item active">Work Monitor</li>
+    </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h1 class="h3 mb-1">
+                    <i class="bi bi-speedometer2 me-2 text-primary"></i>
+                    Work Monitor
+                </h1>
+                <p class="text-muted mb-0">Monitor and manage your algorithm executions</p>
+            </div>
+            <div class="d-flex gap-2 align-items-center">
+                <div class="auto-refresh-controls">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="autoRefreshToggle" checked>
+                        <label class="form-check-label" for="autoRefreshToggle">
+                            <small>Auto-refresh</small>
+                        </label>
+                    </div>
+                </div>
+                <button class="btn btn-outline-primary" onclick="refreshWorks()" id="refreshBtn">
+                    <i class="bi bi-arrow-clockwise"></i> Refresh
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Filter and Stats Row -->
+<div class="row mb-4">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-body py-3">
+                <div class="row g-3 align-items-center">
+                    <div class="col-auto">
+                        <label class="form-label small mb-0">Filter by status:</label>
+                    </div>
+                    <div class="col-auto">
+                        <select class="form-select form-select-sm" id="statusFilter" onchange="filterWorks()">
+                            <option value="">All Status</option>
+                            <option value="running">Running</option>
+                            <option value="queued">Queued</option>
+                            <option value="completed">Completed</option>
+                            <option value="failed">Failed</option>
+                            <option value="error">Error</option>
+                            <option value="cancelled">Cancelled</option>
+                        </select>
+                    </div>
+                    <div class="col-auto">
+                        <label class="form-label small mb-0">Search:</label>
+                    </div>
+                    <div class="col">
+                        <input type="text" class="form-control form-control-sm" id="searchInput" 
+                               placeholder="Search by work ID or config name..." onkeyup="filterWorks()">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-4">
+        <div class="card bg-light">
+            <div class="card-body py-3">
+                <div class="row text-center">
+                    <div class="col-4">
+                        <div class="text-success fw-bold" id="runningCount">0</div>
+                        <small class="text-muted">Running</small>
+                    </div>
+                    <div class="col-4">
+                        <div class="text-warning fw-bold" id="queuedCount">0</div>
+                        <small class="text-muted">Queued</small>
+                    </div>
+                    <div class="col-4">
+                        <div class="text-primary fw-bold" id="totalCount">0</div>
+                        <small class="text-muted">Total</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Works List -->
+<div class="row" id="worksContainer">
+    <!-- Loading placeholder -->
+    <div class="col-12 text-center py-5" id="loadingIndicator">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading works...</span>
+        </div>
+        <p class="mt-3 text-muted">Loading works...</p>
+    </div>
+</div>
+
+<!-- Empty state -->
+<div class="row d-none" id="emptyState">
+    <div class="col-12 text-center py-5">
+        <div class="text-muted">
+            <i class="bi bi-inbox display-1"></i>
+            <h4 class="mt-3">No Works Found</h4>
+            <p>No algorithm executions have been created yet.</p>
+            <a href="/batch/manage" class="btn btn-primary">
+                <i class="bi bi-plus-circle me-2"></i>Create New Batch
+            </a>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let allWorks = [];
+let autoRefreshInterval = null;
+
+// Initialize page
+document.addEventListener('DOMContentLoaded', function() {
+    loadWorks();
+    
+    // Setup auto-refresh
+    const autoRefreshToggle = document.getElementById('autoRefreshToggle');
+    autoRefreshToggle.addEventListener('change', function() {
+        if (this.checked) {
+            startAutoRefresh();
+        } else {
+            stopAutoRefresh();
+        }
+    });
+    
+    // Start auto-refresh by default
+    startAutoRefresh();
+});
+
+function startAutoRefresh() {
+    stopAutoRefresh(); // Clear any existing interval
+    autoRefreshInterval = setInterval(loadWorks, 10000); // Every 10 seconds
+}
+
+function stopAutoRefresh() {
+    if (autoRefreshInterval) {
+        clearInterval(autoRefreshInterval);
+        autoRefreshInterval = null;
+    }
+}
+
+async function loadWorks() {
+    try {
+        // Show refresh indicator
+        const refreshBtn = document.getElementById('refreshBtn');
+        const refreshIcon = refreshBtn.querySelector('i');
+        refreshIcon.classList.add('refresh-indicator');
+        
+        const response = await window.apiClient.request('/api/monitor/works');
+        allWorks = response.works || [];
+        
+        updateStats(allWorks);
+        filterWorks();
+        
+    } catch (error) {
+        console.error('Failed to load works:', error);
+        showAlert('Failed to load works: ' + error.message, 'danger');
+    } finally {
+        // Hide loading and refresh indicators
+        document.getElementById('loadingIndicator').style.display = 'none';
+        const refreshBtn = document.getElementById('refreshBtn');
+        const refreshIcon = refreshBtn.querySelector('i');
+        refreshIcon.classList.remove('refresh-indicator');
+    }
+}
+
+function refreshWorks() {
+    loadWorks();
+}
+
+function updateStats(works) {
+    const stats = works.reduce((acc, work) => {
+        acc.total++;
+        if (work.status === 'running') acc.running++;
+        if (work.status === 'queued') acc.queued++;
+        return acc;
+    }, { total: 0, running: 0, queued: 0 });
+    
+    document.getElementById('totalCount').textContent = stats.total;
+    document.getElementById('runningCount').textContent = stats.running;
+    document.getElementById('queuedCount').textContent = stats.queued;
+}
+
+function filterWorks() {
+    const statusFilter = document.getElementById('statusFilter').value;
+    const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+    
+    let filteredWorks = allWorks;
+    
+    // Filter by status
+    if (statusFilter) {
+        filteredWorks = filteredWorks.filter(work => work.status === statusFilter);
+    }
+    
+    // Filter by search term
+    if (searchTerm) {
+        filteredWorks = filteredWorks.filter(work => 
+            work.id.toLowerCase().includes(searchTerm) ||
+            work.config_name.toLowerCase().includes(searchTerm) ||
+            work.config_description.toLowerCase().includes(searchTerm)
+        );
+    }
+    
+    renderWorks(filteredWorks);
+}
+
+function renderWorks(works) {
+    const container = document.getElementById('worksContainer');
+    const emptyState = document.getElementById('emptyState');
+    
+    if (works.length === 0) {
+        container.innerHTML = '';
+        emptyState.classList.remove('d-none');
+        return;
+    }
+    
+    emptyState.classList.add('d-none');
+    
+    const html = works.map(work => createWorkCard(work)).join('');
+    container.innerHTML = html;
+}
+
+function createWorkCard(work) {
+    const createdDate = new Date(work.created_at * 1000);
+    const updatedDate = new Date(work.updated_at * 1000);
+    const statusClass = `status-${work.status}`;
+    const statusColor = getStatusColor(work.status);
+    const statusIcon = getStatusIcon(work.status);
+    
+    return `
+        <div class="col-lg-6 col-xl-4 mb-4">
+            <div class="card work-card ${statusClass}" data-work-id="${work.id}">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start mb-3">
+                        <div class="flex-grow-1">
+                            <h6 class="card-title mb-1 text-truncate" title="${work.config_name}">
+                                ${work.config_name}
+                            </h6>
+                            <small class="text-muted font-monospace">${work.id}</small>
+                        </div>
+                        <span class="badge bg-${statusColor} status-badge">
+                            <i class="bi bi-${statusIcon} me-1"></i>${work.status}
+                        </span>
+                    </div>
+                    
+                    ${work.config_description ? `
+                        <p class="card-text small text-muted mb-2" title="${work.config_description}">
+                            ${work.config_description.length > 80 ? 
+                                work.config_description.substring(0, 80) + '...' : 
+                                work.config_description}
+                        </p>
+                    ` : ''}
+                    
+                    <div class="small text-muted mb-3">
+                        <div><i class="bi bi-calendar me-1"></i>Created: ${createdDate.toLocaleString()}</div>
+                        <div><i class="bi bi-clock me-1"></i>Updated: ${updatedDate.toLocaleString()}</div>
+                        ${work.config_author ? `<div><i class="bi bi-person me-1"></i>Author: ${work.config_author}</div>` : ''}
+                    </div>
+                    
+                    ${work.error ? `
+                        <div class="alert alert-danger alert-sm py-2">
+                            <small><i class="bi bi-exclamation-triangle me-1"></i>${work.error}</small>
+                        </div>
+                    ` : ''}
+                    
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="work-actions">
+                            ${work.status === 'running' ? `
+                                <button class="btn btn-sm btn-outline-warning me-1" onclick="workAction('${work.id}', 'pause')" title="Pause">
+                                    <i class="bi bi-pause"></i>
+                                </button>
+                            ` : ''}
+                            ${work.status === 'paused' ? `
+                                <button class="btn btn-sm btn-outline-success me-1" onclick="workAction('${work.id}', 'resume')" title="Resume">
+                                    <i class="bi bi-play"></i>
+                                </button>
+                            ` : ''}
+                            ${['running', 'queued', 'paused'].includes(work.status) ? `
+                                <button class="btn btn-sm btn-outline-danger me-1" onclick="workAction('${work.id}', 'cancel')" title="Cancel">
+                                    <i class="bi bi-stop"></i>
+                                </button>
+                            ` : ''}
+                        </div>
+                        <button class="btn btn-sm btn-primary" onclick="monitorWork('${work.id}')">
+                            ${['running', 'queued'].includes(work.status) ? 
+                                '<i class="bi bi-speedometer2 me-1"></i>Monitor' : 
+                                '<i class="bi bi-eye me-1"></i>View'}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function getStatusColor(status) {
+    const colors = {
+        'running': 'success',
+        'queued': 'warning',
+        'completed': 'primary',
+        'failed': 'danger',
+        'error': 'danger',
+        'cancelled': 'secondary',
+        'paused': 'info'
+    };
+    return colors[status] || 'secondary';
+}
+
+function getStatusIcon(status) {
+    const icons = {
+        'running': 'play-circle-fill',
+        'queued': 'clock',
+        'completed': 'check-circle-fill',
+        'failed': 'x-circle-fill',
+        'error': 'exclamation-triangle-fill',
+        'cancelled': 'dash-circle-fill',
+        'paused': 'pause-circle-fill'
+    };
+    return icons[status] || 'question-circle';
+}
+
+function monitorWork(workId) {
+    window.location.href = `/monitor/work/${workId}`;
+}
+
+async function workAction(workId, action) {
+    try {
+        const response = await window.apiClient.request(`/api/monitor/work/${workId}/action/${action}`, {
+            method: 'POST'
+        });
+        
+        showAlert(`Work ${action}ed successfully`, 'success');
+        
+        // Refresh the works list
+        setTimeout(loadWorks, 1000);
+        
+    } catch (error) {
+        console.error(`Failed to ${action} work:`, error);
+        showAlert(`Failed to ${action} work: ${error.message}`, 'danger');
+    }
+}
+
+function showAlert(message, type = 'info') {
+    // Create alert element
+    const alertId = 'alert-' + Date.now();
+    const alertHtml = `
+        <div class="alert alert-${type} alert-dismissible fade show" role="alert" id="${alertId}">
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    `;
+    
+    // Add to page
+    const container = document.querySelector('.container');
+    container.insertAdjacentHTML('afterbegin', alertHtml);
+    
+    // Auto-remove after 5 seconds
+    setTimeout(() => {
+        const alertElement = document.getElementById(alertId);
+        if (alertElement) {
+            alertElement.remove();
+        }
+    }, 5000);
+}
+</script>
+{% endblock %}

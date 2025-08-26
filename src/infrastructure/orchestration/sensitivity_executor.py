@@ -372,7 +372,10 @@ class SensitivityExecutor(AbstractExecutionEngine):
                 # Generate sample parameters
                 sample_params = self._generate_sample_params(base_params, sensitivity_params, rng)
                 
-                sensitivity_unit_id = f"sensitivity:{task.id}:{dataset_id}:{alg.name}:sample_{sample_num}"
+                # Construir unit_id padronizado: type:task:dataset:config:name:sample_X
+                config_id = getattr(self._combination_store, "_preset_id", None) or "default"
+                config_id = str(config_id).replace(":", "_")
+                sensitivity_unit_id = f"sensitivity:{task.id}:{dataset_id}:{config_id}:{alg.name}:{sample_num}"
                 
                 # Check if this sample already exists and is completed
                 ex = self._combination_store.get_executions(unit_id=sensitivity_unit_id)
@@ -446,7 +449,10 @@ class SensitivityExecutor(AbstractExecutionEngine):
             # Generate sample parameters
             sample_params = self._generate_sample_params(base_params, sensitivity_params, rng)
             
-            sensitivity_unit_id = f"sensitivity:{task.id}:{dataset_id}:{alg.name}:sample_{sample_num}"
+            # Construir unit_id padronizado: type:task:dataset:config:name:sample_X
+            config_id = getattr(self._combination_store, "_preset_id", None) or "default"
+            config_id = str(config_id).replace(":", "_")
+            sensitivity_unit_id = f"sensitivity:{task.id}:{dataset_id}:{config_id}:{alg.name}:{sample_num}"
             
             # Check if this sample already exists and is completed
             ex = self._combination_store.get_executions(unit_id=sensitivity_unit_id)

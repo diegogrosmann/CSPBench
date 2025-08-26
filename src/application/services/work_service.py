@@ -61,9 +61,6 @@ def initialize_work_service() -> WorkManager:
         # Create WorkManager with persistent repository
         _global_work_service = WorkManager(repository=_repository)
 
-        # Pause any running work items from previous sessions
-        _pause_orphaned_running_work(_global_work_service)
-
         logger.info("WorkService initialized successfully with persistent storage")
         return _global_work_service
 
@@ -72,7 +69,7 @@ def initialize_work_service() -> WorkManager:
         raise RuntimeError(f"WorkService initialization failed: {e}") from e
 
 
-def _pause_orphaned_running_work(work_service: WorkManager) -> None:
+def pause_orphaned_running_work(work_service: WorkManager) -> None:
     """
     Pause any work items that are in 'running' state from previous sessions.
     This prevents orphaned work items that can't be controlled.

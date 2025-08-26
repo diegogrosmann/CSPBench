@@ -16,7 +16,6 @@ class ExecutionDetail:
     unit_id: str
     combination_id: int
     sequencia: int
-    worker_id: Optional[str]
     status: str
     progress: float
     progress_message: Optional[str]
@@ -97,6 +96,52 @@ class WorkStateQueries:
             WHERE c.work_id = ? AND c.status = 'running'
             ORDER BY c.task_id, c.dataset_id, c.preset_id, c.algorithm_id
             LIMIT 1
+        """, (work_id,))
+        row = cursor.fetchone()
+        return dict(row) if row else None
+
+    def get_last_paused_or_incomplete_combination(self, work_id: str) -> Optional[Dict[str, Any]]:
+        """Retorna uma combinação candidata para contexto quando não há running.
+
+        Preferência: paused > queued > (failed/error incompletas) > cancelled.
+        """
+        cursor = self._get_connection().cursor()
+        # paused
+        cursor.execute("""
+            SELECT c.id as combination_id, c.task_id, c.dataset_id, c.preset_id, c.algorithm_id, c.total_sequences
+            FROM combinations c
+            WHERE c.work_id = ? AND c.status = 'paused'
+            ORDER BY c.id DESC LIMIT 1
+        """, (work_id,))
+        row = cursor.fetchone()
+        if row:
+            return dict(row)
+        # queued
+        cursor.execute("""
+            SELECT c.id as combination_id, c.task_id, c.dataset_id, c.preset_id, c.algorithm_id, c.total_sequences
+            FROM combinations c
+            WHERE c.work_id = ? AND c.status = 'queued'
+            ORDER BY c.id ASC LIMIT 1
+        """, (work_id,))
+        row = cursor.fetchone()
+        if row:
+            return dict(row)
+        # failed/error (não concluídas globalmente)
+        cursor.execute("""
+            SELECT c.id as combination_id, c.task_id, c.dataset_id, c.preset_id, c.algorithm_id, c.total_sequences
+            FROM combinations c
+            WHERE c.work_id = ? AND c.status IN ('failed','error')
+            ORDER BY c.id DESC LIMIT 1
+        """, (work_id,))
+        row = cursor.fetchone()
+        if row:
+            return dict(row)
+        # cancelled
+        cursor.execute("""
+            SELECT c.id as combination_id, c.task_id, c.dataset_id, c.preset_id, c.algorithm_id, c.total_sequences
+            FROM combinations c
+            WHERE c.work_id = ? AND c.status = 'canceled'
+            ORDER BY c.id DESC LIMIT 1
         """, (work_id,))
         row = cursor.fetchone()
         return dict(row) if row else None
@@ -239,6 +284,9 @@ class WorkStateQueries:
             return None
 
         current_combo = self.get_running_combination(work_id)
+        if not current_combo:
+            # fallback para paused/queued/etc.
+            current_combo = self.get_last_paused_or_incomplete_combination(work_id)
         # TASKS
         task_finished, task_running, task_queued = self.get_task_status_lists(work_id)
         running_task_id = current_combo['task_id'] if current_combo else ""
@@ -335,7 +383,6 @@ class WorkStateQueries:
                 e.unit_id,
                 e.combination_id,
                 e.sequencia,
-                e.worker_id,
                 e.status,
                 e.started_at,
                 e.finished_at,
@@ -381,7 +428,6 @@ class WorkStateQueries:
                 unit_id=row['unit_id'],
                 combination_id=row['combination_id'],
                 sequencia=row['sequencia'] or 0,
-                worker_id=row['worker_id'],
                 status=row['status'],
                 progress=row['progress'] or 0.0,
                 progress_message=progress_message,
@@ -408,7 +454,6 @@ class WorkStateQueries:
                 e.unit_id,
                 e.combination_id,
                 e.sequencia,
-                e.worker_id,
                 e.status,
                 e.started_at,
                 e.finished_at,
@@ -438,7 +483,6 @@ class WorkStateQueries:
                 unit_id=row['unit_id'],
                 combination_id=row['combination_id'],
                 sequencia=row['sequencia'] or 0,
-                worker_id=row['worker_id'],
                 status=row['status'],
                 progress=row['progress'] or 0.0,
                 progress_message=row['progress_message'],
@@ -560,6 +604,73 @@ class WorkStateQueries:
         """, (work_id,))
         
         return {row['status']: row['count'] for row in cursor.fetchall()}
+
+    def list_combinations(self, work_id: str) -> List[Dict[str, Any]]:
+        """List all combinations for a work with basic identifying fields."""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT id as combination_id, task_id, dataset_id, preset_id, algorithm_id, mode, status, total_sequences,
+                   started_at, finished_at
+            FROM combinations
+            WHERE work_id = ?
+            ORDER BY task_id, dataset_id, preset_id, algorithm_id
+            """,
+            (work_id,)
+        )
+        rows = cursor.fetchall()
+        return [dict(r) for r in rows]
+
+    def get_execution_stats(self, work_id: str) -> Dict[str, Any]:
+        """Return aggregated execution stats across all combinations.
+
+        completed: executions with status 'completed'
+        running: executions with status 'running'
+        queued: executions with status 'queued'
+        failed: executions with status in ('failed','error')
+        total_sequences: SUM(combinations.total_sequences)
+        """
+        conn = self._get_connection()
+        cursor = conn.cursor()
+
+        # Status counts at execution level
+        cursor.execute(
+            """
+            SELECT e.status, COUNT(*) as cnt
+            FROM executions e
+            JOIN combinations c ON e.combination_id = c.id
+            WHERE c.work_id = ?
+            GROUP BY e.status
+            """,
+            (work_id,)
+        )
+        status_counts = {row['status']: row['cnt'] for row in cursor.fetchall()}
+
+        # Total sequences across combinations
+        cursor.execute(
+            """
+            SELECT COALESCE(SUM(total_sequences),0) as total_sequences
+            FROM combinations
+            WHERE work_id = ?
+            """,
+            (work_id,)
+        )
+        total_sequences = cursor.fetchone()['total_sequences'] or 0
+
+        completed = status_counts.get('completed', 0)
+        running = status_counts.get('running', 0)
+        queued = status_counts.get('queued', 0)
+        failed = status_counts.get('failed', 0) + status_counts.get('error', 0)
+
+        return {
+            'completed': completed,
+            'running': running,
+            'queued': queued,
+            'failed': failed,
+            'total_sequences': total_sequences,
+            'raw_status_counts': status_counts,
+        }
     
     # === UTILITY QUERIES ===
     
