@@ -17,6 +17,97 @@ from src.infrastructure.logging_config import get_logger
 command_logger = get_logger("CSPBench.CLI.Commands")
 
 
+def _run_work_monitor(
+    work_id: str, 
+    show_final_status: bool = True,
+    fallback_message: bool = True
+) -> bool:
+    """
+    Run progress monitor for a work item.
+    
+    Args:
+        work_id: Work identifier to monitor
+        show_final_status: Whether to show final status message after monitoring
+        fallback_message: Whether to show fallback message if monitor fails
+        
+    Returns:
+        True if monitoring completed successfully, False if failed
+    """
+    try:
+        from src.presentation.cli.progress_monitor import ProgressMonitor
+        
+        monitor = ProgressMonitor(work_id)
+        monitor.start()
+        
+        if show_final_status:
+            _show_final_status_message(work_id)
+            
+        return True
+        
+    except Exception as e:
+        if fallback_message:
+            typer.echo(f"⚠️  Não foi possível iniciar o monitor: {e}")
+            typer.echo("🔄 O trabalho continua executando em segundo plano...")
+            typer.echo(f"💡 Use 'cspbench monitor {work_id}' para tentar monitorar novamente mais tarde")
+        
+        return False
+
+
+def _show_final_status_message(work_id: str) -> None:
+    """
+    Show appropriate exit message based on final work status.
+    
+    Args:
+        work_id: Work identifier to check status for
+    """
+    try:
+        from src.application.services.work_service import get_work_service
+        from src.domain.status import BaseStatus
+        
+        work_service = get_work_service()
+        details = work_service.get(work_id)
+        
+        if not details:
+            typer.echo(f"⚠️  Não foi possível obter status final do trabalho {work_id}")
+            return
+            
+        status = details.get("status", "unknown")
+        
+        # Show message based on final status
+        if status == BaseStatus.COMPLETED.value:
+            typer.echo("\n🎉 Trabalho concluído com sucesso!")
+            typer.echo(f"✅ Status final: {status}")
+            if details.get("output_path"):
+                typer.echo(f"📁 Resultados salvos em: {details['output_path']}")
+                
+        elif status == BaseStatus.FAILED.value:
+            typer.echo("\n❌ Trabalho falhou durante a execução")
+            typer.echo(f"💥 Status final: {status}")
+            if details.get("error"):
+                typer.echo(f"🔍 Erro: {details['error']}")
+                
+        elif status == BaseStatus.ERROR.value:
+            typer.echo("\n⚠️  Trabalho finalizado com erros")
+            typer.echo(f"🟡 Status final: {status}")
+            typer.echo("🔍 Verifique os logs para mais detalhes")
+            if details.get("error"):
+                typer.echo(f"💬 Último erro: {details['error']}")
+                
+        elif status == BaseStatus.CANCELED.value:
+            typer.echo("\n🛑 Trabalho foi cancelado")
+            typer.echo(f"⏹️  Status final: {status}")
+            typer.echo("📝 Execução interrompida pelo usuário")
+            
+        else:
+            # Handle other statuses (paused, running, queued, etc.)
+            typer.echo(f"\n🔄 Trabalho terminou com status: {status}")
+            if status in [BaseStatus.PAUSED.value, BaseStatus.RUNNING.value, BaseStatus.QUEUED.value]:
+                typer.echo("💡 O trabalho pode ser retomado a qualquer momento.")
+                
+    except Exception as e:
+        typer.echo(f"⚠️  Erro ao verificar status final: {e}")
+
+
 def register_commands(app: typer.Typer) -> None:
     """
     Register all CLI commands in the Typer application.
@@ -48,31 +139,14 @@ def register_commands(app: typer.Typer) -> None:
             typer.echo(f"✅ Trabalho submetido com sucesso")
 
             if not no_monitor:
-                # Start progress monitoring
-                try:
-                    from src.presentation.cli.progress_monitor import ProgressMonitor
-                    import time
-                    
-                    # Wait a moment for work to start
-                    time.sleep(1)
-                    
-                    typer.echo("\n📊 Iniciando monitoramento de progresso...")
-                    typer.echo("💡 Pressione 'q' para sair do monitor e continuar executando em segundo plano")
-                    typer.echo("💡 Pressione 'c' para cancelar o trabalho")
-                    typer.echo("")
-                    
-                    monitor = ProgressMonitor(work_id)
-                    monitor.start()
-                        
-                except Exception as e:
-                    typer.echo(f"⚠️  Could not start monitor: {e}")
-                    typer.echo("🔄 Work continues running in background...")
-            
-            # Wait for completion if not monitoring
-            if no_monitor:
+                # Use the reusable monitor function
+                _run_work_monitor(work_id, show_final_status=True, fallback_message=True)
+            else:
+                # Wait for completion without monitoring
                 from src.application.services.work_service import get_work_service
                 work_service = get_work_service()
                 work_service.wait_until_terminal(work_id)
+                _show_final_status_message(work_id)
 
         except Exception as e:  # noqa: BLE001
             typer.echo(f"❌ Erro: {e}")
@@ -82,15 +156,36 @@ def register_commands(app: typer.Typer) -> None:
     work_app = typer.Typer(help="Gerencia WorkItems usando WorkService")
 
     @work_app.command("restart")
-    def work_restart(work_id: str):
+    def work_restart(work_id: str = typer.Argument(
+            ..., exists=True, readable=True, help="Work ID a ser Reiniciado"
+        ),
+        no_monitor: bool = typer.Option(False, "--no-monitor", help="Disable progress monitoring interface"),
+    ):
         """Restart a work item using WorkService."""
-        from src.application.services.work_service import get_work_service
+        try:
+            from src.application.services.work_service import get_work_service
 
-        work_service = get_work_service()
-        if work_service.restart(work_id):
-            typer.echo("🔁 Restarted (queued)")
-        else:
-            typer.echo("❌ Não foi possível reiniciar (estado inválido?)")
+            work_service = get_work_service()
+            if not work_service.get(work_id):
+                typer.echo("❌ Work não encontrado")
+                return
+
+            execution_manager = ExecutionManager()
+
+            execution_manager.restart(work_id)
+
+            if not no_monitor:
+                # Use the reusable monitor function
+                _run_work_monitor(work_id, show_final_status=True, fallback_message=True)
+            else:
+                # Wait for completion without monitoring
+                from src.application.services.work_service import get_work_service
+                work_service = get_work_service()
+                work_service.wait_until_terminal(work_id)
+                _show_final_status_message(work_id)
+
+        except Exception as e:  # noqa: BLE001
+            typer.echo(f"❌ Erro: {e}")
             raise typer.Exit(1)
 
     @work_app.command("list")

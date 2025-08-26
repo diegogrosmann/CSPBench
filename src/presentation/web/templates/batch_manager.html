@@ -12,12 +12,6 @@
 
     .manager-container {
         max-width: 1400px;
-                    });
-
-            this.renderBatchFilesList();
-            
-        } catch (error) {
-            console.error('Error loading batch files:', error);uto;
         padding: 0 1rem;
     }
 
@@ -563,9 +557,9 @@ class BatchManagerTabbed {
             // Show success message
             this.showAlert(`Batch "${fileName}" started successfully! Redirecting to monitoring...`, 'success');
             
-            // Redirect to monitoring page after a short delay
+            // Redirect to monitoring page with work_id after a short delay
             setTimeout(() => {
-                window.location.href = '/monitoring';
+                window.location.href = `/monitoring?work_id=${result.work_id}`;
             }, 2000);
             
         } catch (error) {

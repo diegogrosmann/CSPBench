@@ -24,14 +24,13 @@ class ExecutionsMixin:
             INSERT OR REPLACE INTO executions(
               unit_id, combination_id, sequencia, status, started_at, 
               finished_at, params_json, result_json, objective
-            ) VALUES(?,?,?,?,?,NULL,NULL,NULL,NULL)
+            ) VALUES(?,?,?,?,NULL,NULL,NULL,NULL,NULL)
             """,
             (
                 unit_id,
                 combination_id,
                 sequencia,
                 "queued",
-                time.time(),
             ),
         )
 

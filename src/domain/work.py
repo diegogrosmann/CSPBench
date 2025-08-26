@@ -110,10 +110,9 @@ class WorkItem:
         return self._set_status(BaseStatus.CANCELED)
 
     def restart(self) -> bool:
-        if self.status not in (
+        if self.status in (
             BaseStatus.COMPLETED,
             BaseStatus.FAILED,
-            BaseStatus.CANCELED,
         ):
             return False
         self.status = BaseStatus.QUEUED

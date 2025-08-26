@@ -226,6 +226,7 @@ class SystemConfig:
     global_seed: Optional[int]
     distance_method: Literal["hamming"] = "hamming"  # Método de cálculo de distância
     enable_distance_cache: bool = True  # Habilita cache para otimização de performance
+    seed_increment: bool = True  # Whether to increment seeds for each repetition
 
 
 # ====================================================
@@ -322,8 +323,24 @@ class CSPBenchConfig:
                         if hasattr(field_type, "__dataclass_fields__"):
                             kwargs[k] = _convert_to_dataclass(field_type, v)
                         elif isinstance(v, list) and v:
-                            # Handle lists of dataclasses
-                            if hasattr(field_type, "__args__") and field_type.__args__:
+                            # Handle special case for tasks groups items
+                            if k == "items" and target_class in (ExperimentTasksConfig, OptimizationTasksConfig, SensitivityTasksConfig):
+                                # Determine the correct task type based on the target class
+                                if target_class == ExperimentTasksConfig:
+                                    task_class = ExperimentTaskConfig
+                                elif target_class == OptimizationTasksConfig:
+                                    task_class = OptimizationTaskConfig
+                                elif target_class == SensitivityTasksConfig:
+                                    task_class = SensitivityTaskConfig
+                                else:
+                                    task_class = TaskConfig
+                                
+                                kwargs[k] = [
+                                    _convert_to_dataclass(task_class, item)
+                                    for item in v
+                                ]
+                            elif hasattr(field_type, "__args__") and field_type.__args__:
+                                # Handle general lists of dataclasses
                                 list_type = field_type.__args__[0]
                                 if hasattr(list_type, "__dataclass_fields__"):
                                     kwargs[k] = [

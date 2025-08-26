@@ -71,6 +71,10 @@ class DPCSPAlgorithm(CSPAlgorithm):
                     alphabet_size=len(self.alphabet),
                 )
 
+            # Verificação inicial de cancelamento
+            if self._monitor and self._monitor.is_cancelled():
+                return self._build_cancelled_result(start_time)
+
             max_d_param = self.params.get("max_d")
             baseline_upper = self.max_distance(self.strings[0])
             if max_d_param is None:
@@ -128,6 +132,10 @@ class DPCSPAlgorithm(CSPAlgorithm):
 
             if search_strategy == "linear":
                 for d in range(max_d + 1):
+                    # Verificar cancelamento a cada iteração
+                    if self._monitor and self._monitor.is_cancelled():
+                        return self._build_cancelled_result(start_time)
+
                     iterations_tested += 1
                     complexity_est = (d + 1) ** n
                     if complexity_est > complexity_abort_threshold:
@@ -155,6 +163,10 @@ class DPCSPAlgorithm(CSPAlgorithm):
                 feasible_d: int | None = None
                 total_initial = max_d + 1
                 while low <= high:
+                    # Verificar cancelamento a cada iteração do binary search
+                    if self._monitor and self._monitor.is_cancelled():
+                        return self._build_cancelled_result(start_time)
+
                     mid = (low + high) // 2
                     iterations_tested += 1
                     complexity_est = (mid + 1) ** n
@@ -287,3 +299,25 @@ class DPCSPAlgorithm(CSPAlgorithm):
                     "search_strategy": self.params.get("search_strategy"),
                 },
             )
+
+    def _build_cancelled_result(self, start_time: float) -> AlgorithmResult:
+        """Constrói resultado para execução cancelada."""
+        execution_time = time.time() - start_time
+        return AlgorithmResult(
+            success=False,
+            center_string="",
+            max_distance=-1,
+            parameters=self.get_actual_params(),
+            error="Algorithm execution was cancelled",
+            metadata={
+                "algorithm_name": self.name,
+                "execution_time": execution_time,
+                "num_strings": len(self.strings),
+                "string_length": len(self.strings[0]) if self.strings else 0,
+                "alphabet_size": len(self.alphabet) if self.alphabet else 0,
+                "deterministic": True,
+                "seed": self.seed,
+                "internal_jobs": self.internal_jobs,
+                "termination_reason": "cancelled",
+            },
+        )

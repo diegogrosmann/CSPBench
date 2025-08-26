@@ -5,6 +5,7 @@ Gerencia recursos, timeouts e controle de status para execução de tarefas.
 Centraliza toda a lógica de controle de execução em um único ponto.
 """
 
+from pathlib import Path
 import signal
 import threading
 import time
@@ -17,6 +18,7 @@ import psutil
 from src.domain.config import ResourcesConfig
 from src.infrastructure.logging_config import get_logger
 from src.domain.status import BaseStatus
+from src.infrastructure.persistence.work_state.core import WorkStatePersistence
 
 
 class ExecutionLimitError(Exception):
@@ -38,21 +40,46 @@ class ExecutionController:
 
     def __init__(
         self,
-        resources: ResourcesConfig | None = None,
-        check_control: Callable[[], str] | None = None,
+        work_id: str,
+        resources: Optional[ResourcesConfig] = None
     ):
         """
         Initialize execution controller.
 
         Args:
-            resources: Resource configuration
-            check_control: Function to check execution status (pause/cancel)
+            work_id: Work ID to check status from WorkService (required)
+            resources: Resource configuration (can be None for defaults)
         """
         self._resources = resources
-        self._check_control = check_control
+        self._work_id = work_id
         self._logger = get_logger(__name__)
         self._active_processes: List[psutil.Process] = []
         self._batch_start_time = time.time()
+
+
+        from src.application.services.work_service import get_work_service
+        self.work_service = get_work_service()
+        
+        if resources is None:
+            # Get work details to access output_path
+            work_details = self.work_service.get(work_id)
+            if work_details is None:
+                raise ValueError(f"Work {work_id} not found")
+            
+            work_dir = work_details["output_path"]
+
+            # Try to get resources from state.db if it exists
+            try:
+                base_store = WorkStatePersistence(Path(work_dir) / "state.db")
+                work_config = base_store.get_work_config(work_id)
+                if work_config and work_config.execution and work_config.execution.resources:
+                    self._resources = work_config.execution.resources
+                else:
+                    # Use defaults if no config found
+                    self._resources = None
+            except Exception:
+                # If state.db doesn't exist or has issues, use defaults
+                self._resources = None
 
         # Extract configurations with defaults
         self._max_workers = None
@@ -123,27 +150,8 @@ class ExecutionController:
         # Limit internal_jobs to current_workers to prevent thread creation beyond capacity
         return min(self._internal_jobs, self._current_workers)
 
-    def get_worker_config(self) -> dict[str, Any]:
-        """Get configuration dictionary for worker processes."""
-        return {
-            "cpu": {
-                "max_workers": self._current_workers,  # Use current workers (considering memory limits)
-                "exclusive_cores": self._exclusive_cores,
-                "internal_jobs": self.internal_jobs,  # Use property that considers memory limits
-                "affinity": self.get_cpu_affinity(),
-            },
-            "memory": {
-                "max_memory_gb": self._max_memory_gb,
-            },
-            "parallel": {},
-            "timeouts": {
-                "timeout_per_algorithm": self._timeout_per_item,
-                "timeout_total_batch": self._timeout_total_batch,
-            },
-        }
-
     @classmethod
-    def from_config(cls, config: dict[str, Any]) -> "ExecutionController":
+    def from_config(cls, work_id: str, config: dict[str, Any]) -> "ExecutionController":
         """Create ExecutionController from configuration dictionary."""
         from src.domain.config import (
             ResourcesConfig,
@@ -182,7 +190,7 @@ class ExecutionController:
             timeouts=timeouts_cfg,
         )
 
-        return cls(resources=resources)
+        return cls(work_id=work_id, resources=resources)
 
     @property
     def timeout_per_item(self) -> int:
@@ -203,19 +211,24 @@ class ExecutionController:
         Check current execution status.
 
         Returns:
-            Current execution status
+            Current execution status from WorkService
         """
-        if not self._check_control:
-            return BaseStatus.RUNNING
-
-        status_str = self._check_control()
-
-        if status_str == "canceled":
-            return BaseStatus.CANCELED
-        elif status_str == "paused":
-            return BaseStatus.PAUSED
-        else:
-            return BaseStatus.RUNNING
+        try:
+            status = self.work_service.get_status(self._work_id)
+            if status is not None:
+                # Convert string status to BaseStatus if needed
+                if isinstance(status, str):
+                    try:
+                        return BaseStatus(status)
+                    except ValueError:
+                        self._logger.warning(f"Invalid status from WorkService: {status}")
+                        return BaseStatus.RUNNING
+                return status
+        except Exception as e:
+            self._logger.warning(f"Error checking WorkService status: {e}")
+        
+        # Default to RUNNING if status check fails
+        return BaseStatus.RUNNING
 
     def wait_for_continue(self) -> BaseStatus:
         """
@@ -502,6 +515,15 @@ class ExecutionController:
                 "timeout_total_batch": self._timeout_total_batch,
             },
         }
+
+    def get_worker_config(self) -> Dict[str, Any]:
+        """
+        Alias for create_worker_config for backward compatibility.
+        
+        Returns:
+            Configuration dictionary for ProcessPool workers
+        """
+        return self.create_worker_config()
 
     def register_process(self, process: psutil.Process) -> None:
         """Register a process for resource monitoring."""

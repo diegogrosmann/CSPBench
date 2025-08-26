@@ -449,6 +449,10 @@ class H2CSPAlgorithm(CSPAlgorithm):
         max_iters = self.params["local_iters"]
 
         def report_iter(current: int, total: int, **extra):
+            # Verificar cancelamento durante refinamento
+            if self._monitor and self._monitor.is_cancelled():
+                return True  # Sinalizar para parar
+            
             if total == 0:
                 pct = end_pct
             else:
@@ -461,8 +465,7 @@ class H2CSPAlgorithm(CSPAlgorithm):
                     phase="refinement",
                     **extra,
                 )
-            # Force progress override (iteration helper already reports pct based on main formula)
-            # but we keep separate to enrich metadata.
+            return False
 
         refined, best_dist, improvements = _hill_climb(
             center,
@@ -474,7 +477,6 @@ class H2CSPAlgorithm(CSPAlgorithm):
         )
         return refined, best_dist, improvements
 
-    # ------------------------------ run ---------------------------------
     def run(self) -> AlgorithmResult:  # type: ignore[override]
         start_time = time.time()
         try:
@@ -487,6 +489,10 @@ class H2CSPAlgorithm(CSPAlgorithm):
                 self._monitor.on_progress(
                     self._PHASES["init"], "Starting H2CSP", phase="init"
                 )
+
+            # Verificação inicial de cancelamento
+            if self._monitor and self._monitor.is_cancelled():
+                return self._build_cancelled_result(start_time)
 
             # Phase 1: analysis
             difficulties, consensuses, stats = self._analyze_blocks()
@@ -508,6 +514,10 @@ class H2CSPAlgorithm(CSPAlgorithm):
             for idx, ((l, r), diff, cons) in enumerate(
                 zip(self.blocks, difficulties, consensuses), start=1
             ):
+                # Verificar cancelamento durante geração de candidatos
+                if self._monitor and self._monitor.is_cancelled():
+                    return self._build_cancelled_result(start_time)
+
                 cands, tech = self._generate_block_candidates(idx - 1, l, r, diff, cons)
                 all_candidates.append(cands)
                 techniques.append(tech)
@@ -528,6 +538,10 @@ class H2CSPAlgorithm(CSPAlgorithm):
                         technique=tech,
                         candidates=len(cands),
                     )
+
+            # Verificar cancelamento antes da fusão
+            if self._monitor and self._monitor.is_cancelled():
+                return self._build_cancelled_result(start_time)
 
             # Phase 3: fusion (choose first candidate per block)
             chosen = [cands[0] for cands in all_candidates] if all_candidates else []
@@ -582,6 +596,10 @@ class H2CSPAlgorithm(CSPAlgorithm):
                     phase="initial_eval",
                     initial_distance=initial_dist,
                 )
+
+            # Verificar cancelamento antes do refinamento
+            if self._monitor and self._monitor.is_cancelled():
+                return self._build_cancelled_result(start_time)
 
             # Phase 4: refinement
             refined, best_dist, improvements = self._refine(
@@ -651,3 +669,26 @@ class H2CSPAlgorithm(CSPAlgorithm):
                     "error_type": type(e).__name__,
                 },
             )
+
+    def _build_cancelled_result(self, start_time: float) -> AlgorithmResult:
+        """Constrói resultado para execução cancelada."""
+        end_time = time.time()
+        return AlgorithmResult(
+            success=False,
+            center_string="",
+            max_distance=-1,
+            parameters=self.get_actual_params(),
+            error="Algorithm execution was cancelled",
+            metadata={
+                "algorithm_name": self.name,
+                "display_name": getattr(self, "display_name", self.name),
+                "execution_time": end_time - start_time,
+                "num_strings": len(self.strings),
+                "string_length": len(self.strings[0]) if self.strings else 0,
+                "alphabet_size": len(self.alphabet) if self.alphabet else 0,
+                "seed": self.seed,
+                "internal_jobs": self.internal_jobs,
+                "deterministic": True,
+                "termination_reason": "cancelled",
+            },
+        )

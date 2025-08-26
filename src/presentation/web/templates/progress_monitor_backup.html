@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSPBench - Monitor de Progresso</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #1a1a1a;
+            color: #e0e0e0;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .terminal-container {
+            background-color: #000;
+            border: 2px solid #333;
+            border-radius: 5px;
+            padding: 20px;
+            margin: 20px 0;
+            font-family: 'Courier New', monospace;
+            white-space: pre-wrap;
+            overflow-x: auto;
+        }
+        
+        .progress-header {
+            color: #00ff00;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        
+        .progress-table {
+            border: 1px solid #333;
+            margin: 10px 0;
+        }
+        
+        .progress-table th, .progress-table td {
+            border: 1px solid #333;
+            padding: 8px;
+            text-align: left;
+        }
+        
+        .progress-bar-ascii {
+            font-family: 'Courier New', monospace;
+            color: #00ff00;
+        }
+        
+        .error-section {
+            color: #ff6b6b;
+            margin-top: 20px;
+        }
+        
+        .warning-text {
+            color: #ffd93d;
+        }
+        
+        .status-badge {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.8em;
+            font-weight: bold;
+        }
+        
+        .status-running {
+            background-color: #28a745;
+            color: white;
+        }
+        
+        .status-completed {
+            background-color: #17a2b8;
+            color: white;
+        }
+        
+        .status-failed {
+            background-color: #dc3545;
+            color: white;
+        }
+        
+        .status-paused {
+            background-color: #ffc107;
+            color: black;
+        }
+        
+        .card {
+            background-color: #2a2a2a;
+            border: 1px solid #444;
+        }
+        
+        .card-header {
+            background-color: #333;
+            border-bottom: 1px solid #444;
+        }
+        
+        .refresh-controls {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+        }
+        
+        .work-selector {
+            margin: 20px 0;
+        }
+        
+        .execution-row {
+            margin-bottom: 15px;
+            padding: 10px;
+            border: 1px solid #444;
+            border-radius: 5px;
+            background-color: #1f1f1f;
+        }
+        
+        .execution-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+        
+        .unit-id {
+            font-weight: bold;
+            color: #4fc3f7;
+        }
+        
+        .sequence-info {
+            color: #9e9e9e;
+            font-size: 0.9em;
+        }
+        
+        .progress-line {
+            margin: 5px 0;
+        }
+        
+        .message-line {
+            margin: 5px 0;
+            color: #b0bec5;
+            font-style: italic;
+        }
+        
+        .warning-line {
+            margin: 5px 0;
+            color: #ffd93d;
+        }
+        
+        .auto-refresh {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <!-- Header -->
+        <div class="row">
+            <div class="col-12">
+                <h1 class="text-center mt-3 mb-4">
+                    <i class="bi bi-cpu"></i> CSPBench - Monitor de Progresso
+                </h1>
+            </div>
+        </div>
+        
+        <!-- Refresh Controls -->
+        <div class="refresh-controls">
+            <div class="card">
+                <div class="card-body p-2">
+                    <div class="auto-refresh">
+                        <label class="form-check-label me-2">Auto-refresh:</label>
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="autoRefreshToggle" checked>
+                        </div>
+                        <button class="btn btn-sm btn-outline-primary" onclick="refreshData()">
+                            <i class="bi bi-arrow-clockwise"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Work Selector -->
+        <div class="row work-selector">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5><i class="bi bi-list-ul"></i> Selecionar Trabalho</h5>
+                    </div>
+                    <div class="card-body">
+                        <select class="form-select" id="workSelector" onchange="selectWork()">
+                            <option value="">Carregando trabalhos...</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body">
+                        <div id="workStatus">
+                            <span class="text-muted">Selecione um trabalho para ver o status</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Progress Overview -->
+        <div class="row" id="progressOverview" style="display: none;">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header progress-header">
+                        <h5><i class="bi bi-graph-up"></i> Visão Geral do Progresso</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="progressSummary"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Terminal View -->
+        <div class="row" id="terminalView" style="display: none;">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5><i class="bi bi-terminal"></i> Visualização em Terminal</h5>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="terminal-container">
+                            <div id="terminalOutput"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Detailed Progress -->
+        <div class="row" id="detailedProgress" style="display: none;">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5><i class="bi bi-list-task"></i> Execuções em Andamento</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="runningExecutions"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Errors and Warnings -->
+        <div class="row" id="errorsWarnings" style="display: none;">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header text-danger">
+                        <h5><i class="bi bi-exclamation-triangle"></i> Erros</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="errorsList"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header text-warning">
+                        <h5><i class="bi bi-exclamation-circle"></i> Avisos</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="warningsList"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let currentWorkId = null;
+        let autoRefreshInterval = null;
+        
+        // Initialize the page
+        document.addEventListener('DOMContentLoaded', function() {
+            loadWorkList();
+            setupAutoRefresh();
+        });
+        
+        async function loadWorkList() {
+            try {
+                const response = await fetch('/api/monitoring/list');
+                const works = await response.json();
+                
+                const selector = document.getElementById('workSelector');
+                selector.innerHTML = '<option value="">Selecione um trabalho...</option>';
+                
+                works.forEach(work => {
+                    const option = document.createElement('option');
+                    option.value = work.work_id;
+                    
+                    const status = work.status;
+                    const updateTime = new Date(work.updated_at * 1000).toLocaleString();
+                    
+                    option.textContent = `${work.work_id} (${status}) - ${updateTime}`;
+                    selector.appendChild(option);
+                });
+                
+                if (works.length === 0) {
+                    selector.innerHTML = '<option value="">Nenhum trabalho encontrado</option>';
+                }
+            } catch (error) {
+                console.error('Error loading work list:', error);
+                document.getElementById('workSelector').innerHTML = '<option value="">Erro ao carregar trabalhos</option>';
+            }
+        }
+        
+        async function selectWork() {
+            const selector = document.getElementById('workSelector');
+            currentWorkId = selector.value;
+            
+            if (!currentWorkId) {
+                hideAllSections();
+                return;
+            }
+            
+            await loadWorkData();
+        }
+        
+        async function loadWorkData() {
+            if (!currentWorkId) return;
+            
+            try {
+                // Load basic status
+                const statusResponse = await fetch(`/api/monitoring/work/${currentWorkId}/status`);
+                const statusData = await statusResponse.json();
+                updateWorkStatus(statusData);
+                
+                // Load progress data
+                const progressResponse = await fetch(`/api/monitoring/work/${currentWorkId}/progress`);
+                const progressData = await progressResponse.json();
+                updateProgressDisplay(progressData);
+                
+                // Load terminal output
+                const terminalResponse = await fetch(`/api/monitoring/terminal/${currentWorkId}`);
+                const terminalData = await terminalResponse.json();
+                updateTerminalView(terminalData);
+                
+                showAllSections();
+                
+            } catch (error) {
+                console.error('Error loading work data:', error);
+                showError('Erro ao carregar dados do trabalho: ' + error.message);
+            }
+        }
+        
+        function updateWorkStatus(statusData) {
+            const statusElement = document.getElementById('workStatus');
+            
+            const statusClass = getStatusClass(statusData.status);
+            const updateTime = new Date(statusData.updated_at * 1000).toLocaleString();
+            
+            statusElement.innerHTML = `
+                <div>
+                    <strong>Status:</strong> 
+                    <span class="status-badge ${statusClass}">${statusData.status.toUpperCase()}</span>
+                </div>
+                <div class="mt-2">
+                    <strong>Última atualização:</strong> ${updateTime}
+                </div>
+                ${statusData.error ? `
+                    <div class="mt-2 text-danger">
+                        <strong>Erro:</strong> ${statusData.error}
+                    </div>
+                ` : ''}
+            `;
+        }
+        
+        function updateProgressDisplay(progressData) {
+            const summary = progressData.progress_summary;
+            
+            // Update progress summary
+            document.getElementById('progressSummary').innerHTML = `
+                <div class="row">
+                    <div class="col-md-3">
+                        <div class="text-center">
+                            <h6>Tasks</h6>
+                            <div class="fs-4">${summary.task.current}/${summary.task.total}</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="text-center">
+                            <h6>Datasets</h6>
+                            <div class="fs-4">${summary.dataset.current}/${summary.dataset.total}</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="text-center">
+                            <h6>Configurações</h6>
+                            <div class="fs-4">${summary.config.current}/${summary.config.total}</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="text-center">
+                            <h6>Algoritmos</h6>
+                            <div class="fs-4">${summary.algorithm.current}/${summary.algorithm.total}</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="row mt-3">
+                    <div class="col-md-6">
+                        <div class="text-center">
+                            <h6>Sequências</h6>
+                            <div class="fs-4">${summary.sequence.current}/${summary.sequence.total}</div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="text-center">
+                            <h6>Progresso Geral</h6>
+                            <div class="fs-4">${Math.round(summary.overall_progress * 100)}%</div>
+                            <div class="progress mt-2">
+                                <div class="progress-bar" style="width: ${summary.overall_progress * 100}%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // Update running executions
+            const runningHtml = progressData.running_executions.map(exec => `
+                <div class="execution-row">
+                    <div class="execution-header">
+                        <span class="unit-id">${exec.unit_id}</span>
+                        <span class="sequence-info">Seq ${exec.sequencia} | ${exec.duration}</span>
+                    </div>
+                    <div class="progress-line">
+                        <div class="progress">
+                            <div class="progress-bar" style="width: ${exec.progress * 100}%">
+                                ${Math.round(exec.progress * 100)}%
+                            </div>
+                        </div>
+                    </div>
+                    ${exec.progress_message ? `
+                        <div class="message-line">
+                            <i class="bi bi-info-circle"></i> ${exec.progress_message}
+                        </div>
+                    ` : ''}
+                    <div class="sequence-info">
+                        Task: ${exec.task_id} | Dataset: ${exec.dataset_id} | Alg: ${exec.algorithm_id}
+                    </div>
+                </div>
+            `).join('');
+            
+            document.getElementById('runningExecutions').innerHTML = 
+                runningHtml || '<div class="text-muted">Nenhuma execução em andamento</div>';
+            
+            // Update errors
+            const errorsHtml = progressData.errors.map(error => `
+                <div class="mb-2 p-2 border border-danger rounded">
+                    <strong>Unit ID:</strong> ${error.unit_id}<br>
+                    <strong>Tipo:</strong> ${error.error_type}<br>
+                    <strong>Mensagem:</strong> ${error.error_message}<br>
+                    <small class="text-muted">${error.formatted_time}</small>
+                </div>
+            `).join('');
+            
+            document.getElementById('errorsList').innerHTML = 
+                errorsHtml || '<div class="text-muted">Nenhum erro recente</div>';
+            
+            // Update warnings
+            const warningsHtml = progressData.warnings.map(warning => `
+                <div class="mb-2 p-2 border border-warning rounded">
+                    <strong>Mensagem:</strong> ${warning.message}<br>
+                    ${warning.unit_id ? `<strong>Unit ID:</strong> ${warning.unit_id}<br>` : ''}
+                    <small class="text-muted">${warning.formatted_time}</small>
+                </div>
+            `).join('');
+            
+            document.getElementById('warningsList').innerHTML = 
+                warningsHtml || '<div class="text-muted">Nenhum aviso recente</div>';
+        }
+        
+        function updateTerminalView(terminalData) {
+            document.getElementById('terminalOutput').textContent = terminalData.terminal_output || 'No terminal output available';
+        }
+        
+        function getStatusClass(status) {
+            switch (status) {
+                case 'running': return 'status-running';
+                case 'completed': return 'status-completed';
+                case 'failed': case 'error': return 'status-failed';
+                case 'paused': return 'status-paused';
+                default: return '';
+            }
+        }
+        
+        function showAllSections() {
+            document.getElementById('progressOverview').style.display = 'block';
+            document.getElementById('terminalView').style.display = 'block';
+            document.getElementById('detailedProgress').style.display = 'block';
+            document.getElementById('errorsWarnings').style.display = 'block';
+        }
+        
+        function hideAllSections() {
+            document.getElementById('progressOverview').style.display = 'none';
+            document.getElementById('terminalView').style.display = 'none';
+            document.getElementById('detailedProgress').style.display = 'none';
+            document.getElementById('errorsWarnings').style.display = 'none';
+            document.getElementById('workStatus').innerHTML = '<span class="text-muted">Selecione um trabalho para ver o status</span>';
+        }
+        
+        function showError(message) {
+            const errorAlert = `
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    ${message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            `;
+            document.querySelector('.container-fluid').insertAdjacentHTML('afterbegin', errorAlert);
+        }
+        
+        function setupAutoRefresh() {
+            const toggle = document.getElementById('autoRefreshToggle');
+            
+            function updateAutoRefresh() {
+                if (toggle.checked && currentWorkId) {
+                    autoRefreshInterval = setInterval(() => {
+                        loadWorkData();
+                    }, 5000); // Refresh every 5 seconds
+                } else {
+                    if (autoRefreshInterval) {
+                        clearInterval(autoRefreshInterval);
+                        autoRefreshInterval = null;
+                    }
+                }
+            }
+            
+            toggle.addEventListener('change', updateAutoRefresh);
+            updateAutoRefresh();
+        }
+        
+        function refreshData() {
+            if (currentWorkId) {
+                loadWorkData();
+            }
+            loadWorkList();
+        }
+    </script>
+</body>
+</html>

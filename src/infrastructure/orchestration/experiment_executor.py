@@ -33,6 +33,140 @@ from .algorithm_runner import run_algorithm
 logger = get_logger("CSPBench.ExperimentExecutor")
 
 
+def _worker_exec(
+    experiment_unit_id: str,
+    seed: int | None,
+    strings: list[str],
+    alphabet: str,
+    distance_method: str,
+    use_cache: bool,
+    params: dict[str, Any],
+    db_path: str,
+    internal_jobs: int,
+    algorithm_name: str,
+    cpu_config: dict[str, Any] | None = None,
+    work_id: str | None = None,
+) -> tuple[dict[str, Any], str]:
+    """Função executada em subprocesso (precisa ser picklable)."""
+    import psutil
+    from src.infrastructure.persistence.work_state.core import (
+        WorkStatePersistence,
+    )  # local import
+    from src.infrastructure.persistence.work_state.wrappers.execution_scoped import (
+        ExecutionScopedPersistence,
+    )
+    from src.infrastructure.monitoring.persistence_monitor import (
+        PersistenceMonitor,
+    )
+    from src.infrastructure.execution_control import ExecutionController
+    from src.domain.distance import create_distance_calculator
+    from src.domain.status import BaseStatus as _BaseStatus
+    from src.infrastructure.logging_config import get_logger
+
+    logger = get_logger("CSPBench.WorkerProcess")
+
+    # Apply CPU configuration to this worker process
+    if cpu_config:
+        try:
+            current_process = psutil.Process()
+            
+            # Apply CPU affinity if specified
+            if cpu_config.get("affinity"):
+                current_process.cpu_affinity(cpu_config["affinity"])
+                logger.info(f"[WORKER] CPU affinity set to: {cpu_config['affinity']}")
+            
+            # Apply CPU priority if max_workers is limited
+            if cpu_config.get("exclusive_cores", False):
+                # Lower priority for worker processes when using exclusive cores
+                current_process.nice(5)  # Slightly lower priority than main process
+                logger.info("[WORKER] CPU priority adjusted for exclusive cores")
+                
+        except Exception as e:
+            logger.warning(f"[WORKER] Cannot apply CPU configuration: {e}")
+
+    # Apply memory limits if specified in cpu_config
+    if cpu_config and cpu_config.get("max_memory_gb"):
+        try:
+            import resource
+            max_memory_bytes = int(cpu_config["max_memory_gb"] * 1024 * 1024 * 1024)
+            resource.setrlimit(resource.RLIMIT_AS, (max_memory_bytes, max_memory_bytes))
+            logger.info(f"[WORKER] Memory limit set to {cpu_config['max_memory_gb']}GB")
+        except Exception as e:
+            logger.warning(f"[WORKER] Cannot apply memory limit: {e}")
+
+    # Recriar store e wrappers
+    store = WorkStatePersistence(Path(db_path))
+    execution_store = ExecutionScopedPersistence(store, experiment_unit_id)
+    
+    # Controller with work_id for status checks
+    dummy_controller = ExecutionController(work_id=work_id)
+    dummy_controller._internal_jobs = internal_jobs  # type: ignore[attr-defined]
+    
+    # Apply CPU configuration manually if provided (since we can't pass ResourcesConfig to subprocess)
+    if cpu_config:
+        dummy_controller._exclusive_cores = cpu_config.get("exclusive_cores", False)
+        if "max_workers" in cpu_config:
+            dummy_controller._max_workers = cpu_config["max_workers"]
+            dummy_controller._current_workers = cpu_config["max_workers"]
+        
+        # Try to apply CPU affinity in worker process (best effort)
+        try:
+            if cpu_config.get("exclusive_cores", False) and hasattr(dummy_controller, 'apply_memory_limits'):
+                # Apply resource limits (includes CPU affinity if supported)
+                dummy_controller.apply_memory_limits()
+        except Exception as cpu_exc:
+            # Log CPU configuration warning but don't fail the execution
+            logger.warning(f"[WORKER] CPU configuration parcialmente aplicada: {cpu_exc}")
+    
+    # Create monitor with controller for cancellation checks
+    monitor = PersistenceMonitor(execution_store, execution_controller=dummy_controller)
+
+    distance_calc = create_distance_calculator(
+        distance_method=distance_method, strings=strings, use_cache=use_cache
+    )
+    try:
+        execution_store.update_execution_status(_BaseStatus.RUNNING)
+        monitor.on_progress(0.0, "Iniciando instância do algoritmo")
+
+        result = run_algorithm(
+            algorithm_name=algorithm_name,
+            strings=strings,
+            alphabet=alphabet,
+            distance_calculator=distance_calc,
+            execution_controller=dummy_controller,
+            monitor=monitor,
+            seed=seed,
+            params=params,
+        )
+
+        monitor.on_progress(1.0, "Instância do algoritmo finalizada")
+        status_value = result.get("status")
+        if hasattr(status_value, "value"):
+            status_value = status_value.value
+        objective = None
+        alg_result = result.get('algorithm_result', None)
+        if alg_result is not None:
+            max_distance = alg_result.get('max_distance', None)
+            if max_distance is not None:
+                objective = max_distance
+
+        execution_store.update_execution_status(
+            status=status_value, 
+            result=alg_result, 
+            params=result.get("actual_params", None),
+            objective=objective
+        )
+        return result, experiment_unit_id
+    except Exception as exc:  # pragma: no cover - defensive
+        execution_store.update_execution_status(
+            "failed", result={"error": str(exc)}
+        )
+        return {
+            "status": _BaseStatus.FAILED,
+            "error": str(exc),
+        }, experiment_unit_id
+
+
 class ExperimentExecutor(AbstractExecutionEngine):
     _combination_store: CombinationScopedPersistence = None
     _execution_controller: ExecutionController = None
@@ -58,77 +192,6 @@ class ExperimentExecutor(AbstractExecutionEngine):
         # Caminho do banco para recriar persistência em subprocessos
         db_path = Path(self._combination_store.store.db_path)  # type: ignore[attr-defined]
 
-        def _worker_exec(
-            experiment_unit_id: str,
-            seed: int | None,
-            strings: list[str],
-            alphabet: str,
-            distance_method: str,
-            use_cache: bool,
-            params: dict[str, Any],
-            db_path: str,
-            internal_jobs: int,
-        ) -> tuple[dict[str, Any], str]:
-            """Função executada em subprocesso (precisa ser picklable)."""
-            from src.infrastructure.persistence.work_state.core import (
-                WorkStatePersistence,
-            )  # local import
-            from src.infrastructure.persistence.work_state.wrappers.execution_scoped import (
-                ExecutionScopedPersistence,
-            )
-            from src.infrastructure.monitoring.persistence_monitor import (
-                PersistenceMonitor,
-            )
-            from src.infrastructure.execution_control import ExecutionController
-            from src.domain.distance import create_distance_calculator
-            from src.domain.status import BaseStatus as _BaseStatus
-
-            # Recriar store e wrappers
-            store = WorkStatePersistence(Path(db_path))
-            execution_store = ExecutionScopedPersistence(store, experiment_unit_id)
-            monitor = PersistenceMonitor(execution_store)
-
-            # Controller mínimo para fornecer internal_jobs (sem controles cruzados)
-            dummy_controller = ExecutionController(resources=None, check_control=None)
-            dummy_controller._internal_jobs = internal_jobs  # type: ignore[attr-defined]
-
-            distance_calc = create_distance_calculator(
-                distance_method=distance_method, strings=strings, use_cache=use_cache
-            )
-            try:
-                execution_store.update_execution_status(BaseStatus.RUNNING)
-                monitor.on_progress(0.0, "Iniciando instância do algoritmo")
-                result = run_algorithm(
-                    algorithm_name=alg.name,
-                    strings=strings,
-                    alphabet=alphabet,
-                    distance_calculator=distance_calc,
-                    execution_controller=dummy_controller,
-                    monitor=monitor,
-                    seed=seed,
-                    params=params,
-                )
-
-                monitor.on_progress(1.0, "Instância do algoritmo finalizada")
-                status_value = result.get("status")
-                if hasattr(status_value, "value"):
-                    status_value = status_value.value
-                execution_store.update_execution_status(
-                    status_value, 
-                    result=result.get('algorithm_result', None), 
-                    params=result.get("actual_params"),
-                    objective=result.get('algorithm_result', None).get('max_distance', None)
-                )
-                return result, experiment_unit_id
-            except Exception as exc:  # pragma: no cover - defensive
-                execution_store.update_execution_status(
-                    "failed", result={"error": str(exc)}
-                )
-                return {
-                    "status": _BaseStatus.FAILED,
-                    "error": str(exc),
-                }, experiment_unit_id
-
         results: list[dict[str, Any]] = []
 
         try:
@@ -138,6 +201,15 @@ class ExperimentExecutor(AbstractExecutionEngine):
 
         if max_workers > 1:
             # Execução paralela: submeter todas as tarefas de uma vez
+            
+            # Get CPU configuration for worker processes
+            cpu_config = self._execution_controller.create_worker_config()
+            
+            # Add memory configuration to be passed to workers
+            worker_config = cpu_config.copy()
+            if self._batch_config.resources and self._batch_config.resources.memory:
+                worker_config["max_memory_gb"] = self._batch_config.resources.memory.max_memory_gb
+            
             with ProcessPoolExecutor(max_workers=max_workers) as executor:
                 # Preparar todas as tarefas
                 futures = []
@@ -148,6 +220,13 @@ class ExperimentExecutor(AbstractExecutionEngine):
                     experiment_unit_id = (
                         f"experiment:{task.id}:{dataset_id}:{alg.name}:{r}"
                     )
+
+                    ex = self._combination_store.get_executions(unit_id=experiment_unit_id)
+                    if ex and ex[0]["status"] in (
+                        BaseStatus.COMPLETED.value, "completed", 
+                        BaseStatus.FAILED.value, "failed"):
+                        continue
+
                     self._combination_store.submit_execution(
                         unit_id=experiment_unit_id, sequencia=r
                     )
@@ -170,6 +249,9 @@ class ExperimentExecutor(AbstractExecutionEngine):
                         alg.params,
                         str(db_path),
                         self._execution_controller.internal_jobs,
+                        alg.name,  # Adicionar nome do algoritmo
+                        worker_config.get("cpu"),  # Pass full worker configuration including memory
+                        self._combination_store.work_id,  # Pass work_id for status checks
                     )
                     futures.append((r, future))
 
@@ -181,11 +263,28 @@ class ExperimentExecutor(AbstractExecutionEngine):
 
         else:
             # Execução sequencial
+            
+            # Get CPU configuration for sequential execution
+            cpu_config = self._execution_controller.create_worker_config()
+            
+            # Add memory configuration to be passed to workers
+            worker_config = cpu_config.copy()
+            if self._batch_config.resources and self._batch_config.resources.memory:
+                worker_config["max_memory_gb"] = self._batch_config.resources.memory.max_memory_gb
+            
             for r in range(1, repetitions + 1):
-                if self._execution_controller.check_status() != BaseStatus.RUNNING:
-                    break
+                status = self._execution_controller.check_status()
+                if status != BaseStatus.RUNNING:
+                    return status
 
                 experiment_unit_id = f"experiment:{task.id}:{dataset_id}:{alg.name}:{r}"
+                ex = self._combination_store.get_executions(unit_id=experiment_unit_id)
+                if ex and ex[0]["status"] in (
+                    BaseStatus.COMPLETED.value, "completed", 
+                    BaseStatus.FAILED.value, "failed"):
+                    continue
+            
+                
                 self._combination_store.submit_execution(
                     unit_id=experiment_unit_id, sequencia=r
                 )
@@ -207,9 +306,16 @@ class ExperimentExecutor(AbstractExecutionEngine):
                         alg.params,
                         str(db_path),
                         self._execution_controller.internal_jobs,
+                        alg.name,  # Adicionar nome do algoritmo
+                        worker_config.get("cpu"),  # Pass full worker configuration including memory
+                        self._combination_store.work_id,  # Pass work_id for status checks
                 )
                 results.append({experiment_unit_id: result})
 
+        status = self._execution_controller.check_status()
+        if status != BaseStatus.RUNNING:
+            return status
+                
         # Avaliar resultados (considera enum BaseStatus)
         flat_results = [list(item.values())[0] for item in results]
         failed_repetitions = [

@@ -78,6 +78,21 @@ class WorkServicePersistence:
             self._conn.commit()
             self._init_done = True
 
+    def is_ready(self) -> bool:
+        """
+        Verifica se o banco de dados está pronto para uso.
+        
+        Returns:
+            True se o banco está inicializado e funcionando
+        """
+        try:
+            with self._lock:
+                cursor = self._conn.cursor()
+                cursor.execute("SELECT 1")
+                return self._init_done
+        except Exception:
+            return False
+
     def _execute(self, sql: str, params: tuple = ()) -> sqlite3.Cursor:
         """Execute SQL with proper locking."""
         with self._lock:
@@ -104,6 +119,15 @@ class WorkServicePersistence:
 
     def _row_to_work_item(self, row: sqlite3.Row) -> WorkItem:
         """Convert database row to WorkItem."""
+
+        id = row["id"],
+        config_json = row["config_json"],
+        status = row["status"],
+        created_at = row["created_at"],  # Already float from database
+        updated_at = row["updated_at"],  # Already float from database
+        output_path = row["output_path"],
+        error = row["error"],
+        extra_json = row["extra_json"],
 
         return WorkItem.from_dict(
             {

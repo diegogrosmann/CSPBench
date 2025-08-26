@@ -93,15 +93,19 @@ def run_algorithm(
         )
         logger.info(f"Instância do algoritmo '{algorithm_name}' criada com sucesso")
 
-        # Algorithm execution with timing
+        # Algorithm execution with timing and timeout control
         logger.info(f"Iniciando execução do algoritmo '{algorithm_name}'")
         start_time = time.time()
 
         # Determinar timeout efetivo (prioridade params.max_time > controller.timeout_per_item)
-        max_time = float(params.get("max_time", 99999999))
-
+        max_time = float(params.get("max_time", execution_controller.timeout_per_item))
+        
+        # Check if we're in main thread (signals only work in main thread)
+        use_signal_timeout = threading.current_thread() is threading.main_thread()
+        
         algorithm_result: AlgorithmResult | None = None
         timeout_triggered = False
+        error_message: str | None = None
 
         def _target():
             nonlocal algorithm_result, error_message
@@ -113,31 +117,48 @@ def run_algorithm(
                 if monitor:
                     monitor.on_error(str(run_exc), run_exc)
 
-        thread = threading.Thread(
-            target=_target, name=f"Alg-{algorithm_name}", daemon=True
-        )
-        thread.start()
-
-        # Loop de espera com checagem de timeout e cancelamento
-        while thread.is_alive():
-            thread.join(timeout=1)
-            elapsed = time.time() - start_time
-            # Check external cancellation
-            status = execution_controller.check_status()
-            if status == BaseStatus.CANCELED:
-                if monitor:
-                    monitor.on_warning("Execução cancelada externamente")
-                timeout_triggered = False
-                monitor.cancel()
-                break
-            if elapsed > max_time:
-                timeout_triggered = True
-                if monitor:
-                    monitor.on_warning(
-                        f"Timeout atingido ({max_time}s) - solicitando cancelamento"
+        # Apply timeout using ExecutionController only if in main thread
+        try:
+            if use_signal_timeout and "max_time" not in params:
+                # Use signal-based timeout only in main thread
+                with execution_controller.item_timeout():
+                    thread = threading.Thread(
+                        target=_target, name=f"Alg-{algorithm_name}", daemon=True
                     )
-                    monitor.cancel()
-                break
+                    thread.start()
+                    thread.join()
+            else:
+                # Use polling-based timeout for subprocesses or custom max_time
+                thread = threading.Thread(
+                    target=_target, name=f"Alg-{algorithm_name}", daemon=True
+                )
+                thread.start()
+
+                # Loop de espera com checagem de timeout e cancelamento
+                while thread.is_alive():
+                    thread.join(timeout=1)
+                    elapsed = time.time() - start_time
+                    # Check external cancellation
+                    status = execution_controller.check_status()
+                    if status == BaseStatus.CANCELED or status == BaseStatus.PAUSED:
+                        if monitor:
+                            monitor.on_warning("Execução cancelada externamente")
+                        timeout_triggered = False
+                        break
+                    if elapsed > max_time:
+                        timeout_triggered = True
+                        if monitor:
+                            monitor.on_warning(
+                                f"Timeout atingido ({max_time}s) - solicitando cancelamento"
+                            )
+                            monitor.cancel()
+                        break
+        except TimeoutError as timeout_exc:
+            timeout_triggered = True
+            error_message = str(timeout_exc)
+            if monitor:
+                monitor.on_warning(f"Timeout do ExecutionController: {timeout_exc}")
+            logger.warning(f"Timeout aplicado pelo ExecutionController: {timeout_exc}")
 
         # Se ainda vivo após timeout/cancel, não há forma segura de matar thread Python puro.
         # Registramos estado como timeout; algoritmo deve checar monitor.is_cancelled periodicamente para finalizar.
@@ -156,14 +177,14 @@ def run_algorithm(
                 error_message = error_message or "Timeout atingido"
         else:
             controller_status = execution_controller.check_status()
-            if controller_status == BaseStatus.CANCELED:
-                final_status = BaseStatus.CANCELED
+            if not controller_status == BaseStatus.RUNNING:
+                final_status = controller_status
             elif algorithm_result and algorithm_result.get("success"):
                 final_status = BaseStatus.COMPLETED
             elif algorithm_result and not algorithm_result.get("success"):
                 final_status = BaseStatus.ERROR
             else:
-                final_status = BaseStatus.ERROR
+                final_status = BaseStatus.FAILED
 
         # Construir retorno simplificado
         result_dict: Dict[str, Any] = {
@@ -173,7 +194,7 @@ def run_algorithm(
             "duration_s": total_duration,
             "execution_time_s": execution_time,
             "timeout_triggered": timeout_triggered,
-            "actual_params":  algorithm_result.get('parameters', getattr(alg, "params", params)),
+            "actual_params": algorithm_result.get('parameters', getattr(alg, "params", params)) if algorithm_result else getattr(alg, "params", params),
         }
 
         # Log final amigável

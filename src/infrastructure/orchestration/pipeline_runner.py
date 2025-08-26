@@ -21,7 +21,7 @@ from src.domain.config import (
 )
 from src.domain.dataset import Dataset
 
-from src.infrastructure.execution_control import ExecutionController
+from src.infrastructure.execution_control import ExecutionController, ExecutionLimitError
 from src.infrastructure.logging_config import get_logger
 from src.application.services.dataset_service import load_dataset
 from src.application.ports.repositories import ExecutionEngine
@@ -38,18 +38,11 @@ class PipelineRunner:
     def __init__(self, work_store: WorkScopedPersistence):
         self.work_store: WorkScopedPersistence = work_store
         self.work_id = work_store.work_id
-        self.execution_controller: ExecutionController | None = None
+        # ExecutionController will be initialized in run() with proper resources config
+        self.execution_controller: ExecutionController = None
         self.datasets_cache: dict[str, Dataset] = {}
-
+        
         logger.info(f"PipelineRunner inicializado para work_id: {self.work_id}")
-
-    def _check_control(self) -> bool:
-        """Verifica status de controle do pipeline (running/paused/canceled)."""
-        status = self.work_store.get_work_status()
-        if status != BaseStatus.RUNNING:
-            logger.debug(f"Status alterado para {status}. Saindo!")
-            return False
-        return True
 
     def run(self, config: CSPBenchConfig) -> None:
         """Executa o pipeline seguindo o novo fluxo reorganizado."""
@@ -57,31 +50,50 @@ class PipelineRunner:
         logger.info(
             f"Configuração: {len(config.tasks.items)} tarefas do tipo {config.tasks.type}"
         )
+        
+        # Initialize ExecutionController with resources configuration
+        self.execution_controller = ExecutionController(
+            work_id=self.work_id, 
+            resources=config.resources
+        )
+        
+        # Apply resource limits to main process
+        if config.resources:
+            if config.resources.memory:
+                self.execution_controller.apply_memory_limits()
+            if config.resources.cpu:
+                self.execution_controller.apply_cpu_limits()
 
         try:
             self.work_store.update_work_status(BaseStatus.RUNNING)
 
-            # Create ExecutionController with resources and control function
-            self.execution_controller = ExecutionController(
-                resources=config.resources, check_control=self._check_control
-            )
-            logger.info("ExecutionController criado com sucesso")
-
             # Fase 1: Gerar todos os datasets primeiro
             logger.info("=== FASE 1: Gerando datasets ===")
+            self.execution_controller.check_batch_timeout()  # Check timeout before each phase
             self._generate_all_datasets(config)
 
             # Fase 2: Gerar todas as combinações
             logger.info("=== FASE 2: Gerando combinações ===")
+            self.execution_controller.check_batch_timeout()  # Check timeout before each phase
             self._generate_pipeline_combinations(config)
 
             # Fase 3: Executar combinações
             logger.info("=== FASE 3: Executando combinações ===")
+            self.execution_controller.check_batch_timeout()  # Check timeout before each phase
             status = self._execute_combinations(config)
 
-            logger.info("Pipeline executado com sucesso")
-            self.work_store.update_work_status(status)
+            if status == BaseStatus.RUNNING:
+                logger.error("Pipeline ainda em execução após finalização")
+                self.work_store.update_work_status(BaseStatus.FAILED)
+            else:
+                logger.info("Pipeline executado com sucesso")
+                self.work_store.update_work_status(status)
 
+        except ExecutionLimitError as timeout_exc:
+            logger.error(f"Pipeline interrompido por timeout: {timeout_exc}")
+            if self.work_store:
+                self.work_store.work_error(timeout_exc)
+                self.work_store.update_work_status(BaseStatus.CANCELED, error=str(timeout_exc))
         except Exception as e:
             logger.error(f"Erro durante execução do pipeline: {e}", exc_info=True)
             if self.work_store:
@@ -141,6 +153,7 @@ class PipelineRunner:
                 logger.info(
                     "Combinações em andamento/pausadas/canceladas reiniciadas para 'queued'. Verificando novas combinações..."
                 )
+                return  # Não gerar novas combinações se houver em andamento
 
             # Sempre gerar combinações: tanto para casos novos quanto para adicionar novas após reset
             combinations = []
@@ -151,9 +164,9 @@ class PipelineRunner:
                 if isinstance(task, ExperimentTask):
                     total_sequences = task.repetitions
                 elif isinstance(task, OptimizationTask):
-                    total_sequences = task.config.trial
+                    total_sequences = task.config.get("trials", 50) if task.config else 50
                 elif isinstance(task, SensitivityTask):
-                    total_sequences = task.config.samples
+                    total_sequences = task.config.get("samples", 100) if task.config else 100
 
                 # task.datasets agora é List[str] contendo IDs de datasets
                 for dataset_id in task.datasets:
@@ -204,8 +217,8 @@ class PipelineRunner:
 
         while True:
             # Se controle indicar que não está mais em RUNNING, parar
-            if not self._check_control():
-                break
+            if self.execution_controller.check_status() != BaseStatus.RUNNING:
+                return self.execution_controller.check_status()
 
             # Obter próxima combinação pendente
             combination = self.work_store.get_next_pending_combination()
@@ -389,8 +402,16 @@ class PipelineRunner:
                 batch_config=batch_config,
             )
         elif isinstance(task, OptimizationTask):
-            return OptimizationExecutor()
+            return OptimizationExecutor(
+                combination_store=work_combination,
+                execution_controller=self.execution_controller,
+                batch_config=batch_config,
+            )
         elif isinstance(task, SensitivityTask):
-            return SensitivityExecutor()
+            return SensitivityExecutor(
+                combination_store=work_combination,
+                execution_controller=self.execution_controller,
+                batch_config=batch_config,
+            )
         else:
             raise ValueError(f"Tipo de task não suportado: {type(task)}")

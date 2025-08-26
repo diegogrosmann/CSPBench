@@ -36,6 +36,8 @@ class StubExecutionController:
         self._status_sequence = status_sequence or [BaseStatus.RUNNING]
         self._idx = 0
         self.internal_jobs = internal_jobs
+        # Add missing timeout_per_item attribute for compatibility
+        self.timeout_per_item = 30.0
 
     def check_status(self):
         if self._idx < len(self._status_sequence) - 1:
@@ -43,6 +45,12 @@ class StubExecutionController:
             self._idx += 1
             return current
         return self._status_sequence[-1]
+    
+    # Add missing method for compatibility
+    def item_timeout(self):
+        # Return a no-op context manager
+        from contextlib import nullcontext
+        return nullcontext()
 
 
 # --- Fake Algorithms --------------------------------------------------------

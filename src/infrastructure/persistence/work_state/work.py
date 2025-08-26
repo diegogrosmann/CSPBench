@@ -1,5 +1,9 @@
 import time
-from typing import Any
+import json
+from typing import Any, Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:  # pragma: no cover - apenas para type checkers
+    from src.domain.config import CSPBenchConfig
 
 
 class WorkMixin:
@@ -205,3 +209,46 @@ class WorkMixin:
                 "total_executions": sum(execution_stats.values()),
                 "total_events": sum(event_stats.values()),
             }
+
+    # ------------------------------------------------------------------
+    # Config retrieval
+    # ------------------------------------------------------------------
+    def get_work_config(self, work_id: str) -> Optional["CSPBenchConfig"]:
+        """Recupera a configuração (CSPBenchConfig) persistida para um trabalho.
+
+        Passos:
+          1. Valida o work_id.
+          2. Lê o campo config_json da tabela work.
+          3. Desserializa em dict.
+          4. Usa CSPBenchConfig.from_dict para reconstrução.
+
+        Retorna:
+            CSPBenchConfig ou None se não encontrado / inválido.
+        """
+        from .utils import validate_required_field
+
+        validate_required_field(work_id, "work_id")
+
+        with self._lock:
+            cursor = self._conn.cursor()
+            cursor.execute("SELECT config_json FROM work WHERE id = ?", (work_id,))
+            row = cursor.fetchone()
+
+        if not row or not row[0]:  # Nenhum registro ou config vazia
+            return None
+
+        raw = row[0]
+        try:
+            data = json.loads(raw) if isinstance(raw, str) else raw
+        except json.JSONDecodeError:
+            return None
+        if not isinstance(data, dict):  # Sanidade
+            return None
+
+        try:
+            from src.domain.config import CSPBenchConfig  # import tardio para evitar ciclos
+            if hasattr(CSPBenchConfig, "from_dict"):
+                return CSPBenchConfig.from_dict(data)  # type: ignore[return-value]
+        except Exception:
+            return None
+        return None

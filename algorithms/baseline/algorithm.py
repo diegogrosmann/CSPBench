@@ -87,7 +87,7 @@ class BaselineAlg(CSPAlgorithm):
     Greedy consensus algorithm (Baseline) for the Closest String Problem.
 
     The Baseline algorithm uses a greedy strategy that constructs the center
-    string position by position, always choosing the symbol that locally
+    string by position by position, always choosing the symbol that locally
     minimizes the maximum distance at that moment.
 
     This algorithm serves as a fundamental reference for comparison with
@@ -127,6 +127,10 @@ class BaselineAlg(CSPAlgorithm):
             if self._monitor:
                 self._monitor.on_progress(0.0, "Starting Baseline algorithm")
 
+            # Verificação inicial de cancelamento
+            if self._monitor and self._monitor.is_cancelled():
+                return self._build_cancelled_result(start_time)
+
             # Validate input
             if not self.strings:
                 raise ValueError("String list cannot be empty")
@@ -137,6 +141,10 @@ class BaselineAlg(CSPAlgorithm):
             self.tie_break = self.params.get("tie_break", "lex")
             # Execute greedy consensus algorithm
             center_string = self.greedy_consensus()
+
+            # Verificar cancelamento após construção
+            if self._monitor and self._monitor.is_cancelled():
+                return self._build_cancelled_result(start_time)
 
             # Calculate final metrics
             max_distance = self.max_distance(center_string)
@@ -233,6 +241,11 @@ class BaselineAlg(CSPAlgorithm):
             )
 
         for pos in range(L):
+            # Verificar cancelamento durante construção posição-por-posição
+            if self._monitor and self._monitor.is_cancelled():
+                # Retornar consenso parcial se cancelado
+                return "".join(consensus)
+
             # Frequency counting approach (majority vote with tie-break)
             counts: dict[str, int] = {c: 0 for c in self.alphabet}
             for s in self.strings:
@@ -277,3 +290,29 @@ class BaselineAlg(CSPAlgorithm):
                 f"Consensus built: '{result}' (final max distance: {final_distance})",
             )
         return result
+
+    def _build_cancelled_result(self, start_time: float) -> AlgorithmResult:
+        """Constrói resultado para execução cancelada."""
+        end_time = time.time()
+        execution_time = end_time - start_time
+        return AlgorithmResult(
+            success=False,
+            center_string="",
+            max_distance=-1,
+            parameters=self.get_actual_params(),
+            error="Algorithm execution was cancelled",
+            metadata={
+                "algorithm_name": self.name,
+                "execution_time": execution_time,
+                "avg_distance": -1,
+                "total_distance": -1,
+                "num_strings": len(self.strings) if self.strings else 0,
+                "string_length": (
+                    len(self.strings[0]) if self.strings and self.strings[0] else 0
+                ),
+                "alphabet_size": len(self.alphabet) if self.alphabet else 0,
+                "seed": self.seed,
+                "internal_jobs": self.internal_jobs,
+                "termination_reason": "cancelled",
+            },
+        )

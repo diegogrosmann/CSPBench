@@ -105,7 +105,7 @@ class DatasetMixin:
 
             # Create Dataset object
             dataset = Dataset(
-                name=name or ds_id, sequences=sequences, alphabet=alphabet
+                id=ds_id, name=name or ds_id, sequences=sequences, alphabet=alphabet
             )
 
             return dataset

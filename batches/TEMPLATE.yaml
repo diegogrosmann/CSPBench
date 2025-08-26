@@ -104,10 +104,10 @@ algorithms:
     name: "Default Configuration"     # string: Descriptive name
     description: "Algorithms with default parameters"           # string: Detailed description
     algorithms:                       # list: List of algorithms included in this configuration
-      - "Baseline"                    # Baseline algorithm (simplest)
+#      - "Baseline"                    # Baseline algorithm (simplest)
       - "BLF-GA"                      # Block-based Genetic Algorithm (main)
       - "CSC"                         # Closest String with Constraints
-      - "H2-CSP"                       # Heuristic Closest String Problem
+#      - "H2-CSP"                       # Heuristic Closest String Problem
 #      - "DP-CSP"                      # Dynamic Programming CSP
     
     # Algorithm-specific parameters
@@ -261,7 +261,7 @@ experiment:
       algorithms:
         - "default_config"
         - "aggressive_csc"
-      repetitions: 5                 # int: Number of repetitions per combination (1-10 recommended)
+      repetitions: 7                 # int: Number of repetitions per combination (1-10 recommended)
                                       # Each dataset+algorithm combination will be executed N times
     # You can add multiple executions:
     - name: "Complete Experiment"
@@ -270,7 +270,7 @@ experiment:
         - "dataset_file"
       algorithms:
         - "aggressive_csc"
-      repetitions: 10
+      repetitions: 5
 
 # =====================================================================
 # SECTION 5B: SPECIFIC CONFIGURATION - OPTIMIZATION
@@ -341,17 +341,20 @@ optimization:
         direction: "minimize"           # string: Optimization direction
                                         # "minimize" = minimize objective (for distance)
                                         # "maximize" = maximize objective (for quality)
-        trials: 5                       # int: Number of trials/attempts (50-1000 recommended)
+        trials: 100                       # int: Number of trials/attempts (50-1000 recommended)
         timeout_per_trial: 300          # int: Timeout per trial in seconds (60-600)
         sampler: "TPESampler"         # string: Specific sampling algorithm
         pruner: "MedianPruner"        # string: Specific pruning algorithm
-        storage: true                 # Boolean|null: Salvar database
+        storage: "study_results.db"    # string|boolean|null: Storage configuration
+                                        # string: SQLite database filename (saved in work_id/optuna/)
+                                        # true: Enable SQLite storage with auto-generated filename
+                                        # false/null: Use in-memory storage (default)
     
     # Example of second optimization (you can add as many as needed)
     - id: "opt_csc"                   # string: Unique task ID
       name: "CSC Optimization"
       datasets: 
-        - "dataset_ncbi"
+        - "dataset_test"
       algorithm_config: 
         - "aggressive_csc"     # Reference configuration ID
       parameters:
@@ -365,11 +368,15 @@ optimization:
              low: 0.5
              high: 1.0
       config:
-        study_name: "blfga_study"       # string: Study name for identification
+        study_name: "csc_study"         # string: Study name for identification
         direction: "minimize"           # string: Optimization direction
                                         # "minimize" = minimize objective (for distance)
                                         # "maximize" = maximize objective (for quality)
-        trials: 5                       # int: Number of trials/attempts (50-1000 recommended)
+        trials: 100                       # int: Number of trials/attempts (50-1000 recommended)
+        storage: "csc_study_results.db"  # string|boolean|null: Storage configuration
+                                        # string: SQLite database filename (saved in work_id/optuna/)
+                                        # true: Enable SQLite storage with auto-generated filename
+                                        # false/null: Use in-memory storage (default)
 
 # =====================================================================
 # SECTION 5C: SPECIFIC CONFIGURATION - SENSITIVITY
@@ -501,8 +508,8 @@ resources:
   cpu:
     # Do not use the same cores as the main application during tests
     exclusive_cores: false            # bool: If true, tests do not share cores with the main app
-    max_workers: 1                    # int|null: Maximum number of cores to use (null = all available)
-    internal_jobs: 4                  # int: Maximum internal parallel jobs per algorithm
+    max_workers: null                 # int|null: Maximum number of cores to use (null = all available)
+    internal_jobs: 1                  # int: Maximum internal parallel jobs per algorithm
                                       # Controls internal algorithm parallelism (threads/processes)
                                       # Suggested value: 4 for CPUs with 8+ cores
                                       # Relation: max_workers × internal_jobs ≤ CPU_cores

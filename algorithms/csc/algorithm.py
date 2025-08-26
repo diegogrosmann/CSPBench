@@ -289,6 +289,10 @@ class CSCAlgorithm(CSPAlgorithm):
         base_dist = self.max_distance(candidate)
         L = len(current)
         while improved and iterations < max_iterations:
+            # Verificar cancelamento durante busca local
+            if self._monitor and self._monitor.is_cancelled():
+                break
+
             improved = False
             iterations += 1
             # periodic progress report
@@ -346,6 +350,10 @@ class CSCAlgorithm(CSPAlgorithm):
                     total_steps=self._TOTAL_STEPS,
                 )
 
+            # Verificação inicial de cancelamento
+            if self._monitor and self._monitor.is_cancelled():
+                return self._build_cancelled_result(start_time)
+
             # Parameter determination
             d, n_blocks, d_auto_flag, n_blocks_auto_flag = self._determine_parameters()
             self.params.setdefault("d", d)
@@ -363,6 +371,10 @@ class CSCAlgorithm(CSPAlgorithm):
                     d_auto=d_auto_flag,
                     n_blocks_auto=n_blocks_auto_flag,
                 )
+
+            # Verificar cancelamento antes do clustering
+            if self._monitor and self._monitor.is_cancelled():
+                return self._build_cancelled_result(start_time)
 
             # Clustering
             degraded_mode = False
@@ -390,6 +402,10 @@ class CSCAlgorithm(CSPAlgorithm):
             fallback_used = False
 
             if n_clusters == 0:
+                # Verificar cancelamento antes do fallback
+                if self._monitor and self._monitor.is_cancelled():
+                    return self._build_cancelled_result(start_time)
+
                 # Fallback: global consensus + local search
                 fallback_used = True
                 initial = self._consensus_string(self.strings)
@@ -454,6 +470,10 @@ class CSCAlgorithm(CSPAlgorithm):
                     },
                 )
 
+            # Verificar cancelamento antes da geração de consensus
+            if self._monitor and self._monitor.is_cancelled():
+                return self._build_cancelled_result(start_time)
+
             # Local consensus strings
             consensus_list = [self._consensus_string(c) for c in clusters]
             if self._monitor:
@@ -464,6 +484,10 @@ class CSCAlgorithm(CSPAlgorithm):
                     step_index=4,
                     total_steps=self._TOTAL_STEPS,
                 )
+
+            # Verificar cancelamento antes da geração de candidatos
+            if self._monitor and self._monitor.is_cancelled():
+                return self._build_cancelled_result(start_time)
 
             # Candidate generation
             max_candidates = self.params.get(
@@ -489,6 +513,10 @@ class CSCAlgorithm(CSPAlgorithm):
                 fallback_used = True
                 candidates = [consensus_list[0]]
 
+            # Verificar cancelamento antes da avaliação
+            if self._monitor and self._monitor.is_cancelled():
+                return self._build_cancelled_result(start_time)
+
             # Evaluation
             batch_size = self.params.get(
                 "candidate_eval_batch", CSC_DEFAULTS["candidate_eval_batch"]
@@ -496,6 +524,10 @@ class CSCAlgorithm(CSPAlgorithm):
             best_initial, best_initial_dist, evaluated = self._evaluate_candidates(
                 candidates, batch_size, 0.55, 0.75
             )
+
+            # Verificar cancelamento antes da busca local
+            if self._monitor and self._monitor.is_cancelled():
+                return self._build_cancelled_result(start_time)
 
             # Local search
             refined, ls_iters = self._refine_local(
@@ -585,3 +617,25 @@ class CSCAlgorithm(CSPAlgorithm):
                     "error_type": type(e).__name__,
                 },
             )
+
+    def _build_cancelled_result(self, start_time: float) -> AlgorithmResult:
+        """Constrói resultado para execução cancelada."""
+        execution_time = time.time() - start_time
+        return AlgorithmResult(
+            success=False,
+            center_string="",
+            max_distance=-1,
+            parameters=self.get_actual_params(),
+            error="Algorithm execution was cancelled",
+            metadata={
+                "algorithm_name": self.name,
+                "execution_time": execution_time,
+                "num_strings": len(self.strings),
+                "string_length": len(self.strings[0]) if self.strings else 0,
+                "alphabet_size": len(self.alphabet) if self.alphabet else 0,
+                "deterministic": True,
+                "seed": self.seed,
+                "internal_jobs": self.internal_jobs,
+                "termination_reason": "cancelled",
+            },
+        )

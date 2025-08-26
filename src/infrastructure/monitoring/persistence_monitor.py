@@ -11,7 +11,7 @@ Funcionalidades:
 - on_progress: registra progresso (com throttling opcional)
 - on_warning: registra warning associado à unidade
 - on_error: registra erro (ou warning se só mensagem)
-- is_cancelled: permite cancelamento externo (flag interna)
+- is_cancelled: permite cancelamento externo via ExecutionController ou flag interna
 
 Throttling: evita gravação excessiva de progresso com base em delta mínimo de
 percentual e/ou intervalo mínimo de tempo. Sempre registra 0% inicial (se
@@ -20,12 +20,15 @@ invocado) e 100% final.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Optional, TYPE_CHECKING
 import time
 from src.domain.monitoring import AlgorithmMonitor
 from src.infrastructure.persistence.work_state.wrappers.execution_scoped import (
     ExecutionScopedPersistence,
 )
+
+if TYPE_CHECKING:
+    from src.infrastructure.execution_control import ExecutionController
 
 
 class PersistenceMonitor(AlgorithmMonitor):
@@ -44,6 +47,7 @@ class PersistenceMonitor(AlgorithmMonitor):
         "_last_progress",
         "_last_time",
         "_cancelled",
+        "_execution_controller",
     )
 
     def __init__(
@@ -52,6 +56,7 @@ class PersistenceMonitor(AlgorithmMonitor):
         *,
         min_delta_pct: float = 0.01,
         min_interval_s: float = 0.00,
+        execution_controller: Optional["ExecutionController"] = None,
     ) -> None:
         self._exec_store = exec_store
         self._min_delta_pct = min_delta_pct
@@ -59,6 +64,35 @@ class PersistenceMonitor(AlgorithmMonitor):
         self._last_progress = -float("inf")
         self._last_time = 0.0
         self._cancelled = False
+        self._execution_controller = execution_controller
+
+    @classmethod
+    def with_execution_controller(
+        cls,
+        exec_store: ExecutionScopedPersistence,
+        execution_controller: "ExecutionController",
+        *,
+        min_delta_pct: float = 0.01,
+        min_interval_s: float = 0.00,
+    ) -> "PersistenceMonitor":
+        """
+        Convenience factory method to create PersistenceMonitor with ExecutionController.
+        
+        Args:
+            exec_store: Execution-scoped persistence store
+            execution_controller: Controller for status checks and resource management
+            min_delta_pct: Minimum progress delta to persist
+            min_interval_s: Minimum time interval between persistencies
+            
+        Returns:
+            Configured PersistenceMonitor instance
+        """
+        return cls(
+            exec_store=exec_store,
+            min_delta_pct=min_delta_pct,
+            min_interval_s=min_interval_s,
+            execution_controller=execution_controller,
+        )
 
     # ---------------------------------------------------------------------
     # API AlgorithmMonitor
@@ -104,6 +138,19 @@ class PersistenceMonitor(AlgorithmMonitor):
             pass
 
     def is_cancelled(self) -> bool:  # noqa: D401
+        """Check if execution is cancelled via ExecutionController or internal flag."""
+        # Check ExecutionController first if available
+        if self._execution_controller:
+            try:
+                from src.domain.status import BaseStatus
+                status = self._execution_controller.check_status()
+                # Only CANCELED status means cancelled, not PAUSED
+                if status == BaseStatus.CANCELED:
+                    return True
+            except Exception:  # pragma: no cover
+                pass
+        
+        # Fallback to internal flag
         return self._cancelled
 
     # ------------------------------------------------------------------
@@ -120,8 +167,3 @@ class PersistenceMonitor(AlgorithmMonitor):
     def cancel(self) -> None:
         """Sinaliza cancelamento externo."""
         self._cancelled = True
-
-    # Conveniência para algoritmos que desejem acesso direto (evitar import extra)
-    @property
-    def execution(self) -> ExecutionScopedPersistence:  # noqa: D401
-        return self._exec_store

@@ -400,6 +400,11 @@ class BLFGAAlgorithm(CSPAlgorithm):
                     pop_size=self.params["pop_size"],
                     blocks=len(self.blocks),
                 )
+
+            # Verificação inicial de cancelamento
+            if self._monitor and self._monitor.is_cancelled():
+                return self._build_cancelled_result(start_time)
+
             population = self._build_initial_population()
             population = self._sort_population(population)
             self._current_population = population  # for adaptive mutation diversity
@@ -417,6 +422,13 @@ class BLFGAAlgorithm(CSPAlgorithm):
             no_improve_patience = self.params.get("no_improve_patience", 0)
             termination_reason = "max_generations"
             for gen in range(1, max_gens + 1):
+                # Verificar cancelamento a cada geração
+                if self._monitor and self._monitor.is_cancelled():
+                    termination_reason = "cancelled"
+                    best = population[0] if population else ""
+                    best_val = self.max_distance(best) if best else -1
+                    break
+
                 self.generations_executed = gen
                 elapsed = time.time() - start_time
                 if elapsed >= self.params.get("max_time", float("inf")):
@@ -508,31 +520,37 @@ class BLFGAAlgorithm(CSPAlgorithm):
                 if no_improve_patience and self._no_improve >= no_improve_patience:
                     termination_reason = "early_stopping"
                     break
+
+            # Verificar cancelamento antes do refinamento final
             if (
-                best_val > 0
+                termination_reason != "cancelled"
+                and best_val > 0
                 and self.params.get("refinement_type")
                 and self.params.get("refine_elites")
             ):
-                if self._monitor:
-                    self._monitor.on_progress(
-                        0.85,
-                        "Final refinement pass",
-                        phase="refinement_start",
-                        best_fitness_pre=best_val,
-                    )
-                refined = self._refine_individuals([best])
-                refined_best = refined[0]
-                refined_val = self.max_distance(refined_best)
-                if refined_val < best_val:
-                    best, best_val = refined_best, refined_val
-                    self.improvement_generations += 1
-                if self._monitor:
-                    self._monitor.on_progress(
-                        0.95,
-                        "Refinement complete",
-                        phase="refinement_end",
-                        best_fitness_post=best_val,
-                    )
+                if self._monitor and self._monitor.is_cancelled():
+                    termination_reason = "cancelled"
+                else:
+                    if self._monitor:
+                        self._monitor.on_progress(
+                            0.85,
+                            "Final refinement pass",
+                            phase="refinement_start",
+                            best_fitness_pre=best_val,
+                        )
+                    refined = self._refine_individuals([best])
+                    refined_best = refined[0]
+                    refined_val = self.max_distance(refined_best)
+                    if refined_val < best_val:
+                        best, best_val = refined_best, refined_val
+                        self.improvement_generations += 1
+                    if self._monitor:
+                        self._monitor.on_progress(
+                            0.95,
+                            "Refinement complete",
+                            phase="refinement_end",
+                            best_fitness_post=best_val,
+                        )
             else:
                 if self._monitor:
                     self._monitor.on_progress(
@@ -541,7 +559,14 @@ class BLFGAAlgorithm(CSPAlgorithm):
                         phase="refinement_skip",
                         best_fitness=best_val,
                     )
+
             end_time = time.time()
+            
+            # Para execução cancelada, assegurar que temos pelo menos algum resultado
+            if termination_reason == "cancelled":
+                if not best:
+                    return self._build_cancelled_result(start_time)
+                    
             avg_dist = self.average_distance(best)
             total_dist = self.total_distance(best)
             if self._monitor:
@@ -580,6 +605,18 @@ class BLFGAAlgorithm(CSPAlgorithm):
                 "avg_distance": avg_dist,
                 "total_distance": total_dist,
             }
+            
+            # Se foi cancelado, retornar como falha
+            if termination_reason == "cancelled":
+                return AlgorithmResult(
+                    success=False,
+                    center_string=best,
+                    max_distance=best_val,
+                    parameters=self.get_actual_params(),
+                    error="Algorithm execution was cancelled",
+                    metadata=metadata,
+                )
+            
             return AlgorithmResult(
                 success=True,
                 center_string=best,
@@ -614,3 +651,25 @@ class BLFGAAlgorithm(CSPAlgorithm):
                     "error_type": type(e).__name__,
                 },
             )
+
+    def _build_cancelled_result(self, start_time: float) -> AlgorithmResult:
+        """Constrói resultado para execução cancelada."""
+        end_time = time.time()
+        return AlgorithmResult(
+            success=False,
+            center_string="",
+            max_distance=-1,
+            parameters=self.get_actual_params(),
+            error="Algorithm execution was cancelled",
+            metadata={
+                "algorithm_name": self.name,
+                "execution_time": end_time - start_time,
+                "num_strings": len(self.strings),
+                "string_length": len(self.strings[0]) if self.strings else 0,
+                "alphabet_size": len(self.alphabet) if self.alphabet else 0,
+                "seed": self.seed,
+                "internal_jobs": self.internal_jobs,
+                "deterministic": False,
+                "termination_reason": "cancelled",
+            },
+        )
