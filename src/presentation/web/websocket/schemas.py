@@ -51,6 +51,7 @@ class ProgressSnapshot:
     progress: Dict[str, Any]  # ProgressSummary serialized
     executions: List[Dict[str, Any]]  # ExecutionDetail list serialized
     logs: Dict[str, List[Dict[str, Any]]]  # errors and warnings
+    events: Optional[List[Dict[str, Any]]] = None  # events from events table
     executions_full: Optional[List[Dict[str, Any]]] = None  # lista completa por combinação
     combinations: Optional[List[Dict[str, Any]]] = None  # metadados de combinações
 
@@ -70,6 +71,7 @@ class ProgressUpdate:
     progress: Optional[Dict[str, Any]] = None  # Only changed fields
     executions_changed: Optional[ExecutionChanges] = None
     logs_appended: Optional[Dict[str, List[Dict[str, Any]]]] = None
+    events_appended: Optional[List[Dict[str, Any]]] = None  # New events
     executions: Optional[List[Dict[str, Any]]] = None  # Estado atual completo da combinação corrente (quando mudou)
     executions_combination_id: Optional[int] = None  # Combination id referente à lista completa enviada
 

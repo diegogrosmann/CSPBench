@@ -23,6 +23,11 @@ class BatchFileInfo(BaseModel):
     modified: str
     is_template: bool = False
     metadata_name: Optional[str] = None
+    metadata_description: Optional[str] = None
+    metadata_author: Optional[str] = None
+    metadata_version: Optional[str] = None
+    metadata_creation_date: Optional[str] = None
+    metadata_tags: List[str] = []
 
 
 class BatchListResponse(BaseModel):

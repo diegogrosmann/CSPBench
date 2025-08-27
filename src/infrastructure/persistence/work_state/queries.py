@@ -564,6 +564,61 @@ class WorkStateQueries:
             })
         
         return results
+
+    def get_events(self, work_id: str, event_type: str = None, event_category: str = None, 
+                   limit: int = 100, since_timestamp: float = None) -> List[Dict[str, Any]]:
+        """Get events with filtering options."""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        
+        conditions = ["work_id = ?"]
+        params = [work_id]
+        
+        if event_type:
+            conditions.append("event_type = ?")
+            params.append(event_type)
+            
+        if event_category:
+            conditions.append("event_category = ?")
+            params.append(event_category)
+            
+        if since_timestamp:
+            conditions.append("timestamp > ?")
+            params.append(since_timestamp)
+        
+        where_clause = " AND ".join(conditions)
+        params.append(limit)
+        
+        query = f"""
+            SELECT 
+                id,
+                work_id,
+                event_type,
+                event_category,
+                entity_data_json,
+                timestamp
+            FROM events
+            WHERE {where_clause}
+            ORDER BY timestamp DESC
+            LIMIT ?
+        """
+        
+        cursor.execute(query, params)
+        rows = cursor.fetchall()
+        
+        results = []
+        for row in rows:
+            entity_data = json.loads(row['entity_data_json']) if row['entity_data_json'] else {}
+            results.append({
+                'id': row['id'],
+                'work_id': row['work_id'],
+                'event_type': row['event_type'],
+                'event_category': row['event_category'],
+                'entity_data': entity_data,
+                'timestamp': row['timestamp']
+            })
+        
+        return results
     
     # === STATUS QUERIES ===
     

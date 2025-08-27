@@ -81,6 +81,32 @@ def extract_description_from_yaml(file_path: Path) -> Optional[str]:
         return None
 
 
+def extract_metadata_from_yaml(file_path: Path) -> dict:
+    """Extract complete metadata from YAML file."""
+    try:
+        with open(file_path, "r", encoding="utf-8") as f:
+            content = yaml.safe_load(f)
+
+        # Look for metadata section
+        if isinstance(content, dict):
+            metadata = content.get("metadata", {})
+            if isinstance(metadata, dict):
+                return {
+                    "name": metadata.get("name"),
+                    "description": metadata.get("description"),
+                    "author": metadata.get("author"),
+                    "version": metadata.get("version"),
+                    "creation_date": metadata.get("creation_date"),
+                    "tags": metadata.get("tags", [])
+                }
+
+        return {}
+
+    except Exception as e:
+        logger.warning(f"Failed to extract metadata from {file_path}: {e}")
+        return {}
+
+
 def extract_metadata_name_from_yaml(file_path: Path) -> Optional[str]:
     """Extract metadata.name from YAML file."""
     try:
@@ -234,7 +260,7 @@ async def list_batch_files():
             try:
                 stat = file_path.stat()
                 description = extract_description_from_yaml(file_path)
-                metadata_name = extract_metadata_name_from_yaml(file_path)
+                metadata = extract_metadata_from_yaml(file_path)
 
                 file_info = BatchFileInfo(
                     name=file_path.name,
@@ -244,7 +270,12 @@ async def list_batch_files():
                     created=datetime.fromtimestamp(stat.st_ctime).isoformat(),
                     modified=datetime.fromtimestamp(stat.st_mtime).isoformat(),
                     is_template=file_path.name.upper() == "TEMPLATE.YAML",
-                    metadata_name=metadata_name,
+                    metadata_name=metadata.get("name"),
+                    metadata_description=metadata.get("description"),
+                    metadata_author=metadata.get("author"),
+                    metadata_version=metadata.get("version"),
+                    metadata_creation_date=metadata.get("creation_date"),
+                    metadata_tags=metadata.get("tags", []),
                 )
 
                 files.append(file_info)

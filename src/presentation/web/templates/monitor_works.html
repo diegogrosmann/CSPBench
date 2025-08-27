@@ -2,53 +2,51 @@
 
 {% block title %}Work Monitor - CSPBench{% endblock %}
 
+{% block breadcrumb_items %}
+<li class="breadcrumb-item active" aria-current="page">
+    <i class="bi bi-speedometer2 me-1"></i>Work Monitor
+</li>
+{% endblock %}
+
+{% block header %}
+<!-- Remove o header padrão (CSPBench Web Interface) -->
+{% endblock %}
+
 {% block extra_css %}
 <style>
-    .work-card {
+    .work-monitor {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        padding: 2rem 0;
+    }
+
+    .monitor-container {
+        max-width: 1400px;
+        padding: 0 1rem;
+    }
+
+    .monitor-card {
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        margin-bottom: 2rem;
+        overflow: hidden;
         transition: all 0.3s ease;
-        border-left: 4px solid transparent;
     }
-    
-    .work-card:hover {
+
+    .monitor-card:hover {
         transform: translateY(-2px);
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        box-shadow: 0 8px 30px rgba(0,0,0,0.15);
     }
-    
-    .work-card.status-running {
-        border-left-color: #28a745;
+
+    .card-header {
+        background: #f8f9fa;
+        border-bottom: 1px solid #dee2e6;
+        padding: 1.5rem;
+        font-weight: 600;
+        color: #495057;
     }
-    
-    .work-card.status-queued {
-        border-left-color: #ffc107;
-    }
-    
-    .work-card.status-completed {
-        border-left-color: #007bff;
-    }
-    
-    .work-card.status-failed,
-    .work-card.status-error {
-        border-left-color: #dc3545;
-    }
-    
-    .work-card.status-cancelled {
-        border-left-color: #6c757d;
-    }
-    
-    .status-badge {
-        font-size: 0.75rem;
-        padding: 0.25rem 0.5rem;
-    }
-    
-    .work-actions {
-        opacity: 0;
-        transition: opacity 0.3s ease;
-    }
-    
-    .work-card:hover .work-actions {
-        opacity: 1;
-    }
-    
+
     .refresh-indicator {
         animation: spin 1s linear infinite;
     }
@@ -57,63 +55,119 @@
         0% { transform: rotate(0deg); }
         100% { transform: rotate(360deg); }
     }
+
+    .status-badge {
+        font-size: 0.75rem;
+        padding: 0.25rem 0.5rem;
+    }
+
+    .table-hover tbody tr:hover {
+        background-color: rgba(0,0,0,.025);
+    }
+
+    .work-actions {
+        opacity: 0.7;
+        transition: opacity 0.3s ease;
+    }
+
+    .work-actions:hover {
+        opacity: 1;
+    }
+
+    .stats-card {
+        background: rgba(255, 255, 255, 0.95);
+        border: none;
+        backdrop-filter: blur(10px);
+    }
+
+    .table-responsive {
+        border-radius: 8px;
+        overflow: hidden;
+    }
+
+    .btn-action {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.875rem;
+        margin: 0 0.125rem;
+    }
+
+    .text-truncate-custom {
+        max-width: 200px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .work-id-cell {
+        font-family: 'Courier New', monospace;
+        font-size: 0.875rem;
+        color: #6c757d;
+    }
     
-    .auto-refresh-controls {
-        background: rgba(0, 123, 255, 0.1);
-        border: 1px solid rgba(0, 123, 255, 0.2);
-        border-radius: 0.375rem;
-        padding: 0.75rem;
+    .tags-container {
+        max-width: 150px;
+        max-height: 40px;
+        overflow: hidden;
+    }
+    
+    .tags-container .badge {
+        font-size: 0.75rem;
+        margin-bottom: 2px;
+    }
+    
+    .pagination .page-link {
+        padding: 0.375rem 0.75rem;
+    }
+    
+    .pagination .page-item.active .page-link {
+        background-color: #0d6efd;
+        border-color: #0d6efd;
+    }
+    
+    #paginationContainer {
+        background-color: #f8f9fa;
     }
 </style>
 {% endblock %}
 
-{% block breadcrumb %}
-<nav aria-label="breadcrumb" class="mb-4">
-    <ol class="breadcrumb">
-        <li class="breadcrumb-item"><a href="/">Home</a></li>
-        <li class="breadcrumb-item active">Work Monitor</li>
-    </ol>
-</nav>
-{% endblock %}
-
 {% block content %}
-<div class="row">
-    <div class="col-12">
-        <div class="d-flex justify-content-between align-items-center mb-4">
-            <div>
-                <h1 class="h3 mb-1">
-                    <i class="bi bi-speedometer2 me-2 text-primary"></i>
-                    Work Monitor
-                </h1>
-                <p class="text-muted mb-0">Monitor and manage your algorithm executions</p>
-            </div>
-            <div class="d-flex gap-2 align-items-center">
-                <div class="auto-refresh-controls">
-                    <div class="form-check form-switch">
-                        <input class="form-check-input" type="checkbox" id="autoRefreshToggle" checked>
-                        <label class="form-check-label" for="autoRefreshToggle">
-                            <small>Auto-refresh</small>
-                        </label>
-                    </div>
-                </div>
-                <button class="btn btn-outline-primary" onclick="refreshWorks()" id="refreshBtn">
-                    <i class="bi bi-arrow-clockwise"></i> Refresh
-                </button>
-            </div>
+<div class="work-monitor">
+    <div class="monitor-container">
+        <!-- Header -->
+        <div class="text-center text-white mb-4">
+            <h1 class="display-4 fw-bold mb-3">
+                <i class="bi bi-speedometer2 me-3"></i>
+                Work Monitor
+            </h1>
+            <p class="lead">
+                Monitor and manage your algorithm executions
+            </p>
         </div>
-    </div>
-</div>
 
-<!-- Filter and Stats Row -->
-<div class="row mb-4">
-    <div class="col-lg-8">
-        <div class="card">
-            <div class="card-body py-3">
+        <!-- Works Table with Integrated Filters -->
+        <div class="monitor-card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <div>
+                    <i class="bi bi-list me-2"></i>
+                    Works List
+                </div>
+                <div class="d-flex gap-2 align-items-center">
+                    <button class="btn btn-outline-primary" onclick="refreshWorks()" id="refreshBtn">
+                        <i class="bi bi-arrow-clockwise"></i> Refresh
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Integrated Filters -->
+            <div class="p-3 border-bottom">
                 <div class="row g-3 align-items-center">
-                    <div class="col-auto">
-                        <label class="form-label small mb-0">Filter by status:</label>
+                    <div class="col-md-3">
+                        <label class="form-label small mb-1">Search:</label>
+                        <input type="text" class="form-control form-control-sm" id="searchInput" 
+                               placeholder="ID, name, author, tags..." onkeyup="debouncedFilter()">
                     </div>
-                    <div class="col-auto">
+                    <div class="col-md-2">
+                        <label class="form-label small mb-1">Status:</label>
                         <select class="form-select form-select-sm" id="statusFilter" onchange="filterWorks()">
                             <option value="">All Status</option>
                             <option value="running">Running</option>
@@ -124,88 +178,103 @@
                             <option value="cancelled">Cancelled</option>
                         </select>
                     </div>
-                    <div class="col-auto">
-                        <label class="form-label small mb-0">Search:</label>
+                    <div class="col-md-2">
+                        <label class="form-label small mb-1">Author:</label>
+                        <input type="text" class="form-control form-control-sm" id="authorFilter" 
+                               placeholder="Author name..." onkeyup="debouncedFilter()">
                     </div>
-                    <div class="col">
-                        <input type="text" class="form-control form-control-sm" id="searchInput" 
-                               placeholder="Search by work ID or config name..." onkeyup="filterWorks()">
+                    <div class="col-md-3">
+                        <label class="form-label small mb-1">Tags:</label>
+                        <input type="text" class="form-control form-control-sm" id="tagsFilter" 
+                               placeholder="tag1, tag2..." onkeyup="debouncedFilter()">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label small mb-1">Per page:</label>
+                        <select class="form-select form-select-sm" id="perPageSelect" onchange="changePerPage()">
+                            <option value="10">10</option>
+                            <option value="20" selected>20</option>
+                            <option value="50">50</option>
+                            <option value="100">100</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="table-responsive">
+                <!-- Loading placeholder -->
+                <div class="text-center py-5" id="loadingIndicator">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading works...</span>
+                    </div>
+                    <p class="mt-3 text-muted">Loading works...</p>
+                </div>
+
+                <!-- Works table -->
+                <table class="table table-hover mb-0 d-none" id="worksTable">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Nome</th>
+                            <th>ID</th>
+                            <th>Status</th>
+                            <th>Author</th>
+                            <th>Tags</th>
+                            <th>Created</th>
+                            <th>Updated</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="worksTableBody">
+                    </tbody>
+                </table>
+
+                <!-- Pagination -->
+                <div class="d-flex justify-content-between align-items-center p-3 border-top d-none" id="paginationContainer">
+                    <div class="text-muted small">
+                        Showing <span id="showingRange"></span> of <span id="totalItems"></span> works
+                    </div>
+                    <nav aria-label="Works pagination">
+                        <ul class="pagination pagination-sm mb-0" id="pagination">
+                        </ul>
+                    </nav>
+                </div>
+
+                <!-- Empty state -->
+                <div class="text-center py-5 d-none" id="emptyState">
+                    <div class="text-muted">
+                        <i class="bi bi-inbox display-1"></i>
+                        <h4 class="mt-3">No Works Found</h4>
+                        <p>No algorithm executions have been created yet.</p>
+                        <a href="/batch/manage" class="btn btn-primary">
+                            <i class="bi bi-plus-circle me-2"></i>Create New Batch
+                        </a>
                     </div>
                 </div>
             </div>
         </div>
     </div>
-    <div class="col-lg-4">
-        <div class="card bg-light">
-            <div class="card-body py-3">
-                <div class="row text-center">
-                    <div class="col-4">
-                        <div class="text-success fw-bold" id="runningCount">0</div>
-                        <small class="text-muted">Running</small>
-                    </div>
-                    <div class="col-4">
-                        <div class="text-warning fw-bold" id="queuedCount">0</div>
-                        <small class="text-muted">Queued</small>
-                    </div>
-                    <div class="col-4">
-                        <div class="text-primary fw-bold" id="totalCount">0</div>
-                        <small class="text-muted">Total</small>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
 </div>
-
-<!-- Works List -->
-<div class="row" id="worksContainer">
-    <!-- Loading placeholder -->
-    <div class="col-12 text-center py-5" id="loadingIndicator">
-        <div class="spinner-border text-primary" role="status">
-            <span class="visually-hidden">Loading works...</span>
-        </div>
-        <p class="mt-3 text-muted">Loading works...</p>
-    </div>
-</div>
-
-<!-- Empty state -->
-<div class="row d-none" id="emptyState">
-    <div class="col-12 text-center py-5">
-        <div class="text-muted">
-            <i class="bi bi-inbox display-1"></i>
-            <h4 class="mt-3">No Works Found</h4>
-            <p>No algorithm executions have been created yet.</p>
-            <a href="/batch/manage" class="btn btn-primary">
-                <i class="bi bi-plus-circle me-2"></i>Create New Batch
-            </a>
-        </div>
-    </div>
-</div>
-
 {% endblock %}
 
 {% block extra_js %}
 <script>
-let allWorks = [];
+let currentPage = 1;
+let perPage = 20;
+let totalPages = 1;
 let autoRefreshInterval = null;
+let filterTimeout = null;
 
 // Initialize page
 document.addEventListener('DOMContentLoaded', function() {
     loadWorks();
     
-    // Setup auto-refresh
-    const autoRefreshToggle = document.getElementById('autoRefreshToggle');
-    autoRefreshToggle.addEventListener('change', function() {
-        if (this.checked) {
-            startAutoRefresh();
-        } else {
-            stopAutoRefresh();
-        }
-    });
-    
-    // Start auto-refresh by default
+    // Start auto-refresh always enabled
     startAutoRefresh();
 });
+
+function debouncedFilter() {
+    clearTimeout(filterTimeout);
+    filterTimeout = setTimeout(filterWorks, 300);
+}
 
 function startAutoRefresh() {
     stopAutoRefresh(); // Clear any existing interval
@@ -219,6 +288,24 @@ function stopAutoRefresh() {
     }
 }
 
+function getFilterParams() {
+    const statusFilter = document.getElementById('statusFilter').value;
+    const searchInput = document.getElementById('searchInput').value;
+    const authorFilter = document.getElementById('authorFilter').value;
+    const tagsFilter = document.getElementById('tagsFilter').value;
+    
+    const params = new URLSearchParams();
+    params.set('page', currentPage);
+    params.set('per_page', perPage);
+    
+    if (statusFilter) params.set('status', statusFilter);
+    if (searchInput) params.set('search', searchInput);
+    if (authorFilter) params.set('author', authorFilter);
+    if (tagsFilter) params.set('tags', tagsFilter);
+    
+    return params.toString();
+}
+
 async function loadWorks() {
     try {
         // Show refresh indicator
@@ -226,11 +313,10 @@ async function loadWorks() {
         const refreshIcon = refreshBtn.querySelector('i');
         refreshIcon.classList.add('refresh-indicator');
         
-        const response = await window.apiClient.request('/api/monitor/works');
-        allWorks = response.works || [];
+        const params = getFilterParams();
+        const response = await window.apiClient.request(`/api/monitor/works?${params}`);
         
-        updateStats(allWorks);
-        filterWorks();
+        renderWorks(response);
         
     } catch (error) {
         console.error('Failed to load works:', error);
@@ -248,128 +334,220 @@ function refreshWorks() {
     loadWorks();
 }
 
-function updateStats(works) {
-    const stats = works.reduce((acc, work) => {
-        acc.total++;
-        if (work.status === 'running') acc.running++;
-        if (work.status === 'queued') acc.queued++;
-        return acc;
-    }, { total: 0, running: 0, queued: 0 });
-    
-    document.getElementById('totalCount').textContent = stats.total;
-    document.getElementById('runningCount').textContent = stats.running;
-    document.getElementById('queuedCount').textContent = stats.queued;
-}
-
 function filterWorks() {
-    const statusFilter = document.getElementById('statusFilter').value;
-    const searchTerm = document.getElementById('searchInput').value.toLowerCase();
-    
-    let filteredWorks = allWorks;
-    
-    // Filter by status
-    if (statusFilter) {
-        filteredWorks = filteredWorks.filter(work => work.status === statusFilter);
-    }
-    
-    // Filter by search term
-    if (searchTerm) {
-        filteredWorks = filteredWorks.filter(work => 
-            work.id.toLowerCase().includes(searchTerm) ||
-            work.config_name.toLowerCase().includes(searchTerm) ||
-            work.config_description.toLowerCase().includes(searchTerm)
-        );
-    }
-    
-    renderWorks(filteredWorks);
+    currentPage = 1; // Reset to first page when filtering
+    loadWorks();
 }
 
-function renderWorks(works) {
-    const container = document.getElementById('worksContainer');
+function changePerPage() {
+    perPage = parseInt(document.getElementById('perPageSelect').value);
+    currentPage = 1; // Reset to first page
+    loadWorks();
+}
+
+function changePage(page) {
+    currentPage = page;
+    loadWorks();
+}
+
+function renderWorks(response) {
+    const table = document.getElementById('worksTable');
+    const tableBody = document.getElementById('worksTableBody');
     const emptyState = document.getElementById('emptyState');
+    const paginationContainer = document.getElementById('paginationContainer');
+    
+    const works = response.works || [];
     
     if (works.length === 0) {
-        container.innerHTML = '';
+        table.classList.add('d-none');
+        paginationContainer.classList.add('d-none');
         emptyState.classList.remove('d-none');
         return;
     }
     
     emptyState.classList.add('d-none');
+    table.classList.remove('d-none');
+    paginationContainer.classList.remove('d-none');
     
-    const html = works.map(work => createWorkCard(work)).join('');
-    container.innerHTML = html;
+    // Update pagination info
+    totalPages = response.total_pages || 1;
+    updatePaginationInfo(response);
+    renderPagination(response);
+    
+    const html = works.map(work => createWorkRow(work)).join('');
+    tableBody.innerHTML = html;
 }
 
-function createWorkCard(work) {
+function updatePaginationInfo(response) {
+    const totalItems = response.total || 0;
+    const startItem = totalItems > 0 ? ((currentPage - 1) * perPage) + 1 : 0;
+    const endItem = Math.min(currentPage * perPage, totalItems);
+    
+    document.getElementById('showingRange').textContent = `${startItem}-${endItem}`;
+    document.getElementById('totalItems').textContent = totalItems;
+}
+
+function renderPagination(response) {
+    const pagination = document.getElementById('pagination');
+    const totalPages = response.total_pages || 1;
+    const hasNext = response.has_next || false;
+    const hasPrev = response.has_prev || false;
+    
+    let html = '';
+    
+    // Previous button
+    html += `
+        <li class="page-item ${!hasPrev ? 'disabled' : ''}">
+            <a class="page-link" href="#" onclick="${hasPrev ? `changePage(${currentPage - 1})` : 'return false'}" ${!hasPrev ? 'tabindex="-1"' : ''}>
+                <i class="bi bi-chevron-left"></i>
+            </a>
+        </li>
+    `;
+    
+    // Page numbers
+    const startPage = Math.max(1, currentPage - 2);
+    const endPage = Math.min(totalPages, currentPage + 2);
+    
+    if (startPage > 1) {
+        html += `
+            <li class="page-item">
+                <a class="page-link" href="#" onclick="changePage(1)">1</a>
+            </li>
+        `;
+        if (startPage > 2) {
+            html += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
+        }
+    }
+    
+    for (let i = startPage; i <= endPage; i++) {
+        html += `
+            <li class="page-item ${i === currentPage ? 'active' : ''}">
+                <a class="page-link" href="#" onclick="changePage(${i})">${i}</a>
+            </li>
+        `;
+    }
+    
+    if (endPage < totalPages) {
+        if (endPage < totalPages - 1) {
+            html += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
+        }
+        html += `
+            <li class="page-item">
+                <a class="page-link" href="#" onclick="changePage(${totalPages})">${totalPages}</a>
+            </li>
+        `;
+    }
+    
+    // Next button
+    html += `
+        <li class="page-item ${!hasNext ? 'disabled' : ''}">
+            <a class="page-link" href="#" onclick="${hasNext ? `changePage(${currentPage + 1})` : 'return false'}" ${!hasNext ? 'tabindex="-1"' : ''}>
+                <i class="bi bi-chevron-right"></i>
+            </a>
+        </li>
+    `;
+    
+    pagination.innerHTML = html;
+}
+
+function createWorkRow(work) {
     const createdDate = new Date(work.created_at * 1000);
     const updatedDate = new Date(work.updated_at * 1000);
-    const statusClass = `status-${work.status}`;
     const statusColor = getStatusColor(work.status);
     const statusIcon = getStatusIcon(work.status);
     
+    // Format tags
+    const tagsHtml = work.config_tags && work.config_tags.length > 0 
+        ? work.config_tags.map(tag => `<span class="badge bg-light text-dark me-1">${tag}</span>`).join('')
+        : '<span class="text-muted">-</span>';
+    
     return `
-        <div class="col-lg-6 col-xl-4 mb-4">
-            <div class="card work-card ${statusClass}" data-work-id="${work.id}">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-start mb-3">
-                        <div class="flex-grow-1">
-                            <h6 class="card-title mb-1 text-truncate" title="${work.config_name}">
-                                ${work.config_name}
-                            </h6>
-                            <small class="text-muted font-monospace">${work.id}</small>
-                        </div>
-                        <span class="badge bg-${statusColor} status-badge">
-                            <i class="bi bi-${statusIcon} me-1"></i>${work.status}
-                        </span>
+        <tr data-work-id="${work.id}">
+            <td>
+                <div>
+                    <div class="fw-medium text-truncate-custom" title="${work.config_name}">
+                        ${work.config_name}
                     </div>
-                    
                     ${work.config_description ? `
-                        <p class="card-text small text-muted mb-2" title="${work.config_description}">
-                            ${work.config_description.length > 80 ? 
-                                work.config_description.substring(0, 80) + '...' : 
+                        <small class="text-muted text-truncate-custom d-block" title="${work.config_description}">
+                            ${work.config_description.length > 50 ? 
+                                work.config_description.substring(0, 50) + '...' : 
                                 work.config_description}
-                        </p>
+                        </small>
                     ` : ''}
-                    
-                    <div class="small text-muted mb-3">
-                        <div><i class="bi bi-calendar me-1"></i>Created: ${createdDate.toLocaleString()}</div>
-                        <div><i class="bi bi-clock me-1"></i>Updated: ${updatedDate.toLocaleString()}</div>
-                        ${work.config_author ? `<div><i class="bi bi-person me-1"></i>Author: ${work.config_author}</div>` : ''}
-                    </div>
-                    
                     ${work.error ? `
-                        <div class="alert alert-danger alert-sm py-2">
-                            <small><i class="bi bi-exclamation-triangle me-1"></i>${work.error}</small>
-                        </div>
+                        <small class="text-danger d-block">
+                            <i class="bi bi-exclamation-triangle me-1"></i>
+                            ${work.error.length > 50 ? work.error.substring(0, 50) + '...' : work.error}
+                        </small>
                     ` : ''}
-                    
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div class="work-actions">
-                            ${work.status === 'running' ? `
-                                <button class="btn btn-sm btn-outline-warning me-1" onclick="workAction('${work.id}', 'pause')" title="Pause">
-                                    <i class="bi bi-pause"></i>
-                                </button>
-                            ` : ''}
-                            ${work.status === 'paused' ? `
-                                <button class="btn btn-sm btn-outline-success me-1" onclick="workAction('${work.id}', 'resume')" title="Resume">
-                                    <i class="bi bi-play"></i>
-                                </button>
-                            ` : ''}
-                            ${['running', 'queued', 'paused'].includes(work.status) ? `
-                                <button class="btn btn-sm btn-outline-danger me-1" onclick="workAction('${work.id}', 'cancel')" title="Cancel">
-                                    <i class="bi bi-stop"></i>
-                                </button>
-                            ` : ''}
-                        </div>
-                        <button class="btn btn-sm btn-primary" onclick="monitorWork('${work.id}')">
-                            ${['running', 'queued'].includes(work.status) ? 
-                                '<i class="bi bi-speedometer2 me-1"></i>Monitor' : 
-                                '<i class="bi bi-eye me-1"></i>View'}
-                        </button>
-                    </div>
                 </div>
-            </div>
-        </div>
+            </td>
+            <td class="work-id-cell">
+                <div class="text-truncate-custom" title="${work.id}">
+                    ${work.id}
+                </div>
+            </td>
+            <td>
+                <span class="badge bg-${statusColor} status-badge">
+                    <i class="bi bi-${statusIcon} me-1"></i>${work.status}
+                </span>
+            </td>
+            <td>
+                <small class="text-muted">
+                    ${work.config_author || '-'}
+                </small>
+            </td>
+            <td>
+                <div class="tags-container">
+                    ${tagsHtml}
+                </div>
+            </td>
+            <td>
+                <small class="text-muted">
+                    ${createdDate.toLocaleDateString()}<br>
+                    ${createdDate.toLocaleTimeString()}
+                </small>
+            </td>
+            <td>
+                <small class="text-muted">
+                    ${updatedDate.toLocaleDateString()}<br>
+                    ${updatedDate.toLocaleTimeString()}
+                </small>
+            </td>
+            <td>
+                <div class="work-actions d-flex gap-1">
+                    ${work.status === 'running' ? `
+                        <button class="btn btn-sm btn-outline-warning btn-action" 
+                                onclick="workAction('${work.id}', 'pause')" 
+                                title="Pause">
+                            <i class="bi bi-pause"></i>
+                        </button>
+                    ` : ''}
+                    ${work.status === 'paused' ? `
+                        <button class="btn btn-sm btn-outline-success btn-action" 
+                                onclick="workAction('${work.id}', 'resume')" 
+                                title="Resume">
+                            <i class="bi bi-play"></i>
+                        </button>
+                    ` : ''}
+                    ${['running', 'queued', 'paused'].includes(work.status) ? `
+                        <button class="btn btn-sm btn-outline-danger btn-action" 
+                                onclick="workAction('${work.id}', 'cancel')" 
+                                title="Cancel">
+                            <i class="bi bi-stop"></i>
+                        </button>
+                    ` : ''}
+                    <button class="btn btn-sm btn-primary btn-action" 
+                            onclick="monitorWork('${work.id}')"
+                            title="${['running', 'queued'].includes(work.status) ? 'Monitor' : 'View'}">
+                        ${['running', 'queued'].includes(work.status) ? 
+                            '<i class="bi bi-speedometer2"></i>' : 
+                            '<i class="bi bi-eye"></i>'}
+                    </button>
+                </div>
+            </td>
+        </tr>
     `;
 }
 
@@ -424,15 +602,16 @@ function showAlert(message, type = 'info') {
     // Create alert element
     const alertId = 'alert-' + Date.now();
     const alertHtml = `
-        <div class="alert alert-${type} alert-dismissible fade show" role="alert" id="${alertId}">
+        <div class="alert alert-${type} alert-dismissible fade show position-fixed" 
+             role="alert" id="${alertId}" 
+             style="top: 20px; right: 20px; z-index: 1060; max-width: 400px;">
             ${message}
             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         </div>
     `;
     
     // Add to page
-    const container = document.querySelector('.container');
-    container.insertAdjacentHTML('afterbegin', alertHtml);
+    document.body.insertAdjacentHTML('beforeend', alertHtml);
     
     // Auto-remove after 5 seconds
     setTimeout(() => {

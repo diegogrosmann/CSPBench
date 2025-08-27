@@ -40,7 +40,7 @@ datasets:
 
       # Parâmetros comuns
       n: 30
-      L: 80
+      L: 50
       alphabet: "ACGT"
       seed: 42
     # --- Modo "random": sem parâmetros adicionais ---

@@ -40,9 +40,22 @@
   .event-log-placeholder { min-height:220px; }
   .progress-ring-wrapper { width:140px; height:140px; position:relative; }
   .progress-ring-wrapper .percent { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-weight:600; font-size:1.25rem; }
+  /* Auto-follow button styles */
+  #autoFollowBtn.active { background-color: #667eea; border-color: #667eea; color: white; }
+  #autoFollowBtn.active:hover { background-color: #5a6fd8; border-color: #5a6fd8; }
+  /* Highlight current running execution */
+  .table-info { background-color: rgba(102, 126, 234, 0.1) !important; }
   /* Scroll containers */
   .scroll-y { max-height:260px; overflow-y:auto; }
   .small-label { font-size:.65rem; text-transform:uppercase; letter-spacing:.5px; color:#6c757d; }
+  /* Event log styles */
+  .event-type-error { background-color: #dc3545; color: white; }
+  .event-type-warning { background-color: #ffc107; color: #212529; }
+  .event-type-progress { background-color: #0dcaf0; color: #212529; }
+  .event-timestamp { font-family: 'Courier New', monospace; font-size: 0.75rem; }
+  .event-data { font-size: 0.8rem; max-width: 300px; overflow: hidden; text-overflow: ellipsis; }
+  .event-data-expanded { max-width: none; white-space: pre-wrap; word-break: break-word; }
+  #btnAutoScroll.active { background-color: #198754; border-color: #198754; color: white; }
   /* Ajustes responsivos */
   @media (max-width: 1199.98px) {
     .progress-ring-wrapper { width:120px; height:120px; }
@@ -57,7 +70,7 @@
     <!-- Título -->
     <div class="text-center text-white mb-5">
       <h1 class="display-5 fw-bold mb-2"><i class="bi bi-activity me-3"></i>Work Progress Monitor</h1>
-      <p class="lead mb-0">Estrutura base (placeholder) para visualização incremental de progresso</p>
+      <p class="lead mb-0">Monitoramento em tempo real do progresso de execução</p>
     </div>
 
     <!-- Resumo Global -->
@@ -66,16 +79,24 @@
         <div class="d-flex align-items-center gap-2">
           <h5 class="mb-0"><i class="bi bi-graph-up me-2"></i>Resumo</h5>
           <span class="badge bg-secondary status-badge" id="workStatusBadge">STATUS</span>
-          <span class="ms-3 small text-muted d-flex align-items-center" id="elapsedWrapper"><i class="bi bi-clock-history me-1"></i><span id="elapsedTime">--</span></span>
+          <span class="ms-3 small text-muted d-flex align-items-center" id="startTimeWrapper"><i class="bi bi-play-circle me-1"></i><span id="startTime">--</span></span>
         </div>
-        <div class="d-flex flex-wrap gap-2" id="workActions">
-          <!-- Botão Refresh removido -->
-          <div class="btn-group btn-group-sm" role="group">
-            <button class="btn btn-outline-warning" id="btnPause"><i class="bi bi-pause-fill me-1"></i>Pausar</button>
-            <button class="btn btn-outline-success d-none" id="btnResume"><i class="bi bi-play-fill me-1"></i>Retomar</button>
-            <button class="btn btn-outline-danger" id="btnCancel"><i class="bi bi-x-circle me-1"></i>Cancelar</button>
+        <div class="d-flex flex-column align-items-end gap-1">
+          <div class="small text-muted">
+            <i class="bi bi-file-earmark-text me-1"></i>
+            <span id="batchName">Carregando...</span>
           </div>
-          <a href="/monitor/works" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Voltar</a>
+          <div class="d-flex flex-wrap gap-2" id="workActions">
+            <!-- Botões de ação -->
+            <div class="btn-group btn-group-sm" role="group">
+              <button class="btn btn-outline-warning" id="btnPause"><i class="bi bi-pause-fill me-1"></i>Pausar</button>
+              <button class="btn btn-outline-success d-none" id="btnResume"><i class="bi bi-play-fill me-1"></i>Retomar</button>
+              <button class="btn btn-outline-danger" id="btnCancel"><i class="bi bi-x-circle me-1"></i>Cancelar</button>
+            </div>
+            <!-- Botão para ir ao resultado -->
+            <button class="btn btn-outline-info btn-sm" id="btnGoToResult" title="Ver resultado"><i class="bi bi-box-arrow-up-right me-1"></i>Resultado</button>
+            <a href="/monitor/works" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Voltar</a>
+          </div>
         </div>
       </div>
       <div class="card-body">
@@ -127,24 +148,21 @@
     <div class="monitor-card">
       <div class="card-header">
         <ul class="nav nav-tabs card-header-tabs" id="monitorTabs" role="tablist">
-          <li class="nav-item" role="presentation"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-overview" type="button" role="tab"><i class="bi bi-speedometer2 me-1"></i>Overview</button></li>
-          <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-executions" type="button" role="tab"><i class="bi bi-list-task me-1"></i>Executions</button></li>
+          <li class="nav-item" role="presentation"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-executions" type="button" role="tab"><i class="bi bi-list-task me-1"></i>Executions</button></li>
           <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-events" type="button" role="tab"><i class="bi bi-journal-text me-1"></i>Events</button></li>
-          <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-details" type="button" role="tab"><i class="bi bi-braces me-1"></i>Details</button></li>
         </ul>
       </div>
       <div class="card-body tab-content">
-        <!-- Overview Tab -->
-        <div class="tab-pane fade show active" id="tab-overview" role="tabpanel">
-          <div class="placeholder-box">Overview placeholder (gráficos, KPIs, etc.)</div>
-        </div>
         <!-- Executions Tab -->
-        <div class="tab-pane fade" id="tab-executions" role="tabpanel">
+        <div class="tab-pane fade show active" id="tab-executions" role="tabpanel">
           <div class="row g-2 mb-3 align-items-center">
             <div class="col-lg-4 col-md-5">
               <label class="form-label small text-uppercase fw-semibold text-muted mb-1 d-flex align-items-center"><i class="bi bi-filter-square me-1"></i>Combinação</label>
               <div class="d-flex gap-2 align-items-center combo-filter-wrapper">
                 <select class="form-select form-select-sm" id="combinationSelect"></select>
+                <button class="btn btn-sm btn-outline-secondary" id="autoFollowBtn" title="Seguir execução atual automaticamente">
+                  <i class="bi bi-magnet" id="autoFollowIcon"></i>
+                </button>
               </div>
             </div>
             <div class="col-lg-8 col-md-7">
@@ -202,23 +220,126 @@
               </tbody>
             </table>
           </div>
+          
+          <!-- Paginação para Executions -->
+          <div class="d-flex justify-content-between align-items-center mt-3">
+            <div class="text-muted small">
+              <span id="executionsInfo">Mostrando 0 de 0 execuções</span>
+            </div>
+            <nav aria-label="Executions pagination">
+              <ul class="pagination pagination-sm mb-0" id="executionsPagination">
+                <!-- Paginação será gerada via JavaScript -->
+              </ul>
+            </nav>
+          </div>
         </div>
         <!-- Events Tab -->
         <div class="tab-pane fade" id="tab-events" role="tabpanel">
-          <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
-            <h6 class="mb-0"><i class="bi bi-journal-text me-2"></i>Event Log</h6>
-            <div class="btn-group btn-group-sm" role="group">
-              <button class="btn btn-outline-secondary" disabled>Auto-Scroll</button>
-              <button class="btn btn-outline-secondary" disabled>Clear</button>
+          <!-- Filtros -->
+          <div class="row g-2 mb-3 align-items-end">
+            <div class="col-md-2">
+              <label class="form-label small text-uppercase fw-semibold text-muted mb-1">Tipo</label>
+              <select class="form-select form-select-sm" id="eventTypeFilter">
+                <option value="">Todos</option>
+                <option value="error">Error</option>
+                <option value="warning">Warning</option>
+                <option value="progress">Progress</option>
+              </select>
+            </div>
+            <div class="col-md-2">
+              <label class="form-label small text-uppercase fw-semibold text-muted mb-1">Categoria</label>
+              <select class="form-select form-select-sm" id="eventCategoryFilter">
+                <option value="">Todas</option>
+                <option value="work">Work</option>
+                <option value="task">Task</option>
+                <option value="dataset">Dataset</option>
+                <option value="preset">Preset</option>
+                <option value="combination">Combination</option>
+                <option value="unit">Unit</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label small text-uppercase fw-semibold text-muted mb-1">Filtro de Texto</label>
+              <input type="text" class="form-control form-control-sm" id="eventTextFilter" placeholder="Buscar no entity_data...">
+            </div>
+            <div class="col-md-2">
+              <label class="form-label small text-uppercase fw-semibold text-muted mb-1">Data Início</label>
+              <input type="datetime-local" class="form-control form-control-sm" id="eventDateFromFilter">
+            </div>
+            <div class="col-md-2">
+              <label class="form-label small text-uppercase fw-semibold text-muted mb-1">Data Fim</label>
+              <input type="datetime-local" class="form-control form-control-sm" id="eventDateToFilter">
+            </div>
+            <div class="col-md-1 d-flex align-items-end">
+              <button class="btn btn-outline-success btn-sm" id="btnAutoScroll" title="Auto-refresh para primeira página">
+                <i class="bi bi-arrow-clockwise"></i>
+              </button>
             </div>
           </div>
-            <div class="event-log-placeholder border rounded p-3" id="eventLog">
-              <div class="text-center text-muted">No events (placeholder)</div>
+          
+          <!-- Event Log Container -->
+          <div class="border rounded">
+            <div class="table-responsive">
+              <table class="table table-sm table-hover mb-0" id="eventLogTable">
+                <thead class="table-light">
+                  <tr>
+                    <th style="width: 120px">Timestamp</th>
+                    <th style="width: 80px">Tipo</th>
+                    <th style="width: 100px">Categoria</th>
+                    <th>Dados</th>
+                  </tr>
+                </thead>
+                <tbody id="eventLogTableBody">
+                  <tr>
+                    <td colspan="4" class="text-center text-muted py-4">
+                      <i class="bi bi-inbox me-1"></i>Nenhum evento encontrado
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
-        </div>
-        <!-- Details Tab -->
-        <div class="tab-pane fade" id="tab-details" role="tabpanel">
-          <div class="placeholder-box" id="detailsJson">Raw data / JSON (placeholder)</div>
+          </div>
+          
+          <!-- Paginação para Events -->
+          <div class="d-flex justify-content-between align-items-center mt-3">
+            <div class="text-muted small">
+              <span id="eventsInfo">Mostrando 0 de 0 eventos</span>
+            </div>
+            <nav aria-label="Events pagination">
+              <ul class="pagination pagination-sm mb-0" id="eventsPagination">
+                <!-- Paginação será gerada via JavaScript -->
+              </ul>
+            </nav>
+          </div>
+          
+          <!-- Statistics -->
+          <div class="row g-2 mt-2">
+            <div class="col-md-3">
+              <div class="text-center p-2 border rounded">
+                <div class="small text-muted">Total</div>
+                <div class="fw-bold" id="eventStatsTotal">0</div>
+              </div>
+            </div>
+            <div class="col-md-3">
+              <div class="text-center p-2 border rounded">
+                <div class="small text-muted">Errors</div>
+                <div class="fw-bold text-danger" id="eventStatsErrors">0</div>
+              </div>
+            </div>
+            <div class="col-md-3">
+              <div class="text-center p-2 border rounded">
+                <div class="small text-muted">Warnings</div>
+                <div class="fw-bold text-warning" id="eventStatsWarnings">0</div>
+              </div>
+            </div>
+            <div class="col-md-3">
+              <div class="text-center p-2 border rounded">
+                <div class="small text-muted">Progress</div>
+                <div class="fw-bold text-info" id="eventStatsProgress">0</div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -247,13 +368,266 @@
 
 {% block extra_js %}
 <script>
-// === Dynamic Summary Implementation (Resumo) ===
+// === Variáveis Globais ===
+const ITEMS_PER_PAGE = 10;
+
+let allExecutions = [];
+let filteredExecutions = [];
+let currentExecutionsPage = 1;
+
+let allEvents = [];
+let filteredEvents = [];
+let currentEventsPage = 1;
+
+// === Dados de Teste para Paginação ===
+// Adicionar dados fake para testar paginação
+function addTestData() {
+  // Adicionar 25 execuções fake
+  for (let i = 1; i <= 25; i++) {
+    allExecutions.push({
+      id: `exec_${i}`,
+      status: i % 4 === 0 ? 'failed' : i % 3 === 0 ? 'completed' : i % 2 === 0 ? 'running' : 'queued',
+      algorithm: `Algorithm ${i}`,
+      dataset: `Dataset ${i}`,
+      config: `Config ${i}`,
+      task: `Task ${i}`,
+      started_at: Date.now() - (i * 60000),
+      completed_at: i % 2 === 0 ? Date.now() - (i * 30000) : null
+    });
+  }
+  
+  // Adicionar 30 eventos fake
+  for (let i = 1; i <= 30; i++) {
+    allEvents.push({
+      id: i,
+      event_type: i % 4 === 0 ? 'error' : i % 3 === 0 ? 'warning' : i % 2 === 0 ? 'info' : 'progress',
+      event_category: `category_${i % 5}`,
+      timestamp: Date.now() - (i * 30000),
+      entity_data: { message: `Mensagem de teste ${i}`, details: `Detalhes ${i}` }
+    });
+  }
+  
+  // Aplicar dados iniciais
+  filteredExecutions = [...allExecutions];
+  filteredEvents = [...allEvents];
+  
+  console.log('Dados de teste adicionados:', { executions: allExecutions.length, events: allEvents.length });
+  
+  // Renderizar dados de teste imediatamente
+  renderExecutionsPagination();
+  renderExecutionsTable();
+  renderEventsPagination();
+  renderEventsTable();
+}
+
+// Chamar função de teste na inicialização (comentar para usar dados reais)
+// addTestData();
+
+// === Funções Globais de Paginação ===
+// Funções de formatação (movidas para escopo global)
+function formatStatusBadge(status) {
+  const map = {running:'primary',completed:'success',queued:'info',failed:'danger',error:'danger',paused:'warning'};
+  const cls = map[status] || 'secondary';
+  return `<span class="badge bg-${cls} small">${(status||'').toUpperCase()}</span>`;
+}
+
+function formatTime(ts) {
+  const d = new Date(ts*1000);
+  return d.toLocaleTimeString();
+}
+
+function escapeHtml(str) {
+  return str.replace(/[&<>'"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;","\"":"&quot;"}[c]));
+}
+
+// Funções de formatação para eventos
+function formatEventTime(timestamp) {
+  const date = new Date(timestamp * 1000);
+  return date.toLocaleTimeString('pt-BR', { hour12: false });
+}
+
+function formatEventType(type) {
+  const typeClass = `event-type-${type}`;
+  return `<span class="badge ${typeClass}">${type.toUpperCase()}</span>`;
+}
+
+function formatEventData(entityData) {
+  try {
+    const jsonStr = JSON.stringify(entityData, null, 2);
+    const truncated = jsonStr.length > 100 ? jsonStr.substring(0, 100) + '...' : jsonStr;
+    return `<code class="event-data" title="${jsonStr.replace(/"/g, '&quot;')}">${truncated.replace(/[&<>'"]/g, c => ({'&':'&amp;', '<':'&lt;', '>':'&gt;', "'":"&#39;", '"':'&quot;'}[c]))}</code>`;
+  } catch {
+    return '<code class="event-data">Invalid JSON</code>';
+  }
+}
+
+function changeExecutionsPage(page) {
+  const totalPages = Math.ceil(filteredExecutions.length / ITEMS_PER_PAGE);
+  if (page < 1 || page > totalPages) return;
+  
+  currentExecutionsPage = page;
+  renderExecutionsPagination();
+  renderExecutionsTable();
+}
+
+function changeEventsPage(page) {
+  const totalPages = Math.ceil(filteredEvents.length / ITEMS_PER_PAGE);
+  if (page < 1 || page > totalPages) return;
+  
+  currentEventsPage = page;
+  renderEventsPagination();
+  renderEventsTable();
+}
+
+function renderExecutionsPagination() {
+  const totalPages = Math.ceil(filteredExecutions.length / ITEMS_PER_PAGE);
+  const paginationContainer = document.getElementById('executionsPagination');
+  const infoContainer = document.getElementById('executionsInfo');
+  
+  if (!paginationContainer) return;
+  
+  // Atualizar informações
+  const start = (currentExecutionsPage - 1) * ITEMS_PER_PAGE + 1;
+  const end = Math.min(currentExecutionsPage * ITEMS_PER_PAGE, filteredExecutions.length);
+  if (infoContainer) infoContainer.textContent = `Mostrando ${start}-${end} de ${filteredExecutions.length} execuções`;
+  
+  if (totalPages <= 1) {
+    paginationContainer.innerHTML = '';
+    return;
+  }
+  
+  let html = '';
+  
+  // Botão anterior
+  html += `<li class="page-item ${currentExecutionsPage === 1 ? 'disabled' : ''}">
+    <a class="page-link" href="#" onclick="changeExecutionsPage(${currentExecutionsPage - 1}); return false;">Anterior</a>
+  </li>`;
+  
+  // Páginas
+  for (let i = 1; i <= totalPages; i++) {
+    if (i === currentExecutionsPage) {
+      html += `<li class="page-item active"><span class="page-link">${i}</span></li>`;
+    } else {
+      html += `<li class="page-item"><a class="page-link" href="#" onclick="changeExecutionsPage(${i}); return false;">${i}</a></li>`;
+    }
+  }
+  
+  // Botão próximo
+  html += `<li class="page-item ${currentExecutionsPage === totalPages ? 'disabled' : ''}">
+    <a class="page-link" href="#" onclick="changeExecutionsPage(${currentExecutionsPage + 1}); return false;">Próximo</a>
+  </li>`;
+  
+  paginationContainer.innerHTML = html;
+}
+
+function renderEventsPagination() {
+  const totalPages = Math.ceil(filteredEvents.length / ITEMS_PER_PAGE);
+  const paginationContainer = document.getElementById('eventsPagination');
+  const infoContainer = document.getElementById('eventsInfo');
+  
+  if (!paginationContainer) return;
+  
+  // Atualizar informações
+  const start = (currentEventsPage - 1) * ITEMS_PER_PAGE + 1;
+  const end = Math.min(currentEventsPage * ITEMS_PER_PAGE, filteredEvents.length);
+  if (infoContainer) infoContainer.textContent = `Mostrando ${start}-${end} de ${filteredEvents.length} eventos`;
+  
+  if (totalPages <= 1) {
+    paginationContainer.innerHTML = '';
+    return;
+  }
+  
+  let html = '';
+  
+  // Botão anterior
+  html += `<li class="page-item ${currentEventsPage === 1 ? 'disabled' : ''}">
+    <a class="page-link" href="#" onclick="changeEventsPage(${currentEventsPage - 1}); return false;">Anterior</a>
+  </li>`;
+  
+  // Páginas
+  for (let i = 1; i <= totalPages; i++) {
+    if (i === currentEventsPage) {
+      html += `<li class="page-item active"><span class="page-link">${i}</span></li>`;
+    } else {
+      html += `<li class="page-item"><a class="page-link" href="#" onclick="changeEventsPage(${i}); return false;">${i}</a></li>`;
+    }
+  }
+  
+  // Botão próximo
+  html += `<li class="page-item ${currentEventsPage === totalPages ? 'disabled' : ''}">
+    <a class="page-link" href="#" onclick="changeEventsPage(${currentEventsPage + 1}); return false;">Próximo</a>
+  </li>`;
+  
+  paginationContainer.innerHTML = html;
+}
+
+function renderExecutionsTable() {
+  const start = (currentExecutionsPage - 1) * ITEMS_PER_PAGE;
+  const end = start + ITEMS_PER_PAGE;
+  
+  // Ordenar execuções por sequência (igual à função original)
+  const sortedExecutions = [...filteredExecutions].sort((a, b) => (a.sequencia || 0) - (b.sequencia || 0));
+  const pageExecutions = sortedExecutions.slice(start, end);
+  
+  // Renderizar apenas os itens da página atual
+  const tbody = document.getElementById('executionsTableBody');
+  if (!tbody) return;
+  
+  if (pageExecutions.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4"><i class="bi bi-inbox me-1"></i>Nenhuma execução</td></tr>';
+    return;
+  }
+
+  // Renderizar execuções usando a mesma estrutura da função original
+  tbody.innerHTML = pageExecutions.map(exec => {
+    const progressWidth = Math.round((exec.progress || 0) * 100);
+    const tableClass = exec.status === 'running' ? ' class="table-info"' : '';
+    
+    return `<tr${tableClass}>
+        <td class="text-muted">${exec.sequencia || '—'}</td>
+        <td>${formatStatusBadge(exec.status)}</td>
+        <td><div class="progress" style="height:6px;"><div class="progress-bar" style="width:${progressWidth}%"></div></div></td>
+        <td>${exec.started_at ? formatTime(exec.started_at) : '—'}</td>
+        <td>${exec.finished_at ? formatTime(exec.finished_at) : '—'}</td>
+        <td class="small">${escapeHtml(exec.progress_message || '')}</td>
+      </tr>`;
+  }).join('');
+}
+
+function renderEventsTable() {
+  const tbody = document.getElementById('eventLogTableBody');
+  if (!tbody) return;
+  
+  if (filteredEvents.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-4"><i class="bi bi-inbox me-1"></i>Nenhum evento encontrado</td></tr>';
+    return;
+  }
+
+  // Ordenar por timestamp (mais novos primeiro) - igual à função original
+  const sortedEvents = [...filteredEvents].sort((a, b) => b.timestamp - a.timestamp);
+  
+  // Aplicar paginação
+  const start = (currentEventsPage - 1) * ITEMS_PER_PAGE;
+  const end = start + ITEMS_PER_PAGE;
+  const pageEvents = sortedEvents.slice(start, end);
+
+  // Renderizar eventos usando a mesma estrutura da função original
+  tbody.innerHTML = pageEvents.map(event => `<tr>
+        <td class="event-timestamp">${formatEventTime(event.timestamp)}</td>
+        <td>${formatEventType(event.event_type)}</td>
+        <td><span class="badge bg-secondary">${event.event_category}</span></td>
+        <td class="event-data">${formatEventData(event.entity_data)}</td>
+      </tr>`).join('');
+}
+
+// === Nova implementação de monitoramento de progresso ===
 (() => {
   const WORK_ID = '{{ work_id }}';
-  // Element refs
+  
+  // Referencias dos elementos
   const els = {
     statusBadge: document.getElementById('workStatusBadge'),
-    elapsed: document.getElementById('elapsedTime'),
+    startTime: document.getElementById('startTime'),
     // Hierarchy
     taskProgress: document.getElementById('taskProgress'),
     datasetProgress: document.getElementById('datasetProgress'),
@@ -268,41 +642,52 @@
     progressPercent: document.getElementById('progressPercent'),
     progressCircle: document.getElementById('progressCircle'),
     progressRatio: document.getElementById('progressRatio'),
-    // Execution metrics
-  // current context already mapped above; removed execution metrics list
-  comboSelect: document.getElementById('combinationSelect'),
-  // btnFollowCurrent removido
-  statRunning: document.getElementById('statRunning'),
-  statCompleted: document.getElementById('statCompleted'),
-  statQueued: document.getElementById('statQueued'),
-  statFailed: document.getElementById('statFailed'),
-  comboProgressBar: document.getElementById('comboProgressBar'),
-  comboProgressLabel: document.getElementById('comboProgressLabel'),
+    // Execution controls
+    comboSelect: document.getElementById('combinationSelect'),
+    autoFollowBtn: document.getElementById('autoFollowBtn'),
+    statRunning: document.getElementById('statRunning'),
+    statCompleted: document.getElementById('statCompleted'),
+    statQueued: document.getElementById('statQueued'),
+    statFailed: document.getElementById('statFailed'),
+    comboProgressBar: document.getElementById('comboProgressBar'),
+    comboProgressLabel: document.getElementById('comboProgressLabel'),
+    // Action buttons
+    btnGoToResult: document.getElementById('btnGoToResult'),
   };
 
-  let workStatusCache = null; // holds created_at / updated_at for elapsed
-  let progressCache = null;   // full last progress summary
+  // Estado global
+  let workStatusCache = null;
+  let progressCache = null;
   let ws = null;
   let wsRetry = 0;
   const CIRCUMFERENCE = 2 * Math.PI * 60; // r=60
-  let combinationsCache = [];
-  let selectedCombinationId = null; // explicit selection
-  let currentCombinationId = null;  // from progress snapshot
-  let followCurrent = true;
-  // botão seguir removido; followCurrent controlado apenas pela opção 'Corrente'
-  let latestExecutions = [];
-  let execRefreshTimer = null;
+  
+  // Dados de execuções - agora recebemos todas do backend
+  let allCombinations = []; // todas as combinações
+  let filteredEvents = [];
+  let currentCombinationId = null; // combinação que está executando
+  
+  // Controles de filtro
+  let selectedCombinationId = null; // combinação selecionada no dropdown
+  let autoFollow = true; // se deve seguir a execução atual automaticamente
 
-  function fmtElapsed(seconds) {
-    if (!Number.isFinite(seconds) || seconds < 0) return '--';
-    const h = Math.floor(seconds / 3600);
-    const m = Math.floor((seconds % 3600) / 60);
-    const s = Math.floor(seconds % 60);
-    const pad = (v) => String(v).padStart(2,'0');
-    if (h) return `${pad(h)}:${pad(m)}:${pad(s)}`;
-    return `${pad(m)}:${pad(s)}`;
+    // Utilitários
+  function formatStatusBadge(status){
+    const map = {running:'primary',completed:'success',queued:'info',failed:'danger',error:'danger',paused:'warning'};
+    const cls = map[status] || 'secondary';
+    return `<span class="badge bg-${cls} small">${(status||'').toUpperCase()}</span>`;
   }
 
+  function formatTime(ts){
+    const d = new Date(ts*1000);
+    return d.toLocaleTimeString();
+  }
+
+  function escapeHtml(str){
+    return str.replace(/[&<>'"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;","\"":"&quot;"}[c]));
+  }
+
+  // Buscar status do work
   async function fetchWorkStatus() {
     try {
       const resp = await fetch(`/api/monitor/work/${WORK_ID}/status`);
@@ -310,8 +695,24 @@
       const data = await resp.json();
       workStatusCache = data;
       updateStatusBadge(data.status);
-      updateElapsed();
-  updateActionButtons(data.status);
+      updateStartTime();
+      updateActionButtons(data.status);
+      
+      // Buscar nome do batch
+      await fetchBatchName();
+    } catch (_) { /* ignore */ }
+  }
+
+  // Buscar nome do batch
+  async function fetchBatchName() {
+    try {
+      const resp = await fetch(`/api/monitor/works`);
+      if (!resp.ok) return;
+      const data = await resp.json();
+      const work = data.works.find(w => w.id === WORK_ID);
+      if (work && work.config_name) {
+        document.getElementById('batchName').textContent = work.config_name;
+      }
     } catch (_) { /* ignore */ }
   }
 
@@ -326,18 +727,18 @@
       paused: 'bg-warning',
       cancelled: 'bg-secondary'
     };
-    // reset classes keeping base and status-badge
     els.statusBadge.className = 'badge status-badge ' + (map[status] || 'bg-secondary');
     els.statusBadge.textContent = status?.toUpperCase() || 'UNKNOWN';
   }
 
   function updateActionButtons(status){
-  const pauseBtn = document.getElementById('btnPause');
-  const resumeBtn = document.getElementById('btnResume');
-  const cancelBtn = document.getElementById('btnCancel');
+    const pauseBtn = document.getElementById('btnPause');
+    const resumeBtn = document.getElementById('btnResume');
+    const cancelBtn = document.getElementById('btnCancel');
     if(!pauseBtn) return;
+    
     const terminal = ['completed','failed','error','cancelled'].includes(status);
-    // Toggle pause/resume visibility
+    
     if(status==='paused'){
       pauseBtn.classList.add('d-none');
       resumeBtn.classList.remove('d-none');
@@ -345,42 +746,52 @@
       resumeBtn.classList.add('d-none');
       pauseBtn.classList.remove('d-none');
     }
+    
     pauseBtn.disabled = terminal || status==='paused';
     resumeBtn.disabled = terminal || status!=='paused';
     cancelBtn.disabled = terminal;
-  // No restart button anymore
   }
 
   async function postAction(action){
-  const btns = ['btnPause','btnResume','btnCancel'].map(id=>document.getElementById(id));
+    const btns = ['btnPause','btnResume','btnCancel'].map(id=>document.getElementById(id));
     btns.forEach(b=>b && (b.disabled=true));
     try {
       const resp = await fetch(`/api/monitor/work/${WORK_ID}/action/${action}`, {method:'POST'});
       if(!resp.ok){
         console.warn('Action failed', action);
       } else {
-        await fetchWorkStatus(); // refresh status
+        await fetchWorkStatus();
       }
-    } catch(e){ console.warn('Action error',action,e);} finally { btns.forEach(b=>b && (b.disabled=false)); }
+    } catch(e){ 
+      console.warn('Action error',action,e);
+    } finally { 
+      btns.forEach(b=>b && (b.disabled=false)); 
+    }
   }
 
-  function updateElapsed() {
-    if (!workStatusCache || !els.elapsed) return;
-    const { created_at, updated_at, status } = workStatusCache;
+  function updateStartTime() {
+    if (!workStatusCache || !els.startTime) return;
+    const { created_at } = workStatusCache;
     if (!created_at) return;
-    const end = (status === 'completed' || status === 'failed' || status === 'error' || status === 'cancelled') ? updated_at : Date.now()/1000;
-    const elapsed = fmtElapsed(end - created_at);
-    els.elapsed.textContent = elapsed;
+    const startDate = new Date(created_at * 1000);
+    const startTimeStr = startDate.toLocaleString('pt-BR', { 
+      day: '2-digit',
+      month: '2-digit', 
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+    els.startTime.textContent = startTimeStr;
   }
 
-  // Progress summary application
+  // Aplicar dados de progresso do backend
   function applyProgress(progress) {
-    progressCache = progress; // store full object
+    progressCache = progress;
     try {
-      // Hierarchy counts (Finished/Total)
+      // Hierarchy counts
       if (progress.tasks && els.taskProgress) {
         const fin = progress.tasks.Finished || 0;
-        const runPlus = progress.tasks.Running ? 1 : 0; // Running contem id quando existe
+        const runPlus = progress.tasks.Running ? 1 : 0;
         els.taskProgress.textContent = `${fin + runPlus}/${progress.tasks.Total || 0}`;
       }
       if (progress.datasets && els.datasetProgress) {
@@ -405,8 +816,18 @@
       if (els.currentDataset) els.currentDataset.textContent = cur.dataset_id || '—';
       if (els.currentConfig) els.currentConfig.textContent = cur.preset_id || '—';
       if (els.currentAlgorithm) els.currentAlgorithm.textContent = cur.algorithm_id || '—';
-  currentCombinationId = cur.combination_id || null;
-  maybeAutoFollowCombination();
+      
+      // Atualizar combinação atual
+      const newCurrentCombinationId = cur.combination_id || null;
+      if (newCurrentCombinationId !== currentCombinationId) {
+        currentCombinationId = newCurrentCombinationId;
+        // Se auto-follow está ativo, atualizar seleção
+        if (autoFollow && currentCombinationId) {
+          selectedCombinationId = currentCombinationId;
+          updateCombinationSelect();
+          filterAndRenderExecutions();
+        }
+      }
 
       // Global progress ring
       const gp = progress.global_progress || 0;
@@ -422,145 +843,134 @@
         els.progressRatio.textContent = `${f}/${t}`;
       }
 
-      // Execution metrics (current combination execution status)
-  // execution metrics (Finished/Running/Queued/Total) no longer displayed
     } catch (err) {
       console.warn('Failed to apply progress summary', err);
     }
   }
 
-  const CURRENT_OPTION_VALUE = '__current__';
-  function maybeAutoFollowCombination(){
-    if(!followCurrent) return;
-    // Quando seguindo, effective selection é currentCombinationId
-    renderExecutionsForCurrentSelection();
-  }
-
-  async function loadCombinations(){
-    try {
-      const resp = await fetch(`/api/monitor/work/${WORK_ID}/combinations`);
-      if(!resp.ok) return;
-      const data = await resp.json();
-      combinationsCache = data.combinations || [];
-      updateCombinationSelectUI();
-    } catch(e){ console.warn('Failed load combinations', e); }
-  }
-
-  function updateCombinationSelectUI(){
-    if(!els.comboSelect) return;
-    const sel = els.comboSelect;
-    const prev = sel.value;
-    sel.innerHTML = '';
-    // opção Corrente
-    const optCurrent = document.createElement('option');
-    optCurrent.value = CURRENT_OPTION_VALUE;
-    optCurrent.textContent = 'Corrente';
-    sel.appendChild(optCurrent);
-  // opção placeholder removida
-    combinationsCache.forEach(c => {
-      const o = document.createElement('option');
-      o.value = c.combination_id;
-      o.textContent = `${c.task_id}/${c.dataset_id}/${c.preset_id}/${c.algorithm_id} (#${c.combination_id})`;
-      if(!followCurrent && selectedCombinationId && String(c.combination_id) === String(selectedCombinationId)) o.selected = true;
-      sel.appendChild(o);
+  // Atualizar dropdown de combinações
+  function updateCombinationSelect() {
+    if (!els.comboSelect) return;
+    const prev = els.comboSelect.value;
+    els.comboSelect.innerHTML = '';
+    
+    // Opção vazia
+    const emptyOpt = document.createElement('option');
+    emptyOpt.value = '';
+    emptyOpt.textContent = 'Todas as combinações';
+    els.comboSelect.appendChild(emptyOpt);
+    
+    // Opções das combinações
+    allCombinations.forEach(c => {
+      const opt = document.createElement('option');
+      opt.value = c.combination_id;
+      opt.textContent = `${c.task_id}/${c.dataset_id}/${c.preset_id}/${c.algorithm_id}`;
+      els.comboSelect.appendChild(opt);
     });
-    if(followCurrent){
-      sel.value = CURRENT_OPTION_VALUE;
-    } else if(prev && [...sel.options].some(o=>o.value===prev)) {
-      sel.value = prev;
+    
+    // Restaurar seleção ou definir baseado no estado atual
+    if (selectedCombinationId) {
+      els.comboSelect.value = selectedCombinationId;
+    } else if (prev && [...els.comboSelect.options].some(o => o.value === prev)) {
+      els.comboSelect.value = prev;
+      selectedCombinationId = prev || null;
     }
   }
 
-  function getEffectiveSelectedCombinationId(){
-    if(followCurrent) return currentCombinationId;
-    return selectedCombinationId;
-  }
-  function renderExecutionsForCurrentSelection(){
-    const eff = getEffectiveSelectedCombinationId();
-    if(!eff){
-      renderExecutions([],{Running:0,Completed:0,Queued:0,Failed:0,Total:0});
-      return;
+  // Atualizar estado visual do botão auto-follow
+  function updateAutoFollowButton() {
+    if (!els.autoFollowBtn) return;
+    if (autoFollow) {
+      els.autoFollowBtn.classList.add('active');
+      els.autoFollowBtn.title = 'Auto-follow ativo - clique para desativar';
+    } else {
+      els.autoFollowBtn.classList.remove('active');
+      els.autoFollowBtn.title = 'Auto-follow inativo - clique para ativar';
     }
-    if(!followCurrent && currentCombinationId && !idsEqual(eff,currentCombinationId)){
-      // mostrando combinação arbitrária; latestExecutions já deve conter dados retornados de set_combination
-      const stats = computeExecutionStats(latestExecutions);
-      renderExecutions(latestExecutions, stats, true);
-      return;
-    }
-    const stats = computeExecutionStats(latestExecutions);
-    renderExecutions(latestExecutions, stats);
   }
 
-  function computeExecutionStats(rows){
-    const stats = {Running:0,Completed:0,Queued:0,Failed:0,Total:0};
-    // Total = total_sequences da combinação (se algum row possui)
-    if(rows.length){ stats.Total = rows[0].total_sequences || 0; }
-    rows.forEach(r=>{
-      if(r.status==='running') stats.Running++;
-      else if(r.status==='completed') stats.Completed++;
-      else if(r.status==='queued') stats.Queued++;
-      else if(r.status==='failed' || r.status==='error') stats.Failed++;
+  // Filtrar e renderizar execuções baseado na seleção atual
+  function filterAndRenderExecutions() {
+    filteredExecutions = allExecutions;
+    
+    // Filtrar por combinação se uma estiver selecionada
+    if (selectedCombinationId) {
+      filteredExecutions = allExecutions.filter(exec => 
+        idsEqual(exec.combination_id, selectedCombinationId)
+      );
+    }
+    
+    // Resetar para primeira página
+    currentExecutionsPage = 1;
+    
+    // Calcular estatísticas
+    const stats = computeExecutionStats(filteredExecutions);
+    
+    // Renderizar com paginação
+    renderExecutions(filteredExecutions, stats);
+    renderExecutionsPagination();
+  }
+
+  function idsEqual(a, b) {
+    if (a == null || b == null) return false;
+    return String(a) === String(b);
+  }
+
+  function computeExecutionStats(executions) {
+    const stats = {Running: 0, Completed: 0, Queued: 0, Failed: 0, Total: 0};
+    
+    // Total é o número de execuções
+    stats.Total = executions.length;
+    
+    executions.forEach(exec => {
+      if (exec.status === 'running') stats.Running++;
+      else if (exec.status === 'completed') stats.Completed++;
+      else if (exec.status === 'queued') stats.Queued++;
+      else if (exec.status === 'failed' || exec.status === 'error') stats.Failed++;
     });
+    
     return stats;
   }
 
-  function renderExecutions(rows, stats, notCurrent=false){
-    if(els.statRunning) els.statRunning.textContent = stats.Running || 0;
-    if(els.statCompleted) els.statCompleted.textContent = stats.Completed || 0;
-    if(els.statQueued) els.statQueued.textContent = stats.Queued || 0;
-    if(els.statFailed) els.statFailed.textContent = stats.Failed || 0;
+  function renderExecutions(executions, stats) {
+    // Atualizar estatísticas
+    if (els.statRunning) els.statRunning.textContent = stats.Running || 0;
+    if (els.statCompleted) els.statCompleted.textContent = stats.Completed || 0;
+    if (els.statQueued) els.statQueued.textContent = stats.Queued || 0;
+    if (els.statFailed) els.statFailed.textContent = stats.Failed || 0;
+    
+    // Atualizar barra de progresso
     const tot = stats.Total || 0;
-    const done = (stats.Completed||0) + (stats.Failed||0);
-    if(els.comboProgressBar){
-      const pct = tot? Math.round( (done / tot) * 100 ):0;
+    const done = (stats.Completed || 0) + (stats.Failed || 0);
+    if (els.comboProgressBar) {
+      const pct = tot ? Math.round((done / tot) * 100) : 0;
       els.comboProgressBar.style.width = pct + '%';
       els.comboProgressBar.textContent = pct + '%';
     }
-    if(els.comboProgressLabel) els.comboProgressLabel.textContent = `${done}/${tot}`;
+    if (els.comboProgressLabel) els.comboProgressLabel.textContent = `${done}/${tot}`;
+    
+    // Renderizar tabela
     const tbody = document.getElementById('executionsTableBody');
-    if(!tbody) return;
-    tbody.innerHTML='';
-    if(!rows.length){
-      if(notCurrent){
-        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4"><i class="bi bi-exclamation-circle me-1"></i>Sem dados: combinação não é a corrente</td></tr>';
-      } else {
-        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4"><i class="bi bi-inbox me-1"></i>Nenhuma execução</td></tr>';
-      }
+    if (!tbody) return;
+    
+    tbody.innerHTML = '';
+    
+    if (!executions.length) {
+      tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4"><i class="bi bi-inbox me-1"></i>Nenhuma execução encontrada</td></tr>';
       return;
     }
-    rows.forEach(r=>{
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td class="text-muted">${r.sequencia}</td>
-        <td>${formatStatusBadge(r.status)}</td>
-        <td><div class="progress" style="height:6px;"><div class="progress-bar" style="width:${Math.round((r.progress||0)*100)}%"></div></div></td>
-        <td>${r.started_at? formatTime(r.started_at):'—'}</td>
-        <td>${r.finished_at? formatTime(r.finished_at):'—'}</td>
-        <td class="small">${escapeHtml(r.progress_message||'')}</td>`;
-      tbody.appendChild(tr);
-    });
+    
+    // Ordenar execuções por sequência
+    const sortedExecutions = [...executions].sort((a, b) => (a.sequencia || 0) - (b.sequencia || 0));
+    
+    // Renderizar tabela usando a função global para consistência
+    renderExecutionsTable();
   }
 
-  function formatStatusBadge(status){
-    const map = {running:'primary',completed:'success',queued:'info',failed:'danger',error:'danger',paused:'warning'};
-    const cls = map[status] || 'secondary';
-    return `<span class="badge bg-${cls} small">${(status||'').toUpperCase()}</span>`;
-  }
-  function formatTime(ts){
-    // ts em segundos epoch
-    const d = new Date(ts*1000);
-    return d.toLocaleTimeString();
-  }
-  function escapeHtml(str){
-    return str.replace(/[&<>'"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;","\"":"&quot;"}[c]));
-  }
-
+  // Merge parcial de dados de progresso
   function mergePartialProgress(partial) {
-    if (!progressCache) {
-      // If we haven't received a full snapshot yet, ignore partial
-      return;
-    }
-    // Deep merge only top-level dictionaries we expect
+    if (!progressCache) return;
+    
     const keys = ['tasks','datasets','configs','algorithms','execution','global_execution','current_combination_details','global_progress'];
     for (const k of keys) {
       if (partial[k] !== undefined) {
@@ -574,142 +984,384 @@
     applyProgress(progressCache);
   }
 
+  // Merge de execuções - acumula execuções sem duplicar
+  function mergeExecutions(newExecutions) {
+    if (!Array.isArray(newExecutions)) return;
+    
+    // Criar um mapa das execuções existentes por chave única
+    const existingMap = new Map();
+    allExecutions.forEach(exec => {
+      // Usar combination_id + sequencia como chave única
+      const key = `${exec.combination_id || 'null'}_${exec.sequencia || 'null'}`;
+      existingMap.set(key, exec);
+    });
+    
+    // Adicionar ou atualizar execuções
+    newExecutions.forEach(newExec => {
+      const key = `${newExec.combination_id || 'null'}_${newExec.sequencia || 'null'}`;
+      
+      if (existingMap.has(key)) {
+        // Atualizar execução existente (merge dos dados)
+        const existing = existingMap.get(key);
+        Object.assign(existing, newExec);
+      } else {
+        // Adicionar nova execução
+        allExecutions.push(newExec);
+        existingMap.set(key, newExec);
+      }
+    });
+  }
+
+  // WebSocket
   function initWebSocket() {
     try {
       const scheme = location.protocol === 'https:' ? 'wss' : 'ws';
-  // Endpoint correto conforme routes: /ws/work/{work_id}
-  const url = `${scheme}://${location.host}/ws/work/${WORK_ID}`;
+      const url = `${scheme}://${location.host}/ws/work/${WORK_ID}`;
       ws = new WebSocket(url);
+      
       ws.onopen = () => { 
-        wsRetry = 0; 
-        // Dispara refresh inicial para garantir execuções correntes logo no começo
-        try { if(followCurrent) ws.send(JSON.stringify({action:'refresh_executions'})); } catch(_){}
-      }; // reset retries
+        wsRetry = 0;
+        console.log('WebSocket conectado');
+      };
+      
       ws.onmessage = (evt) => {
         try {
           const msg = JSON.parse(evt.data);
-          if (msg.type === 'snapshot' && msg.payload?.progress) {
-            applyProgress(msg.payload.progress);
-            if(msg.payload.executions){
-              latestExecutions = msg.payload.executions;
-              // Snapshot sempre refere-se à combinação corrente
-              if(followCurrent){ selectedCombinationId = currentCombinationId; }
-              renderExecutionsForCurrentSelection();
+          
+          if (msg.type === 'snapshot') {
+            // Snapshot inicial com todos os dados
+            if (msg.payload?.progress) {
+              applyProgress(msg.payload.progress);
             }
-            if(msg.payload.combinations){
-              combinationsCache = msg.payload.combinations;
-              updateCombinationSelectUI();
+            if (msg.payload?.executions) {
+              allExecutions = msg.payload.executions;
+              filterAndRenderExecutions();
+            }
+            if (msg.payload?.combinations) {
+              allCombinations = msg.payload.combinations;
+              updateCombinationSelect();
+            }
+            if (msg.payload?.events) {
+              window.eventsManager?.setEvents(msg.payload.events);
             }
           } else if (msg.type === 'update') {
-            const candidate = msg.payload?.progress || msg.payload?.update?.progress || msg.update?.progress || msg.progress;
-            if (candidate) mergePartialProgress(candidate);
-            const execs = msg.payload?.executions || msg.update?.executions;
-            if(execs){
-              const combId = msg.payload?.executions_combination_id || msg.update?.executions_combination_id;
-              if(combId !== undefined && combId !== null){
-                // Execuções para combinação arbitrária
-                if(selectedCombinationId && String(selectedCombinationId)===String(combId)){
-                  latestExecutions = execs;
-                  const stats = computeExecutionStats(latestExecutions);
-                  renderExecutions(latestExecutions, stats, currentCombinationId && String(currentCombinationId)!==String(combId));
-                }
-              } else {
-                // Assume combinação corrente
-                latestExecutions = execs;
-                if(followCurrent){ selectedCombinationId = currentCombinationId; }
-                renderExecutionsForCurrentSelection();
+            // Atualizações incrementais
+            if (msg.payload?.progress || msg.update?.progress) {
+              const progressUpdate = msg.payload?.progress || msg.update?.progress;
+              mergePartialProgress(progressUpdate);
+            }
+            if (msg.payload?.executions || msg.update?.executions) {
+              // Atualização das execuções - merge com existentes
+              const newExecutions = msg.payload?.executions || msg.update?.executions;
+              mergeExecutions(newExecutions);
+              filterAndRenderExecutions();
+            }
+            if (msg.payload?.combinations || msg.update?.combinations) {
+              allCombinations = msg.payload?.combinations || msg.update?.combinations;
+              updateCombinationSelect();
+            }
+            if (msg.payload?.events_appended || msg.update?.events_appended) {
+              const newEvents = msg.payload?.events_appended || msg.update?.events_appended;
+              window.eventsManager?.addEvents(newEvents);
+            }
+          } else if (msg.type === 'event') {
+            // Eventos do sistema
+            if (msg.payload?.event_type === 'work_status_changed') {
+              const newStatus = msg.payload.new_status;
+              console.log(`Status do work mudou para: ${newStatus}`);
+              
+              // Atualizar cache de status
+              if (workStatusCache) {
+                workStatusCache.status = newStatus;
+                workStatusCache.updated_at = msg.timestamp || Date.now() / 1000;
               }
+              
+              // Atualizar interface
+              updateStatusBadge(newStatus);
+              updateActionButtons(newStatus);
+              updateStartTime();
             }
           }
-        } catch (e) { /* ignore parse errors */ }
+        } catch (e) {
+          console.warn('Erro ao processar mensagem WebSocket:', e);
+        }
       };
-      ws.onclose = () => scheduleReconnect();
-      ws.onerror = () => { try { ws.close(); } catch(_){} };
+      
+      ws.onclose = () => {
+        console.log('WebSocket desconectado');
+        scheduleReconnect();
+      };
+      
+      ws.onerror = (err) => {
+        console.warn('Erro no WebSocket:', err);
+        try { ws.close(); } catch(_){}
+      };
     } catch (err) {
+      console.warn('Erro ao inicializar WebSocket:', err);
       scheduleReconnect();
     }
   }
 
   function scheduleReconnect() {
-    if (wsRetry > 6) return; // stop after some attempts
+    if (wsRetry > 6) return;
     const delay = Math.min(10000, 500 * Math.pow(2, wsRetry++));
     setTimeout(initWebSocket, delay);
   }
 
-  // Periodic elapsed updater
-  setInterval(updateElapsed, 1000);
-
-  // Initial bootstrap
-  fetchWorkStatus();
-  initWebSocket();
-  loadCombinations();
-  startExecutionsAutoRefresh();
-
-  els.comboSelect?.addEventListener('change', e=>{
-    const val = e.target.value;
-    if(val === CURRENT_OPTION_VALUE){
-      followCurrent = true;
-      selectedCombinationId = null;
-      if(ws && ws.readyState===1 && currentCombinationId){
-        try { ws.send(JSON.stringify({action:'refresh_executions'})); } catch(_){ }
+  // Event listeners
+  function setupEventListeners() {
+    // Dropdown de combinações
+    els.comboSelect?.addEventListener('change', (e) => {
+      selectedCombinationId = e.target.value || null;
+      // Se selecionou uma combinação específica, desativar auto-follow
+      if (selectedCombinationId) {
+        autoFollow = false;
+        updateAutoFollowButton();
       }
-      renderExecutionsForCurrentSelection();
+      filterAndRenderExecutions();
+    });
+
+    // Botão auto-follow
+    els.autoFollowBtn?.addEventListener('click', () => {
+      autoFollow = !autoFollow;
+      updateAutoFollowButton();
+      
+      if (autoFollow && currentCombinationId) {
+        // Ativar auto-follow: selecionar combinação atual
+        selectedCombinationId = currentCombinationId;
+        updateCombinationSelect();
+        filterAndRenderExecutions();
+      } else if (!autoFollow) {
+        // Desativar auto-follow: mostrar todas
+        selectedCombinationId = null;
+        updateCombinationSelect();
+        filterAndRenderExecutions();
+      }
+    });
+
+    // Botões de ação
+    document.getElementById('btnPause')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      postAction('pause');
+    });
+    
+    document.getElementById('btnResume')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      postAction('resume');
+    });
+    
+    document.getElementById('btnCancel')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      if (confirm('Cancelar este work?')) {
+        postAction('cancel');
+      }
+    });
+  }
+
+  // Inicialização
+  function init() {
+    // Configurar estado inicial
+    updateAutoFollowButton();
+    
+    // Configurar event listeners
+    setupEventListeners();
+    
+    // Configurar botão "Resultado"
+    if (els.btnGoToResult) {
+      els.btnGoToResult.addEventListener('click', () => {
+        window.open(`/monitor/work/${WORK_ID}/result`, '_blank');
+      });
+    }
+    
+    // Buscar dados iniciais
+    fetchWorkStatus();
+    initWebSocket();
+  }
+
+  // Inicializar quando o DOM estiver pronto
+  init();
+})();
+
+// === Event Log Management ===
+(() => {
+  // Estado dos eventos
+  let autoScroll = false;
+  
+  // Referencias dos elementos
+  const eventElements = {
+    typeFilter: document.getElementById('eventTypeFilter'),
+    categoryFilter: document.getElementById('eventCategoryFilter'),
+    textFilter: document.getElementById('eventTextFilter'),
+    dateFromFilter: document.getElementById('eventDateFromFilter'),
+    dateToFilter: document.getElementById('eventDateToFilter'),
+    autoScrollBtn: document.getElementById('btnAutoScroll'),
+    table: document.getElementById('eventLogTable'),
+    tableBody: document.getElementById('eventLogTableBody'),
+    statsTotal: document.getElementById('eventStatsTotal'),
+    statsErrors: document.getElementById('eventStatsErrors'),
+    statsWarnings: document.getElementById('eventStatsWarnings'),
+    statsProgress: document.getElementById('eventStatsProgress')
+  };
+
+  // Utilitários
+  function formatEventTime(timestamp) {
+    const date = new Date(timestamp * 1000);
+    return date.toLocaleTimeString('pt-BR', { hour12: false });
+  }
+
+  function formatEventType(type) {
+    const typeClass = `event-type-${type}`;
+    return `<span class="badge ${typeClass}">${type.toUpperCase()}</span>`;
+  }
+
+  function formatEventData(entityData) {
+    try {
+      const jsonStr = JSON.stringify(entityData, null, 2);
+      const truncated = jsonStr.length > 100 ? jsonStr.substring(0, 100) + '...' : jsonStr;
+      return `<code class="event-data" title="${jsonStr.replace(/"/g, '&quot;')}">${truncated.replace(/[&<>'"]/g, c => ({'&':'&amp;', '<':'&lt;', '>':'&gt;', "'":"&#39;", '"':'&quot;'}[c]))}</code>`;
+    } catch {
+      return '<code class="event-data">Invalid JSON</code>';
+    }
+  }
+
+  // Filtros
+  function matchesFilters(event) {
+    // Filtro por tipo
+    if (eventElements.typeFilter.value && event.event_type !== eventElements.typeFilter.value) {
+      return false;
+    }
+    
+    // Filtro por categoria
+    if (eventElements.categoryFilter.value && event.event_category !== eventElements.categoryFilter.value) {
+      return false;
+    }
+    
+    // Filtro por texto (busca no entity_data)
+    if (eventElements.textFilter.value) {
+      const searchText = eventElements.textFilter.value.toLowerCase();
+      const entityDataStr = JSON.stringify(event.entity_data || {}).toLowerCase();
+      if (!entityDataStr.includes(searchText)) {
+        return false;
+      }
+    }
+    
+    // Filtro por data (faixa de datas)
+    const eventDate = new Date(event.timestamp * 1000);
+    
+    if (eventElements.dateFromFilter.value) {
+      const fromDate = new Date(eventElements.dateFromFilter.value);
+      if (eventDate < fromDate) {
+        return false;
+      }
+    }
+    
+    if (eventElements.dateToFilter.value) {
+      const toDate = new Date(eventElements.dateToFilter.value);
+      if (eventDate > toDate) {
+        return false;
+      }
+    }
+    
+    return true;
+  }
+
+  function applyFilters() {
+    filteredEvents = allEvents.filter(matchesFilters);
+    currentEventsPage = 1; // Resetar para primeira página
+    renderEvents();
+    updateStatistics();
+  }
+
+  // Renderização
+  function renderEvents() {
+    if (!eventElements.tableBody) return;
+    
+    if (!filteredEvents.length) {
+      eventElements.tableBody.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-4"><i class="bi bi-inbox me-1"></i>Nenhum evento encontrado</td></tr>';
+      renderEventsPagination();
       return;
     }
-    followCurrent = false;
-    selectedCombinationId = val || null;
-    if(selectedCombinationId){
-      if(ws && ws.readyState===1){
-        try { ws.send(JSON.stringify({action:'set_combination', combination_id: selectedCombinationId})); } catch(_){ }
-      }
-      renderExecutions([], {Running:0,Completed:0,Queued:0,Failed:0,Total:0}, currentCombinationId && !idsEqual(currentCombinationId, selectedCombinationId));
-    } else {
-      renderExecutions([],{Running:0,Completed:0,Queued:0,Failed:0,Total:0});
-    }
-  });
-
-  function startExecutionsAutoRefresh(){
-    if(execRefreshTimer) clearInterval(execRefreshTimer);
-    execRefreshTimer = setInterval(()=>{
-      if(ws && ws.readyState===1){
-        try {
-          if(selectedCombinationId && currentCombinationId && !idsEqual(selectedCombinationId,currentCombinationId)){
-            ws.send(JSON.stringify({action:'set_combination', combination_id: selectedCombinationId}));
-          } else if(selectedCombinationId && currentCombinationId && idsEqual(selectedCombinationId,currentCombinationId)) {
-            ws.send(JSON.stringify({action:'refresh_executions'}));
-          } else if(followCurrent && currentCombinationId) {
-            ws.send(JSON.stringify({action:'refresh_executions'}));
-          }
-        } catch(_){ }
-      }
-    }, 1500);
+    
+    // Ordenar por timestamp (mais novos primeiro)
+    const sortedEvents = [...filteredEvents].sort((a, b) => b.timestamp - a.timestamp);
+    
+    // Renderizar tabela usando a função global para consistência
+    renderEventsTable();
+    
+    // Renderizar paginação
+    renderEventsPagination();
   }
 
-  // Bind action buttons
-  // Botão refresh removido
-  document.getElementById('btnPause')?.addEventListener('click', e=>{ e.preventDefault(); postAction('pause'); });
-  document.getElementById('btnResume')?.addEventListener('click', e=>{ e.preventDefault(); postAction('resume'); });
-  document.getElementById('btnCancel')?.addEventListener('click', e=>{ e.preventDefault(); if(confirm('Cancelar este work?')) postAction('cancel'); });
-  // restart removed
+  function updateStatistics() {
+    const stats = {
+      total: filteredEvents.length,
+      errors: filteredEvents.filter(e => e.event_type === 'error').length,
+      warnings: filteredEvents.filter(e => e.event_type === 'warning').length,
+      progress: filteredEvents.filter(e => e.event_type === 'progress').length
+    };
+    
+    if (eventElements.statsTotal) eventElements.statsTotal.textContent = stats.total;
+    if (eventElements.statsErrors) eventElements.statsErrors.textContent = stats.errors;
+    if (eventElements.statsWarnings) eventElements.statsWarnings.textContent = stats.warnings;
+    if (eventElements.statsProgress) eventElements.statsProgress.textContent = stats.progress;
+  }
 
-  // Fallback polling for progress if no snapshot after some time (optional minimal)
-  setTimeout(async () => {
-    if (!progressCache) {
-      // Attempt one-time HTTP check if a database-ready endpoint exists
-      try {
-        const readyResp = await fetch(`/api/monitor/work/${WORK_ID}/database-status`);
-        if (readyResp.ok) {
-          const ready = await readyResp.json();
-          if (!ready.ready) return; // still not ready
-          // (NOTE) No direct REST endpoint for summary; relying on WS only.
+  // Funções públicas para o WebSocket
+  window.eventsManager = {
+    setEvents: function(events) {
+      allEvents = events || [];
+      applyFilters();
+    },
+    
+    addEvents: function(newEvents) {
+      if (!Array.isArray(newEvents)) return;
+      
+      // Adicionar novos eventos (evitar duplicatas por ID)
+      const existingIds = new Set(allEvents.map(e => e.id));
+      const uniqueNewEvents = newEvents.filter(e => !existingIds.has(e.id));
+      
+      if (uniqueNewEvents.length > 0) {
+        allEvents.push(...uniqueNewEvents);
+        
+        // Se auto-refresh estiver ativo, ir para a primeira página
+        if (autoScroll) {
+          currentEventsPage = 1;
         }
-      } catch (_) {}
+        
+        applyFilters();
+      }
     }
-  }, 4000);
-  function idsEqual(a,b){
-    if(a==null || b==null) return false;
-    return String(a)===String(b);
+  };
+
+  // Event listeners
+  function setupEventListeners() {
+    // Filtros
+    eventElements.typeFilter?.addEventListener('change', applyFilters);
+    eventElements.categoryFilter?.addEventListener('change', applyFilters);
+    eventElements.textFilter?.addEventListener('input', applyFilters);
+    eventElements.dateFromFilter?.addEventListener('change', applyFilters);
+    eventElements.dateToFilter?.addEventListener('change', applyFilters);
+    
+    // Botão auto-scroll
+    eventElements.autoScrollBtn?.addEventListener('click', () => {
+      autoScroll = !autoScroll;
+      if (autoScroll) {
+        eventElements.autoScrollBtn.classList.add('active');
+        eventElements.autoScrollBtn.title = 'Auto-refresh ativo - vai para primeira página quando houver novos eventos';
+        // Ir para a primeira página
+        currentEventsPage = 1;
+        renderEventsPagination();
+        renderEventsTable();
+      } else {
+        eventElements.autoScrollBtn.classList.remove('active');
+        eventElements.autoScrollBtn.title = 'Auto-refresh inativo';
+      }
+    });
   }
+
+  // Funções de paginação
+  // Inicialização
+  setupEventListeners();
 })();
 </script>
 {% endblock %}

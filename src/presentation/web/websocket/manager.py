@@ -8,7 +8,7 @@ import json
 import logging
 import time
 from pathlib import Path
-from typing import Dict, List, Optional, Set
+from typing import Dict, List, Optional, Set, Any
 from dataclasses import asdict
 
 from src.infrastructure.persistence.work_state.queries import WorkStateQueries
@@ -48,6 +48,7 @@ class WorkMonitorSession:
         self.last_work_status: Optional[str] = None
         self.last_error_timestamp: float = 0
         self.last_warning_timestamp: float = 0
+        self.last_event_timestamp: float = 0
 
         # Subscribers
         self.subscribers: Set[asyncio.Queue] = set()
@@ -161,16 +162,31 @@ class WorkMonitorSession:
                     error={"code": "WORK_NOT_FOUND", "message": f"Work {self.work_id} not found"}
                 )
 
-            executions = []
-            if progress_summary.current_combination_details:
-                combination_id = progress_summary.current_combination_details.get("combination_id")
-                if combination_id:
-                    executions = queries.get_combination_executions_detail(combination_id)
-                    # Atualiza cache
-                    self._executions_cache[combination_id] = executions
-                    self._executions_state_cache[combination_id] = {
-                        e.unit_id: {"status": e.status, "progress": e.progress} for e in executions
-                    }
+            # Buscar TODAS as execuções de TODAS as combinações
+            all_executions = []
+            try:
+                combinations_list = queries.list_combinations(self.work_id)
+                for combo in combinations_list:
+                    combo_id = combo.get("combination_id")
+                    if combo_id:
+                        combo_executions = queries.get_combination_executions_detail(combo_id)
+                        all_executions.extend(combo_executions)
+                        # Atualiza cache para cada combinação
+                        self._executions_cache[combo_id] = combo_executions
+                        self._executions_state_cache[combo_id] = {
+                            e.unit_id: {"status": e.status, "progress": e.progress} for e in combo_executions
+                        }
+            except Exception as e:
+                logger.warning(f"Failed to load all executions: {e}")
+                # Fallback: apenas combinação atual
+                if progress_summary.current_combination_details:
+                    combination_id = progress_summary.current_combination_details.get("combination_id")
+                    if combination_id:
+                        all_executions = queries.get_combination_executions_detail(combination_id)
+                        self._executions_cache[combination_id] = all_executions
+                        self._executions_state_cache[combination_id] = {
+                            e.unit_id: {"status": e.status, "progress": e.progress} for e in all_executions
+                        }
 
             # Lista de combinações para permitir seleção arbitrária
             try:
@@ -180,20 +196,24 @@ class WorkMonitorSession:
 
             errors = queries.get_error_summary(self.work_id, limit=10)
             warnings = queries.get_execution_warnings(self.work_id, limit=10)
+            
+            # Buscar todos os eventos
+            events = queries.get_events(self.work_id, limit=50)
 
             snapshot = ProgressSnapshot(
                 progress=serialize_progress_summary(progress_summary),
-                executions=[serialize_execution_detail(e) for e in executions],
+                executions=[serialize_execution_detail(e) for e in all_executions],
                 logs={
                     "errors": [serialize_error_summary(e) for e in errors],
                     "warnings": warnings
                 },
-                executions_full=[serialize_execution_detail(e) for e in executions],
+                events=events,
+                executions_full=[serialize_execution_detail(e) for e in all_executions],
                 combinations=combinations_list,
             )
 
             if update_tracking:
-                self._update_tracking_state(progress_summary, executions)
+                self._update_tracking_state(progress_summary, all_executions)
                 logger.debug(f"Snapshot build: tracking updated for work {self.work_id}")
 
             return ProgressMessage(
@@ -269,6 +289,7 @@ class WorkMonitorSession:
                         logger.debug(f"Final flush (no new combination) {previous_combination_id} failed: {e}")
 
                 # Agora processa execuções da combinação corrente (se houver)
+                executions = []
                 if current_combination_id:
                     executions = queries.get_combination_executions_detail(current_combination_id)
                     if previous_combination_id != current_combination_id:
@@ -286,15 +307,34 @@ class WorkMonitorSession:
                 new_logs = await self._check_new_logs(queries)
                 logs_changed = bool(new_logs["errors"] or new_logs["warnings"])
 
+                # Check for new events
+                new_events = await self._check_new_events(queries)
+                events_changed = bool(new_events)
+
                 # Send updates if anything changed
-                if progress_changed or executions_changed or logs_changed or combination_changed:
+                if progress_changed or executions_changed or logs_changed or events_changed or combination_changed:
                     full_execs_serialized = None
                     if combination_changed or executions_changed:
-                        full_execs_serialized = [serialize_execution_detail(e) for e in executions]
+                        # Buscar TODAS as execuções para atualização incremental também
+                        try:
+                            all_executions_for_update = []
+                            combinations_list = queries.list_combinations(self.work_id)
+                            for combo in combinations_list:
+                                combo_id = combo.get("combination_id")
+                                if combo_id:
+                                    combo_executions = queries.get_combination_executions_detail(combo_id)
+                                    all_executions_for_update.extend(combo_executions)
+                            full_execs_serialized = [serialize_execution_detail(e) for e in all_executions_for_update]
+                        except Exception as e:
+                            logger.warning(f"Failed to load all executions for update: {e}")
+                            # Fallback: apenas combinação atual
+                            full_execs_serialized = [serialize_execution_detail(e) for e in executions]
+                    
                     await self._send_update(
                         progress_summary if progress_changed else None,
                         execution_changes if executions_changed else None,
                         new_logs if logs_changed else None,
+                        new_events if events_changed else None,
                         executions=full_execs_serialized,
                         executions_combination_id=current_combination_id if full_execs_serialized is not None else None
                     )
@@ -345,6 +385,7 @@ class WorkMonitorSession:
         progress_summary=None,
         execution_changes=None,
         new_logs=None,
+        new_events=None,
         executions=None,
         executions_combination_id=None,
     ) -> None:
@@ -359,6 +400,9 @@ class WorkMonitorSession:
             
         if new_logs:
             update_data["logs_appended"] = new_logs
+
+        if new_events:
+            update_data["events_appended"] = new_events
 
         if executions is not None:
             update_data["executions"] = executions
@@ -397,6 +441,23 @@ class WorkMonitorSession:
             logger.error(f"Error checking new logs for work {self.work_id}: {e}")
 
         return new_logs
+
+    async def _check_new_events(self, queries: WorkStateQueries) -> List[Dict[str, Any]]:
+        """Check for new events from events table."""
+        new_events = []
+        
+        try:
+            events = queries.get_events(self.work_id, limit=10, since_timestamp=self.last_event_timestamp)
+            for event in events:
+                event_timestamp = event.get("timestamp", 0)
+                if event_timestamp > self.last_event_timestamp:
+                    new_events.append(event)
+                    self.last_event_timestamp = max(self.last_event_timestamp, event_timestamp)
+
+        except Exception as e:
+            logger.error(f"Error checking new events for work {self.work_id}: {e}")
+
+        return new_events
 
     def _hash_progress(self, progress_summary) -> str:
         """Generate hash for progress summary."""
@@ -463,6 +524,15 @@ class WorkMonitorSession:
         """Update internal tracking state."""
         self.last_progress_hash = self._hash_progress(progress_summary)
         self._update_executions_state(executions)
+        
+        # Inicializar last_work_status na primeira vez
+        with WorkStateQueries(self.db_path) as queries:
+            self.last_work_status = queries.get_work_status(self.work_id)
+            
+            # Atualizar timestamp de eventos para o mais recente
+            events = queries.get_events(self.work_id, limit=1)
+            if events:
+                self.last_event_timestamp = max(self.last_event_timestamp, events[0]['timestamp'])
         
         if progress_summary.current_combination_details:
             self.last_combination_id = progress_summary.current_combination_details.get("combination_id")

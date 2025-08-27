@@ -120,15 +120,6 @@ class WorkServicePersistence:
     def _row_to_work_item(self, row: sqlite3.Row) -> WorkItem:
         """Convert database row to WorkItem."""
 
-        id = row["id"],
-        config_json = row["config_json"],
-        status = row["status"],
-        created_at = row["created_at"],  # Already float from database
-        updated_at = row["updated_at"],  # Already float from database
-        output_path = row["output_path"],
-        error = row["error"],
-        extra_json = row["extra_json"],
-
         return WorkItem.from_dict(
             {
                 "id": row["id"],

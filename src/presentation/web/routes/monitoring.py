@@ -2,6 +2,7 @@
 API routes for monitoring functionality.
 """
 
+import json
 from typing import List, Dict, Any
 from fastapi import APIRouter, HTTPException
 from src.application.services.work_service import get_work_service
@@ -12,15 +13,31 @@ router = APIRouter(prefix="/api/monitor", tags=["monitoring"])
 
 
 @router.get("/works")
-async def get_works() -> Dict[str, Any]:
-    """Get list of all works with status information."""
+async def get_works(
+    page: int = 1, 
+    per_page: int = 20,
+    status: str = None,
+    search: str = None,
+    author: str = None,
+    tags: str = None
+) -> Dict[str, Any]:
+    """Get list of all works with status information, filtering and pagination."""
     try:
         work_service = get_work_service()
         works = work_service.list()
         
-        # Enrich with status information
+        # Enrich with status information and batch metadata
         enriched_works = []
         for work in works:
+            # Extract config from config_json field
+            config = {}
+            if work.get("config_json"):
+                try:
+                    config = json.loads(work["config_json"])
+                except json.JSONDecodeError:
+                    config = {}
+            
+            metadata = config.get("metadata", {})
             work_data = {
                 "id": work["id"],
                 "status": work.get("status", "unknown"),
@@ -28,18 +45,64 @@ async def get_works() -> Dict[str, Any]:
                 "updated_at": work.get("updated_at", 0),
                 "output_path": work.get("output_path", ""),
                 "error": work.get("error", None),
-                "config_name": work.get("config", {}).get("metadata", {}).get("name", "Unknown"),
-                "config_description": work.get("config", {}).get("metadata", {}).get("description", ""),
-                "config_author": work.get("config", {}).get("metadata", {}).get("author", ""),
+                "config_name": metadata.get("name", "Unknown"),
+                "config_description": metadata.get("description", ""),
+                "config_author": metadata.get("author", ""),
+                "config_version": metadata.get("version", ""),
+                "config_creation_date": metadata.get("creation_date", ""),
+                "config_tags": metadata.get("tags", []),
             }
             enriched_works.append(work_data)
         
+        # Apply filters
+        filtered_works = enriched_works
+        
+        # Filter by status
+        if status:
+            filtered_works = [w for w in filtered_works if w["status"] == status]
+        
+        # Filter by author
+        if author:
+            filtered_works = [w for w in filtered_works if author.lower() in w["config_author"].lower()]
+        
+        # Filter by tags
+        if tags:
+            tag_list = [t.strip().lower() for t in tags.split(",")]
+            filtered_works = [
+                w for w in filtered_works 
+                if any(tag in [t.lower() for t in w["config_tags"]] for tag in tag_list)
+            ]
+        
+        # Filter by search term (searches in multiple fields)
+        if search:
+            search_lower = search.lower()
+            filtered_works = [
+                w for w in filtered_works 
+                if (search_lower in w["id"].lower() or
+                    search_lower in w["config_name"].lower() or
+                    search_lower in w["config_description"].lower() or
+                    search_lower in w["config_author"].lower() or
+                    any(search_lower in tag.lower() for tag in w["config_tags"]))
+            ]
+        
         # Sort by creation date (newest first)
-        enriched_works.sort(key=lambda x: x["created_at"], reverse=True)
+        filtered_works.sort(key=lambda x: x["created_at"], reverse=True)
+        
+        # Calculate pagination
+        total_items = len(filtered_works)
+        total_pages = (total_items + per_page - 1) // per_page
+        start_idx = (page - 1) * per_page
+        end_idx = start_idx + per_page
+        paginated_works = filtered_works[start_idx:end_idx]
         
         return {
-            "works": enriched_works,
-            "total": len(enriched_works)
+            "works": paginated_works,
+            "total": total_items,
+            "page": page,
+            "per_page": per_page,
+            "total_pages": total_pages,
+            "has_next": page < total_pages,
+            "has_prev": page > 1
         }
         
     except Exception as e:
@@ -56,6 +119,14 @@ async def get_work_status(work_id: str) -> Dict[str, Any]:
         if not work:
             raise HTTPException(status_code=404, detail=f"Work {work_id} not found")
         
+        # Extract config from config_json field
+        config = {}
+        if work.get("config_json"):
+            try:
+                config = json.loads(work["config_json"])
+            except json.JSONDecodeError:
+                config = {}
+        
         return {
             "work_id": work_id,
             "status": work.get("status", "unknown"),
@@ -63,7 +134,7 @@ async def get_work_status(work_id: str) -> Dict[str, Any]:
             "updated_at": work.get("updated_at", 0),
             "output_path": work.get("output_path", ""),
             "error": work.get("error", None),
-            "config": work.get("config", {}),
+            "config": config,
         }
         
     except HTTPException:
