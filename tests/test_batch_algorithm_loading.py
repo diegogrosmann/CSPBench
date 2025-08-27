@@ -73,15 +73,13 @@ resources:
         algorithms = self.get_algorithms_from_preset(config, "test_commented")
         
         # Verificar que apenas algoritmos não comentados foram carregados
-        # Baseado no YAML: apenas "BLF-GA" e "H²-CSP" devem estar presentes
-        expected_algorithms = ["BLF-GA", "H²-CSP"]
-        
+        # Baseado no YAML: apenas "BLF-GA" e "H2-CSP" devem estar presentes
+        expected_algorithms = ["BLF-GA", "H2-CSP"]
+
         assert set(algorithms) == set(expected_algorithms), (
             f"Algoritmos carregados: {algorithms}, "
             f"Esperados: {expected_algorithms}"
-        )
-        
-        # Verificar que algoritmos comentados foram ignorados
+        )        # Verificar que algoritmos comentados foram ignorados
         commented_algorithms = ["Baseline", "CSC", "DP-CSP"]
         for alg in commented_algorithms:
             assert alg not in algorithms, f"Algoritmo comentado '{alg}' foi carregado incorretamente"
@@ -93,13 +91,12 @@ resources:
         algorithms = self.get_algorithms_from_preset(config, "test_all_enabled")
         
         # Todos os algoritmos devem estar presentes
-        expected_algorithms = ["Baseline", "BLF-GA", "CSC", "H²-CSP", "DP-CSP"]
-        
+        expected_algorithms = ["Baseline", "BLF-GA", "CSC", "H2-CSP", "DP-CSP"]
+
         assert set(algorithms) == set(expected_algorithms), (
             f"Algoritmos carregados: {algorithms}, "
             f"Esperados: {expected_algorithms}"
-        )
-
+        )    
     def test_all_commented_algorithms_result_in_empty_list(self):
         """Testa se todos os algoritmos comentados resultam em lista vazia."""
         config = self.load_batch_config("batch_test_all_commented.yaml")
@@ -124,8 +121,8 @@ resources:
         
         # Testar segundo preset
         algorithms_2 = self.get_algorithms_from_preset(config, "config_mixed_2")
-        expected_2 = ["BLF-GA", "H²-CSP"]  # Baseline, CSC e DP-CSP comentados
-        
+        expected_2 = ["BLF-GA", "H2-CSP"]  # Baseline, CSC e DP-CSP comentados
+
         assert set(algorithms_2) == set(expected_2), (
             f"Preset 2 - Algoritmos carregados: {algorithms_2}, "
             f"Esperados: {expected_2}"
@@ -162,9 +159,9 @@ resources:
         
         # Verificar que apenas algoritmos não comentados têm parâmetros carregados
         loaded_alg_names = [item.name for item in preset.items]
-        
+
         for item in preset.items:
-            assert item.name in ["BLF-GA", "H²-CSP"], (
+            assert item.name in ["BLF-GA", "H2-CSP"], (
                 f"Algoritmo inesperado carregado: {item.name}"
             )
             assert isinstance(item.params, dict), (
@@ -259,7 +256,7 @@ resources:
         # Verificar que comentários não aparecem como valores
         for alg in yaml_algorithms:
             assert not alg.startswith("#"), f"Comentário encontrado como valor: {alg}"
-            assert alg in ["BLF-GA", "H²-CSP"], f"Algoritmo inesperado no YAML: {alg}"
+            assert alg in ["BLF-GA", "H2-CSP"], f"Algoritmo inesperado no YAML: {alg}"
 
     def test_performance_with_large_configuration(self):
         """Testa performance do carregamento com configurações maiores."""

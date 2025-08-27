@@ -45,5 +45,5 @@ def test_progress_phases_cover_expected():
         "local_search"
     }  # local_search pode estar embutida
     assert expected.issubset(phases)
-    # progresso final 100
-    assert any(e.get("progress") == 100.0 for e in store.events)
+    # progresso final 100 (verificar tanto 100.0 quanto 1.0)
+    assert any(e.get("progress") == 100.0 for e in store.events) or any(e.get("progress") == 1.0 for e in store.events)

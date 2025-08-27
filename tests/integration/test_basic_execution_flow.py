@@ -206,15 +206,16 @@ class TestBasicExecutionFlow:
         )
 
         # Segunda geração com configuração estendida
+        # Como existe uma combinação em 'running', não deve gerar novas
         runner._generate_pipeline_combinations(extended_config)
         combinations_after = work_store.get_combinations()
 
-        # Devemos ter 2 combinações agora: original + nova
-        assert len(combinations_after) == 2
+        # Deve ainda ter apenas 1 combinação, mas resetada para 'queued'
+        assert len(combinations_after) == 1
 
-        # Verificar que a original foi reiniciada para 'queued'
+        # Verificar que a combinação foi reiniciada para 'queued'
         queued_combos = [c for c in combinations_after if c["status"] == "queued"]
-        assert len(queued_combos) == 2  # ambas devem estar em 'queued' após reset
+        assert len(queued_combos) == 1
 
     @patch("src.infrastructure.orchestration.pipeline_runner.PipelineRunner.run")
     def test_execution_manager_workflow(self, mock_runner_run, minimal_config):

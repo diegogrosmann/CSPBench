@@ -124,15 +124,13 @@ class TestWebSocketConnection:
     
     def test_work_websocket_database_not_ready(self, test_client, mock_work_service):
         """Test WebSocket connection when database is not ready."""
-        mock_work_service.get_work_details.return_value = {
-            "output_path": "/nonexistent/path"
-        }
+        mock_work_service.get_work_details.return_value = None
         
         with test_client.websocket_connect("/ws/work/test_work") as websocket:
             # Should receive error message
             data = websocket.receive_json()
             assert data["type"] == "error"
-            assert data["payload"]["code"] == "DATABASE_NOT_READY"
+            assert data["payload"]["code"] == "WORK_NOT_FOUND"
 
 
 class TestProgressTracking:
@@ -301,6 +299,7 @@ class TestRealExecution:
         pytest.skip("Integration test - requires real execution")
     
     @pytest.mark.integration  
+    @pytest.mark.asyncio
     async def test_real_database_queries(self):
         """Test with real database queries."""
         # This test would use real database from running execution

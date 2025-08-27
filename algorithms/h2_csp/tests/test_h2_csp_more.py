@@ -23,7 +23,7 @@ def ensure_reg():  # small helper
 def build(strings, alphabet, **params):
     ensure_reg()
     calc = create_distance_calculator("hamming", strings)
-    Alg = global_registry["H2CSP"]
+    Alg = global_registry["H2-CSP"]
     return Alg(strings, alphabet, distance_calculator=calc, **params)
 
 
