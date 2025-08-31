@@ -21,7 +21,7 @@ def main():
 
     Environment variables:
         WEB_HOST: Host to bind to (default: 0.0.0.0)
-        WEB_PORT: Port to bind to (default: 8000)
+        PORT: Port to bind to (default: 8000)
         DEBUG: Enable debug mode (default: false)
         RELOAD: Enable auto-reload (default: true in debug)
     """
@@ -32,7 +32,7 @@ def main():
 
         # Configuration with environment variable fallbacks
         host = os.getenv("WEB_HOST", "0.0.0.0")
-        port = int(os.getenv("WEB_PORT", "8000"))
+        port = int(os.getenv("PORT", os.getenv("WEB_PORT", "8000")))
         debug = os.getenv("DEBUG", "false").lower() == "true"
         reload = os.getenv("RELOAD", str(debug).lower()).lower() == "true"
 

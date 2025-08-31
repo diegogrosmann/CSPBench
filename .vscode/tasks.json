@@ -181,6 +181,33 @@
             "options": {
                 "cwd": "${workspaceFolder}"
             }
+        },
+        {
+            "label": "Deploy Cloud Run",
+            "type": "shell",
+            "command": "bash",
+            "args": [
+                "deploy/cloud_run_deploy.sh",
+                "--env-file",
+                "deploy/.env.deploy"
+                // Para preparar bucket na mesma execução, adicione: "--prepare-bucket"
+            ],
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": [],
+            "options": {
+                "cwd": "${workspaceFolder}",
+                "envFile": "${workspaceFolder}/deploy/.env",
+                "env": {
+                    "PYTHONPATH": "${workspaceFolder}",
+                    "PYTHONDONTWRITEBYTECODE": "1"
+                }
+            }
         }
     ]
 }

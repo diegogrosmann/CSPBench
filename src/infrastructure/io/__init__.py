@@ -1,14 +1,6 @@
-"""
-Módulo de I/O da Infraestrutura
+"""Infrastructure I/O module.
 
-Implementações para entrada e saída de dados.
-"""
+Legacy exporter layer removed in favor of unified FinalizationService.
+This package kept for backward import stability (now intentionally minimal)."""
 
-from .exporters import CsvExporter, FileExporter, JsonExporter, TxtExporter
-
-__all__ = [
-    "FileExporter",
-    "CsvExporter",
-    "JsonExporter",
-    "TxtExporter",
-]
+__all__: list[str] = []

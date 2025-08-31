@@ -1,12 +1,25 @@
-"""Combinations mixin for work state persistence."""
+"""Combinations mixin for work state persistence.
+
+Adiciona (patch) logs detalhados para diagnosticar perda/skip de combinações:
+ - submit_combinations: lista inseridas vs ignoradas
+ - update_combination_status: transições (old -> new) com timestamps
+ - get_next_queued_combination: seleção e fila remanescente
+ - init_combination: combinações reiniciadas
+
+Ativar via LOG_LEVEL=DEBUG para maior verbosidade.
+"""
 
 import json
 import time
 from typing import Any, Optional
 
 from src.infrastructure.persistence.work_state.events import EventsMixin
+from src.infrastructure.logging_config import get_logger
 
 from .utils import validate_status
+
+# Logger dedicado para operações de combinação
+_combolog = get_logger("CSPBench.Persistence.Combinations")
 
 
 class CombinationsMixin:
@@ -35,13 +48,30 @@ class CombinationsMixin:
             rows = cursor.fetchall()
             has_combinations = bool(rows)
 
-            for cur in rows:
-                # Logar cada combinação afetada
-                self.combination_warning(
+            if rows:
+                _combolog.debug(
+                    "[init_combination] Reinicializando %d combinações work_id=%s: %s",
+                    len(rows),
                     work_id,
-                    combination_id=cur[0],
-                    message=f"Reiniciando combinação {cur[0]} com status {cur[5]}",
+                    [
+                        {
+                            "id": r[0],
+                            "task": r[1],
+                            "dataset": r[2],
+                            "preset": r[3],
+                            "algorithm": r[4],
+                            "status": r[5],
+                        }
+                        for r in rows
+                    ],
                 )
+                for cur in rows:
+                    # Log estruturado também em events
+                    self.combination_warning(
+                        work_id,
+                        combination_id=cur[0],
+                        message=f"Reiniciando combinação {cur[0]} com status {cur[5]}",
+                    )
 
             if has_combinations:
                 # Reiniciar todas para 'queued'
@@ -68,7 +98,9 @@ class CombinationsMixin:
 
         timestamp = time.time()
         rows_params = []
+        unique_keys: list[tuple[str, str, str, str, str, str]] = []
         for combo in tasks_combinations:
+            mode = combo.get("mode", "experiment")
             rows_params.append(
                 (
                     work_id,
@@ -76,12 +108,22 @@ class CombinationsMixin:
                     combo["dataset_id"],
                     combo["preset_id"],
                     combo["algorithm_id"],
-                    combo.get("mode", "experiment"),
+                    mode,
                     "queued",
                     combo.get("total_sequences", 0),
                     timestamp,
                     None,  # started_at
                     None,  # finished_at
+                )
+            )
+            unique_keys.append(
+                (
+                    combo["task_id"],
+                    combo["dataset_id"],
+                    combo["preset_id"],
+                    combo["algorithm_id"],
+                    mode,
+                    str(combo.get("total_sequences", 0)),
                 )
             )
 
@@ -101,12 +143,61 @@ class CombinationsMixin:
             # Contar quantas foram efetivamente inseridas agora (status queued e created_at ~= timestamp)
             cursor.execute(
                 """
-                SELECT COUNT(*) FROM combinations
+                SELECT id, task_id, dataset_id, preset_id, algorithm_id, mode, total_sequences
+                FROM combinations
                 WHERE work_id = ? AND created_at = ?
                 """,
                 (work_id, timestamp),
             )
-            inserted = cursor.fetchone()[0]
+            inserted_rows = cursor.fetchall()
+            inserted = len(inserted_rows)
+
+            # Diagnóstico de duplicatas ignoradas
+            if inserted != len(tasks_combinations):
+                _combolog.debug(
+                    "[submit_combinations] work_id=%s inseridas=%d ignoradas=%d total_enviadas=%d",
+                    work_id,
+                    inserted,
+                    len(tasks_combinations) - inserted,
+                    len(tasks_combinations),
+                )
+            else:
+                _combolog.debug(
+                    "[submit_combinations] work_id=%s todas %d combinações inseridas",
+                    work_id,
+                    inserted,
+                )
+
+            if inserted_rows:
+                _combolog.debug(
+                    "[submit_combinations] IDs inseridos: %s",
+                    [
+                        {
+                            "id": r[0],
+                            "task": r[1],
+                            "dataset": r[2],
+                            "preset": r[3],
+                            "algorithm": r[4],
+                            "mode": r[5],
+                            "total_sequences": r[6],
+                        }
+                        for r in inserted_rows
+                    ],
+                )
+
+            # Contagem atual de estados por status para visibilidade
+            cursor.execute(
+                """
+                SELECT status, COUNT(*) FROM combinations WHERE work_id = ? GROUP BY status
+                """,
+                (work_id,),
+            )
+            status_counts = {row[0]: row[1] for row in cursor.fetchall()}
+            _combolog.debug(
+                "[submit_combinations] Distribuição de status após inserção: %s",
+                status_counts,
+            )
+
             return inserted
 
     def update_combination_status(
@@ -122,50 +213,94 @@ class CombinationsMixin:
         validate_status(status)
 
         timestamp = time.time()
+        with self._lock:
+            cursor = self._conn.cursor()
+            cursor.execute(
+                """
+                SELECT id, status, started_at, finished_at FROM combinations
+                WHERE work_id=? AND task_id=? AND dataset_id=? AND preset_id=? AND algorithm_id=?
+                """,
+                (work_id, task_id, dataset_id, preset_id, algorithm_id),
+            )
+            row = cursor.fetchone()
+            orig = None
+            if row:
+                orig = {
+                    "id": row[0],
+                    "old_status": row[1],
+                    "old_started_at": row[2],
+                    "old_finished_at": row[3],
+                }
 
-        if status == "running":
-            self._execute(
+            if status == "running":
+                cursor.execute(
+                    """
+                    UPDATE combinations 
+                    SET status=?, started_at=? 
+                    WHERE work_id=? AND task_id=? AND dataset_id=? AND preset_id=? AND algorithm_id=?
+                    """,
+                    (
+                        status,
+                        timestamp,
+                        work_id,
+                        task_id,
+                        dataset_id,
+                        preset_id,
+                        algorithm_id,
+                    ),
+                )
+            elif status in ("completed", "failed"):
+                cursor.execute(
+                    """
+                    UPDATE combinations 
+                    SET status=?, finished_at=? 
+                    WHERE work_id=? AND task_id=? AND dataset_id=? AND preset_id=? AND algorithm_id=?
+                    """,
+                    (
+                        status,
+                        timestamp,
+                        work_id,
+                        task_id,
+                        dataset_id,
+                        preset_id,
+                        algorithm_id,
+                    ),
+                )
+            else:
+                cursor.execute(
+                    """
+                    UPDATE combinations 
+                    SET status=? 
+                    WHERE work_id=? AND task_id=? AND dataset_id=? AND preset_id=? AND algorithm_id=?
+                    """,
+                    (status, work_id, task_id, dataset_id, preset_id, algorithm_id),
+                )
+            self._conn.commit()
+
+            # Recarregar estado final para log
+            cursor.execute(
                 """
-                UPDATE combinations 
-                SET status=?, started_at=? 
+                SELECT id, status, started_at, finished_at FROM combinations
                 WHERE work_id=? AND task_id=? AND dataset_id=? AND preset_id=? AND algorithm_id=?
                 """,
-                (
-                    status,
-                    timestamp,
-                    work_id,
+                (work_id, task_id, dataset_id, preset_id, algorithm_id),
+            )
+            new_row = cursor.fetchone()
+            if new_row:
+                _combolog.debug(
+                    "[update_combination_status] id=%s %s/%s/%s/%s: %s -> %s (started_at=%s finished_at=%s) orig_started_at=%s orig_finished_at=%s",
+                    new_row[0],
                     task_id,
                     dataset_id,
                     preset_id,
                     algorithm_id,
-                ),
-            )
-        elif status in ("completed", "failed"):
-            self._execute(
-                """
-                UPDATE combinations 
-                SET status=?, finished_at=? 
-                WHERE work_id=? AND task_id=? AND dataset_id=? AND preset_id=? AND algorithm_id=?
-                """,
-                (
-                    status,
-                    timestamp,
-                    work_id,
-                    task_id,
-                    dataset_id,
-                    preset_id,
-                    algorithm_id,
-                ),
-            )
-        else:
-            self._execute(
-                """
-                UPDATE combinations 
-                SET status=? 
-                WHERE work_id=? AND task_id=? AND dataset_id=? AND preset_id=? AND algorithm_id=?
-                """,
-                (status, work_id, task_id, dataset_id, preset_id, algorithm_id),
-            )
+                    orig["old_status"] if orig else None,
+                    new_row[1],
+                    new_row[2],
+                    new_row[3],
+                    orig["old_started_at"] if orig else None,
+                    orig["old_finished_at"] if orig else None,
+                )
 
     def get_next_queued_combination(self, work_id: str) -> dict[str, Any] | None:
         """Get next queued combination for execution following hierarchical order.
@@ -175,6 +310,13 @@ class CombinationsMixin:
         """
         with self._lock:
             cursor = self._conn.cursor()
+            # Contagem antes
+            cursor.execute(
+                "SELECT COUNT(*) FROM combinations WHERE work_id = ? AND status='queued'",
+                (work_id,),
+            )
+            queued_before = cursor.fetchone()[0]
+
             cursor.execute(
                 """
                 SELECT id, task_id, dataset_id, preset_id, algorithm_id, mode, total_sequences
@@ -185,13 +327,16 @@ class CombinationsMixin:
                 """,
                 (work_id,),
             )
-
             row = cursor.fetchone()
-
             if not row:
+                _combolog.debug(
+                    "[get_next_queued_combination] Nenhuma combinação em fila (queued_before=%d) work_id=%s",
+                    queued_before,
+                    work_id,
+                )
                 return None
 
-            return {
+            combo = {
                 "id": row[0],
                 "task_id": row[1],
                 "dataset_id": row[2],
@@ -200,6 +345,16 @@ class CombinationsMixin:
                 "mode": row[5],
                 "total_sequences": row[6],
             }
+            _combolog.debug(
+                "[get_next_queued_combination] Selecionada id=%s task=%s dataset=%s preset=%s algorithm=%s queued_before=%d",
+                combo["id"],
+                combo["task_id"],
+                combo["dataset_id"],
+                combo["preset_id"],
+                combo["algorithm_id"],
+                queued_before,
+            )
+            return combo
 
     def get_next_pending_combination(self, work_id: str) -> dict[str, Any] | None:
         """Get next pending combination (compatibility method)."""

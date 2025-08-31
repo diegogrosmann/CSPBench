@@ -8,7 +8,7 @@ This module provides Pydantic models for batch configuration management includin
 """
 
 from typing import List, Optional
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 import yaml
 
 
@@ -44,8 +44,9 @@ class BatchUploadRequest(BaseModel):
     content: str = Field(..., description="YAML batch configuration content")
     overwrite: bool = Field(False, description="Whether to overwrite existing file")
 
-    @validator("content")
-    def validate_yaml_content(cls, v):
+    @field_validator("content")
+    @classmethod
+    def validate_yaml_content(cls, v: str):
         """Validate YAML content format."""
         if not v.strip():
             raise ValueError("Content cannot be empty")
@@ -58,8 +59,9 @@ class BatchUploadRequest(BaseModel):
 
         return v
 
-    @validator("name")
-    def validate_name(cls, v):
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, v: str):
         """Validate batch configuration name."""
         if not v.strip():
             raise ValueError("Name cannot be empty")

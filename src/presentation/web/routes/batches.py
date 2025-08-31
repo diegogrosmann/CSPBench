@@ -25,18 +25,11 @@ from ..core.batch_models import (
     OperationResponse,
 )
 from ..core.security import sanitize_filename
+from src.infrastructure.utils.path_utils import get_batch_directory
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/batches", tags=["batches"])
-
-
-def get_batch_directory() -> Path:
-    """Get the batch files directory path."""
-    batch_dir_env = os.getenv("BATCH_DIRECTORY", "./batches")
-    batch_dir = Path(batch_dir_env).resolve()
-    batch_dir.mkdir(exist_ok=True)
-    return batch_dir
 
 
 def format_file_size(size_bytes: int) -> str:
@@ -262,10 +255,21 @@ async def list_batch_files():
                 description = extract_description_from_yaml(file_path)
                 metadata = extract_metadata_from_yaml(file_path)
 
+                # Try to get relative path, fallback to absolute path if not possible
+                try:
+                    relative_path = str(file_path.relative_to(Path.cwd()))
+                except ValueError:
+                    # If file is not in a subdirectory of cwd, use relative to batch_dir
+                    try:
+                        relative_path = str(file_path.relative_to(batch_dir.parent))
+                    except ValueError:
+                        # Last fallback: use absolute path
+                        relative_path = str(file_path)
+
                 file_info = BatchFileInfo(
                     name=file_path.name,
                     description=description,
-                    path=str(file_path.relative_to(Path.cwd())),
+                    path=relative_path,
                     size=format_file_size(stat.st_size),
                     created=datetime.fromtimestamp(stat.st_ctime).isoformat(),
                     modified=datetime.fromtimestamp(stat.st_mtime).isoformat(),
@@ -316,10 +320,17 @@ async def get_batch_file(filename: str):
         with open(file_path, "r", encoding="utf-8") as f:
             content = f.read()
 
+        # Try to get relative path, fallback to absolute path if not possible  
+        try:
+            relative_path = str(file_path.relative_to(Path.cwd()))
+        except ValueError:
+            # If file is not in a subdirectory of cwd, use filename only
+            relative_path = filename
+
         return {
             "name": filename,
             "content": content,
-            "path": str(file_path.relative_to(Path.cwd())),
+            "path": relative_path,
         }
 
     except HTTPException:
@@ -363,9 +374,15 @@ async def save_batch_file(filename: str, content: dict):
 
         logger.info(f"Batch file saved: {file_path}")
 
+        # Try to get relative path, fallback to filename if not possible
+        try:
+            relative_path = str(file_path.relative_to(Path.cwd()))
+        except ValueError:
+            relative_path = filename
+
         return {
             "message": f"Batch file '{filename}' saved successfully",
-            "path": str(file_path.relative_to(Path.cwd())),
+            "path": relative_path,
         }
 
     except HTTPException:

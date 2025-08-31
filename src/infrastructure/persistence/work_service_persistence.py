@@ -15,6 +15,7 @@ from typing import List, Optional
 
 from src.domain.work import WorkItem, WorkStatus
 from src.domain.status import BaseStatus
+from src.infrastructure.utils.path_utils import get_work_db_path
 
 logger = logging.getLogger(__name__)
 
@@ -41,28 +42,29 @@ class WorkServicePersistence:
     """
 
     def __init__(self, db_path: Optional[str] = None):
-        """
-        Initialize persistent repository with SQLite database.
-
-        Args:
-            db_path: Path to SQLite database file. If None, uses WORK_DB_PATH environment variable
-                    or defaults to "data/work_manager.db"
-        """
-
+        """Initialize with database path from environment or parameter."""
         if db_path is None:
-            db_path = os.getenv("WORK_DB_PATH", "data/work_manager.db")
+            self.db_path = get_work_db_path()
+        else:
+            self.db_path = Path(db_path)
+            # Convert to absolute path if relative
+            if not self.db_path.is_absolute():
+                self.db_path = self.db_path.resolve()
+            # Create parent directory if needed
+            self.db_path.parent.mkdir(parents=True, exist_ok=True)
 
-        self.db_path = Path(db_path)
-        self._init_done = False
-        self.db_path.parent.mkdir(parents=True, exist_ok=True)
-
-        self._lock = threading.RLock()
-        self._conn = sqlite3.connect(
-            str(self.db_path), check_same_thread=False, timeout=30.0
-        )
+        self._conn = sqlite3.connect(self.db_path, check_same_thread=False)
+        self._conn.row_factory = sqlite3.Row
+        
+        # Configurações para concorrência e performance
         self._conn.execute("PRAGMA journal_mode=WAL")
         self._conn.execute("PRAGMA synchronous=NORMAL")
-        self._conn.execute("PRAGMA foreign_keys=ON")
+        self._conn.execute("PRAGMA busy_timeout=30000")  # 30 segundos
+        self._conn.execute("PRAGMA wal_autocheckpoint=1000")
+        self._conn.execute("PRAGMA cache_size=10000")
+        
+        self._lock = threading.RLock()
+        self._init_done = False
 
         self._init_schema()
 
@@ -94,12 +96,26 @@ class WorkServicePersistence:
             return False
 
     def _execute(self, sql: str, params: tuple = ()) -> sqlite3.Cursor:
-        """Execute SQL with proper locking."""
-        with self._lock:
-            cursor = self._conn.cursor()
-            cursor.execute(sql, params)
-            self._conn.commit()
-            return cursor
+        """Execute SQL with proper locking and retry logic."""
+        max_retries = 3
+        retry_delay = 0.1
+        
+        for attempt in range(max_retries):
+            try:
+                with self._lock:
+                    cursor = self._conn.cursor()
+                    cursor.execute(sql, params)
+                    self._conn.commit()
+                    return cursor
+            except sqlite3.OperationalError as e:
+                if "database is locked" in str(e).lower() and attempt < max_retries - 1:
+                    logger.warning(f"Database locked, retrying in {retry_delay}s (attempt {attempt + 1}/{max_retries})")
+                    time.sleep(retry_delay)
+                    retry_delay *= 2
+                    continue
+                raise
+            except Exception:
+                raise
 
     def _fetch_one(self, sql: str, params: tuple = ()) -> Optional[sqlite3.Row]:
         """Fetch one row with proper locking."""
@@ -242,15 +258,26 @@ class WorkServicePersistence:
         )
         return cursor.rowcount
 
+    def get_status_counts(self) -> dict[str, int]:
+        """Get count of work items by status."""
+        rows = self._fetch_all(
+            """
+            SELECT status, COUNT(*) as count 
+            FROM work_items 
+            GROUP BY status
+        """
+        )
+        return {row["status"]: row["count"] for row in rows}
+
     def close(self) -> None:
         """Close database connection."""
-        with self._lock:
-            if self._conn:
-                self._conn.close()
+        if hasattr(self, "_conn") and self._conn:
+            self._conn.close()
 
-    def __del__(self):
-        """Cleanup on destruction."""
-        try:
-            self.close()
-        except:
-            pass  # Ignore errors during cleanup
+    def __enter__(self):
+        """Context manager entry."""
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Context manager exit."""
+        self.close()

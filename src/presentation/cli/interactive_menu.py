@@ -6,10 +6,12 @@ argument routing and bootstrapping.
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import List, Optional
 
 from typing import Callable
+from src.infrastructure.utils.path_utils import get_batch_directory
 
 # Recebe injetado um callable que representa o app Typer; evitamos import circular.
 AppInvoker = Callable[[list[str]], None]
@@ -21,9 +23,9 @@ def show_interactive_menu(app_invoke: AppInvoker) -> None:
     print("=" * 60)
     print()
 
-    batches_dir = Path("batches")
+    batches_dir = get_batch_directory()
     if not batches_dir.exists():
-        _show_commands_help("📁 Directory 'batches/' not found")
+        _show_commands_help(f"📁 Directory '{batches_dir}' not found")
         return
 
     batch_files: List[Path] = list(batches_dir.glob("*.yaml")) + list(
@@ -31,7 +33,7 @@ def show_interactive_menu(app_invoke: AppInvoker) -> None:
     )
 
     if not batch_files:
-        _show_commands_help("📋 No batch files found in 'batches/'")
+        _show_commands_help(f"📋 No batch files found in '{batches_dir}'")
         return
 
     _display_batch_files(batch_files)

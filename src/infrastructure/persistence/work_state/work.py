@@ -1,5 +1,6 @@
 import time
 import json
+from pathlib import Path
 from typing import Any, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:  # pragma: no cover - apenas para type checkers
@@ -252,3 +253,24 @@ class WorkMixin:
         except Exception:
             return None
         return None
+
+    # ------------------------------------------------------------------
+    # Output path access
+    # ------------------------------------------------------------------
+    def get_work_output_path(self, work_id: str) -> Optional[Path]:
+        """Return stored output_path as Path if present, else None.
+
+        Added to support centralized finalization exports using the path
+        originally assigned when the work was submitted (WorkManager stores
+        OUTPUT_BASE_DIRECTORY/{work_id}). Falls back to None if not found.
+        """
+        try:
+            with self._lock:
+                cursor = self._conn.cursor()
+                cursor.execute("SELECT output_path FROM work WHERE id=?", (work_id,))
+                row = cursor.fetchone()
+            if not row or not row[0]:  # no record or empty string
+                return None
+            return Path(row[0])
+        except Exception:  # pragma: no cover - defensive
+            return None

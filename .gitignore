@@ -16,3 +16,15 @@ data/*
 batches/*
 !batches/TEMPLATE.yaml
 data/work_manager.db-shm
+
+# Build artifacts and logs
+htmlcov/
+.coverage
+*.log
+logs/
+outputs/
+cache/
+
+# OS files
+.DS_Store
+Thumbs.db

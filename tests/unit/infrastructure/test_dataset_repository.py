@@ -227,7 +227,9 @@ class TestFileDatasetRepositoryEnvironment:
 
             base_path = FileDatasetRepository._get_base_path()
 
-            assert base_path == Path("./datasets")
+            # The implementation returns an absolute path, so we should compare with the resolved path
+            expected_path = Path("./datasets").resolve()
+            assert base_path == expected_path
 
     def test_get_base_path_from_env(self, tmp_path):
         """Test getting base path from environment variable."""

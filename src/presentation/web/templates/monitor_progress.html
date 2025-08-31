@@ -47,6 +47,13 @@
   .table-info { background-color: rgba(102, 126, 234, 0.1) !important; }
   /* Scroll containers */
   .scroll-y { max-height:260px; overflow-y:auto; }
+  /* Executions table with fixed header */
+  #executionsContainer { position: relative; }
+  #executionsContainer .sticky-top { position: sticky; top: 0; z-index: 10; background: #f8f9fa; }
+  #executionsContainer::-webkit-scrollbar { width: 6px; }
+  #executionsContainer::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 3px; }
+  #executionsContainer::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 3px; }
+  #executionsContainer::-webkit-scrollbar-thumb:hover { background: #a8a8a8; }
   .small-label { font-size:.65rem; text-transform:uppercase; letter-spacing:.5px; color:#6c757d; }
   /* Event log styles */
   .event-type-error { background-color: #dc3545; color: white; }
@@ -203,9 +210,9 @@
               </div>
             </div>
           </div>
-          <div class="table-responsive table-placeholder border rounded" style="min-height:260px;">
+          <div class="table-responsive table-placeholder border rounded" style="min-height:260px; max-height:400px; overflow-y:auto;" id="executionsContainer">
             <table class="table table-sm align-middle mb-0" id="executionsTable">
-              <thead class="table-light">
+              <thead class="table-light sticky-top">
                 <tr>
                   <th style="width:70px">#</th>
                   <th>Status</th>
@@ -221,16 +228,11 @@
             </table>
           </div>
           
-          <!-- Paginação para Executions -->
-          <div class="d-flex justify-content-between align-items-center mt-3">
+          <!-- Info de execuções sem paginação -->
+          <div class="d-flex justify-content-between align-items-center mt-2">
             <div class="text-muted small">
-              <span id="executionsInfo">Mostrando 0 de 0 execuções</span>
+              <span id="executionsInfo">Mostrando 0 execuções</span>
             </div>
-            <nav aria-label="Executions pagination">
-              <ul class="pagination pagination-sm mb-0" id="executionsPagination">
-                <!-- Paginação será gerada via JavaScript -->
-              </ul>
-            </nav>
           </div>
         </div>
         <!-- Events Tab -->
@@ -369,11 +371,10 @@
 {% block extra_js %}
 <script>
 // === Variáveis Globais ===
-const ITEMS_PER_PAGE = 10;
+const ITEMS_PER_PAGE = 10; // Mantido apenas para Events
 
 let allExecutions = [];
 let filteredExecutions = [];
-let currentExecutionsPage = 1;
 
 let allEvents = [];
 let filteredEvents = [];
@@ -414,7 +415,6 @@ function addTestData() {
   console.log('Dados de teste adicionados:', { executions: allExecutions.length, events: allEvents.length });
   
   // Renderizar dados de teste imediatamente
-  renderExecutionsPagination();
   renderExecutionsTable();
   renderEventsPagination();
   renderEventsTable();
@@ -461,15 +461,6 @@ function formatEventData(entityData) {
   }
 }
 
-function changeExecutionsPage(page) {
-  const totalPages = Math.ceil(filteredExecutions.length / ITEMS_PER_PAGE);
-  if (page < 1 || page > totalPages) return;
-  
-  currentExecutionsPage = page;
-  renderExecutionsPagination();
-  renderExecutionsTable();
-}
-
 function changeEventsPage(page) {
   const totalPages = Math.ceil(filteredEvents.length / ITEMS_PER_PAGE);
   if (page < 1 || page > totalPages) return;
@@ -477,47 +468,6 @@ function changeEventsPage(page) {
   currentEventsPage = page;
   renderEventsPagination();
   renderEventsTable();
-}
-
-function renderExecutionsPagination() {
-  const totalPages = Math.ceil(filteredExecutions.length / ITEMS_PER_PAGE);
-  const paginationContainer = document.getElementById('executionsPagination');
-  const infoContainer = document.getElementById('executionsInfo');
-  
-  if (!paginationContainer) return;
-  
-  // Atualizar informações
-  const start = (currentExecutionsPage - 1) * ITEMS_PER_PAGE + 1;
-  const end = Math.min(currentExecutionsPage * ITEMS_PER_PAGE, filteredExecutions.length);
-  if (infoContainer) infoContainer.textContent = `Mostrando ${start}-${end} de ${filteredExecutions.length} execuções`;
-  
-  if (totalPages <= 1) {
-    paginationContainer.innerHTML = '';
-    return;
-  }
-  
-  let html = '';
-  
-  // Botão anterior
-  html += `<li class="page-item ${currentExecutionsPage === 1 ? 'disabled' : ''}">
-    <a class="page-link" href="#" onclick="changeExecutionsPage(${currentExecutionsPage - 1}); return false;">Anterior</a>
-  </li>`;
-  
-  // Páginas
-  for (let i = 1; i <= totalPages; i++) {
-    if (i === currentExecutionsPage) {
-      html += `<li class="page-item active"><span class="page-link">${i}</span></li>`;
-    } else {
-      html += `<li class="page-item"><a class="page-link" href="#" onclick="changeExecutionsPage(${i}); return false;">${i}</a></li>`;
-    }
-  }
-  
-  // Botão próximo
-  html += `<li class="page-item ${currentExecutionsPage === totalPages ? 'disabled' : ''}">
-    <a class="page-link" href="#" onclick="changeExecutionsPage(${currentExecutionsPage + 1}); return false;">Próximo</a>
-  </li>`;
-  
-  paginationContainer.innerHTML = html;
 }
 
 function renderEventsPagination() {
@@ -562,24 +512,20 @@ function renderEventsPagination() {
 }
 
 function renderExecutionsTable() {
-  const start = (currentExecutionsPage - 1) * ITEMS_PER_PAGE;
-  const end = start + ITEMS_PER_PAGE;
-  
   // Ordenar execuções por sequência (igual à função original)
   const sortedExecutions = [...filteredExecutions].sort((a, b) => (a.sequencia || 0) - (b.sequencia || 0));
-  const pageExecutions = sortedExecutions.slice(start, end);
   
-  // Renderizar apenas os itens da página atual
+  // Renderizar todas as execuções sem paginação
   const tbody = document.getElementById('executionsTableBody');
   if (!tbody) return;
   
-  if (pageExecutions.length === 0) {
+  if (sortedExecutions.length === 0) {
     tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4"><i class="bi bi-inbox me-1"></i>Nenhuma execução</td></tr>';
     return;
   }
 
-  // Renderizar execuções usando a mesma estrutura da função original
-  tbody.innerHTML = pageExecutions.map(exec => {
+  // Renderizar todas as execuções
+  tbody.innerHTML = sortedExecutions.map(exec => {
     const progressWidth = Math.round((exec.progress || 0) * 100);
     const tableClass = exec.status === 'running' ? ' class="table-info"' : '';
     
@@ -592,6 +538,12 @@ function renderExecutionsTable() {
         <td class="small">${escapeHtml(exec.progress_message || '')}</td>
       </tr>`;
   }).join('');
+  
+  // Atualizar informações de contagem
+  const infoContainer = document.getElementById('executionsInfo');
+  if (infoContainer) {
+    infoContainer.textContent = `Mostrando ${sortedExecutions.length} execuções`;
+  }
 }
 
 function renderEventsTable() {
@@ -900,15 +852,11 @@ function renderEventsTable() {
       );
     }
     
-    // Resetar para primeira página
-    currentExecutionsPage = 1;
-    
     // Calcular estatísticas
     const stats = computeExecutionStats(filteredExecutions);
     
-    // Renderizar com paginação
+    // Renderizar sem paginação
     renderExecutions(filteredExecutions, stats);
-    renderExecutionsPagination();
   }
 
   function idsEqual(a, b) {
@@ -965,6 +913,32 @@ function renderEventsTable() {
     
     // Renderizar tabela usando a função global para consistência
     renderExecutionsTable();
+    
+    // Auto-scroll para execução em andamento se auto-follow estiver ativo
+    if (autoFollow && currentCombinationId && selectedCombinationId === currentCombinationId) {
+      // Procurar por execução em andamento (running)
+      const runningExecution = sortedExecutions.find(exec => exec.status === 'running');
+      if (runningExecution) {
+        // Encontrar a linha correspondente na tabela
+        const rows = tbody.querySelectorAll('tr');
+        for (let i = 0; i < rows.length; i++) {
+          if (rows[i].classList.contains('table-info')) {
+            // Fazer scroll suave para a execução em andamento
+            const container = document.getElementById('executionsContainer');
+            if (container) {
+              const rowTop = rows[i].offsetTop;
+              const containerHeight = container.clientHeight;
+              const scrollTop = rowTop - (containerHeight / 2) + (rows[i].offsetHeight / 2);
+              container.scrollTo({
+                top: Math.max(0, scrollTop),
+                behavior: 'smooth'
+              });
+            }
+            break;
+          }
+        }
+      }
+    }
   }
 
   // Merge parcial de dados de progresso
@@ -1169,7 +1143,8 @@ function renderEventsTable() {
     // Configurar botão "Resultado"
     if (els.btnGoToResult) {
       els.btnGoToResult.addEventListener('click', () => {
-        window.open(`/monitor/work/${WORK_ID}/result`, '_blank');
+  // Redireciona para a página de resultados com work_id em hash para futura seleção automática
+  window.open(`/results#work=${WORK_ID}`, '_blank');
       });
     }
     

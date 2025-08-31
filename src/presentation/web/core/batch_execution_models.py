@@ -9,7 +9,7 @@ This module provides Pydantic models for batch execution management including:
 
 from datetime import datetime
 from typing import Dict, List, Optional, Any
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 import yaml
 
 
@@ -23,8 +23,9 @@ class BatchExecutionRequest(BaseModel):
         "log", description="Monitor type: 'none', 'log', 'websocket'"
     )
 
-    @validator("batch_file")
-    def validate_batch_file(cls, v):
+    @field_validator("batch_file")
+    @classmethod
+    def validate_batch_file(cls, v: str):
         """Validate batch file path."""
         if not v.strip():
             raise ValueError("Batch file path cannot be empty")
@@ -38,8 +39,9 @@ class BatchExecutionRequest(BaseModel):
 
         return v.strip()
 
-    @validator("monitor_type")
-    def validate_monitor_type(cls, v):
+    @field_validator("monitor_type")
+    @classmethod
+    def validate_monitor_type(cls, v: str):
         """Validate monitor type."""
         valid_types = ["none", "log", "websocket"]
         if v not in valid_types:

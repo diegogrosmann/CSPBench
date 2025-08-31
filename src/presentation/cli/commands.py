@@ -254,7 +254,9 @@ def register_commands(app: typer.Typer) -> None:
         """Start the web interface."""
         try:
             host = host if host is not None else os.getenv("WEB_HOST", "0.0.0.0")
-            port = int(port) if port is not None else int(os.getenv("WEB_PORT", "8000"))
+            # Use PORT environment variable as primary, fallback to WEB_PORT for compatibility
+            default_port = int(os.getenv("PORT", os.getenv("WEB_PORT", "8080")))
+            port = int(port) if port is not None else default_port
 
             # Use dev flag or WEB_DEBUG env var
             debug_env = os.getenv("WEB_DEBUG", "false").lower() == "true"
@@ -307,10 +309,11 @@ def register_commands(app: typer.Typer) -> None:
             from src.infrastructure.orchestration.dataset_generation_orchestrator import (
                 DatasetGenerationOrchestrator,
             )
+            from src.infrastructure.utils.path_utils import get_dataset_directory
 
-            dataset_path = os.getenv("DATASET_PATH", "datasets")
+            dataset_path = get_dataset_directory()
             typer.echo("📁 Using dataset path: %s" % dataset_path)
-            orchestrator = DatasetGenerationOrchestrator(base_path=dataset_path)
+            orchestrator = DatasetGenerationOrchestrator(base_path=str(dataset_path))
             result_path = orchestrator.run_interactive_generation()
             if result_path:
                 typer.echo("\n🎉 Dataset saved successfully!")

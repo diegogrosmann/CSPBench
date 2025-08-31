@@ -18,6 +18,7 @@ def setup_basic_logging(
     max_bytes: Optional[int] = None,
     backup_count: Optional[int] = None,
     log_file_path: Optional[str] = None,  # Full file path if specified
+    log_to_stdout: Optional[bool] = None,
 ) -> None:
     """
     Configure basic system logging using environment variables as defaults.
@@ -36,15 +37,19 @@ def setup_basic_logging(
     base_name = base_name or os.getenv("LOG_BASE_NAME", "cspbench")
     max_bytes = max_bytes or int(os.getenv("LOG_MAX_BYTES", "10485760"))  # 10MB
     backup_count = backup_count or int(os.getenv("LOG_BACKUP_COUNT", "5"))
-    # Determine file path
-    if log_file_path:
-        log_file = Path(log_file_path)
-        log_file.parent.mkdir(parents=True, exist_ok=True)
-    else:
-        # Create directory if it doesn't exist
-        log_path = Path(log_dir)
-        log_path.mkdir(parents=True, exist_ok=True)
-        log_file = log_path / f"{base_name}.log"
+    if log_to_stdout is None:
+        env_flag = os.getenv("LOG_TO_STDOUT", "false").lower()
+        log_to_stdout = env_flag in {"1", "true", "yes", "on"}
+    # Determine file path (only if not logging to stdout)
+    if not log_to_stdout:
+        if log_file_path:
+            log_file = Path(log_file_path)
+            log_file.parent.mkdir(parents=True, exist_ok=True)
+        else:
+            # Create directory if it doesn't exist
+            log_path = Path(log_dir)
+            log_path.mkdir(parents=True, exist_ok=True)
+            log_file = log_path / f"{base_name}.log"
 
     # Configure formatting
     formatter = logging.Formatter(
@@ -52,11 +57,18 @@ def setup_basic_logging(
         datefmt="%Y-%m-%d %H:%M:%S",
     )
 
-    # Configure file handler with rotation
-    file_handler = logging.handlers.RotatingFileHandler(
-        log_file, maxBytes=max_bytes, backupCount=backup_count, encoding="utf-8"
-    )
-    file_handler.setFormatter(formatter)
+    handlers = []
+    if log_to_stdout:
+        stream_handler = logging.StreamHandler()
+        stream_handler.setFormatter(formatter)
+        handlers.append(stream_handler)
+    else:
+        # Configure file handler with rotation
+        file_handler = logging.handlers.RotatingFileHandler(
+            log_file, maxBytes=max_bytes, backupCount=backup_count, encoding="utf-8"
+        )
+        file_handler.setFormatter(formatter)
+        handlers.append(file_handler)
 
     # Configure root logger
     root_logger = logging.getLogger()
@@ -66,8 +78,9 @@ def setup_basic_logging(
     for handler in root_logger.handlers[:]:
         root_logger.removeHandler(handler)
 
-    # Add new handler
-    root_logger.addHandler(file_handler)
+    # Add new handlers
+    for h in handlers:
+        root_logger.addHandler(h)
 
 
 def setup_logging_from_env() -> None:

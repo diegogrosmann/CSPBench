@@ -9,6 +9,21 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
+from fastapi import APIRouter, HTTPException, BackgroundTasks
+from fastapi.responses import JSONResponse
+
+from src.application.services.execution_manager import ExecutionManager
+from src.application.services.work_service import get_work_service
+from src.domain.config import load_cspbench_config
+from src.domain.errors import BatchConfigurationError
+from src.infrastructure.utils.path_utils import get_batch_directory
+
+import logging
+import os
+from datetime import datetime
+from pathlib import Path
+from typing import Optional
+
 from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
@@ -54,7 +69,7 @@ async def execute_batch(
         logger.info(f"Received batch execution request for file: {request.batch_file}")
 
         # Get batch directory and construct full path
-        batch_dir = Path(os.getenv("BATCH_DIRECTORY", "./batches"))
+        batch_dir = get_batch_directory()
         batch_path = batch_dir / request.batch_file
 
         # Validate file exists and is readable

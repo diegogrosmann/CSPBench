@@ -1,17 +1,10 @@
+"""Deprecated exporters package.
+
+All previous exporter implementations were removed in favor of the unified
+`FinalizationService` located at `src.infrastructure.export.finalization_service`.
+
+This module is intentionally left minimal to avoid import errors on stale
+references while signaling deprecation.
 """
-Exportadores de dados para diferentes formatos.
 
-Implementa interfaces para exportar resultados seguindo o padrão Port/Adapter.
-"""
-
-from .csv_exporter import CsvExporter
-from .file_exporter import FileExporter
-from .json_exporter import JsonExporter
-from .txt_exporter import TxtExporter
-
-__all__ = [
-    "FileExporter",
-    "JsonExporter",
-    "CsvExporter",
-    "TxtExporter",
-]
+__all__: list[str] = []  # no public symbols

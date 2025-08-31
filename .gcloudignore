@@ -1,0 +1,70 @@
+# .gcloudignore - Google Cloud Build optimized
+# This file excludes files from upload to Google Cloud Build
+
+# Python cache and build files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+.venv/
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Git
+.git/
+.gitignore
+
+# Testing
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+.tox/
+.tests/
+
+# Documentation
+*.md
+!README.md
+LICENSE
+CITATION.cff
+CONTRIBUTING.md
+
+# Runtime directories
+logs/
+outputs/
+cache/
+data/
+tmp/
+
+# Keep essential files
+!requirements.txt
+!pyproject.toml
+!main.py

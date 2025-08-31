@@ -6,7 +6,7 @@ from enum import Enum
 from typing import Any, Dict, List, Optional, Union
 from datetime import datetime
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 
 
 class DatasetType(str, Enum):
@@ -70,8 +70,9 @@ class DatasetUploadRequest(BaseModel):
     name: str = Field(..., description="Dataset name")
     content: str = Field(..., description="FASTA content")
 
-    @validator("content")
-    def validate_fasta_content(cls, v):
+    @field_validator("content")
+    @classmethod
+    def validate_fasta_content(cls, v: str):
         """Validate FASTA content format."""
         if not v.strip():
             raise ValueError("Content cannot be empty")
@@ -142,7 +143,8 @@ class NCBIDatasetRequest(BaseModel):
         None, description="Uniformization policy (strict, pad, trim)"
     )
 
-    @validator("max_sequences")
+    @field_validator("max_sequences")
+    @classmethod
     def validate_max_sequences(cls, v):
         """Validate max_sequences limit."""
         if v is not None and v > 10000:

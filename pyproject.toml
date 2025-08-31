@@ -126,6 +126,10 @@ addopts = [
     "--cov-report=term-missing",
     "--cov-report=html",
 ]
+# Definir markers custom
+markers = [
+    "integration: marca testes de integração mais pesados",
+]
 # Inclui também testes de plugins em algorithms/*/tests
 testpaths = ["tests", "algorithms/*/tests"]
 python_files = ["test_*.py"]

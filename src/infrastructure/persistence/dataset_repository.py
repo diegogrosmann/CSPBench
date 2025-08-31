@@ -11,6 +11,7 @@ from typing import List, Any
 
 from src.domain import Dataset
 from src.domain.errors import DatasetNotFoundError, DatasetValidationError
+from src.infrastructure.utils.path_utils import get_dataset_directory
 
 
 class FileDatasetRepository:
@@ -20,8 +21,14 @@ class FileDatasetRepository:
     def _get_base_path(base_path: str | None = None) -> Path:
         """Get base path, using environment variable as default."""
         if base_path is None:
-            base_path = os.getenv("DATASET_DIRECTORY", "./datasets")
+            return get_dataset_directory()
+        
         path = Path(base_path)
+        
+        # Convert to absolute path if relative
+        if not path.is_absolute():
+            path = path.resolve()
+            
         path.mkdir(parents=True, exist_ok=True)
         return path
 

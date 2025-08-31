@@ -23,8 +23,13 @@ class WorkBase:
         # Conexão SQLite
         self._conn = sqlite3.connect(self.db_path, check_same_thread=False)
         self._conn.row_factory = sqlite3.Row  # rows como mapeamentos
+
+        # Configurações para concorrência e performance
         self._conn.execute("PRAGMA journal_mode=WAL")
         self._conn.execute("PRAGMA synchronous=NORMAL")
+        self._conn.execute("PRAGMA busy_timeout=30000")  # 30 segundos
+        self._conn.execute("PRAGMA wal_autocheckpoint=1000")  # Checkpoint automático
+        self._conn.execute("PRAGMA cache_size=10000")  # Cache maior para performance
 
         # Infra de concorrência e estado
         self._lock = threading.RLock()
@@ -35,10 +40,25 @@ class WorkBase:
         self.init_schema()
 
     def _execute(self, sql: str, params: Sequence[Any] | None = None) -> None:
-        """Execute SQL statement with proper locking."""
-        with self._lock:
-            self._conn.execute(sql, params or [])
-            self._conn.commit()
+        """Execute SQL statement with proper locking and retry logic."""
+        max_retries = 3
+        retry_delay = 0.1
+        
+        for attempt in range(max_retries):
+            try:
+                with self._lock:
+                    self._conn.execute(sql, params or [])
+                    self._conn.commit()
+                return
+            except sqlite3.OperationalError as e:
+                if "database is locked" in str(e).lower() and attempt < max_retries - 1:
+                    self._logger.warning(f"Database locked, retrying in {retry_delay}s (attempt {attempt + 1}/{max_retries})")
+                    time.sleep(retry_delay)
+                    retry_delay *= 2  # Exponential backoff
+                    continue
+                raise
+            except Exception:
+                raise
 
     def _executemany(self, sql: str, seq_of_params):
         """Execute SQL statement with multiple parameter sets."""
@@ -47,18 +67,46 @@ class WorkBase:
             self._conn.commit()
 
     def _fetch_one(self, sql: str, params: Sequence[Any] | None = None) -> tuple | None:
-        """Fetch one row with proper locking."""
-        with self._lock:
-            cursor = self._conn.cursor()
-            cursor.execute(sql, params or [])
-            return cursor.fetchone()
+        """Fetch one row with proper locking and retry logic."""
+        max_retries = 3
+        retry_delay = 0.1
+        
+        for attempt in range(max_retries):
+            try:
+                with self._lock:
+                    cursor = self._conn.cursor()
+                    cursor.execute(sql, params or [])
+                    return cursor.fetchone()
+            except sqlite3.OperationalError as e:
+                if "database is locked" in str(e).lower() and attempt < max_retries - 1:
+                    self._logger.warning(f"Database locked during fetch, retrying in {retry_delay}s (attempt {attempt + 1}/{max_retries})")
+                    time.sleep(retry_delay)
+                    retry_delay *= 2
+                    continue
+                raise
+            except Exception:
+                raise
 
     def _fetch_all(self, sql: str, params: Sequence[Any] | None = None) -> list[tuple]:
-        """Fetch all rows with proper locking."""
-        with self._lock:
-            cursor = self._conn.cursor()
-            cursor.execute(sql, params or [])
-            return cursor.fetchall()
+        """Fetch all rows with proper locking and retry logic."""
+        max_retries = 3
+        retry_delay = 0.1
+        
+        for attempt in range(max_retries):
+            try:
+                with self._lock:
+                    cursor = self._conn.cursor()
+                    cursor.execute(sql, params or [])
+                    return cursor.fetchall()
+            except sqlite3.OperationalError as e:
+                if "database is locked" in str(e).lower() and attempt < max_retries - 1:
+                    self._logger.warning(f"Database locked during fetch all, retrying in {retry_delay}s (attempt {attempt + 1}/{max_retries})")
+                    time.sleep(retry_delay)
+                    retry_delay *= 2
+                    continue
+                raise
+            except Exception:
+                raise
 
     def init_schema(self) -> None:
         """Initialize database schema."""

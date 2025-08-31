@@ -13,6 +13,7 @@ from src.infrastructure.persistence.work_service_persistence import (
 from src.domain.config import CSPBenchConfig
 from src.domain.work import WorkItem, WorkStatus
 from src.domain.status import BaseStatus
+from src.infrastructure.utils.path_utils import get_output_base_directory
 
 
 class WorkManager:
@@ -33,7 +34,7 @@ class WorkManager:
     ) -> str:
         with self._lock:
             wid = self._new_id()
-            work_dir = Path(os.environ.get("OUTPUT_BASE_DIRECTORY", "results")) / wid
+            work_dir = get_output_base_directory() / wid
             item = WorkItem(
                 id=wid,
                 config=config,

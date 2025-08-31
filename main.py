@@ -16,13 +16,14 @@ Key CLI (usar .venv/bin/python):
   .venv/bin/python main.py work-item-list
 
 Variáveis de ambiente comuns:
-  DATASET_PATH, LOG_LEVEL, OUTPUT_BASE_DIRECTORY, NCBI_EMAIL, NCBI_API_KEY
+  DATASET_DIRECTORY, LOG_LEVEL, OUTPUT_BASE_DIRECTORY, NCBI_EMAIL, NCBI_API_KEY
 """
 
 import sys
 from pathlib import Path
 from typing import Optional
 import typer
+import os
 
 # Early startup notice as soon as possible when running as script
 if __name__ == "__main__":
@@ -38,7 +39,7 @@ if __name__ == "__main__":
 try:
     from dotenv import load_dotenv
 
-    load_dotenv(override=True)
+    load_dotenv(override=False)
 except ImportError:
     # If python-dotenv is not installed, continue without it
     pass
@@ -58,6 +59,74 @@ except Exception as e:
     print(f"⚠️  Aviso: falha ao inicializar logging: {e}")
     # Continue execution even if logging fails
     logger = None
+
+
+# Ensure base directories from environment exist (dataset, batch, outputs)
+def _ensure_runtime_directories():
+    """Create (if needed) and report status for key runtime directories.
+
+    Directories are taken from environment variables:
+      - DATASET_DIRECTORY
+      - BATCH_DIRECTORY
+      - OUTPUT_BASE_DIRECTORY
+    """
+    dir_env_vars = [
+        "DATASET_DIRECTORY",
+        "BATCH_DIRECTORY",
+        "OUTPUT_BASE_DIRECTORY",
+    ]
+
+    results: list[str] = []
+    for var in dir_env_vars:
+        raw = os.getenv(var)
+        if not raw:
+            msg = f"⚠️  {var} não definida no ambiente (.env)."
+            print(msg)
+            if logger:
+                logger.warning(msg)
+            results.append(f"{var}: MISSING")
+            continue
+
+        try:
+            p = Path(raw).expanduser()
+            # Só criamos se não existir
+            if not p.exists():
+                p.mkdir(parents=True, exist_ok=True)
+                msg = f"✅ {var} criada: {p}"
+                print(msg)
+                if logger:
+                    logger.info(msg)
+                results.append(f"{var}: CREATED")
+            else:
+                msg = f"ℹ️  {var} já existe: {p}"
+                if logger:
+                    logger.debug(msg)
+                print(msg)
+                results.append(f"{var}: OK")
+        except Exception as exc:  # noqa: BLE001
+            msg = f"❌ Falha ao garantir diretório para {var}: {exc} (valor='{raw}')"
+            print(msg)
+            if logger:
+                logger.error(msg, exc_info=True)
+            results.append(f"{var}: ERROR")
+
+    # Resumo final compacto (útil em logs agregados)
+    if logger:
+        logger.info(
+            "Status diretórios base: " + ", ".join(results)
+        )
+
+
+# Executa verificação/criação imediatamente após carregar logging & .env
+try:
+    _ensure_runtime_directories()
+except Exception as _e:  # noqa: BLE001
+    # Nunca impedir a inicialização por isso
+    print(f"⚠️  Aviso: erro inesperado ao garantir diretórios base: {_e}")
+    if logger:
+        logger.warning(
+            f"Erro inesperado ao garantir diretórios base: {_e}", exc_info=True
+        )
 
 
 # IMPORTANT: Import algorithms first to load the global_registry via auto-discovery

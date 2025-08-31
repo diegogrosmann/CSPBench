@@ -262,6 +262,7 @@ let perPage = 20;
 let totalPages = 1;
 let autoRefreshInterval = null;
 let filterTimeout = null;
+let cachedWorks = [];
 
 // Initialize page
 document.addEventListener('DOMContentLoaded', function() {
@@ -357,6 +358,7 @@ function renderWorks(response) {
     const paginationContainer = document.getElementById('paginationContainer');
     
     const works = response.works || [];
+    cachedWorks = works; // Cache para uso em outras funções
     
     if (works.length === 0) {
         table.classList.add('d-none');
@@ -578,7 +580,15 @@ function getStatusIcon(status) {
 }
 
 function monitorWork(workId) {
-    window.location.href = `/monitor/work/${workId}`;
+    // Buscar o status do trabalho para decidir o redirecionamento
+    const work = cachedWorks?.find(w => w.id === workId);
+    
+    // Se trabalho completado, vai para resultados. Senão, vai para monitor
+    if (work && ['completed', 'failed', 'error', 'cancelled'].includes(work.status)) {
+        window.location.href = `/results#work=${workId}`;
+    } else {
+        window.location.href = `/monitor/work/${workId}`;
+    }
 }
 
 async function workAction(workId, action) {

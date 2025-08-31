@@ -594,11 +594,8 @@ def _parse_algorithm_presets(
             
             # Usar apenas algoritmos especificados na lista 'algorithms'
             for alg_name in algorithms_list:
-                if alg_name not in params_block:
-                    raise BatchConfigurationError(
-                        f"Algoritmo '{alg_name}' listado em 'algorithms' mas não encontrado em 'algorithm_params'"
-                    )
-                params = params_block[alg_name]
+                # Se o algoritmo não está em algorithm_params, usar parâmetros vazios
+                params = params_block.get(alg_name, {})
                 if params is None:
                     params = {}
                 if not isinstance(params, dict):

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 import time
+import os
 from typing import Any, Dict
 from src.domain.status import BaseStatus
 from src.infrastructure.persistence.work_state.wrappers.combination_scoped import (
@@ -77,6 +78,8 @@ class PipelineRunner:
             self.execution_controller.check_batch_timeout()  # Check timeout before each phase
             self._generate_pipeline_combinations(config)
 
+            time.sleep(2)  # Pequena pausa para garantir que as combinações sejam processadas
+
             # Fase 3: Executar combinações
             logger.info("=== FASE 3: Executando combinações ===")
             self.execution_controller.check_batch_timeout()  # Check timeout before each phase
@@ -106,6 +109,37 @@ class PipelineRunner:
                 logger.debug("Limpando ExecutionController")
                 self.execution_controller.cleanup()
                 logger.info("Pipeline finalizado e recursos liberados")
+            # Finalization export (raw db + manifest + full_results + summary)
+            try:
+                from src.infrastructure.persistence.work_state.core import WorkStatePersistence  # local import to avoid cycles
+                from src.infrastructure.export.finalization_service import (
+                    FinalizationConfig,
+                    FinalizationService,
+                )
+                # Infer DB path and output path from work_store
+                store: WorkStatePersistence = self.work_store._store  # type: ignore[attr-defined]
+                db_path = store.db_path  # Path object
+                # Attempt to get output directory from work row (output_path field) if present
+                output_dir = None
+                try:
+                    output_dir = store.get_work_output_path(self.work_id)  # may return Path or None
+                except Exception:
+                    output_dir = None
+                if output_dir is None:
+                    # fallback: derive from environment OUTPUT_BASE_DIRECTORY
+                    from pathlib import Path
+                    base = os.environ.get("OUTPUT_BASE_DIRECTORY", "./data/outputs")
+                    output_dir = Path(base) / self.work_id
+                output_dir.mkdir(parents=True, exist_ok=True)
+                cfg = FinalizationConfig(
+                    work_id=self.work_id,
+                    db_path=db_path,
+                    output_dir=output_dir,
+                    tool_version=FinalizationService.detect_tool_version(),
+                )
+                FinalizationService(cfg).run()
+            except Exception as fe:  # pragma: no cover - defensive
+                logger.error(f"Erro durante finalização de exportação: {fe}")
 
     def _generate_all_datasets(self, config: CSPBenchConfig) -> None:
         """Fase 1: Gera todos os datasets necessários."""
@@ -222,6 +256,10 @@ class PipelineRunner:
 
             # Obter próxima combinação pendente
             combination = self.work_store.get_next_pending_combination()
+            logger.debug(
+                "[PipelineRunner] Próxima combinação retornada=%s",
+                combination,
+            )
             if not combination:
                 logger.info("Todas as combinações foram processadas")
                 break
@@ -232,7 +270,9 @@ class PipelineRunner:
             )
 
             # Executar combinação e armazenar o status
-            status = self._execute_single_combination(combination, config, work_combination)
+            status = self._execute_single_combination(
+                combination, config, work_combination
+            )
             execution_statuses.append(status)
 
         # Verificar a lista de status e determinar o resultado final

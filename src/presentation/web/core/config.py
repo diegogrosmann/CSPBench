@@ -8,6 +8,7 @@ from typing import Optional
 # from src.application.services.pipeline_service import PipelineService  # Module doesn't exist
 from src.domain.config import CSPBenchConfig
 from src.infrastructure.logging_config import get_logger
+from src.infrastructure.utils.path_utils import get_dataset_directory, get_batch_directory, get_output_base_directory
 
 logger = get_logger("CSPBench.WebConfig")
 
@@ -25,22 +26,22 @@ class WebConfig:
 
         # Web-specific configuration
         self.web_host = os.getenv("WEB_HOST", "0.0.0.0")
-        self.web_port = int(os.getenv("WEB_PORT", "8000"))
+        self.web_port = int(os.getenv("PORT", "8080"))
         self.debug = bool(os.getenv("DEBUG", "false").lower() in ["true", "1", "yes"])
         self.log_level = os.getenv("LOG_LEVEL", "info").upper()
         self.access_log = bool(
             os.getenv("ACCESS_LOG", "true").lower() in ["true", "1", "yes"]
         )
 
-        # Paths
-        self.datasets_path = Path(os.getenv("DATASET_PATH", "datasets"))
-        self.batches_path = Path(os.getenv("BATCH_PATH", "batches"))
-        self.outputs_path = Path(os.getenv("OUTPUT_PATH", "outputs"))
+        # Paths - usar funções utilitárias padronizadas
+        self.datasets_path = get_dataset_directory()
+        self.batches_path = get_batch_directory()
+        self.outputs_path = get_output_base_directory()
 
-        # Ensure directories exist
-        self.datasets_path.mkdir(exist_ok=True)
-        self.batches_path.mkdir(exist_ok=True)
-        self.outputs_path.mkdir(exist_ok=True)
+        # Ensure directories exist (note: path_utils functions already handle this)
+        # self.datasets_path.mkdir(exist_ok=True)
+        # self.batches_path.mkdir(exist_ok=True)
+        # self.outputs_path.mkdir(exist_ok=True)
 
         logger.info("Web configuration initialized")
 
@@ -85,5 +86,9 @@ class WebConfig:
         return self.config
 
 
-# Global instance
-web_config = WebConfig.get_instance()
+# Global instance - lazy initialization
+# web_config = WebConfig.get_instance()
+
+def get_web_config() -> WebConfig:
+    """Get the global web config instance."""
+    return WebConfig.get_instance()

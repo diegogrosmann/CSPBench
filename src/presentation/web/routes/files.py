@@ -1,14 +1,37 @@
 """
-API routes for file operations and downloads
+File management routes for accessing work results and downloading files.
 """
 
-from fastapi import APIRouter, HTTPException, Response
-from fastapi.responses import FileResponse, StreamingResponse
-from typing import Optional
+import io
+import logging
+import mimetypes
 import os
 import zipfile
-import io
 from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+from fastapi import APIRouter, HTTPException, Query
+from fastapi.responses import FileResponse, StreamingResponse
+
+from src.infrastructure.utils.path_utils import get_output_base_directory
+
+logger = logging.getLogger(__name__)
+
+router = APIRouter(tags=["files"])
+
+
+def format_file_size(size_bytes: int) -> str:
+    """Format file size in human readable format."""
+    if size_bytes == 0:
+        return "0 B"
+
+    size_names = ["B", "KB", "MB", "GB"]
+    i = 0
+    while size_bytes >= 1024 and i < len(size_names) - 1:
+        size_bytes /= 1024.0
+        i += 1
+
+    return f"{size_bytes:.1f} {size_names[i]}"
 
 from src.infrastructure.logging_config import get_logger
 
@@ -24,7 +47,8 @@ async def download_file(path: str):
         file_path = Path(path).resolve()
 
         # Ensure file is within allowed directories (outputs, logs)
-        allowed_dirs = [Path("outputs").resolve(), Path("logs").resolve()]
+        output_base = get_output_base_directory()
+        allowed_dirs = [output_base.resolve(), Path("logs").resolve()]
         if not any(
             str(file_path).startswith(str(allowed_dir)) for allowed_dir in allowed_dirs
         ):
@@ -54,7 +78,7 @@ async def download_execution_zip(work_id: str):
     """Download all files from an execution as a ZIP archive"""
     try:
         # Check if work directory exists
-        work_dir = Path("outputs") / work_id
+        work_dir = get_output_base_directory() / work_id
         if not work_dir.exists():
             raise HTTPException(
                 status_code=404, detail=f"Execution {work_id} not found"
@@ -94,7 +118,7 @@ async def list_execution_files(work_id: str):
     """List all files in an execution directory"""
     try:
         # Check if work directory exists
-        work_dir = Path("outputs") / work_id
+        work_dir = get_output_base_directory() / work_id
         if not work_dir.exists():
             raise HTTPException(
                 status_code=404, detail=f"Execution {work_id} not found"
@@ -125,4 +149,89 @@ async def list_execution_files(work_id: str):
         raise
     except Exception as e:
         logger.error(f"Error listing files for execution {work_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/api/files/works")
+async def list_works() -> List[Dict[str, Any]]:
+    """List available work result directories under OUTPUT_BASE_DIRECTORY.
+
+    Returns basic metadata so UI can present choices.
+    """
+    outputs_dir = get_output_base_directory()
+    if not outputs_dir.exists():
+        return []
+    works: List[Dict[str, Any]] = []
+    for child in sorted(outputs_dir.iterdir()):
+        if child.is_dir():
+            try:
+                # Try to read manifest for quick metadata
+                manifest_path = child / "manifest.json"
+                manifest: Dict[str, Any] | None = None
+                if manifest_path.exists():
+                    import json
+
+                    try:
+                        manifest = json.loads(manifest_path.read_text())
+                    except Exception:  # noqa: BLE001
+                        manifest = None
+                works.append(
+                    {
+                        "work_id": child.name,
+                        "path": str(child),
+                        "modified": child.stat().st_mtime,
+                        "manifest": manifest,
+                    }
+                )
+            except Exception as e:  # noqa: BLE001
+                logger.warning(f"Failed to read work dir {child}: {e}")
+    return works
+
+
+@router.post("/api/files/download-zip-selected/{work_id}")
+async def download_selected_files_zip(work_id: str, paths: List[str]):
+    """Download a subset of files from a work directory as a ZIP.
+
+    Body: JSON list of absolute or relative (to work dir) paths.
+    Only files inside OUTPUT_BASE_DIRECTORY/{work_id} are allowed.
+    """
+    try:
+        base_dir = (get_output_base_directory() / work_id).resolve()
+        if not base_dir.exists():
+            raise HTTPException(status_code=404, detail="Work not found")
+
+        # Normalize and validate paths
+        normalized: List[Path] = []
+        for p in paths:
+            p_path = Path(p)
+            if not p_path.is_absolute():
+                p_path = base_dir / p_path
+            p_path = p_path.resolve()
+            if not str(p_path).startswith(str(base_dir)):
+                raise HTTPException(status_code=400, detail=f"Invalid path outside work dir: {p}")
+            if not p_path.exists() or not p_path.is_file():
+                raise HTTPException(status_code=404, detail=f"File not found: {p}")
+            normalized.append(p_path)
+
+        if not normalized:
+            raise HTTPException(status_code=400, detail="No files selected")
+
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
+            for file_path in normalized:
+                rel = file_path.relative_to(base_dir)
+                zip_file.write(file_path, rel)
+        zip_buffer.seek(0)
+
+        return StreamingResponse(
+            io.BytesIO(zip_buffer.read()),
+            media_type="application/zip",
+            headers={
+                "Content-Disposition": f"attachment; filename=execution_{work_id}_selected.zip"
+            },
+        )
+    except HTTPException:
+        raise
+    except Exception as e:  # noqa: BLE001
+        logger.error(f"Error creating selected zip for {work_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))

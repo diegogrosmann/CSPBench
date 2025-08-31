@@ -22,6 +22,7 @@ from __future__ import annotations
 
 from typing import Any, Optional, TYPE_CHECKING
 import time
+import logging
 from src.domain.monitoring import AlgorithmMonitor
 from src.infrastructure.persistence.work_state.wrappers.execution_scoped import (
     ExecutionScopedPersistence,
@@ -48,6 +49,7 @@ class PersistenceMonitor(AlgorithmMonitor):
         "_last_time",
         "_cancelled",
         "_execution_controller",
+        "_logger",
     )
 
     def __init__(
@@ -65,6 +67,7 @@ class PersistenceMonitor(AlgorithmMonitor):
         self._last_time = 0.0
         self._cancelled = False
         self._execution_controller = execution_controller
+        self._logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}")
 
     @classmethod
     def with_execution_controller(
@@ -109,15 +112,21 @@ class PersistenceMonitor(AlgorithmMonitor):
                 self._exec_store.add_progress(progress, message)
                 self._last_progress = progress
                 self._last_time = now
-        except Exception:  # pragma: no cover - não deve interromper o algoritmo
-            pass
+        except Exception as e:
+            self._logger.error(
+                "Erro ao persistir progresso: %s (progress=%.2f, message=%s)",
+                e, progress, message, exc_info=True
+            )
 
     def on_warning(self, message: str, /, **data: Any) -> None:  # noqa: D401
         try:
             context = data if data else None
             self._exec_store.unit_warning(message, context)
-        except Exception:  # pragma: no cover
-            pass
+        except Exception as e:
+            self._logger.error(
+                "Erro ao persistir warning: %s (message=%s, data=%s)",
+                e, message, data, exc_info=True
+            )
 
     def on_error(
         self, message: str, exc: Exception | None = None, /, **data: Any
@@ -134,8 +143,11 @@ class PersistenceMonitor(AlgorithmMonitor):
                     else {"as_error_message": message}
                 )
                 self._exec_store.unit_warning(message, context)
-        except Exception:  # pragma: no cover
-            pass
+        except Exception as e:
+            self._logger.error(
+                "Erro ao persistir erro/warning: %s (message=%s, exc=%s, data=%s)",
+                e, message, exc, data, exc_info=True
+            )
 
     def is_cancelled(self) -> bool:  # noqa: D401
         """Check if execution is cancelled via ExecutionController or internal flag."""
@@ -147,8 +159,11 @@ class PersistenceMonitor(AlgorithmMonitor):
                 # Only CANCELED status means cancelled, not PAUSED
                 if status == BaseStatus.CANCELED:
                     return True
-            except Exception:  # pragma: no cover
-                pass
+            except Exception as e:
+                self._logger.warning(
+                    "Erro ao verificar status de cancelamento via ExecutionController: %s",
+                    e, exc_info=True
+                )
         
         # Fallback to internal flag
         return self._cancelled
