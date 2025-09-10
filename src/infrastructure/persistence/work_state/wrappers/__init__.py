@@ -7,9 +7,9 @@ locais do código e testes; manter o alias evita quebrar estes pontos enquanto
 o restante do refactor avança.
 """
 
-from .work_scoped import WorkScopedPersistence
-from .execution_scoped import ExecutionScopedPersistence
 from .combination_scoped import CombinationScopedPersistence
+from .execution_scoped import ExecutionScopedPersistence
+from .work_scoped import WorkScopedPersistence
 
 # Alias backward-compatible
 UnitScopedPersistence = ExecutionScopedPersistence  # type: ignore

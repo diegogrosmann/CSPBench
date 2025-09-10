@@ -1,56 +1,60 @@
-"""Monitoring interfaces for CSP algorithms.
+"""
+Monitoring Interfaces for CSP Algorithms.
 
-Módulo de domínio puro contendo APENAS o protocolo de monitoramento
-(`AlgorithmMonitor`). Implementações concretas (Null, Composite, Throttled,
-adapters para persistência, etc.) devem viver fora desta unidade para manter
-o domínio mínimo e sem dependências desnecessárias.
+Pure domain module containing ONLY the monitoring protocol (`AlgorithmMonitor`).
+Concrete implementations (Null, Composite, Throttled, persistence adapters, etc.)
+should live outside this unit to keep the domain minimal and without unnecessary
+dependencies.
 
-Extensões futuras podem adicionar novos métodos ao protocolo; para manter
-retrocompatibilidade, forneça defaults aqui ou use verificações com `hasattr`.
+Future extensions can add new methods to the protocol; to maintain backward
+compatibility, provide defaults here or use checks with `hasattr`.
 """
 
 from __future__ import annotations
 
-from typing import Protocol, runtime_checkable, Any
+from typing import Any, Protocol, runtime_checkable
 
 
 @runtime_checkable
 class AlgorithmMonitor(Protocol):
-    """Contrato mínimo para monitoramento de execução de algoritmos.
+    """
+    Minimal contract for algorithm execution monitoring.
 
-    Todos os métodos devem ser best-effort: implementações **não** devem
-    levantar exceções para não interromper o fluxo do algoritmo.
+    All methods should be best-effort: implementations should **not** raise
+    exceptions to avoid interrupting the algorithm flow.
 
-    Parâmetros comuns:
-        progress (float): 0.0 a 100.0 representando percentual (ou pode extrapolar >100 se fizer sentido em casos especiais).
-        message (str): descrição curta do evento.
-        **data: payload adicional serializável / simples.
+    Common Parameters:
+        progress (float): 0.0 to 100.0 representing percentage (or can extrapolate >100 if makes sense in special cases).
+        message (str): Short event description.
+        **data: Additional serializable/simple payload.
     """
 
-    # Métodos principais --------------------------------------------------
+    # Main methods --------------------------------------------------
     def on_progress(self, progress: float, message: str, /, **data: Any) -> None:
-        """Evento de progresso.
+        """
+        Progress event.
 
-        Recomendação: Implementações podem aplicar throttling (tempo ou delta
-        mínimo de progresso) para evitar flooding.
+        Recommendation: Implementations can apply throttling (time or minimum
+        progress delta) to avoid flooding.
         """
         ...  # pragma: no cover
 
     def on_warning(self, message: str, /, **data: Any) -> None:
-        """Evento de aviso não fatal."""
+        """Non-fatal warning event."""
         ...  # pragma: no cover
 
-    # Métodos opcionais ---------------------------------------------------
+    # Optional methods ---------------------------------------------------
     def on_error(
         self, message: str, exc: Exception | None = None, /, **data: Any
-    ) -> None:  # noqa: D401,E501
-        """Evento de erro (opcional)."""
+    ) -> None:
+        """Error event (optional)."""
         ...  # pragma: no cover
 
     def is_cancelled(self) -> bool:
-        """Indica se a execução foi cancelada externamente.
+        """
+        Indicate if execution was canceled externally.
 
-        Algoritmos podem consultar em loops longos e abortar graciosamente.
+        Algorithms can query in long loops and abort gracefully.
         Default: False.
         """
         return False  # pragma: no cover

@@ -13,10 +13,10 @@ Orquestra o fluxo interativo via DatasetWizard.
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
-from src.domain.dataset import Dataset
-from src.infrastructure.persistence.dataset_repository import FileDatasetRepository
 from src.application.services.dataset_generator import SyntheticDatasetGenerator
+from src.domain.dataset import Dataset
 from src.infrastructure.external.dataset_entrez import EntrezDatasetDownloader
+from src.infrastructure.persistence.dataset_repository import FileDatasetRepository
 
 try:
     # Nova implementação CLI substitui antigo módulo TUI removido

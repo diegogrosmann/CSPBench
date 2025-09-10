@@ -1,15 +1,25 @@
 """
-Compat configuration parser for tests.
+Compatibility Configuration Parser for Tests.
 
 Provides minimal dataclasses and parsing/validation helpers expected by tests
 in tests/unit/application/test_config_parser.py. This is independent from the
-new unified config used elsewhere.
+new unified config used elsewhere in the application.
+
+This module maintains backward compatibility with existing test infrastructure
+while providing a clean separation from the main configuration system.
+
+Features:
+- Legacy configuration parsing
+- Batch metadata extraction
+- Infrastructure configuration parsing
+- Optimization and sensitivity analysis configuration
+- Validation helpers for different configuration types
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 import json
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -25,6 +35,8 @@ from src.domain.errors import (
 # -------------------- Dataclasses used in tests --------------------
 @dataclass
 class BatchMetadata:
+    """Batch metadata configuration for legacy compatibility."""
+    
     nome: str
     descricao: str
     autor: str
@@ -36,12 +48,16 @@ class BatchMetadata:
 
 @dataclass
 class InfrastructureConfig:
+    """Infrastructure configuration for legacy compatibility."""
+    
     history: Dict[str, Any] = field(default_factory=dict)
     result: Dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
 class ExportConfig:
+    """Export configuration for legacy compatibility."""
+    
     enabled: bool = True
     destination: str = "outputs"
     formats: Dict[str, Any] = field(default_factory=lambda: {"json": True})
@@ -49,6 +65,8 @@ class ExportConfig:
 
 @dataclass
 class PlotsConfig:
+    """Plots configuration for legacy compatibility."""
+    
     enabled: bool = True
     plot_convergence: bool = True
     style: str = "seaborn-v0_8"
@@ -56,6 +74,8 @@ class PlotsConfig:
 
 @dataclass
 class MonitoringConfig:
+    """Monitoring configuration for legacy compatibility."""
+    
     enabled: bool = True
     interface: str = "simple"
     update_interval: int = 5
@@ -63,12 +83,16 @@ class MonitoringConfig:
 
 @dataclass
 class LoggingConfig:
+    """Logging configuration for legacy compatibility."""
+    
     level: str = "INFO"
     output: Dict[str, Any] = field(default_factory=lambda: {"console": True})
 
 
 @dataclass
 class SystemConfig:
+    """System configuration for legacy compatibility."""
+    
     reproducibility: Dict[str, Any] = field(
         default_factory=lambda: {"global_seed": None, "strict_mode": False}
     )
@@ -79,6 +103,8 @@ class SystemConfig:
 
 @dataclass
 class OptimizationConfig:
+    """Optimization configuration for legacy compatibility."""
+    
     nome: str
     study_name: str
     direction: str
@@ -91,6 +117,8 @@ class OptimizationConfig:
 
 @dataclass
 class SensitivityConfig:
+    """Sensitivity analysis configuration for legacy compatibility."""
+    
     nome: str
     analysis_method: str
     target_datasets: List[str]
@@ -101,9 +129,11 @@ class SensitivityConfig:
     output_metrics: List[str] = field(default_factory=list)
 
 
-# Lightweight container used by ExperimentService (compat)
+# Lightweight container used by ExperimentService (compatibility)
 @dataclass
 class BatchConfig:
+    """Lightweight batch configuration container for ExperimentService compatibility."""
+    
     metadata: Any
     task: Any
     datasets: List[Any] = field(default_factory=list)
@@ -121,10 +151,31 @@ class BatchConfig:
 
 
 class ConfigurationParser:
-    """Parser util expected by unit tests."""
+    """
+    Parser utility expected by unit tests.
+    
+    Provides static methods for parsing various configuration file formats
+    and extracting different configuration sections for legacy compatibility.
+    """
 
     @staticmethod
     def load_file(path: str | Path) -> Dict[str, Any]:
+        """
+        Load configuration from file.
+        
+        Supports YAML and JSON formats with automatic format detection
+        based on file extension.
+        
+        Args:
+            path: Path to configuration file
+            
+        Returns:
+            dict: Parsed configuration data
+            
+        Raises:
+            BatchConfigurationError: If file not found, unsupported format,
+                                   or invalid structure
+        """
         p = Path(path)
         if not p.exists():
             raise BatchConfigurationError("File not found")
@@ -145,6 +196,7 @@ class ConfigurationParser:
 
     @staticmethod
     def parse_metadata(config: Dict[str, Any]) -> BatchMetadata:
+        """Extract batch metadata from configuration."""
         meta = config.get("metadados") or config.get("batch_info")
         if not meta:
             raise BatchConfigurationError("metadados/batch_info section not found")
@@ -160,6 +212,7 @@ class ConfigurationParser:
 
     @staticmethod
     def parse_infrastructure_config(config: Dict[str, Any]) -> InfrastructureConfig:
+        """Extract infrastructure configuration."""
         infra = config.get("infrastructure", {})
         return InfrastructureConfig(
             history=dict(infra.get("history", {})), result=dict(infra.get("result", {}))
@@ -167,6 +220,7 @@ class ConfigurationParser:
 
     @staticmethod
     def parse_export_config(config: Dict[str, Any]) -> ExportConfig:
+        """Extract export configuration."""
         exp = config.get("export", {})
         return ExportConfig(
             enabled=bool(exp.get("enabled", True)),
@@ -176,6 +230,7 @@ class ConfigurationParser:
 
     @staticmethod
     def parse_plots_config(config: Dict[str, Any]) -> PlotsConfig:
+        """Extract plots configuration."""
         plots = config.get("plots", {})
         return PlotsConfig(
             enabled=bool(plots.get("enabled", True)),
@@ -185,6 +240,7 @@ class ConfigurationParser:
 
     @staticmethod
     def parse_monitoring_config(config: Dict[str, Any]) -> MonitoringConfig:
+        """Extract monitoring configuration."""
         mon = config.get("monitoring", {})
         return MonitoringConfig(
             enabled=bool(mon.get("enabled", True)),
@@ -194,6 +250,7 @@ class ConfigurationParser:
 
     @staticmethod
     def parse_logging_config(config: Dict[str, Any]) -> LoggingConfig:
+        """Extract logging configuration."""
         log = config.get("logging", {})
         return LoggingConfig(
             level=str(log.get("level", "INFO")),
@@ -202,6 +259,7 @@ class ConfigurationParser:
 
     @staticmethod
     def parse_system_config(config: Dict[str, Any]) -> SystemConfig:
+        """Extract system configuration."""
         sysc = config.get("system", {})
         return SystemConfig(
             reproducibility=dict(
@@ -214,6 +272,7 @@ class ConfigurationParser:
 
     @staticmethod
     def parse_resources_config(config: Dict[str, Any]) -> Dict[str, Any]:
+        """Extract resources configuration."""
         res = config.get("resources", {})
         par = res.get("parallel", {})
         return {
@@ -224,6 +283,7 @@ class ConfigurationParser:
 
     @staticmethod
     def parse_optimization_configs(config: Dict[str, Any]) -> List[OptimizationConfig]:
+        """Extract optimization configurations."""
         opt = config.get("optimization", {})
         lst = opt.get("optimizations", []) or []
         out: List[OptimizationConfig] = []
@@ -244,6 +304,7 @@ class ConfigurationParser:
 
     @staticmethod
     def parse_sensitivity_configs(config: Dict[str, Any]) -> List[SensitivityConfig]:
+        """Extract sensitivity analysis configurations."""
         sen = config.get("sensitivity", {})
         glob = sen.get("global_salib_config", {})
         lst = sen.get("analyses", []) or []
@@ -264,15 +325,31 @@ class ConfigurationParser:
         return out
 
 
-# Simple facade used by ExperimentService (compat)
+# Simple facade used by ExperimentService (compatibility)
 class ConfigParser:
+    """Simple configuration parser facade for ExperimentService compatibility."""
+    
     parse_config = staticmethod(ConfigurationParser.load_file)
     load_config = staticmethod(ConfigurationParser.load_file)
 
 
 class ConfigurationValidator:
+    """Configuration validation utilities for legacy compatibility."""
+    
     @staticmethod
     def validate_batch_structure(config: Dict[str, Any]) -> str:
+        """
+        Validate batch configuration structure and determine type.
+        
+        Args:
+            config: Configuration dictionary to validate
+            
+        Returns:
+            str: Configuration type ('experiment', 'optimization', 'sensitivity')
+            
+        Raises:
+            BatchConfigurationError: If structure is invalid or unrecognized
+        """
         # New structure with explicit task.type
         task = config.get("task", {})
         if task and "type" in task:
@@ -292,6 +369,15 @@ class ConfigurationValidator:
 
     @staticmethod
     def validate_optimization_config(config: OptimizationConfig) -> None:
+        """
+        Validate optimization configuration.
+        
+        Args:
+            config: Optimization configuration to validate
+            
+        Raises:
+            OptimizationConfigurationError: If configuration is invalid
+        """
         if not config.target_datasets:
             raise OptimizationConfigurationError("target_datasets list cannot be empty")
         if not isinstance(config.parameters, dict):
@@ -299,6 +385,15 @@ class ConfigurationValidator:
 
     @staticmethod
     def validate_sensitivity_config(config: SensitivityConfig) -> None:
+        """
+        Validate sensitivity analysis configuration.
+        
+        Args:
+            config: Sensitivity configuration to validate
+            
+        Raises:
+            SensitivityConfigurationError: If configuration is invalid
+        """
         valid_methods = {"morris", "sobol", "fast", "delta"}
         if config.analysis_method not in valid_methods:
             raise SensitivityConfigurationError("Invalid analysis method")

@@ -15,6 +15,9 @@ PORT ?= 8080
 DATA_DIR ?= $(PWD)/data
 CPU ?= 4
 MEMORY ?= 2Gi
+MAX_INSTANCES ?= 2
+MIN_INSTANCES ?= 0
+CONCURRENCY ?= 80
 
 # Cores para output
 RED = \033[0;31m
@@ -22,6 +25,8 @@ GREEN = \033[0;32m
 YELLOW = \033[1;33m
 BLUE = \033[0;34m
 NC = \033[0m # No Color
+
+## (Removido) Carregamento automático de .env desativado conforme solicitação
 
 # ===================================================================
 # Help / Info
@@ -115,6 +120,12 @@ lint: setup ## Executa linting
 	@echo "$(BLUE)=== Executando linting ===$(NC)"
 	@.venv/bin/python -m ruff check .
 
+lint-fix: setup ## Corrige automaticamente problemas de lint (ruff --fix, isort, black)
+	@echo "$(BLUE)=== Corrigindo lint automaticamente ===$(NC)"
+	@.venv/bin/python -m ruff check . --fix || true
+	@.venv/bin/python -m isort .
+	@.venv/bin/python -m black .
+
 clean-dev: ## Limpa arquivos de desenvolvimento
 	@echo "$(YELLOW)Limpando cache e arquivos temporários...$(NC)"
 	@rm -rf __pycache__ *.pyc *.pyo */*.pyc */*.pyo */__pycache__
@@ -149,34 +160,38 @@ build-multi: ## Constrói imagem para múltiplas plataformas
 # Docker Run
 # ===================================================================
 
-run: build ## Executa container localmente
+run: build ## Executa container localmente (usa .env e monta /app/data)
 	@echo "$(BLUE)=== Executando container ===$(NC)"
 	@mkdir -p $(DATA_DIR)
 	@docker run --rm -it \
 		--name $(CONTAINER_NAME) \
-		-p $(PORT):8080 \
-		-v $(DATA_DIR):/data \
-		-e PORT=8080 \
+		--env-file .env \
+		-p $(PORT):$(PORT) \
+		-v $(DATA_DIR):/app/data \
+		-e PORT=$(PORT) \
 		$(IMAGE_TAG)
 
-run-detached: build ## Executa container em background
+run-detached: build ## Executa container em background (usa .env e monta /app/data)
 	@echo "$(BLUE)=== Executando container em background ===$(NC)"
 	@mkdir -p $(DATA_DIR)
 	@docker run -d \
 		--name $(CONTAINER_NAME) \
-		-p $(PORT):8080 \
-		-v $(DATA_DIR):/data \
-		-e PORT=8080 \
+		--env-file .env \
+		-p $(PORT):$(PORT) \
+		-v $(DATA_DIR):/app/data \
+		-e PORT=$(PORT) \
 		$(IMAGE_TAG)
 	@echo "$(GREEN)✓ Container executando em background$(NC)"
 	@echo "$(YELLOW)URL: http://localhost:$(PORT)$(NC)"
 
-run-shell: build ## Executa container com shell interativo
+run-shell: build ## Executa container com shell interativo (usa .env)
 	@echo "$(BLUE)=== Executando container com shell ===$(NC)"
 	@mkdir -p $(DATA_DIR)
 	@docker run --rm -it \
 		--name $(CONTAINER_NAME)-shell \
-		-v $(DATA_DIR):/data \
+		--env-file .env \
+		-v $(DATA_DIR):/app/data \
+		-e PORT=$(PORT) \
 		--entrypoint /bin/bash \
 		$(IMAGE_TAG)
 
@@ -212,7 +227,7 @@ pull: ## Baixa imagem do registry
 # Cloud Deployment
 # ===================================================================
 
-deploy-cloud-run: ## Deploy no Google Cloud Run
+deploy-cloud-run: ## Deploy no Google Cloud Run (PORT é reservado; ajustar MAX_INSTANCES conforme quota)
 	@echo "$(BLUE)=== Deploy no Google Cloud Run ===$(NC)"
 	@gcloud run deploy $(APP_NAME) \
 		--image $(IMAGE_TAG) \
@@ -221,9 +236,9 @@ deploy-cloud-run: ## Deploy no Google Cloud Run
 		--allow-unauthenticated \
 		--memory $(MEMORY) \
 		--cpu $(CPU) \
-		--max-instances 2 \
-		--add-volume name=shared,type=cloud-storage,bucket=csp-bench \
-		--add-volume-mount volume=shared,mount-path=/data
+		--max-instances $(MAX_INSTANCES) \
+		--min-instances $(MIN_INSTANCES) \
+		--concurrency $(CONCURRENCY)
 	@echo "$(GREEN)✓ Deploy realizado!$(NC)"
 
 deploy-update: push ## Atualiza deployment no Cloud Run
@@ -237,9 +252,11 @@ deploy-update: push ## Atualiza deployment no Cloud Run
 # Monitoring & Maintenance
 # ===================================================================
 
-health: ## Verifica saúde da aplicação
+health: ## Verifica saúde da aplicação (segue redirect e mostra resultado)
 	@echo "$(BLUE)=== Verificando saúde da aplicação ===$(NC)"
-	@curl -f http://localhost:$(PORT)/health || echo "$(RED)❌ Aplicação não está saudável$(NC)"
+	@curl -fs -L http://localhost:$(PORT)/health >/dev/null \
+		&& echo "$(GREEN)✓ Aplicação saudável$(NC)" \
+		|| echo "$(RED)❌ Aplicação não está saudável$(NC)"
 
 ps: ## Lista containers relacionados
 	@echo "$(BLUE)=== Containers CSPBench ===$(NC)"
@@ -249,8 +266,8 @@ images: ## Lista imagens relacionadas
 	@echo "$(BLUE)=== Imagens CSPBench ===$(NC)"
 	@docker images | grep $(APP_NAME) || echo "Nenhuma imagem encontrada"
 
-stats: ## Mostra estatísticas do container
-	@docker stats $(CONTAINER_NAME)
+stats: ## Mostra estatísticas do container (snapshot)
+	@docker stats --no-stream $(CONTAINER_NAME)
 
 # ===================================================================
 # Cleanup
@@ -287,7 +304,7 @@ dive: ## Analisa camadas da imagem (requer dive)
 # Special Targets
 # ===================================================================
 
-.PHONY: help info setup clean-setup dev dev-web test test-cov format lint clean-dev \
+.PHONY: help info setup clean-setup dev dev-web test test-cov format lint lint-fix clean-dev \
 	build build-no-cache build-multi run run-detached run-shell stop logs \
 	login push pull deploy-cloud-run deploy-update health ps images stats \
 	clean clean-all size inspect dive .env

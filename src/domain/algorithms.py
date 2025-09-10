@@ -7,7 +7,7 @@ Free from external dependencies following hexagonal architecture.
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Optional, TYPE_CHECKING, TypedDict
+from typing import Any, Dict, Optional, TypedDict
 
 from .distance import DistanceCalculator
 from .monitoring import AlgorithmMonitor

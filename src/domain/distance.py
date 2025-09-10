@@ -1,8 +1,19 @@
 """
-Domain: Distance Calculator
+Domain: Distance Calculator.
 
-Este módulo contém a implementação para cálculo de distâncias
-entre strings no contexto do Problema de String Mais Próxima (CSP).
+This module contains the implementation for calculating distances
+between strings in the context of the Closest String Problem (CSP).
+
+Features:
+- Abstract distance calculator interface
+- String pool management with caching
+- Multiple distance metrics (Hamming, Levenshtein)
+- Quality metrics and solution comparison
+- Factory pattern for easy instantiation
+
+Distance Metrics:
+- Hamming Distance: For equal-length strings
+- Levenshtein Distance: Edit distance with insertions, deletions, substitutions
 """
 
 from abc import ABC, abstractmethod
@@ -10,16 +21,30 @@ from abc import ABC, abstractmethod
 
 class DistanceCalculator(ABC):
     """
-    Classe abstrata para calculadora de distâncias com pool de strings e cache otimizado.
+    Abstract class for distance calculator with string pool and optimized cache.
+    
+    Provides a framework for calculating distances between strings with
+    support for string pools, caching, and various quality metrics.
+    
+    Features:
+    - String pool management
+    - Distance caching for performance
+    - Quality metrics calculation
+    - Solution comparison utilities
+    
+    Attributes:
+        _strings: Pool of strings for calculations
+        use_cache: Whether to use cache for repeated calculations
+        _cache: Distance calculation cache
     """
 
     def __init__(self, strings: list[str] | None = None, use_cache: bool = True):
         """
-        Inicializa o calculador de distâncias.
+        Initialize the distance calculator.
 
         Args:
-            strings: Pool de strings para cálculos
-            use_cache: Se deve usar cache para otimizar cálculos repetidos
+            strings: Pool of strings for calculations
+            use_cache: Whether to use cache to optimize repeated calculations
         """
         self._strings = strings or []
         self.use_cache = use_cache
@@ -29,26 +54,26 @@ class DistanceCalculator(ABC):
     @abstractmethod
     def distance(str1: str, str2: str) -> int:
         """
-        Calcula distância entre duas strings.
+        Calculate distance between two strings.
 
         Args:
-            str1: Primeira string
-            str2: Segunda string
+            str1: First string
+            str2: Second string
 
         Returns:
-            int: Distância calculada
+            int: Calculated distance
         """
         pass
 
     def max_distance(self, center: str) -> int:
         """
-        Calcula distância máxima de um centro para um conjunto de strings.
+        Calculate maximum distance from a center to a set of strings.
 
         Args:
-            center: String central
+            center: Center string
 
         Returns:
-            int: Distância máxima
+            int: Maximum distance
         """
         if not self._strings:
             return 0
@@ -57,13 +82,13 @@ class DistanceCalculator(ABC):
 
     def average_distance(self, center: str) -> float:
         """
-        Calcula distância média de um centro para um conjunto de strings.
+        Calculate average distance from a center to a set of strings.
 
         Args:
-            center: String central
+            center: Center string
 
         Returns:
-            float: Distância média
+            float: Average distance
         """
         if not self._strings:
             return 0.0
@@ -73,25 +98,25 @@ class DistanceCalculator(ABC):
 
     def total_distance(self, center: str) -> int:
         """
-        Calcula distância total de um centro para um conjunto de strings.
+        Calculate total distance from a center to a set of strings.
 
         Args:
-            center: String central
+            center: Center string
 
         Returns:
-            int: Distância total
+            int: Total distance
         """
         return sum(self.distances_to_all(center))
 
     def distances_to_all(self, center: str) -> list[int]:
         """
-        Calcula distâncias de um centro para todas as strings.
+        Calculate distances from a center to all strings.
 
         Args:
-            center: String central
+            center: Center string
 
         Returns:
-            list[int]: Lista de distâncias
+            list[int]: List of distances
         """
         if not self.use_cache:
             return [self.distance(center, s) for s in self._strings]
@@ -103,13 +128,13 @@ class DistanceCalculator(ABC):
 
     def median_distance(self, center: str) -> float:
         """
-        Calcula distância mediana de um centro para um conjunto de strings.
+        Calculate median distance from a center to a set of strings.
 
         Args:
-            center: String central
+            center: Center string
 
         Returns:
-            float: Distância mediana
+            float: Median distance
         """
         if not self._strings:
             return 0.0
@@ -125,48 +150,48 @@ class DistanceCalculator(ABC):
 
     def set_strings(self, strings: list[str]) -> None:
         """
-        Define o pool de strings.
+        Set the string pool.
 
         Args:
-            strings: Nova lista de strings
+            strings: New list of strings
         """
         self._strings = strings.copy()
-        # Limpar cache ao alterar strings
+        # Clear cache when changing strings
         if self._cache is not None:
             self._cache.clear()
 
     def get_strings(self) -> list[str]:
         """
-        Retorna cópia do pool de strings.
+        Return copy of the string pool.
 
         Returns:
-            list[str]: Pool de strings atual
+            list[str]: Current string pool
         """
         return self._strings.copy()
 
     def cache_size(self) -> int:
         """
-        Retorna o tamanho atual do cache.
+        Return the current cache size.
 
         Returns:
-            int: Número de entradas no cache
+            int: Number of cache entries
         """
         return len(self._cache) if self._cache is not None else 0
 
     def clear_cache(self) -> None:
-        """Limpa o cache de distâncias."""
+        """Clear the distance cache."""
         if self._cache is not None:
             self._cache.clear()
 
     def min_distance(self, center: str) -> int:
         """
-        Calcula distância mínima de um centro para um conjunto de strings.
+        Calculate minimum distance from a center to a set of strings.
 
         Args:
-            center: String central
+            center: Center string
 
         Returns:
-            int: Distância mínima
+            int: Minimum distance
         """
         if not self._strings:
             return 0
@@ -175,13 +200,13 @@ class DistanceCalculator(ABC):
 
     def diversity_metric(self, strings: list[str] | None = None) -> float:
         """
-        Calcula métrica de diversidade de um conjunto de strings.
+        Calculate diversity metric of a set of strings.
 
         Args:
-            strings: Lista de strings (usa self._strings se None)
+            strings: List of strings (uses self._strings if None)
 
         Returns:
-            float: Valor de diversidade (0-1, onde 1 é diversidade máxima)
+            float: Diversity value (0-1, where 1 is maximum diversity)
         """
         target_strings = strings if strings is not None else self._strings
 
@@ -208,13 +233,13 @@ class DistanceCalculator(ABC):
 
     def consensus_strength(self, center: str) -> float:
         """
-        Calcula força do consenso de uma string central.
+        Calculate consensus strength of a center string.
 
         Args:
-            center: String central
+            center: Center string
 
         Returns:
-            float: Força do consenso (0-1, onde 1 é consenso perfeito)
+            float: Consensus strength (0-1, where 1 is perfect consensus)
         """
         if not self._strings:
             return 1.0
@@ -229,13 +254,13 @@ class DistanceCalculator(ABC):
 
     def solution_quality(self, center: str) -> dict:
         """
-        Calcula múltiplas métricas de qualidade para uma solução.
+        Calculate multiple quality metrics for a solution.
 
         Args:
-            center: String central
+            center: Center string
 
         Returns:
-            dict: Dicionário com várias métricas
+            dict: Dictionary with various metrics
         """
         return {
             "max_distance": self.max_distance(center),
@@ -251,14 +276,14 @@ class DistanceCalculator(ABC):
 
     def compare_solutions(self, center1: str, center2: str) -> dict:
         """
-        Compara duas soluções candidatas.
+        Compare two candidate solutions.
 
         Args:
-            center1: Primeira string central
-            center2: Segunda string central
+            center1: First center string
+            center2: Second center string
 
         Returns:
-            dict: Comparação das soluções
+            dict: Solution comparison
         """
         eval1 = self.solution_quality(center1)
         eval2 = self.solution_quality(center2)
@@ -276,36 +301,36 @@ class DistanceCalculator(ABC):
 
 
 # =============================================================================
-# IMPLEMENTAÇÕES CONCRETAS
+# CONCRETE IMPLEMENTATIONS
 # =============================================================================
 
 
 class HammingDistanceCalculator(DistanceCalculator):
     """
-    Implementação concreta para cálculo de distância de Hamming.
+    Concrete implementation for Hamming distance calculation.
 
-    A distância de Hamming é o número de posições onde os caracteres diferem
-    entre duas strings de mesmo comprimento.
+    The Hamming distance is the number of positions at which the corresponding
+    characters are different between two strings of equal length.
     """
 
     @staticmethod
     def distance(str1: str, str2: str) -> int:
         """
-        Calcula distância de Hamming entre duas strings.
+        Calculate Hamming distance between two strings.
 
         Args:
-            str1: Primeira string
-            str2: Segunda string
+            str1: First string
+            str2: Second string
 
         Returns:
-            int: Número de posições onde as strings diferem
+            int: Number of positions where strings differ
 
         Raises:
-            ValueError: Se as strings têm comprimentos diferentes
+            ValueError: If strings have different lengths
         """
         if len(str1) != len(str2):
             raise ValueError(
-                f"Strings devem ter o mesmo comprimento: {len(str1)} != {len(str2)}"
+                f"Strings must have the same length: {len(str1)} != {len(str2)}"
             )
 
         return sum(c1 != c2 for c1, c2 in zip(str1, str2))
@@ -313,58 +338,58 @@ class HammingDistanceCalculator(DistanceCalculator):
 
 class LevenshteinDistanceCalculator(DistanceCalculator):
     """
-    Implementação para distância de Levenshtein (distância de edição).
+    Implementation for Levenshtein distance (edit distance).
 
-    A distância de Levenshtein é o número mínimo de operações de edição
-    (inserção, deleção ou substituição) necessárias para transformar
-    uma string em outra.
+    The Levenshtein distance is the minimum number of edit operations
+    (insertion, deletion, or substitution) required to transform
+    one string into another.
 
-    Note: Esta implementação é para futura extensibilidade.
+    Note: This implementation is for future extensibility.
     """
 
     @staticmethod
     def distance(str1: str, str2: str) -> int:
         """
-        Calcula distância de Levenshtein entre duas strings.
+        Calculate Levenshtein distance between two strings.
 
         Args:
-            str1: Primeira string
-            str2: Segunda string
+            str1: First string
+            str2: Second string
 
         Returns:
-            int: Distância de Levenshtein
+            int: Levenshtein distance
 
         Note:
-            Implementação básica usando programação dinâmica.
+            Basic implementation using dynamic programming.
         """
         m, n = len(str1), len(str2)
 
-        # Criar matriz DP
+        # Create DP matrix
         dp = [[0] * (n + 1) for _ in range(m + 1)]
 
-        # Inicializar primeira linha e coluna
+        # Initialize first row and column
         for i in range(m + 1):
             dp[i][0] = i
         for j in range(n + 1):
             dp[0][j] = j
 
-        # Preencher matriz DP
+        # Fill DP matrix
         for i in range(1, m + 1):
             for j in range(1, n + 1):
                 if str1[i - 1] == str2[j - 1]:
                     dp[i][j] = dp[i - 1][j - 1]
                 else:
                     dp[i][j] = 1 + min(
-                        dp[i - 1][j],  # deleção
-                        dp[i][j - 1],  # inserção
-                        dp[i - 1][j - 1],  # substituição
+                        dp[i - 1][j],  # deletion
+                        dp[i][j - 1],  # insertion
+                        dp[i - 1][j - 1],  # substitution
                     )
 
         return dp[m][n]
 
 
 # =============================================================================
-# FACTORY PARA CRIAÇÃO DE DISTANCE CALCULATORS
+# FACTORY FOR CREATING DISTANCE CALCULATORS
 # =============================================================================
 
 
@@ -372,18 +397,18 @@ def create_distance_calculator(
     distance_method: str, strings: list[str] | None = None, use_cache: bool = True
 ) -> DistanceCalculator:
     """
-    Factory para criar DistanceCalculator baseado no método especificado.
+    Factory to create DistanceCalculator based on specified method.
 
     Args:
-        distance_method: Método de cálculo de distância ("hamming" ou "levenshtein")
-        strings: Pool de strings para cálculos (opcional)
-        use_cache: Se deve usar cache para otimizar cálculos repetidos
+        distance_method: Distance calculation method ("hamming" or "levenshtein")
+        strings: Pool of strings for calculations (optional)
+        use_cache: Whether to use cache to optimize repeated calculations
 
     Returns:
-        DistanceCalculator: Instância concreta do calculador apropriado
+        DistanceCalculator: Concrete calculator instance of appropriate type
 
     Raises:
-        ValueError: Se o método de distância não for suportado
+        ValueError: If distance method is not supported
 
     Examples:
         >>> calc = create_distance_calculator("hamming", ["ACGT", "AGCT"], True)
@@ -398,6 +423,6 @@ def create_distance_calculator(
         return LevenshteinDistanceCalculator(strings, use_cache)
     else:
         raise ValueError(
-            f"Método de distância não suportado: '{distance_method}'. "
-            f"Métodos disponíveis: 'hamming', 'levenshtein'"
+            f"Unsupported distance method: '{distance_method}'. "
+            f"Available methods: 'hamming', 'levenshtein'"
         )

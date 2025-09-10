@@ -1,7 +1,39 @@
 """
-CSPBench Domain Exceptions
+CSPBench Domain Exceptions.
 
-Defines custom exceptions for domain and application errors.
+Defines custom exceptions for domain and application errors following
+a hierarchical structure that allows for specific error handling
+while maintaining broad exception categories.
+
+Exception Hierarchy:
+    CSPBenchError (base)
+    ├── DomainError (domain-specific errors)
+    │   ├── DatasetError
+    │   │   ├── DatasetNotFoundError
+    │   │   ├── DatasetValidationError
+    │   │   └── DatasetEmptyError
+    │   └── AlgorithmError
+    │       ├── AlgorithmNotFoundError
+    │       ├── AlgorithmExecutionError
+    │       ├── AlgorithmRegistrationError
+    │       ├── AlgorithmTimeoutError
+    │       └── AlgorithmParameterError
+    └── ApplicationError (application-specific errors)
+        ├── ConfigurationError
+        │   ├── BatchConfigurationError
+        │   ├── OptimizationConfigurationError
+        │   └── SensitivityConfigurationError
+        ├── ExecutionError
+        │   ├── BatchExecutionError
+        │   ├── OptimizationExecutionError
+        │   └── SensitivityExecutionError
+        ├── ExportError
+        │   ├── UnsupportedFormatError
+        │   └── ExportDestinationError
+        ├── RepositoryError
+        │   ├── RepositoryConnectionError
+        │   └── RepositoryPermissionError
+        └── InfrastructureError
 """
 
 

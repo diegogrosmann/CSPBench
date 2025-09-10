@@ -7,11 +7,12 @@ import hashlib
 import json
 import logging
 import time
-from pathlib import Path
-from typing import Dict, List, Optional, Set, Any
 from dataclasses import asdict
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Set
 
-from src.infrastructure.persistence.work_state.queries import WorkStateQueries
+from src.infrastructure.persistence.work_state.core import WorkPersistence
+
 from .schemas import (
     EventType,
     ExecutionChanges,
@@ -19,9 +20,9 @@ from .schemas import (
     ProgressMessage,
     ProgressSnapshot,
     ProgressUpdate,
+    serialize_error_summary,
     serialize_execution_detail,
     serialize_progress_summary,
-    serialize_error_summary,
 )
 
 logger = logging.getLogger(__name__)
@@ -29,7 +30,7 @@ logger = logging.getLogger(__name__)
 
 class WorkMonitorSession:
     """Individual monitoring session for a work."""
-    
+
     def __init__(self, work_id: str, db_path: Path, update_interval: float = 0.5):
         self.work_id = work_id
         self.db_path = db_path
@@ -63,7 +64,9 @@ class WorkMonitorSession:
         """Add a subscriber queue."""
         async with self._lock:
             self.subscribers.add(queue)
-            logger.debug(f"Added subscriber to work {self.work_id}. Total: {len(self.subscribers)}")
+            logger.debug(
+                f"Added subscriber to work {self.work_id}. Total: {len(self.subscribers)}"
+            )
 
             # Se o monitor já está rodando e snapshot inicial já foi enviado, enviamos
             # um snapshot atualizado somente para o novo subscriber (late joiner).
@@ -73,26 +76,34 @@ class WorkMonitorSession:
                     if snapshot_message:
                         ws_message = snapshot_message.to_websocket_message().to_json()
                         await queue.put(ws_message)
-                        logger.debug(f"Sent on-demand snapshot to late subscriber of {self.work_id}")
+                        logger.debug(
+                            f"Sent on-demand snapshot to late subscriber of {self.work_id}"
+                        )
                 except Exception as e:
-                    logger.warning(f"Failed to send on-demand snapshot to new subscriber for {self.work_id}: {e}")
+                    logger.warning(
+                        f"Failed to send on-demand snapshot to new subscriber for {self.work_id}: {e}"
+                    )
 
     async def remove_subscriber(self, queue: asyncio.Queue) -> None:
         """Remove a subscriber queue."""
         async with self._lock:
             self.subscribers.discard(queue)
-            logger.debug(f"Removed subscriber from work {self.work_id}. Total: {len(self.subscribers)}")
-            
+            logger.debug(
+                f"Removed subscriber from work {self.work_id}. Total: {len(self.subscribers)}"
+            )
+
             # Stop monitoring if no subscribers
             if not self.subscribers and self.running:
-                logger.info(f"No more subscribers for work {self.work_id}, stopping monitor")
+                logger.info(
+                    f"No more subscribers for work {self.work_id}, stopping monitor"
+                )
                 await self.stop()
 
     async def start(self) -> None:
         """Start monitoring loop."""
         if self.running:
             return
-            
+
         self.running = True
         self._monitor_task = asyncio.create_task(self._monitor_loop())
         logger.info(f"Started monitoring for work {self.work_id}")
@@ -101,7 +112,7 @@ class WorkMonitorSession:
         """Stop monitoring loop."""
         if not self.running:
             return
-            
+
         self.running = False
         if self._monitor_task:
             self._monitor_task.cancel()
@@ -116,16 +127,16 @@ class WorkMonitorSession:
         try:
             # Send initial snapshot
             await self._send_initial_snapshot()
-            
+
             while self.running:
                 try:
                     await self._check_for_updates()
                     await asyncio.sleep(self.update_interval)
-                    
+
                 except Exception as e:
                     logger.error(f"Error in monitor loop for work {self.work_id}: {e}")
                     await asyncio.sleep(self.update_interval)
-                    
+
         except asyncio.CancelledError:
             logger.debug(f"Monitor loop cancelled for work {self.work_id}")
         except Exception as e:
@@ -140,72 +151,93 @@ class WorkMonitorSession:
                 self._initial_snapshot_sent = True
 
         except Exception as e:
-            logger.error(f"Failed to send initial snapshot for work {self.work_id}: {e}")
+            logger.error(
+                f"Failed to send initial snapshot for work {self.work_id}: {e}"
+            )
             error_msg = ProgressMessage(
                 type=MessageType.ERROR,
                 work_id=self.work_id,
                 timestamp=time.time(),
-                error={"code": "SNAPSHOT_FAILED", "message": str(e)}
+                error={"code": "SNAPSHOT_FAILED", "message": str(e)},
             )
             await self._broadcast_message(error_msg)
 
-    async def _build_snapshot_message(self, update_tracking: bool = False) -> Optional[ProgressMessage]:
+    async def _build_snapshot_message(
+        self, update_tracking: bool = False
+    ) -> Optional[ProgressMessage]:
         """Constroi mensagem de snapshot atual. Se update_tracking, atualiza estado interno."""
-        with WorkStateQueries(self.db_path) as queries:
-            progress_summary = queries.get_work_progress_summary(self.work_id)
+        persistence = WorkPersistence(f"sqlite:///{self.db_path}")
+        try:
+            progress_summary = persistence.get_work_progress_summary(self.work_id)
             if not progress_summary:
-                logger.debug(f"Snapshot build: work {self.work_id} progress_summary not found")
+                logger.debug(
+                    f"Snapshot build: work {self.work_id} progress_summary not found"
+                )
                 return ProgressMessage(
                     type=MessageType.ERROR,
                     work_id=self.work_id,
                     timestamp=time.time(),
-                    error={"code": "WORK_NOT_FOUND", "message": f"Work {self.work_id} not found"}
+                    error={
+                        "code": "WORK_NOT_FOUND",
+                        "message": f"Work {self.work_id} not found",
+                    },
                 )
 
             # Buscar TODAS as execuções de TODAS as combinações
             all_executions = []
             try:
-                combinations_list = queries.list_combinations(self.work_id)
+                combinations_list = persistence.list_combinations(self.work_id)
                 for combo in combinations_list:
                     combo_id = combo.get("combination_id")
                     if combo_id:
-                        combo_executions = queries.get_combination_executions_detail(combo_id)
+                        combo_executions = persistence.get_combination_executions_detail(
+                            combo_id
+                        )
                         all_executions.extend(combo_executions)
                         # Atualiza cache para cada combinação
                         self._executions_cache[combo_id] = combo_executions
                         self._executions_state_cache[combo_id] = {
-                            e.unit_id: {"status": e.status, "progress": e.progress} for e in combo_executions
+                            e.unit_id: {"status": e.status, "progress": e.progress}
+                            for e in combo_executions
                         }
             except Exception as e:
                 logger.warning(f"Failed to load all executions: {e}")
                 # Fallback: apenas combinação atual
                 if progress_summary.current_combination_details:
-                    combination_id = progress_summary.current_combination_details.get("combination_id")
+                    combination_id = progress_summary.current_combination_details.get(
+                        "combination_id"
+                    )
                     if combination_id:
-                        all_executions = queries.get_combination_executions_detail(combination_id)
+                        all_executions = persistence.get_combination_executions_detail(
+                            combination_id
+                        )
                         self._executions_cache[combination_id] = all_executions
                         self._executions_state_cache[combination_id] = {
-                            e.unit_id: {"status": e.status, "progress": e.progress} for e in all_executions
+                            e.unit_id: {"status": e.status, "progress": e.progress}
+                            for e in all_executions
                         }
 
             # Lista de combinações para permitir seleção arbitrária
             try:
-                combinations_list = queries.list_combinations(self.work_id)
+                combinations_list = persistence.list_combinations(self.work_id)
             except Exception:
                 combinations_list = []
 
-            errors = queries.get_error_summary(self.work_id, limit=10)
-            warnings = queries.get_execution_warnings(self.work_id, limit=10)
-            
-            # Buscar todos os eventos
-            events = queries.get_events(self.work_id, limit=50)
+            errors = persistence.get_error_summary(self.work_id, limit=10)
+            warnings = persistence.get_execution_warnings(self.work_id, limit=10)
+
+            # Buscar todos os eventos (se método existir)
+            try:
+                events = persistence.event_list_by_work(self.work_id)[-50:]  # últimos 50
+            except AttributeError:
+                events = []
 
             snapshot = ProgressSnapshot(
                 progress=serialize_progress_summary(progress_summary),
                 executions=[serialize_execution_detail(e) for e in all_executions],
                 logs={
                     "errors": [serialize_error_summary(e) for e in errors],
-                    "warnings": warnings
+                    "warnings": warnings,
                 },
                 events=events,
                 executions_full=[serialize_execution_detail(e) for e in all_executions],
@@ -214,29 +246,35 @@ class WorkMonitorSession:
 
             if update_tracking:
                 self._update_tracking_state(progress_summary, all_executions)
-                logger.debug(f"Snapshot build: tracking updated for work {self.work_id}")
+                logger.debug(
+                    f"Snapshot build: tracking updated for work {self.work_id}"
+                )
 
             return ProgressMessage(
                 type=MessageType.SNAPSHOT,
                 work_id=self.work_id,
                 timestamp=time.time(),
-                snapshot=snapshot
+                snapshot=snapshot,
             )
+        finally:
+            persistence.close()
 
     async def _check_for_updates(self) -> None:
         """Check for updates and send incremental changes."""
         try:
-            with WorkStateQueries(self.db_path) as queries:
+            with WorkPersistence() as persistence:
                 # Get current state
-                progress_summary = queries.get_work_progress_summary(self.work_id)
+                progress_summary = persistence.get_work_progress_summary(self.work_id)
                 if not progress_summary:
                     return
 
-                current_work_status = queries.get_work_status(self.work_id)
-                
+                current_work_status = persistence.get_work_status(self.work_id)
+
                 # Check for work status change
                 if self.last_work_status != current_work_status:
-                    await self._send_work_status_event(self.last_work_status, current_work_status)
+                    await self._send_work_status_event(
+                        self.last_work_status, current_work_status
+                    )
                     self.last_work_status = current_work_status
 
                 # Check for progress changes
@@ -250,51 +288,80 @@ class WorkMonitorSession:
 
                 previous_combination_id = self.last_combination_id
                 if progress_summary.current_combination_details:
-                    current_combination_id = progress_summary.current_combination_details.get("combination_id")
+                    current_combination_id = (
+                        progress_summary.current_combination_details.get(
+                            "combination_id"
+                        )
+                    )
 
                 # Caso de mudança de combinação (existe nova e difere da anterior)
-                if current_combination_id and previous_combination_id and current_combination_id != previous_combination_id:
+                if (
+                    current_combination_id
+                    and previous_combination_id
+                    and current_combination_id != previous_combination_id
+                ):
                     try:
                         # Flush final da combinação anterior antes de trocar
-                        prev_execs = queries.get_combination_executions_detail(previous_combination_id)
+                        prev_execs = persistence.get_combination_executions_detail(
+                            previous_combination_id
+                        )
                         self._executions_cache[previous_combination_id] = prev_execs
                         self._executions_state_cache[previous_combination_id] = {
-                            e.unit_id: {"status": e.status, "progress": e.progress} for e in prev_execs
+                            e.unit_id: {"status": e.status, "progress": e.progress}
+                            for e in prev_execs
                         }
                         # Envia update final dessa combinação (força cliente a ver completions finais)
                         await self._send_update(
                             progress_summary=None,
                             execution_changes=None,
                             new_logs=None,
-                            executions=[serialize_execution_detail(e) for e in prev_execs],
+                            executions=[
+                                serialize_execution_detail(e) for e in prev_execs
+                            ],
                             executions_combination_id=previous_combination_id,
                         )
                         self._flushed_combinations.add(previous_combination_id)
                     except Exception as e:
-                        logger.debug(f"Flush previous combination {previous_combination_id} failed: {e}")
+                        logger.debug(
+                            f"Flush previous combination {previous_combination_id} failed: {e}"
+                        )
 
                 # Caso nenhuma nova combinação mas havia anterior e ainda não flushado (fim do trabalho ou pausa)
-                if not current_combination_id and previous_combination_id is not None and previous_combination_id not in self._flushed_combinations:
+                if (
+                    not current_combination_id
+                    and previous_combination_id is not None
+                    and previous_combination_id not in self._flushed_combinations
+                ):
                     try:
-                        prev_execs = queries.get_combination_executions_detail(previous_combination_id)
+                        prev_execs = persistence.get_combination_executions_detail(
+                            previous_combination_id
+                        )
                         await self._send_update(
                             progress_summary=None,
                             execution_changes=None,
                             new_logs=None,
-                            executions=[serialize_execution_detail(e) for e in prev_execs],
+                            executions=[
+                                serialize_execution_detail(e) for e in prev_execs
+                            ],
                             executions_combination_id=previous_combination_id,
                         )
                         self._flushed_combinations.add(previous_combination_id)
                     except Exception as e:
-                        logger.debug(f"Final flush (no new combination) {previous_combination_id} failed: {e}")
+                        logger.debug(
+                            f"Final flush (no new combination) {previous_combination_id} failed: {e}"
+                        )
 
                 # Agora processa execuções da combinação corrente (se houver)
                 executions = []
                 if current_combination_id:
-                    executions = queries.get_combination_executions_detail(current_combination_id)
+                    executions = persistence.get_combination_executions_detail(
+                        current_combination_id
+                    )
                     if previous_combination_id != current_combination_id:
                         combination_changed = True
-                        await self._send_combination_changed_event(previous_combination_id, current_combination_id)
+                        await self._send_combination_changed_event(
+                            previous_combination_id, current_combination_id
+                        )
                         # Reset estado de execuções para nova combinação para detectar 'new'
                         self.last_executions_state = {}
                         self.last_combination_id = current_combination_id
@@ -312,31 +379,52 @@ class WorkMonitorSession:
                 events_changed = bool(new_events)
 
                 # Send updates if anything changed
-                if progress_changed or executions_changed or logs_changed or events_changed or combination_changed:
+                if (
+                    progress_changed
+                    or executions_changed
+                    or logs_changed
+                    or events_changed
+                    or combination_changed
+                ):
                     full_execs_serialized = None
                     if combination_changed or executions_changed:
                         # Buscar TODAS as execuções para atualização incremental também
                         try:
                             all_executions_for_update = []
-                            combinations_list = queries.list_combinations(self.work_id)
+                            combinations_list = persistence.list_combinations(self.work_id)
                             for combo in combinations_list:
                                 combo_id = combo.get("combination_id")
                                 if combo_id:
-                                    combo_executions = queries.get_combination_executions_detail(combo_id)
+                                    combo_executions = (
+                                        persistence.get_combination_executions_detail(
+                                            combo_id
+                                        )
+                                    )
                                     all_executions_for_update.extend(combo_executions)
-                            full_execs_serialized = [serialize_execution_detail(e) for e in all_executions_for_update]
+                            full_execs_serialized = [
+                                serialize_execution_detail(e)
+                                for e in all_executions_for_update
+                            ]
                         except Exception as e:
-                            logger.warning(f"Failed to load all executions for update: {e}")
+                            logger.warning(
+                                f"Failed to load all executions for update: {e}"
+                            )
                             # Fallback: apenas combinação atual
-                            full_execs_serialized = [serialize_execution_detail(e) for e in executions]
-                    
+                            full_execs_serialized = [
+                                serialize_execution_detail(e) for e in executions
+                            ]
+
                     await self._send_update(
                         progress_summary if progress_changed else None,
                         execution_changes if executions_changed else None,
                         new_logs if logs_changed else None,
                         new_events if events_changed else None,
                         executions=full_execs_serialized,
-                        executions_combination_id=current_combination_id if full_execs_serialized is not None else None
+                        executions_combination_id=(
+                            current_combination_id
+                            if full_execs_serialized is not None
+                            else None
+                        ),
                     )
 
                     if progress_changed:
@@ -352,7 +440,9 @@ class WorkMonitorSession:
         except Exception as e:
             logger.error(f"Error checking updates for work {self.work_id}: {e}")
 
-    async def _send_work_status_event(self, old_status: Optional[str], new_status: str) -> None:
+    async def _send_work_status_event(
+        self, old_status: Optional[str], new_status: str
+    ) -> None:
         """Send work status change event."""
         event = ProgressMessage(
             type=MessageType.EVENT,
@@ -361,12 +451,14 @@ class WorkMonitorSession:
             event={
                 "event_type": EventType.WORK_STATUS_CHANGED,
                 "old_status": old_status,
-                "new_status": new_status
-            }
+                "new_status": new_status,
+            },
         )
         await self._broadcast_message(event)
 
-    async def _send_combination_changed_event(self, old_id: Optional[int], new_id: int) -> None:
+    async def _send_combination_changed_event(
+        self, old_id: Optional[int], new_id: int
+    ) -> None:
         """Send combination change event."""
         event = ProgressMessage(
             type=MessageType.EVENT,
@@ -375,8 +467,8 @@ class WorkMonitorSession:
             event={
                 "event_type": EventType.COMBINATION_CHANGED,
                 "old_combination_id": old_id,
-                "new_combination_id": new_id
-            }
+                "new_combination_id": new_id,
+            },
         )
         await self._broadcast_message(event)
 
@@ -391,13 +483,13 @@ class WorkMonitorSession:
     ) -> None:
         """Send incremental update."""
         update_data = {}
-        
+
         if progress_summary:
             update_data["progress"] = serialize_progress_summary(progress_summary)
-            
+
         if execution_changes:
             update_data["executions_changed"] = asdict(execution_changes)
-            
+
         if new_logs:
             update_data["logs_appended"] = new_logs
 
@@ -413,46 +505,56 @@ class WorkMonitorSession:
                 type=MessageType.UPDATE,
                 work_id=self.work_id,
                 timestamp=time.time(),
-                update=ProgressUpdate(**update_data)
+                update=ProgressUpdate(**update_data),
             )
             await self._broadcast_message(message)
 
-    async def _check_new_logs(self, queries: WorkStateQueries) -> Dict[str, List]:
+    async def _check_new_logs(self, persistence: WorkPersistence) -> Dict[str, List]:
         """Check for new error and warning logs."""
         new_logs = {"errors": [], "warnings": []}
-        
+
         try:
             # Get recent errors
-            errors = queries.get_error_summary(self.work_id, limit=5)
+            errors = persistence.get_error_summary(self.work_id, limit=5)
             for error in errors:
                 if error.timestamp > self.last_error_timestamp:
                     new_logs["errors"].append(serialize_error_summary(error))
-                    self.last_error_timestamp = max(self.last_error_timestamp, error.timestamp)
+                    self.last_error_timestamp = max(
+                        self.last_error_timestamp, error.timestamp
+                    )
 
-            # Get recent warnings  
-            warnings = queries.get_execution_warnings(self.work_id, limit=5)
+            # Get recent warnings
+            warnings = persistence.get_execution_warnings(self.work_id, limit=5)
             for warning in warnings:
                 warning_timestamp = warning.get("timestamp", 0)
                 if warning_timestamp > self.last_warning_timestamp:
                     new_logs["warnings"].append(warning)
-                    self.last_warning_timestamp = max(self.last_warning_timestamp, warning_timestamp)
+                    self.last_warning_timestamp = max(
+                        self.last_warning_timestamp, warning_timestamp
+                    )
 
         except Exception as e:
             logger.error(f"Error checking new logs for work {self.work_id}: {e}")
 
         return new_logs
 
-    async def _check_new_events(self, queries: WorkStateQueries) -> List[Dict[str, Any]]:
+    async def _check_new_events(
+        self, persistence: WorkPersistence
+    ) -> List[Dict[str, Any]]:
         """Check for new events from events table."""
         new_events = []
-        
+
         try:
-            events = queries.get_events(self.work_id, limit=10, since_timestamp=self.last_event_timestamp)
+            events = persistence.get_events(
+                self.work_id, limit=10
+            )
             for event in events:
                 event_timestamp = event.get("timestamp", 0)
                 if event_timestamp > self.last_event_timestamp:
                     new_events.append(event)
-                    self.last_event_timestamp = max(self.last_event_timestamp, event_timestamp)
+                    self.last_event_timestamp = max(
+                        self.last_event_timestamp, event_timestamp
+                    )
 
         except Exception as e:
             logger.error(f"Error checking new events for work {self.work_id}: {e}")
@@ -480,16 +582,20 @@ class WorkMonitorSession:
             current_state[exec_detail.unit_id] = {
                 "status": exec_detail.status,
                 # Mantém precisão integral para refletir pequenos avanços
-                "progress": exec_detail.progress
+                "progress": exec_detail.progress,
             }
 
         if not self.last_executions_state:
             # First time, consider all as new
             self.last_executions_state = current_state
-            return ExecutionChanges(new=[uid for uid in current_state.keys()]) if current_state else None
+            return (
+                ExecutionChanges(new=[uid for uid in current_state.keys()])
+                if current_state
+                else None
+            )
 
         changes = ExecutionChanges()
-        
+
         # Check for updates and completions
         for unit_id, current in current_state.items():
             if unit_id in self.last_executions_state:
@@ -498,9 +604,11 @@ class WorkMonitorSession:
                     if not changes.updated:
                         changes.updated = []
                     changes.updated.append(unit_id)
-                    
+
                     # Check if completed
-                    if current["status"] in ["completed", "failed", "error"] and last["status"] not in ["completed", "failed", "error"]:
+                    if current["status"] in ["completed", "failed", "error"] and last[
+                        "status"
+                    ] not in ["completed", "failed", "error"]:
                         if not changes.completed:
                             changes.completed = []
                         changes.completed.append(unit_id)
@@ -518,24 +626,32 @@ class WorkMonitorSession:
                 changes.removed.append(unit_id)
 
         # Return changes only if there are actual changes
-        return changes if any([changes.updated, changes.completed, changes.new, changes.removed]) else None
+        return (
+            changes
+            if any([changes.updated, changes.completed, changes.new, changes.removed])
+            else None
+        )
 
     def _update_tracking_state(self, progress_summary, executions):
         """Update internal tracking state."""
         self.last_progress_hash = self._hash_progress(progress_summary)
         self._update_executions_state(executions)
-        
+
         # Inicializar last_work_status na primeira vez
-        with WorkStateQueries(self.db_path) as queries:
-            self.last_work_status = queries.get_work_status(self.work_id)
-            
+        with WorkPersistence() as queries:
+            self.last_work_status = persistence.get_work_status(self.work_id)
+
             # Atualizar timestamp de eventos para o mais recente
-            events = queries.get_events(self.work_id, limit=1)
+            events = persistence.get_events(self.work_id, limit=1)
             if events:
-                self.last_event_timestamp = max(self.last_event_timestamp, events[0]['timestamp'])
-        
+                self.last_event_timestamp = max(
+                    self.last_event_timestamp, events[0]["timestamp"]
+                )
+
         if progress_summary.current_combination_details:
-            self.last_combination_id = progress_summary.current_combination_details.get("combination_id")
+            self.last_combination_id = progress_summary.current_combination_details.get(
+                "combination_id"
+            )
 
     def _update_executions_state(self, executions):
         """Update executions tracking state."""
@@ -543,28 +659,41 @@ class WorkMonitorSession:
         for exec_detail in executions:
             self.last_executions_state[exec_detail.unit_id] = {
                 "status": exec_detail.status,
-                "progress": exec_detail.progress
+                "progress": exec_detail.progress,
             }
         # Mantém cache coerente para combination corrente
         if self.last_combination_id is not None:
             self._executions_cache[self.last_combination_id] = executions
-            self._executions_state_cache[self.last_combination_id] = self.last_executions_state.copy()
+            self._executions_state_cache[self.last_combination_id] = (
+                self.last_executions_state.copy()
+            )
 
-    async def get_full_executions_for_combination(self, combination_id: int) -> Optional[List[Dict]]:
+    async def get_full_executions_for_combination(
+        self, combination_id: int
+    ) -> Optional[List[Dict]]:
         """Retorna lista completa serializada para uma combination específica."""
         from .schemas import serialize_execution_detail
+
         try:
             if combination_id not in self._executions_cache:
                 # Carregar do banco
-                with WorkStateQueries(self.db_path) as queries:
-                    executions = queries.get_combination_executions_detail(combination_id)
+                with WorkPersistence() as queries:
+                    executions = persistence.get_combination_executions_detail(
+                        combination_id
+                    )
                     self._executions_cache[combination_id] = executions
                     self._executions_state_cache[combination_id] = {
-                        e.unit_id: {"status": e.status, "progress": e.progress} for e in executions
+                        e.unit_id: {"status": e.status, "progress": e.progress}
+                        for e in executions
                     }
-            return [serialize_execution_detail(e) for e in self._executions_cache.get(combination_id, [])]
+            return [
+                serialize_execution_detail(e)
+                for e in self._executions_cache.get(combination_id, [])
+            ]
         except Exception as e:
-            logger.warning(f"Failed to load executions for combination {combination_id}: {e}")
+            logger.warning(
+                f"Failed to load executions for combination {combination_id}: {e}"
+            )
             return None
 
     async def _handle_work_completion(self) -> None:
@@ -578,11 +707,11 @@ class WorkMonitorSession:
         """Broadcast message to all subscribers."""
         if not self.subscribers:
             return
-            
+
         # Convert to WebSocket message
         ws_message = message.to_websocket_message()
         message_json = ws_message.to_json()
-        
+
         # Send to all subscribers
         failed_queues = set()
         for queue in self.subscribers.copy():
@@ -591,7 +720,7 @@ class WorkMonitorSession:
             except Exception as e:
                 logger.warning(f"Failed to send message to subscriber: {e}")
                 failed_queues.add(queue)
-        
+
         # Remove failed queues
         if failed_queues:
             async with self._lock:
@@ -600,12 +729,14 @@ class WorkMonitorSession:
 
 class WorkMonitorManager:
     """Manager for all work monitoring sessions."""
-    
+
     def __init__(self):
         self.sessions: Dict[str, WorkMonitorSession] = {}
         self._lock = asyncio.Lock()
 
-    async def get_or_create_session(self, work_id: str, db_path: Path) -> WorkMonitorSession:
+    async def get_or_create_session(
+        self, work_id: str, db_path: Path
+    ) -> WorkMonitorSession:
         """Get existing session or create new one."""
         async with self._lock:
             if work_id not in self.sessions:

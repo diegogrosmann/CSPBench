@@ -1,47 +1,26 @@
 """
 Batch Execution API Routes
-Provides REST endpoints for batch execution management using unified ExecutionManager.
+
+Provides REST endpoints for batch execution management using unified WorkManager.
 """
 
 import logging
-import os
 from datetime import datetime
-from pathlib import Path
-from typing import Optional
 
-from fastapi import APIRouter, HTTPException, BackgroundTasks
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 
-from src.application.services.execution_manager import ExecutionManager
 from src.application.services.work_service import get_work_service
+from src.application.work.work_manager import WorkManager
 from src.domain.config import load_cspbench_config
-from src.domain.errors import BatchConfigurationError
+from src.domain.status import BaseStatus
 from src.infrastructure.utils.path_utils import get_batch_directory
 
-import logging
-import os
-from datetime import datetime
-from pathlib import Path
-from typing import Optional
-
-from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends
-from fastapi.responses import JSONResponse
-from pydantic import BaseModel
-
-from src.application.services.execution_manager import ExecutionManager
-from src.application.work.work_manager import WorkManager
-from src.domain import WorkStatus
-from src.domain.status import BaseStatus
-from src.application.services.work_service import get_work_service
-from src.domain.config import load_cspbench_config
-
 from ..core.batch_execution_models import (
+    BatchControlResponse,
     BatchExecutionRequest,
     BatchExecutionResponse,
-    BatchStatusResponse,
-    BatchResultsResponse,
     BatchListResponse,
-    BatchControlResponse,
+    BatchStatusResponse,
 )
 
 # Get logger
@@ -56,14 +35,21 @@ async def execute_batch(
     request: BatchExecutionRequest, background_tasks: BackgroundTasks
 ) -> BatchExecutionResponse:
     """
-    Execute batch configuration using unified ExecutionManager.
+    Execute batch configuration using unified WorkManager.
+
+    This endpoint provides a centralized way to execute batch configurations
+    through the unified WorkManager, which handles both work item management
+    and pipeline execution.
 
     Args:
-        request: Batch execution request with batch file path
-        background_tasks: FastAPI background tasks
+        request: Batch execution configuration
+        current_user: Authenticated user context
 
     Returns:
-        Batch execution response with work_id and status
+        BatchExecutionResponse: Response with work ID and execution details
+
+    Raises:
+        HTTPException: If configuration loading or execution fails
     """
     try:
         logger.info(f"Received batch execution request for file: {request.batch_file}")
@@ -93,17 +79,15 @@ async def execute_batch(
                 status_code=400, detail=f"Failed to load configuration: {e}"
             )
 
-        # Use ExecutionManager without monitor
-        execution_manager = ExecutionManager()
+        # Use WorkManager for execution
+        work_manager = get_work_service()
         extra_data = {
             "description": f"Web execution of {request.batch_file}",
             "batch_file": request.batch_file,
             "origin": "web",
         }
 
-        work_id = execution_manager.execute(
-            config=config, extra=extra_data
-        )
+        work_id = work_manager.execute(config=config, extra=extra_data)
 
         logger.info(f"Work submitted with ID: {work_id}")
 
@@ -116,7 +100,7 @@ async def execute_batch(
             status=BaseStatus.QUEUED.value,
             message="Batch execution started successfully",
             submitted_at=datetime.now(),
-            output_path=work_details.get("output_path") if work_details else None,
+            output_path=work_details.output_path if work_details else None,
         )
 
     except HTTPException:
@@ -127,7 +111,9 @@ async def execute_batch(
 
 
 @router.get("/{work_id}/status", response_model=BatchStatusResponse)
-async def get_batch_status(work_id: str, work_manager: WorkManager = Depends(get_work_service)) -> BatchStatusResponse:
+async def get_batch_status(
+    work_id: str, work_manager: WorkManager = Depends(get_work_service)
+) -> BatchStatusResponse:
     """
     Get status of a batch execution.
 
@@ -149,7 +135,9 @@ async def get_batch_status(work_id: str, work_manager: WorkManager = Depends(get
             updated_at=datetime.fromtimestamp(work_item.get("updated_at", 0)),
             output_path=work_item.get("output_path"),
             error_message=work_item.get("error"),
-            config_name=work_item.get("config", {}).get("metadata", {}).get("name", "Unknown"),
+            config_name=work_item.get("config", {})
+            .get("metadata", {})
+            .get("name", "Unknown"),
         )
 
     except HTTPException:
@@ -160,7 +148,9 @@ async def get_batch_status(work_id: str, work_manager: WorkManager = Depends(get
 
 
 @router.get("/list", response_model=BatchListResponse)
-async def list_batches(work_manager: WorkManager = Depends(get_work_service)) -> BatchListResponse:
+async def list_batches(
+    work_manager: WorkManager = Depends(get_work_service),
+) -> BatchListResponse:
     """
     List all batch executions.
 
@@ -168,25 +158,27 @@ async def list_batches(work_manager: WorkManager = Depends(get_work_service)) ->
         List of batch executions
     """
     try:
-        works = work_manager.list()
-        
+        work_items = work_manager.list()
+
         batches = []
-        for work in works:
-            batches.append({
-                "work_id": work.get("id", "unknown"),
-                "status": work.get("status", "unknown"),
-                "created_at": datetime.fromtimestamp(work.get("created_at", 0)),
-                "updated_at": datetime.fromtimestamp(work.get("updated_at", 0)),
-                "config_name": work.get("config", {}).get("metadata", {}).get("name", "Unknown"),
-                "batch_file": work.get("extra", {}).get("batch_file", ""),
-                "description": work.get("extra", {}).get("description", ""),
-                "origin": work.get("extra", {}).get("origin", "unknown"),
-            })
+        for work_item in work_items:
+            batches.append(
+                {
+                    "work_id": work_item.id,
+                    "status": work_item.status.value,
+                    "created_at": datetime.fromtimestamp(work_item.created_at),
+                    "updated_at": datetime.fromtimestamp(work_item.updated_at),
+                    "config_name": work.get("config", {})
+                    .get("metadata", {})
+                    .get("name", "Unknown"),
+                    "batch_file": work.get("extra", {}).get("batch_file", ""),
+                    "description": work.get("extra", {}).get("description", ""),
+                    "origin": work.get("extra", {}).get("origin", "unknown"),
+                }
+            )
 
         return BatchListResponse(
-            batches=batches,
-            total=len(batches),
-            timestamp=datetime.now()
+            batches=batches, total=len(batches), timestamp=datetime.now()
         )
 
     except Exception as e:
@@ -196,9 +188,7 @@ async def list_batches(work_manager: WorkManager = Depends(get_work_service)) ->
 
 @router.post("/{work_id}/control", response_model=BatchControlResponse)
 async def control_batch(
-    work_id: str, 
-    action: str,
-    work_manager: WorkManager = Depends(get_work_service)
+    work_id: str, action: str, work_manager: WorkManager = Depends(get_work_service)
 ) -> BatchControlResponse:
     """
     Control batch execution (pause, resume, cancel).
@@ -222,8 +212,7 @@ async def control_batch(
 
         if not success:
             raise HTTPException(
-                status_code=404, 
-                detail=f"Work {work_id} not found or action failed"
+                status_code=404, detail=f"Work {work_id} not found or action failed"
             )
 
         return BatchControlResponse(
@@ -231,7 +220,7 @@ async def control_batch(
             action=action,
             success=True,
             message=f"Action '{action}' executed successfully",
-            timestamp=datetime.now()
+            timestamp=datetime.now(),
         )
 
     except HTTPException:

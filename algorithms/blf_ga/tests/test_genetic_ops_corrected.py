@@ -7,7 +7,6 @@ and standardized distance function integration.
 
 import random
 import unittest
-from unittest.mock import Mock
 
 from algorithms.blf_ga.ops import genetic_ops
 from src.domain.distance import HammingDistanceCalculator

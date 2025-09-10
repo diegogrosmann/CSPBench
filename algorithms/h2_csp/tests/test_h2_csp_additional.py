@@ -7,15 +7,12 @@ from __future__ import annotations
 
 import pytest
 
-from src.domain.distance import create_distance_calculator
 from src.domain.algorithms import global_registry
-
-import algorithms.h2_csp.algorithm  # garante registro
+from src.domain.distance import create_distance_calculator
 
 
 def _ensure_h2_registered():
     if "H2CSP" not in global_registry:  # pragma: no cover
-        import importlib
         import importlib
 
         importlib.import_module("algorithms.h2_csp.algorithm")

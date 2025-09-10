@@ -5,7 +5,6 @@ Conjunto de sequências com metadados. Agora permite comprimentos variados
 quando desejado (ex.: dados do Entrez sem uniformização).
 """
 
-import random
 from typing import Any, Dict, List, Optional
 
 
@@ -21,7 +20,11 @@ class Dataset:
     """
 
     def __init__(
-        self, id: str, name: str, sequences: List[str] = [], alphabet: Optional[str] = None
+        self,
+        id: str,
+        name: str,
+        sequences: List[str] = [],
+        alphabet: Optional[str] = None,
     ):
         """
         Initialize a dataset with sequences.
@@ -34,7 +37,7 @@ class Dataset:
         """
         if not id:
             raise ValueError("Dataset id is required and cannot be empty")
-        
+
         self.id = id
         self.sequences = sequences
         self._alphabet = alphabet
@@ -197,11 +200,13 @@ class Dataset:
         alphabet = data.get("metadata", {}).get("alphabet")
         name = data.get("metadata", {}).get("name", "unnamed_dataset")
         dataset_id = data.get("metadata", {}).get("id")
-        
+
         if not dataset_id:
             raise ValueError("Dataset id is required in metadata")
-        
-        return cls(id=dataset_id, name=name, sequences=data["sequences"], alphabet=alphabet)
+
+        return cls(
+            id=dataset_id, name=name, sequences=data["sequences"], alphabet=alphabet
+        )
 
     def add_sequence(self, sequence: str) -> None:
         """
@@ -257,7 +262,10 @@ class Dataset:
         filtered_name = f"{self.name}_filtered" if self.name else "filtered_dataset"
         filtered_id = f"{self.id}_filtered"
         return Dataset(
-            id=filtered_id, name=filtered_name, sequences=filtered_sequences, alphabet=self._alphabet
+            id=filtered_id,
+            name=filtered_name,
+            sequences=filtered_sequences,
+            alphabet=self._alphabet,
         )
 
     def get_sequences(self) -> List[str]:

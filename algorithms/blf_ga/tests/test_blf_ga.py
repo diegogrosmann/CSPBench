@@ -16,13 +16,13 @@ Test Coverage:
 - Stopping criteria and restart mechanisms
 """
 
-import pytest
-from unittest.mock import Mock, patch
 import time
-from typing import Any
+from unittest.mock import Mock
 
-from src.domain.algorithms import AlgorithmResult
+import pytest
+
 from src.domain.distance import HammingDistanceCalculator
+
 from ..algorithm import BLFGAAlgorithm
 from ..config import BLF_GA_DEFAULTS
 
@@ -132,20 +132,20 @@ class TestBLFGAAlgorithm:
 
         # Check that the algorithms were created with different seeds
         assert algo1.seed != algo2.seed
-        
+
         # Results should likely be different (though not guaranteed)
         # We verify that the algorithm instances have different seeds
         test_algo1 = self.create_algorithm(seed=42, max_gens=1)
         test_algo2 = self.create_algorithm(seed=123, max_gens=1)
-        
+
         # Ensure they have different seeds set
         assert test_algo1.seed == 42
         assert test_algo2.seed == 123
-        
+
         # Generate a few random numbers to verify different sequences
         test_algo1._setup_random_generator()
         test_algo2._setup_random_generator()
-        
+
         # Check that random sequences are different
         rand1 = [test_algo1.rng.random() for _ in range(5)]
         rand2 = [test_algo2.rng.random() for _ in range(5)]
@@ -340,7 +340,9 @@ class TestBLFGAAlgorithm:
             assert hasattr(algo, "mutation_adaptations")
         else:
             # If algorithm failed, it might not have executed any generations
-            print(f"Algorithm failed with error: {result.get('error', 'Unknown error')}")
+            print(
+                f"Algorithm failed with error: {result.get('error', 'Unknown error')}"
+            )
             # At least check that the attribute exists
             assert hasattr(algo, "generations_executed")
 
@@ -412,7 +414,7 @@ class TestBLFGAAlgorithm:
         assert isinstance(result, dict)
         assert "center_string" in result
         assert "success" in result
-        
+
         # If algorithm succeeded, verify center string is valid
         if result["success"]:
             assert result["center_string"] is not None
@@ -422,11 +424,13 @@ class TestBLFGAAlgorithm:
             assert result["max_distance"] >= 0
         else:
             # If failed, check error handling
-            print(f"Algorithm failed with error: {result.get('error', 'Unknown error')}")
+            print(
+                f"Algorithm failed with error: {result.get('error', 'Unknown error')}"
+            )
             assert "error" in result
             # For failed runs, max_distance might be -1 (error indicator)
             assert result["max_distance"] == -1
-        
+
         assert result["metadata"] is not None
         assert isinstance(result["metadata"], dict)
 
@@ -453,7 +457,9 @@ class TestBLFGAAlgorithm:
                 "initial_fitness",
             ]
             for field in success_fields:
-                assert field in metadata, f"Missing field {field} in successful run metadata"
+                assert (
+                    field in metadata
+                ), f"Missing field {field} in successful run metadata"
 
     def test_adaptive_mutation_without_current_population(self):
         """Test adaptive mutation when current population is not yet set."""
@@ -475,7 +481,7 @@ class TestBLFGAAlgorithm:
         # Verify basic functionality - the algorithm successfully computes distances
         assert "center_string" in result
         assert "max_distance" in result
-        
+
         if result["success"]:
             assert result["center_string"] is not None
             assert isinstance(result["max_distance"], int)

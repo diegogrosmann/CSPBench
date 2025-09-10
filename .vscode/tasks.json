@@ -208,6 +208,54 @@
                     "PYTHONDONTWRITEBYTECODE": "1"
                 }
             }
+        },
+        {
+            "label": "Clean Database",
+            "type": "shell",
+            "command": "${workspaceFolder}/.venv/bin/python",
+            "args": [
+                "scripts/clean_database.py"
+            ],
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": [],
+            "options": {
+                "cwd": "${workspaceFolder}",
+                "envFile": "${workspaceFolder}/.env",
+                "env": {
+                    "PYTHONPATH": "${workspaceFolder}",
+                    "PYTHONDONTWRITEBYTECODE": "1"
+                }
+            }
+        },
+        {
+            "label": "Clean Database (Force)",
+            "type": "shell",
+            "command": "${workspaceFolder}/.venv/bin/python",
+            "args": [
+                "scripts/clean_database_force.py"
+            ],
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": [],
+            "options": {
+                "cwd": "${workspaceFolder}",
+                "envFile": "${workspaceFolder}/.env",
+                "env": {
+                    "PYTHONPATH": "${workspaceFolder}",
+                    "PYTHONDONTWRITEBYTECODE": "1"
+                }
+            }
         }
     ]
 }

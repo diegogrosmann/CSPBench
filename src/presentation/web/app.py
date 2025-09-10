@@ -1,12 +1,11 @@
 """FastAPI Web Application for CSPBench.
 
 Provides a minimal deterministic web interface. Lifecycle is handled via a
-single lifespan context combining WorkService lifecycle and web_config service
-initialization (no deprecated @on_event handlers).
+single lifespan context managing WorkService lifecycle.
 """
 
-from contextlib import asynccontextmanager
 import logging
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -14,7 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from src.application.services.work_service import work_service_lifespan
-from .core.config import get_web_config
+
 from .routes import algorithms, datasets, health, pages
 
 logger = logging.getLogger(__name__)
@@ -24,16 +23,8 @@ logger = logging.getLogger(__name__)
 async def combined_lifespan(app):  # pragma: no cover - framework integration
     # Enter WorkService lifespan first
     async with work_service_lifespan(app):
-        # Additional startup (web_config)
-        try:
-            logger.info("Initializing web_config services...")
-            success = web_config.initialize_services()
-            if success:
-                logger.info("web_config services initialized")
-            else:
-                logger.warning("web_config initialization reported issues")
-        except Exception as e:  # noqa: BLE001
-            logger.error(f"web_config initialization failed: {e}")
+        # Web application is ready
+        logger.info("Web application lifecycle initialized")
         yield
         # Optional shutdown hooks here in future
 
@@ -56,10 +47,13 @@ app.add_middleware(
 )
 
 # Static files
-app.mount("/static", StaticFiles(directory="src/presentation/web/static"), name="static")
+app.mount(
+    "/static", StaticFiles(directory="src/presentation/web/static"), name="static"
+)
 
 # Mount datasets directory only if it exists
 import os
+
 datasets_path = Path(__file__).parent.parent.parent.parent / "datasets"
 # Use environment variable for dataset directory, fallback to Docker path for production
 dataset_dir_env = os.getenv("DATASET_DIRECTORY", "/app/data/datasets")
@@ -67,20 +61,26 @@ data_datasets_path = Path(dataset_dir_env)
 
 # Prefer the configured directory, fallback to project datasets
 if data_datasets_path.exists():
-    app.mount("/datasets", StaticFiles(directory=str(data_datasets_path)), name="datasets")
+    app.mount(
+        "/datasets", StaticFiles(directory=str(data_datasets_path)), name="datasets"
+    )
 elif datasets_path.exists():
     app.mount("/datasets", StaticFiles(directory=str(datasets_path)), name="datasets")
 else:
     # Create the configured datasets directory if it doesn't exist and we have permissions
     try:
         data_datasets_path.mkdir(parents=True, exist_ok=True)
-        app.mount("/datasets", StaticFiles(directory=str(data_datasets_path)), name="datasets")
+        app.mount(
+            "/datasets", StaticFiles(directory=str(data_datasets_path)), name="datasets"
+        )
     except (PermissionError, OSError) as e:
         logger.warning(f"Could not create datasets directory {data_datasets_path}: {e}")
         # Fallback to a local datasets directory
         fallback_path = Path("./data/datasets")
         fallback_path.mkdir(parents=True, exist_ok=True)
-        app.mount("/datasets", StaticFiles(directory=str(fallback_path)), name="datasets")
+        app.mount(
+            "/datasets", StaticFiles(directory=str(fallback_path)), name="datasets"
+        )
 
 # Routers
 app.include_router(algorithms.router, tags=["algorithms"])

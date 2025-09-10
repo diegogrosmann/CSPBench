@@ -5,9 +5,8 @@ Implements DatasetRepository using file system.
 Respects DATASET_DIRECTORY from environment for base path.
 """
 
-import os
 from pathlib import Path
-from typing import List, Any
+from typing import Any, List
 
 from src.domain import Dataset
 from src.domain.errors import DatasetNotFoundError, DatasetValidationError
@@ -22,13 +21,13 @@ class FileDatasetRepository:
         """Get base path, using environment variable as default."""
         if base_path is None:
             return get_dataset_directory()
-        
+
         path = Path(base_path)
-        
+
         # Convert to absolute path if relative
         if not path.is_absolute():
             path = path.resolve()
-            
+
         path.mkdir(parents=True, exist_ok=True)
         return path
 

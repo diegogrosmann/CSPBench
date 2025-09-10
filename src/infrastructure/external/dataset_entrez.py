@@ -15,12 +15,13 @@ Author: CSPBench Development Team
 import logging
 import os
 import random
-from typing import Any, Dict, List, Tuple, Optional, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 from urllib.error import HTTPError
 
 from dotenv import load_dotenv
-from src.domain.dataset import Dataset
+
 from src.domain.config import EntrezDatasetConfig
+from src.domain.dataset import Dataset
 
 load_dotenv()
 
@@ -87,8 +88,15 @@ class EntrezDatasetDownloader:
 
         sequences, used_params = EntrezDatasetDownloader._fetch_sequences(params_dict)
 
-        dataset_id = getattr(params, "id", "entrez_dataset") if isinstance(params, EntrezDatasetConfig) else "entrez_dataset"
-        return Dataset(id=dataset_id, name="entrez_dataset", sequences=sequences), used_params
+        dataset_id = (
+            getattr(params, "id", "entrez_dataset")
+            if isinstance(params, EntrezDatasetConfig)
+            else "entrez_dataset"
+        )
+        return (
+            Dataset(id=dataset_id, name="entrez_dataset", sequences=sequences),
+            used_params,
+        )
 
     @staticmethod
     def _config_to_params(config: EntrezDatasetConfig) -> Dict[str, Any]:

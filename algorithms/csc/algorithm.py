@@ -52,11 +52,11 @@ This file intentionally consolidates implementation + orchestration for clarity 
 
 from __future__ import annotations
 
-import time
 import logging
+import time
 from collections import Counter
 from itertools import combinations, product
-from typing import Any, List
+from typing import List
 
 import numpy as np
 from sklearn.cluster import DBSCAN
@@ -226,7 +226,6 @@ class CSCAlgorithm(CSPAlgorithm):
         blocks_per_consenso = [
             self._split_blocks(cons, n_blocks) for cons in consensus_list
         ]
-        from itertools import product
 
         candidates: list[str] = []
         truncated = False

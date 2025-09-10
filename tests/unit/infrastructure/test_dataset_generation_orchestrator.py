@@ -1,10 +1,10 @@
-from unittest.mock import patch
 from pathlib import Path
+from unittest.mock import patch
 
+from src.domain.dataset import Dataset
 from src.infrastructure.orchestration.dataset_generation_orchestrator import (
     DatasetGenerationOrchestrator,
 )
-from src.domain.dataset import Dataset
 
 
 def test_orchestrator_synthetic_flow(tmp_path):
@@ -24,7 +24,12 @@ def test_orchestrator_synthetic_flow(tmp_path):
                 with patch(
                     "src.application.services.dataset_generator.SyntheticDatasetGenerator.generate_random",
                     return_value=(
-                        Dataset(id="test_dataset", name="test", sequences=["ACGTA", "ACGTT", "ACGTC"], alphabet="ACGT"),
+                        Dataset(
+                            id="test_dataset",
+                            name="test",
+                            sequences=["ACGTA", "ACGTT", "ACGTC"],
+                            alphabet="ACGT",
+                        ),
                         {},
                     ),
                 ):

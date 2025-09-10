@@ -1,125 +1,94 @@
 """Pipeline combination-scoped persistence wrapper."""
 
-from typing import Any, Optional
-from src.infrastructure.persistence.work_state.core import WorkStatePersistence
+from typing import Any, Optional, TYPE_CHECKING
+
+from src.infrastructure.persistence.work_state.core import WorkPersistence
+from src.infrastructure.persistence.work_state.wrappers.work_scoped import WorkScopedPersistence
+
+if TYPE_CHECKING:
+    from src.infrastructure.persistence.work_state.wrappers.execution_scoped import ExecutionScopedPersistence
 
 
-class CombinationScopedPersistence:
+class CombinationScopedPersistence(WorkScopedPersistence):
     """
-    Wrapper for WorkStatePersistence with work_id and combination identifiers pre-configured.
+    Wrapper for WorkPersistence with work_id and combination identifiers pre-configured.
 
-    Eliminates the need to pass work_id and combination identifiers repeatedly.
-    Useful for operations focused on a specific pipeline combination.
+    Inherits from WorkScopedPersistence to provide work-level operations
+    while adding combination-specific functionality.
     """
 
-    def __init__(self, store: WorkStatePersistence, combination_id: int):
-        self._store = store
+    def __init__(self, combination_id: int, store: Optional[WorkPersistence] = None):
         self._combination_id = combination_id
-        # Campos derivados (serão carregados do banco)
-        self._work_id: str | None = None
-        self._task_id: str | None = None
-        self._dataset_id: str | None = None
-        self._preset_id: str | None = None
-        self._algorithm_id: str | None = None
-        self._mode: str | None = None
-        self._load_from_id()
+        
+        # Load work_id and other fields from combination_id
+        temp_store = store if store is not None else WorkPersistence()
+        work_id, task_id, dataset_id, preset_id, algorithm_id, mode = self._load_combination_data(temp_store)
+        
+        # Initialize parent with work_id
+        super().__init__(work_id, store)
+        
+        # Store combination-specific fields
+        self._task_id = task_id
+        self._dataset_id = dataset_id
+        self._preset_id = preset_id
+        self._algorithm_id = algorithm_id
+        self._mode = mode
 
-    def _load_from_id(self) -> None:
-        """Carrega os campos da combinação a partir do ID."""
-        row = self._store._fetch_one(  # uso interno controlado
-            """
-            SELECT work_id, task_id, dataset_id, preset_id, algorithm_id, mode
-            FROM combinations
-            WHERE id = ?
-            """,
-            (self._combination_id,),
-        )
-        if not row:
+    def _load_combination_data(self, store: WorkPersistence) -> tuple[str, str, str, str, str, str]:
+        """Load combination data from database."""
+        combination = store.combination_get(self._combination_id)
+        if not combination:
             raise ValueError(f"Combinação id={self._combination_id} não encontrada")
-        (
-            self._work_id,
-            self._task_id,
-            self._dataset_id,
-            self._preset_id,
-            self._algorithm_id,
-            self._mode,
-        ) = row
+        
+        return (
+            combination['work_id'],
+            combination['task_id'],
+            combination['dataset_id'], 
+            combination['preset_id'],
+            combination['algorithm_id'],
+            combination['mode']
+        )
 
     @property
     def combination_id(self) -> int:
         return self._combination_id
 
     @property
-    def work_id(self) -> str:
-        return self._work_id  # type: ignore[return-value]
-
-    @property
     def task_id(self) -> str:
-        return self._task_id  # type: ignore[return-value]
+        return self._task_id
 
     @property
     def dataset_id(self) -> str:
-        return self._dataset_id  # type: ignore[return-value]
+        return self._dataset_id
 
     @property
     def preset_id(self) -> str:
-        return self._preset_id  # type: ignore[return-value]
+        return self._preset_id
 
     @property
     def algorithm_id(self) -> str:
-        return self._algorithm_id  # type: ignore[return-value]
+        return self._algorithm_id
 
     @property
     def mode(self) -> str:
-        return self._mode  # type: ignore[return-value]
-
-    @property
-    def store(self) -> WorkStatePersistence:
-        return self._store
+        return self._mode
 
     def __repr__(self) -> str:
         return (
             "CombinationScopedPersistence("
-            f"combination_id={self._combination_id}, work_id={self._work_id}, "
+            f"combination_id={self._combination_id}, work_id={self.work_id}, "
             f"task_id={self._task_id}, dataset_id={self._dataset_id}, "
             f"preset_id={self._preset_id}, algorithm_id={self._algorithm_id}, mode={self._mode}"
             ")"
         )
 
-    def __getattr__(self, name: str):
-        """Delegar ao store para métodos/atributos não cobertos pelo wrapper."""
-        return getattr(self._store, name)
-
     # === Helpers internos ===
     def _get_combination(self, required: bool = True) -> Optional[dict[str, Any]]:
-        # Busca direta pelo ID (mais eficiente)
-        row = self._store._fetch_one(
-            """
-            SELECT id, work_id, task_id, dataset_id, preset_id, algorithm_id, mode, status, total_sequences,
-                   created_at, started_at, finished_at
-            FROM combinations
-            WHERE id = ?
-            """,
-            (self._combination_id,),
-        )
-        if row:
-            return {
-                "id": row[0],
-                "work_id": row[1],
-                "task_id": row[2],
-                "dataset_id": row[3],
-                "preset_id": row[4],
-                "algorithm_id": row[5],
-                "mode": row[6],
-                "status": row[7],
-                "total_sequences": row[8],
-                "created_at": row[9],
-                "started_at": row[10],
-                "finished_at": row[11],
-            }
-        if required:
+        """Get combination data by ID."""
+        combination = self.store.combination_get(self._combination_id)
+        if not combination and required:
             raise ValueError("Combinação não encontrada")
-        return None
+        return combination
 
     def _get_combination_id(self, required: bool = True) -> Optional[int]:
         return self._combination_id
@@ -127,29 +96,33 @@ class CombinationScopedPersistence:
     # === Combinação ===
     def update_combination_status(self, status: str) -> None:
         """Atualiza status da combinação atual."""
-        self._store.update_combination_status(
-            self.work_id,
-            self.task_id,
-            self.dataset_id,
-            self.preset_id,
-            self.algorithm_id,
-            status,
-        )
+        self._store.combination_update(self._combination_id, status=status)
 
-    def _get_combination(self) -> dict[str, Any]:
+    def get_combination_data(self) -> dict[str, Any]:
         """Retorna os dados da combinação atual."""
         return self._get_combination(required=True)  # type: ignore[return-value]
 
     def get_combination_progress(self) -> Optional[float]:
         """Retorna progresso da combinação atual."""
-        return self._store.get_combination_progress(self._combination_id)
+        # Get all executions for this combination
+        executions, _ = self.store.execution_list(
+            filters={'combination_id': self._combination_id}
+        )
+        
+        if not executions:
+            return 0.0
+            
+        completed = sum(1 for ex in executions if ex['status'] in ['completed', 'failed', 'error'])
+        total = len(executions)
+        
+        return completed / total if total > 0 else 0.0
 
     # === Execuções da combinação ===
     def submit_execution(
-        self, *, unit_id: str, sequencia: Optional[int] = None
+        self, *, unit_id: str, sequencia: int
     ) -> None:
         """Cria uma execução associada à combinação atual."""
-        self._store.submit_execution(
+        self.store.execution_create(
             unit_id=unit_id,
             combination_id=self._combination_id,
             sequencia=sequencia,
@@ -163,23 +136,36 @@ class CombinationScopedPersistence:
         sequencia: Optional[int] = None,
     ) -> list[dict[str, Any]]:
         """Lista execuções associadas à combinação atual."""
-        return self._store.get_executions(
-            unit_id=unit_id,
-            status=status,
-            combination_id=self._combination_id,
-            sequencia=sequencia,
-        )
+        filters = {'combination_id': self._combination_id}
+        if unit_id is not None:
+            filters['unit_id'] = unit_id
+        if status is not None:
+            filters['status'] = status
+        if sequencia is not None:
+            filters['sequencia'] = sequencia
+            
+        executions, _ = self.store.execution_list(filters=filters)
+        return executions
 
     # === Eventos ===
+    # Override parent methods to use combination-specific context
+    def log_warning(self, message: str, context: dict[str, Any] | None = None) -> None:
+        """Log warning for the current combination."""
+        self.combination_warning(message, context)
+
+    def log_error(self, error: Exception) -> None:
+        """Log error for the current combination."""
+        self.combination_error(error)
+
     def combination_warning(
         self, message: str, context: dict[str, Any] | None = None
     ) -> None:
-        self._store.combination_warning(
-            self.work_id, str(self._combination_id), message, context
-        )
+        # Use parent class's method for combination warnings
+        super().combination_warning(str(self._combination_id), message, context)
 
     def combination_error(self, error: Exception) -> None:
-        self._store.combination_error(self.work_id, str(self._combination_id), error)
+        # Use parent class's method for combination errors  
+        super().combination_error(str(self._combination_id), error)
 
     def record_error(self, error: Exception) -> None:
         """Alias for combination_error for backward compatibility."""
@@ -188,10 +174,12 @@ class CombinationScopedPersistence:
     def unit_warning(
         self, unit_id: str, message: str, context: dict[str, Any] | None = None
     ) -> None:
-        self._store.unit_warning(self.work_id, unit_id, message, context)
+        # Use parent class's method for unit warnings
+        super().unit_warning(unit_id, message, context)
 
     def unit_error(self, unit_id: str, error: Exception) -> None:
-        self._store.unit_error(self.work_id, unit_id, error)
+        # Use parent class's method for unit errors
+        super().unit_error(unit_id, error)
 
     def generic_event(
         self,
@@ -200,4 +188,45 @@ class CombinationScopedPersistence:
         message: str,
         context: dict[str, Any] | None = None,
     ) -> None:
-        self._store.generic_event(self.work_id, unit_id, event_type, message, context)
+        # Use the parent class's generic_event method from WorkScopedPersistence
+        super().generic_event(unit_id, event_type, message, context)
+
+    # === FACTORY METHODS ===
+    def for_execution(self, unit_id: str) -> "ExecutionScopedPersistence":
+        """
+        Create an ExecutionScopedPersistence for the specified execution unit within this combination.
+        
+        Args:
+            unit_id: ID of the execution unit
+            
+        Returns:
+            ExecutionScopedPersistence instance
+            
+        Raises:
+            ValueError: If execution doesn't belong to this combination
+        """
+        from src.infrastructure.persistence.work_state.wrappers.execution_scoped import ExecutionScopedPersistence
+        
+        # Verify execution belongs to this combination
+        executions = self.get_executions()
+        unit_ids = [exec["unit_id"] for exec in executions]
+        
+        if unit_id not in unit_ids:
+            raise ValueError(
+                f"Execution unit {unit_id} not found in combination {self._combination_id}. "
+                f"Available units: {unit_ids}"
+            )
+        
+        return ExecutionScopedPersistence(unit_id, self.work_id, self.store)
+
+    def get_all_executions(self) -> list["ExecutionScopedPersistence"]:
+        """
+        Get all executions in this combination as ExecutionScopedPersistence instances.
+        
+        Returns:
+            List of ExecutionScopedPersistence instances
+        """
+        from src.infrastructure.persistence.work_state.wrappers.execution_scoped import ExecutionScopedPersistence
+        
+        executions = self.get_executions()
+        return [ExecutionScopedPersistence(exec["unit_id"], self.work_id, self.store) for exec in executions]

@@ -2,13 +2,16 @@
 
 import os
 import threading
-from pathlib import Path
 from typing import Optional
 
 # from src.application.services.pipeline_service import PipelineService  # Module doesn't exist
 from src.domain.config import CSPBenchConfig
 from src.infrastructure.logging_config import get_logger
-from src.infrastructure.utils.path_utils import get_dataset_directory, get_batch_directory, get_output_base_directory
+from src.infrastructure.utils.path_utils import (
+    get_batch_directory,
+    get_dataset_directory,
+    get_output_base_directory,
+)
 
 logger = get_logger("CSPBench.WebConfig")
 
@@ -88,6 +91,7 @@ class WebConfig:
 
 # Global instance - lazy initialization
 # web_config = WebConfig.get_instance()
+
 
 def get_web_config() -> WebConfig:
     """Get the global web config instance."""

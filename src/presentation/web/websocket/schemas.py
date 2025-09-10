@@ -2,22 +2,23 @@
 WebSocket message schemas and data structures.
 """
 
-from dataclasses import asdict, dataclass
-from typing import Any, Dict, List, Optional, Union
-from enum import Enum
 import json
+from dataclasses import asdict, dataclass
+from enum import Enum
+from typing import Any, Dict, List, Optional
 
-from src.infrastructure.persistence.work_state.queries import (
+from src.infrastructure.persistence.work_state.core import (
+    ErrorSummary,
     ExecutionDetail,
     ProgressSummary,
-    ErrorSummary,
 )
 
 
 class MessageType(str, Enum):
     """WebSocket message types."""
+
     SNAPSHOT = "snapshot"
-    UPDATE = "update"  
+    UPDATE = "update"
     EVENT = "event"
     ERROR = "error"
     HEARTBEAT = "heartbeat"
@@ -25,6 +26,7 @@ class MessageType(str, Enum):
 
 class EventType(str, Enum):
     """Event types for real-time notifications."""
+
     WORK_STATUS_CHANGED = "work_status_changed"
     COMBINATION_CHANGED = "combination_changed"
     EXECUTION_STATUS_CHANGED = "execution_status_changed"
@@ -35,6 +37,7 @@ class EventType(str, Enum):
 @dataclass
 class WebSocketMessage:
     """Base WebSocket message structure."""
+
     type: MessageType
     work_id: str
     timestamp: float
@@ -48,37 +51,47 @@ class WebSocketMessage:
 @dataclass
 class ProgressSnapshot:
     """Complete progress snapshot."""
+
     progress: Dict[str, Any]  # ProgressSummary serialized
     executions: List[Dict[str, Any]]  # ExecutionDetail list serialized
     logs: Dict[str, List[Dict[str, Any]]]  # errors and warnings
     events: Optional[List[Dict[str, Any]]] = None  # events from events table
-    executions_full: Optional[List[Dict[str, Any]]] = None  # lista completa por combinação
+    executions_full: Optional[List[Dict[str, Any]]] = (
+        None  # lista completa por combinação
+    )
     combinations: Optional[List[Dict[str, Any]]] = None  # metadados de combinações
 
 
 @dataclass
 class ExecutionChanges:
     """Changes in executions list."""
+
     updated: List[str] = None  # unit_ids with progress/status changes
     completed: List[str] = None  # unit_ids that completed
     new: List[str] = None  # new unit_ids started
     removed: List[str] = None  # unit_ids no longer in current combination
 
 
-@dataclass 
+@dataclass
 class ProgressUpdate:
     """Incremental progress update."""
+
     progress: Optional[Dict[str, Any]] = None  # Only changed fields
     executions_changed: Optional[ExecutionChanges] = None
     logs_appended: Optional[Dict[str, List[Dict[str, Any]]]] = None
     events_appended: Optional[List[Dict[str, Any]]] = None  # New events
-    executions: Optional[List[Dict[str, Any]]] = None  # Estado atual completo da combinação corrente (quando mudou)
-    executions_combination_id: Optional[int] = None  # Combination id referente à lista completa enviada
+    executions: Optional[List[Dict[str, Any]]] = (
+        None  # Estado atual completo da combinação corrente (quando mudou)
+    )
+    executions_combination_id: Optional[int] = (
+        None  # Combination id referente à lista completa enviada
+    )
 
 
 @dataclass
 class ProgressMessage:
     """Structured progress message for WebSocket."""
+
     type: MessageType
     work_id: str
     timestamp: float
@@ -98,12 +111,12 @@ class ProgressMessage:
             payload = self.event
         elif self.error:
             payload = self.error
-            
+
         return WebSocketMessage(
             type=self.type,
             work_id=self.work_id,
             timestamp=self.timestamp,
-            payload=payload
+            payload=payload,
         )
 
 

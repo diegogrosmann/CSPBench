@@ -74,8 +74,6 @@ Functions:
     greedy_consensus: Greedy construction of consensus string.
 """
 
-from typing import Any
-
 from src.domain.algorithms import AlgorithmResult, CSPAlgorithm, register_algorithm
 
 from .config import BASELINE_DEFAULTS
@@ -247,7 +245,7 @@ class BaselineAlg(CSPAlgorithm):
                 return "".join(consensus)
 
             # Frequency counting approach (majority vote with tie-break)
-            counts: dict[str, int] = {c: 0 for c in self.alphabet}
+            counts: dict[str, int] = dict.fromkeys(self.alphabet, 0)
             for s in self.strings:
                 counts[s[pos]] = counts.get(s[pos], 0) + 1
 

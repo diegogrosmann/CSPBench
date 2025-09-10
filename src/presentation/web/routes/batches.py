@@ -8,15 +8,15 @@ This module provides REST API endpoints for batch file management including:
 """
 
 import logging
-import os
-import uuid
-import yaml
 from datetime import datetime
 from pathlib import Path
-from typing import List, Optional
+from typing import Optional
 
-from fastapi import APIRouter, HTTPException, File, UploadFile, Form
+import yaml
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
+
+from src.infrastructure.utils.path_utils import get_batch_directory
 
 from ..core.batch_models import (
     BatchFileInfo,
@@ -25,7 +25,6 @@ from ..core.batch_models import (
     OperationResponse,
 )
 from ..core.security import sanitize_filename
-from src.infrastructure.utils.path_utils import get_batch_directory
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +48,7 @@ def format_file_size(size_bytes: int) -> str:
 def extract_description_from_yaml(file_path: Path) -> Optional[str]:
     """Extract description from YAML file."""
     try:
-        with open(file_path, "r", encoding="utf-8") as f:
+        with open(file_path, encoding="utf-8") as f:
             content = f.read()
 
         # Look for description field in YAML
@@ -77,7 +76,7 @@ def extract_description_from_yaml(file_path: Path) -> Optional[str]:
 def extract_metadata_from_yaml(file_path: Path) -> dict:
     """Extract complete metadata from YAML file."""
     try:
-        with open(file_path, "r", encoding="utf-8") as f:
+        with open(file_path, encoding="utf-8") as f:
             content = yaml.safe_load(f)
 
         # Look for metadata section
@@ -90,7 +89,7 @@ def extract_metadata_from_yaml(file_path: Path) -> dict:
                     "author": metadata.get("author"),
                     "version": metadata.get("version"),
                     "creation_date": metadata.get("creation_date"),
-                    "tags": metadata.get("tags", [])
+                    "tags": metadata.get("tags", []),
                 }
 
         return {}
@@ -103,7 +102,7 @@ def extract_metadata_from_yaml(file_path: Path) -> dict:
 def extract_metadata_name_from_yaml(file_path: Path) -> Optional[str]:
     """Extract metadata.name from YAML file."""
     try:
-        with open(file_path, "r", encoding="utf-8") as f:
+        with open(file_path, encoding="utf-8") as f:
             content = yaml.safe_load(f)
 
         # Look for metadata.name field
@@ -317,10 +316,10 @@ async def get_batch_file(filename: str):
         if not file_path.is_file() or not filename.endswith(".yaml"):
             raise HTTPException(status_code=400, detail="Invalid batch file")
 
-        with open(file_path, "r", encoding="utf-8") as f:
+        with open(file_path, encoding="utf-8") as f:
             content = f.read()
 
-        # Try to get relative path, fallback to absolute path if not possible  
+        # Try to get relative path, fallback to absolute path if not possible
         try:
             relative_path = str(file_path.relative_to(Path.cwd()))
         except ValueError:

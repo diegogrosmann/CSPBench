@@ -1,15 +1,16 @@
+import tempfile
 from pathlib import Path
-from src.infrastructure.persistence.work_state.core import WorkStatePersistence
+
+from src.infrastructure.persistence.work_state import WorkPersistence
 from src.infrastructure.persistence.work_state.wrappers.work_scoped import (
     WorkScopedPersistence,
 )
-import tempfile
 
 
 def test_submit_combinations_inserts_all(tmp_path: Path):
     db_dir = tmp_path / "work"
     db_dir.mkdir()
-    store = WorkStatePersistence(db_dir / "state.db")
+    store = WorkPersistence(f"sqlite:///{db_dir / 'state.db'}")
     work_id = "W1"
 
     # inserir work mínimo
@@ -27,7 +28,7 @@ def test_submit_combinations_inserts_all(tmp_path: Path):
             }
 
     store.submit_work(DummyWork())
-    scoped = WorkScopedPersistence(store, work_id)
+    scoped = WorkScopedPersistence(work_id, store)
 
     combinations = [
         {

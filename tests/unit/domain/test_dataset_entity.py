@@ -7,7 +7,7 @@ def test_dataset_requires_id():
     """Test that Dataset requires an id parameter."""
     with pytest.raises(ValueError, match="Dataset id is required"):
         Dataset(id="", name="test_dataset", sequences=["ACGT"])
-    
+
     # Valid dataset with id
     ds = Dataset(id="test_id", name="test_dataset", sequences=["ACGT"])
     assert ds.id == "test_id"
@@ -47,7 +47,9 @@ def test_dataset_add_remove_operations():
 
 
 def test_dataset_filter_and_non_uniform_length():
-    ds = Dataset(id="test_dataset_id", name="test_dataset", sequences=["ACG", "ATG", "AAG", "AC"])
+    ds = Dataset(
+        id="test_dataset_id", name="test_dataset", sequences=["ACG", "ATG", "AAG", "AC"]
+    )
     filtered = ds.filter_by_pattern("C", 1)
     assert filtered.get_sequences() == ["ACG", "AC"]
     # non-uniform -> max length is 3
@@ -57,7 +59,9 @@ def test_dataset_filter_and_non_uniform_length():
 
 def test_dataset_validation_with_alphabet():
     with pytest.raises(ValueError):
-        Dataset(id="test_dataset_id", name="test_dataset", sequences=["AX"], alphabet="ACGT")
+        Dataset(
+            id="test_dataset_id", name="test_dataset", sequences=["AX"], alphabet="ACGT"
+        )
     # valid when alphabet is None (inferred)
     ds = Dataset(
         id="test_dataset_id", name="test_dataset", sequences=["AX"]
@@ -69,7 +73,7 @@ def test_dataset_requires_id():
     """Test that Dataset requires an id parameter."""
     with pytest.raises(ValueError, match="Dataset id is required"):
         Dataset(id="", name="test_dataset", sequences=["ACGT"])
-    
+
     # Valid dataset with id
     ds = Dataset(id="test_id", name="test_dataset", sequences=["ACGT"])
     assert ds.id == "test_id"

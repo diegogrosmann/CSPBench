@@ -1,5 +1,5 @@
-from src.domain.distance import create_distance_calculator
 from src.domain.algorithms import global_registry
+from src.domain.distance import create_distance_calculator
 
 
 class MemoryStore:
@@ -46,4 +46,6 @@ def test_progress_phases_cover_expected():
     }  # local_search pode estar embutida
     assert expected.issubset(phases)
     # progresso final 100 (verificar tanto 100.0 quanto 1.0)
-    assert any(e.get("progress") == 100.0 for e in store.events) or any(e.get("progress") == 1.0 for e in store.events)
+    assert any(e.get("progress") == 100.0 for e in store.events) or any(
+        e.get("progress") == 1.0 for e in store.events
+    )

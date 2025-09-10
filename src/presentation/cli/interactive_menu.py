@@ -6,11 +6,9 @@ argument routing and bootstrapping.
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
-from typing import List, Optional
+from typing import Callable, List, Optional
 
-from typing import Callable
 from src.infrastructure.utils.path_utils import get_batch_directory
 
 # Recebe injetado um callable que representa o app Typer; evitamos import circular.

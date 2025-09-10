@@ -13,8 +13,6 @@ from .distance import (
     LevenshteinDistanceCalculator,
     create_distance_calculator,
 )
-from .work import WorkStatus, WorkItem
-
 from .errors import (
     AlgorithmError,
     AlgorithmExecutionError,
@@ -38,6 +36,7 @@ from .errors import (
     SensitivityConfigurationError,
     SensitivityExecutionError,
 )
+from .work import WorkItem, WorkStatus
 
 __all__ = [
     # Algorithms

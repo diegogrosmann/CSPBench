@@ -1,23 +1,24 @@
 import time
 from pathlib import Path
-from src.application.services.execution_manager import ExecutionManager
+
+from src.application.services.work_service import get_work_service
+from src.domain.config import ResultsFormats  # usar classe existente
 from src.domain.config import (
-    CSPBenchConfig,
-    MetadataConfig,
-    SyntheticDatasetConfig,
     AlgorithmsPresetConfig,
     AlgParamsConfig,
-    ExperimentTasksConfig,
-    ExperimentTaskConfig,
-    TasksGroupConfig,
-    OutputConfig,
-    ResultsConfig,
-    ResultsFormats,  # usar classe existente
-    ResourcesConfig,
     CPUConfig,
+    CSPBenchConfig,
+    ExperimentTaskConfig,
+    ExperimentTasksConfig,
     MemoryConfig,
-    TimeoutsConfig,
+    MetadataConfig,
+    OutputConfig,
+    ResourcesConfig,
+    ResultsConfig,
+    SyntheticDatasetConfig,
     SystemConfig,
+    TasksGroupConfig,
+    TimeoutsConfig,
 )
 from src.domain.status import BaseStatus
 
@@ -99,7 +100,7 @@ def test_basic_pipeline_flow(tmp_path, monkeypatch):
     monkeypatch.setenv("OUTPUT_BASE_DIRECTORY", str(tmp_path))
 
     config = build_minimal_config()
-    manager = ExecutionManager()
+    manager = get_work_service()
     work_id = manager.execute(config=config)
 
     # Esperar término (timeout defensivo)

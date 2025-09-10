@@ -3,16 +3,18 @@ Assume retorno (center, distance, metadata) para CSPAlgorithm.
 """
 
 from __future__ import annotations
-from typing import Any, Dict, Optional
+
+import threading
 import time
 import traceback
-import threading
-from src.domain.algorithms import global_registry, CSPAlgorithm, AlgorithmResult
+from typing import Any, Dict, Optional
+
+from src.domain.algorithms import AlgorithmResult, CSPAlgorithm, global_registry
 from src.domain.distance import DistanceCalculator
+from src.domain.status import BaseStatus
+from src.infrastructure.execution_control import ExecutionController
 from src.infrastructure.logging_config import get_logger
 from src.infrastructure.monitoring.persistence_monitor import PersistenceMonitor
-from src.infrastructure.execution_control import ExecutionController
-from src.domain.status import BaseStatus
 
 # Create module logger
 logger = get_logger("CSPBench.AlgorithmRunner")
@@ -80,7 +82,7 @@ def run_algorithm(
         logger.debug(f"Criando instância do algoritmo com {len(strings)} strings")
 
         # Remove 'seed' from params to avoid duplicate keyword argument
-        filtered_params = {k: v for k, v in params.items() if k != 'seed'}
+        filtered_params = {k: v for k, v in params.items() if k != "seed"}
 
         alg: CSPAlgorithm = cls(
             strings=strings,
@@ -99,10 +101,10 @@ def run_algorithm(
 
         # Determinar timeout efetivo (prioridade params.max_time > controller.timeout_per_item)
         max_time = float(params.get("max_time", execution_controller.timeout_per_item))
-        
+
         # Check if we're in main thread (signals only work in main thread)
         use_signal_timeout = threading.current_thread() is threading.main_thread()
-        
+
         algorithm_result: AlgorithmResult | None = None
         timeout_triggered = False
         error_message: str | None = None
@@ -194,7 +196,11 @@ def run_algorithm(
             "duration_s": total_duration,
             "execution_time_s": execution_time,
             "timeout_triggered": timeout_triggered,
-            "actual_params": algorithm_result.get('parameters', getattr(alg, "params", params)) if algorithm_result else getattr(alg, "params", params),
+            "actual_params": (
+                algorithm_result.get("parameters", getattr(alg, "params", params))
+                if algorithm_result
+                else getattr(alg, "params", params)
+            ),
         }
 
         # Log final amigável

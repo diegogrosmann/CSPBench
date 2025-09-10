@@ -12,6 +12,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from src.domain.algorithms import global_registry
+
 from ..core.models import HealthCheck
 
 logger = logging.getLogger(__name__)
@@ -34,7 +35,7 @@ def get_version():
         pyproject_path = project_root / "pyproject.toml"
 
         if pyproject_path.exists():
-            with open(pyproject_path, "r") as f:
+            with open(pyproject_path) as f:
                 content = f.read()
                 for line in content.split("\n"):
                     if line.strip().startswith("version ="):

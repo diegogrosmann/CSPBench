@@ -4,13 +4,11 @@ File management routes for accessing work results and downloading files.
 
 import io
 import logging
-import mimetypes
-import os
 import zipfile
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse, StreamingResponse
 
 from src.infrastructure.utils.path_utils import get_output_base_directory
@@ -32,6 +30,7 @@ def format_file_size(size_bytes: int) -> str:
         i += 1
 
     return f"{size_bytes:.1f} {size_names[i]}"
+
 
 from src.infrastructure.logging_config import get_logger
 
@@ -208,7 +207,9 @@ async def download_selected_files_zip(work_id: str, paths: List[str]):
                 p_path = base_dir / p_path
             p_path = p_path.resolve()
             if not str(p_path).startswith(str(base_dir)):
-                raise HTTPException(status_code=400, detail=f"Invalid path outside work dir: {p}")
+                raise HTTPException(
+                    status_code=400, detail=f"Invalid path outside work dir: {p}"
+                )
             if not p_path.exists() or not p_path.is_file():
                 raise HTTPException(status_code=404, detail=f"File not found: {p}")
             normalized.append(p_path)

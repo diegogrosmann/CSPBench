@@ -1,10 +1,10 @@
-from unittest.mock import patch, Mock
+from unittest.mock import Mock, patch
 
 from src.application.services.dataset_service import load_dataset
 from src.domain.config import (
-    SyntheticDatasetConfig,
-    FileDatasetConfig,
     EntrezDatasetConfig,
+    FileDatasetConfig,
+    SyntheticDatasetConfig,
 )
 from src.domain.dataset import Dataset
 
@@ -55,7 +55,9 @@ def test_load_dataset_entrez():
         "src.application.services.dataset_service.EntrezDatasetDownloader.download"
     ) as dl:
         dl.return_value = (
-            Dataset(id="test_entrez_id", sequences=["ACGT", "ATGT"], name="test_dataset"),
+            Dataset(
+                id="test_entrez_id", sequences=["ACGT", "ATGT"], name="test_dataset"
+            ),
             {"term": "cox1", "n": 2},
         )
         ds, params = load_dataset(cfg)

@@ -15,11 +15,10 @@ Test Coverage:
 - Distance calculation integration
 """
 
-import pytest
-from unittest.mock import Mock
 import random
 
 from src.domain.distance import HammingDistanceCalculator
+
 from ..ops import genetic_ops
 
 

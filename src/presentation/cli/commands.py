@@ -1,6 +1,6 @@
 """CLI Commands Registration Module
 
-Centraliza registro de comandos usando ExecutionManager unificado.
+Centraliza registro de comandos usando WorkManager unificado.
 """
 
 import os
@@ -9,8 +9,6 @@ from pathlib import Path
 import typer
 
 from src.domain.config import load_cspbench_config
-from src.domain.status import BaseStatus
-from src.application.services.execution_manager import ExecutionManager
 from src.infrastructure.logging_config import get_logger
 
 # Create module logger
@@ -18,92 +16,96 @@ command_logger = get_logger("CSPBench.CLI.Commands")
 
 
 def _run_work_monitor(
-    work_id: str, 
-    show_final_status: bool = True,
-    fallback_message: bool = True
+    work_id: str, show_final_status: bool = True, fallback_message: bool = True
 ) -> bool:
     """
     Run progress monitor for a work item.
-    
+
     Args:
         work_id: Work identifier to monitor
         show_final_status: Whether to show final status message after monitoring
         fallback_message: Whether to show fallback message if monitor fails
-        
+
     Returns:
         True if monitoring completed successfully, False if failed
     """
     try:
         from src.presentation.cli.progress_monitor import ProgressMonitor
-        
+
         monitor = ProgressMonitor(work_id)
         monitor.start()
-        
+
         if show_final_status:
             _show_final_status_message(work_id)
-            
+
         return True
-        
+
     except Exception as e:
         if fallback_message:
             typer.echo(f"⚠️  Não foi possível iniciar o monitor: {e}")
             typer.echo("🔄 O trabalho continua executando em segundo plano...")
-            typer.echo(f"💡 Use 'cspbench monitor {work_id}' para tentar monitorar novamente mais tarde")
-        
+            typer.echo(
+                f"💡 Use 'cspbench monitor {work_id}' para tentar monitorar novamente mais tarde"
+            )
+
         return False
 
 
 def _show_final_status_message(work_id: str) -> None:
     """
     Show appropriate exit message based on final work status.
-    
+
     Args:
         work_id: Work identifier to check status for
     """
     try:
         from src.application.services.work_service import get_work_service
         from src.domain.status import BaseStatus
-        
+
         work_service = get_work_service()
         details = work_service.get(work_id)
-        
+
         if not details:
             typer.echo(f"⚠️  Não foi possível obter status final do trabalho {work_id}")
             return
-            
-        status = details.get("status", "unknown")
-        
+
+        status = details.status.value
+
         # Show message based on final status
         if status == BaseStatus.COMPLETED.value:
             typer.echo("\n🎉 Trabalho concluído com sucesso!")
             typer.echo(f"✅ Status final: {status}")
-            if details.get("output_path"):
-                typer.echo(f"📁 Resultados salvos em: {details['output_path']}")
-                
+            if details.output_path:
+                typer.echo(f"📁 Resultados salvos em: {details.output_path}")
+
         elif status == BaseStatus.FAILED.value:
             typer.echo("\n❌ Trabalho falhou durante a execução")
             typer.echo(f"💥 Status final: {status}")
-            if details.get("error"):
-                typer.echo(f"🔍 Erro: {details['error']}")
-                
+            if details.error:
+                typer.echo(f"🔍 Erro: {details.error}")
+
         elif status == BaseStatus.ERROR.value:
             typer.echo("\n⚠️  Trabalho finalizado com erros")
             typer.echo(f"🟡 Status final: {status}")
             typer.echo("🔍 Verifique os logs para mais detalhes")
-            if details.get("error"):
-                typer.echo(f"💬 Último erro: {details['error']}")
-                
+            if details.error:
+                typer.echo(f"💬 Último erro: {details.error}")
+
         elif status == BaseStatus.CANCELED.value:
             typer.echo("\n🛑 Trabalho foi cancelado")
             typer.echo(f"⏹️  Status final: {status}")
             typer.echo("📝 Execução interrompida pelo usuário")
-            
+
         else:
             # Handle other statuses (paused, running, queued, etc.)
             typer.echo(f"\n🔄 Trabalho terminou com status: {status}")
-            if status in [BaseStatus.PAUSED.value, BaseStatus.RUNNING.value, BaseStatus.QUEUED.value]:
+            if status in [
+                BaseStatus.PAUSED.value,
+                BaseStatus.RUNNING.value,
+                BaseStatus.QUEUED.value,
+            ]:
                 typer.echo("💡 O trabalho pode ser retomado a qualquer momento.")
-                
+
     except Exception as e:
         typer.echo(f"⚠️  Erro ao verificar status final: {e}")
 
@@ -119,31 +121,39 @@ def register_commands(app: typer.Typer) -> None:
         batch: Path = typer.Argument(
             ..., exists=True, readable=True, help="Batch YAML file"
         ),
-        no_monitor: bool = typer.Option(False, "--no-monitor", help="Disable progress monitoring interface"),
+        no_monitor: bool = typer.Option(
+            False, "--no-monitor", help="Disable progress monitoring interface"
+        ),
     ):
-        """Execute pipeline using unified ExecutionManager.
+        """Execute pipeline using unified WorkManager.
 
-        Uses ExecutionManager for consistent execution workflow between CLI and Web.
+        Uses WorkManager for consistent execution workflow between CLI and Web.
         Automatically shows progress monitoring interface unless --no-monitor is used.
         """
         try:
+            typer.echo("")
             typer.echo(f"🚀 Executando: batch={batch}")
             config = load_cspbench_config(batch)
 
             extra = {"origin": "cli", "batch_file": str(batch)}
-            execution_manager = ExecutionManager()
+            
+            from src.application.services.work_service import get_work_service
+            
+            work_manager = get_work_service()
 
-            work_id = execution_manager.execute(config=config, extra=extra)
+            work_id = work_manager.execute(config=config, extra=extra)
 
-            typer.echo(f"🆔 work_id={work_id} executando em segundo plano")
-            typer.echo(f"✅ Trabalho submetido com sucesso")
+            typer.echo("✅ Trabalho submetido com sucesso. work_id={work_id}")
 
             if not no_monitor:
                 # Use the reusable monitor function
-                _run_work_monitor(work_id, show_final_status=True, fallback_message=True)
+                _run_work_monitor(
+                    work_id, show_final_status=True, fallback_message=True
+                )
             else:
                 # Wait for completion without monitoring
                 from src.application.services.work_service import get_work_service
+
                 work_service = get_work_service()
                 work_service.wait_until_terminal(work_id)
                 _show_final_status_message(work_id)
@@ -156,10 +166,13 @@ def register_commands(app: typer.Typer) -> None:
     work_app = typer.Typer(help="Gerencia WorkItems usando WorkService")
 
     @work_app.command("restart")
-    def work_restart(work_id: str = typer.Argument(
+    def work_restart(
+        work_id: str = typer.Argument(
             ..., exists=True, readable=True, help="Work ID a ser Reiniciado"
         ),
-        no_monitor: bool = typer.Option(False, "--no-monitor", help="Disable progress monitoring interface"),
+        no_monitor: bool = typer.Option(
+            False, "--no-monitor", help="Disable progress monitoring interface"
+        ),
     ):
         """Restart a work item using WorkService."""
         try:
@@ -170,16 +183,19 @@ def register_commands(app: typer.Typer) -> None:
                 typer.echo("❌ Work não encontrado")
                 return
 
-            execution_manager = ExecutionManager()
+            work_manager = get_work_service()
 
-            execution_manager.restart(work_id)
+            work_manager.restart_execution(work_id)
 
             if not no_monitor:
                 # Use the reusable monitor function
-                _run_work_monitor(work_id, show_final_status=True, fallback_message=True)
+                _run_work_monitor(
+                    work_id, show_final_status=True, fallback_message=True
+                )
             else:
                 # Wait for completion without monitoring
                 from src.application.services.work_service import get_work_service
+
                 work_service = get_work_service()
                 work_service.wait_until_terminal(work_id)
                 _show_final_status_message(work_id)
@@ -202,8 +218,8 @@ def register_commands(app: typer.Typer) -> None:
 
         typer.echo("📋 Lista de trabalhos:")
         for item in items:
-            status = item.get("status", "unknown")
-            wid = item.get("id", item.get("work_id", "unknown"))
+            status = item.status.value
+            wid = item.id
             typer.echo(f"  • {wid}: {status}")
 
     @work_app.command("status")
@@ -212,20 +228,18 @@ def register_commands(app: typer.Typer) -> None:
         from src.application.services.work_service import get_work_service
 
         work_service = get_work_service()
-        details = work_service.get(work_id)
+        work_item = work_service.get(work_id)
 
-        if not details:
+        if not work_item:
             typer.echo(f"❌ Trabalho {work_id} não encontrado")
             raise typer.Exit(1)
 
         typer.echo(f"📊 Status do trabalho {work_id}:")
-        typer.echo(f"  Status: {details.get('status', 'unknown')}")
-        typer.echo(f"  Criado: {details.get('created_at', 'unknown')}")
-        typer.echo(f"  Atualizado: {details.get('updated_at', 'unknown')}")
-        if details.get("error"):
-            typer.echo(f"  Erro: {details['error']}")
-
-
+        typer.echo(f"  Status: {work_item.status.value}")
+        typer.echo(f"  Criado: {work_item.created_at}")
+        typer.echo(f"  Atualizado: {work_item.updated_at}")
+        if work_item.error:
+            typer.echo(f"  Erro: {work_item.error}")
 
     app.add_typer(work_app, name="work")
 

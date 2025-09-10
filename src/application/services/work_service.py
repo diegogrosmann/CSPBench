@@ -1,37 +1,49 @@
 """
-WorkService - Unified Work Management Service
-Provides application-wide persistent work management state.
+WorkService - Unified Work Management Service.
+
+Provides application-wide persistent work management state with global
+singleton pattern and FastAPI lifecycle integration.
+
+This module implements a global work service that manages the lifecycle
+of work items across the entire application, ensuring persistence and
+proper cleanup of resources.
+
+Features:
+- Global singleton work service
+- Persistent storage integration
+- Orphaned work cleanup on startup
+- FastAPI lifecycle management
+- Thread-safe operations
 """
 
 from __future__ import annotations
 
 import logging
 from contextlib import asynccontextmanager
-from typing import Any, Optional
+from typing import Optional
 
 from fastapi import FastAPI
 
 from src.application.work.work_manager import WorkManager
-from src.infrastructure.persistence.work_service_persistence import (
-    WorkServicePersistence,
-)
+from src.infrastructure.persistence.work_state.core import WorkPersistence
 
 # Global state
 _global_work_service: Optional[WorkManager] = None
-_repository: Optional[WorkServicePersistence] = None
 
 logger = logging.getLogger(__name__)
-
 
 def get_work_service() -> WorkManager:
     """
     Get the global WorkService instance.
 
     Returns:
-        Global WorkService instance
+        WorkManager: Global WorkService instance
 
     Raises:
         RuntimeError: If WorkService not initialized
+        
+    Note:
+        Auto-initializes if not already done for convenience.
     """
     global _global_work_service
     if _global_work_service is None:
@@ -43,23 +55,24 @@ def get_work_service() -> WorkManager:
 def initialize_work_service() -> WorkManager:
     """
     Initialize the global WorkService with persistent storage.
-    Also pauses any running work items from previous sessions.
+    
+    Also pauses any running work items from previous sessions to prevent
+    orphaned work items that cannot be controlled.
 
     Returns:
-        Initialized WorkService instance
+        WorkManager: Initialized WorkService instance
+        
+    Raises:
+        RuntimeError: If WorkService initialization fails
     """
-    global _global_work_service, _repository
+    global _global_work_service
 
     if _global_work_service is not None:
         logger.info("WorkService already initialized")
         return _global_work_service
 
     try:
-        # Initialize persistent repository
-        _repository = WorkServicePersistence()
-
-        # Create WorkManager with persistent repository
-        _global_work_service = WorkManager(repository=_repository)
+        _global_work_service = WorkManager()
 
         logger.info("WorkService initialized successfully with persistent storage")
         return _global_work_service
@@ -71,24 +84,29 @@ def initialize_work_service() -> WorkManager:
 
 def pause_orphaned_running_work(work_service: WorkManager) -> None:
     """
-    Pause any work items that are in 'running' state from previous sessions.
-    This prevents orphaned work items that can't be controlled.
+    Pause any work items in 'running' state from previous sessions.
+    
+    This prevents orphaned work items that can't be controlled after
+    application restart. Running work items are automatically paused
+    to allow manual intervention.
+    
+    Args:
+        work_service: WorkManager instance to check for orphaned work
     """
     try:
-        from src.domain.work import WorkStatus
         from src.domain.status import BaseStatus
 
         # Get all work items
-        all_work = work_service.list()
+        all_work_items = work_service.list()
 
         running_count = 0
         paused_count = 0
 
-        for work_item in all_work:
-            work_id = work_item.get("work_id") or work_item.get("id")
-            status = work_item.get("status")
+        for work_item in all_work_items:
+            work_id = work_item.id
+            status = work_item.status
 
-            if status == BaseStatus.RUNNING.value:
+            if status == BaseStatus.RUNNING:
                 running_count += 1
                 try:
                     # Pause the orphaned running work
@@ -116,16 +134,18 @@ def pause_orphaned_running_work(work_service: WorkManager) -> None:
 def cleanup_work_service() -> None:
     """
     Cleanup the global WorkService and close connections.
+    
+    Properly closes repository connections and resets global state.
+    Should be called during application shutdown.
     """
-    global _global_work_service, _repository
+    global _global_work_service
 
     try:
-        if _repository:
-            _repository.close()
-            logger.info("WorkService repository closed")
+        if _global_work_service:
+            _global_work_service.close()
+            logger.info("WorkService closed")
 
         _global_work_service = None
-        _repository = None
         logger.info("WorkService cleanup completed")
 
     except Exception as e:
@@ -138,6 +158,13 @@ async def work_service_lifespan(app: FastAPI):
     FastAPI lifespan context manager for WorkService.
 
     Initializes WorkService on startup and cleans up on shutdown.
+    Provides proper resource management for FastAPI applications.
+    
+    Args:
+        app: FastAPI application instance
+        
+    Yields:
+        None: Application runs between startup and shutdown
     """
     try:
         # Startup
@@ -155,22 +182,52 @@ async def work_service_lifespan(app: FastAPI):
 
 
 def get_work_status(work_id: str):
-    """Get work status from the global WorkService."""
+    """
+    Get work status from the global WorkService.
+    
+    Args:
+        work_id: Unique work identifier
+        
+    Returns:
+        str: Current work status, None if not found
+    """
     return get_work_service().get_status(work_id)
 
 
 def get_work_details(work_id: str):
-    """Get work details from the global WorkService."""
+    """
+    Get work details from the global WorkService.
+    
+    Args:
+        work_id: Unique work identifier
+        
+    Returns:
+        WorkItem: Work item instance, None if not found
+    """
     return get_work_service().get(work_id)
 
 
 def list_all_work():
-    """List all work items from the global WorkService."""
+    """
+    List all work items from the global WorkService.
+    
+    Returns:
+        list: List of all work items as WorkItem instances
+    """
     return get_work_service().list()
 
 
 def control_work(work_id: str, action: str) -> bool:
-    """Control work execution (pause, resume, cancel, restart)."""
+    """
+    Control work execution (pause, resume, cancel, restart).
+    
+    Args:
+        work_id: Unique work identifier
+        action: Control action ('pause', 'resume', 'cancel', 'restart')
+        
+    Returns:
+        bool: True if action successful, False otherwise
+    """
     work_service = get_work_service()
 
     if action == "pause":

@@ -2,9 +2,9 @@
 Dataset-related API models for CSPBench Web Interface.
 """
 
-from enum import Enum
-from typing import Any, Dict, List, Optional, Union
 from datetime import datetime
+from enum import Enum
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field, field_validator
 

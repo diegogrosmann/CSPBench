@@ -15,8 +15,8 @@ from __future__ import annotations
 
 import pytest
 
-from src.domain.distance import create_distance_calculator
 from src.domain.algorithms import global_registry
+from src.domain.distance import create_distance_calculator
 
 
 def _ensure_h2_registered():
@@ -269,7 +269,6 @@ def test_h2csp_distance_consistency():
     center = res["center_string"]
     md = res["metadata"]
     # Recompute and compare
-    from math import isclose
 
     assert md["avg_distance"] == pytest.approx(
         sum(alg.distances_to_all(center)) / len(strings)

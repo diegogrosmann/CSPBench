@@ -8,9 +8,8 @@ de complexidade agora vivem em `algorithm.py`.
 from __future__ import annotations
 
 import logging
-import time
-from collections.abc import Callable, Sequence
-from typing import Any, TypeAlias, cast
+from collections.abc import Sequence
+from typing import TypeAlias, cast
 
 logger = logging.getLogger(__name__)
 

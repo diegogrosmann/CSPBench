@@ -12,8 +12,8 @@ from __future__ import annotations
 
 import pytest
 
-from algorithms.dp_csp import DPCSPAlgorithm
 from algorithms.baseline import BaselineAlg
+from algorithms.dp_csp import DPCSPAlgorithm
 from src.domain.distance import create_distance_calculator
 
 

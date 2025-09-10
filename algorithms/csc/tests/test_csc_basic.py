@@ -1,7 +1,7 @@
 import pytest
 
-from src.domain.distance import create_distance_calculator
 from src.domain.algorithms import global_registry
+from src.domain.distance import create_distance_calculator
 
 
 def build_algorithm(strings, alphabet, **params):

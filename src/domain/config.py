@@ -1,12 +1,12 @@
+import os
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
-import re
-from typing import Any, Dict, List, Optional, Literal, Union, Sequence
+from typing import Any, Dict, List, Literal, Optional, Sequence, Union
 
 import yaml
 
 from src.domain.errors import BatchConfigurationError
-import os
 
 # ====================================================
 # NOTA IMPORTANTE
@@ -324,7 +324,11 @@ class CSPBenchConfig:
                             kwargs[k] = _convert_to_dataclass(field_type, v)
                         elif isinstance(v, list) and v:
                             # Handle special case for tasks groups items
-                            if k == "items" and target_class in (ExperimentTasksConfig, OptimizationTasksConfig, SensitivityTasksConfig):
+                            if k == "items" and target_class in (
+                                ExperimentTasksConfig,
+                                OptimizationTasksConfig,
+                                SensitivityTasksConfig,
+                            ):
                                 # Determine the correct task type based on the target class
                                 if target_class == ExperimentTasksConfig:
                                     task_class = ExperimentTaskConfig
@@ -334,12 +338,14 @@ class CSPBenchConfig:
                                     task_class = SensitivityTaskConfig
                                 else:
                                     task_class = TaskConfig
-                                
+
                                 kwargs[k] = [
                                     _convert_to_dataclass(task_class, item)
                                     for item in v
                                 ]
-                            elif hasattr(field_type, "__args__") and field_type.__args__:
+                            elif (
+                                hasattr(field_type, "__args__") and field_type.__args__
+                            ):
                                 # Handle general lists of dataclasses
                                 list_type = field_type.__args__[0]
                                 if hasattr(list_type, "__dataclass_fields__"):
@@ -581,17 +587,17 @@ def _parse_algorithm_presets(
         params_block = preset.get("algorithm_params", {}) or {}
         if not isinstance(params_block, dict):
             raise BatchConfigurationError("'algorithm_params' deve ser mapping")
-        
+
         # Verificar se existe uma lista 'algorithms' que filtra quais algoritmos usar
         algorithms_list = preset.get("algorithms", None)
-        
+
         # Se existe a chave 'algorithms' (mesmo que vazia ou None), usar apenas os algoritmos listados
         # Se não existe a chave 'algorithms', usar todos os algorithm_params (comportamento legacy)
         if "algorithms" in preset:
             # A chave 'algorithms' existe - filtrar por ela (mesmo que seja None ou vazia)
             if algorithms_list is None:
                 algorithms_list = []  # Tratar None como lista vazia
-            
+
             # Usar apenas algoritmos especificados na lista 'algorithms'
             for alg_name in algorithms_list:
                 # Se o algoritmo não está em algorithm_params, usar parâmetros vazios

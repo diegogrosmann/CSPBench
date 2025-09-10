@@ -8,9 +8,9 @@ This module provides Pydantic models for batch execution management including:
 """
 
 from datetime import datetime
-from typing import Dict, List, Optional, Any
+from typing import Any, Dict, List, Optional
+
 from pydantic import BaseModel, Field, field_validator
-import yaml
 
 
 class BatchExecutionRequest(BaseModel):

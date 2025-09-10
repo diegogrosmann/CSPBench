@@ -1,9 +1,38 @@
+"""
+Synthetic Dataset Generator.
+
+Provides synthetic dataset generation capabilities for testing and
+benchmarking purposes. Supports multiple generation modes including
+random sequences, noise-based variations, mutation-based sequences,
+and clustered data.
+
+Features:
+- Random sequence generation
+- Noise-based sequence variation
+- Mutation-based sequence evolution (substitution, insertion, deletion)
+- Clustered sequence generation
+- Configurable parameters for all generation modes
+- Deterministic generation with seed support
+- Compatibility with existing test infrastructure
+
+Default Values:
+    - n: 20 sequences
+    - length: 50 characters
+    - alphabet: "ACGT" (DNA)
+    - noise_rate: 0.1 (10%)
+    - mutation_rate: 0.1 (10%)
+    - num_clusters: 2
+    - cluster_distance: 0.2 (20%)
+    - pad_char: "N"
+"""
+
 import random
 from typing import List, Optional
+
 from src.domain.config import SyntheticDatasetConfig
 from src.domain.dataset import Dataset
 
-# Valores padrão para geração sintética
+# Default values for synthetic generation
 SYNTHETIC_DEFAULTS = {
     "n": 20,
     "length": 50,
@@ -11,24 +40,45 @@ SYNTHETIC_DEFAULTS = {
     "seed": None,
     "noise_rate": 0.1,
     "mutation_rate": 0.1,
-    "mutation_types": None,  # será ["substitution"] se None
+    "mutation_types": None,  # will be ["substitution"] if None
     "num_clusters": 2,
     "cluster_distance": 0.2,
-    "base_sequence": None,  # será gerada automaticamente se None
+    "base_sequence": None,  # will be generated automatically if None
     "pad_char": "N",
 }
 
 
 class SyntheticDatasetGenerator:
-    """Gerador de datasets sintéticos (compatibilidade com testes existentes)."""
+    """
+    Synthetic dataset generator (compatibility with existing tests).
+    
+    Provides static methods for generating various types of synthetic
+    datasets with configurable parameters. All methods return a tuple
+    of (Dataset, parameters) for consistency.
+    
+    Methods:
+        generate_random: Random sequence generation
+        generate_with_noise: Noise-based variation
+        generate_with_mutations: Mutation-based evolution
+        generate_clustered: Clustered sequence generation
+        generate_from_config: Configuration-based generation
+    """
 
     @staticmethod
     def _ensure_rng(
         seed: Optional[int] = None, rng: Optional[random.Random] = None
     ) -> random.Random:
-        """Retorna um RNG a partir de um existente ou criando um novo com base na seed.
+        """
+        Return an RNG from an existing one or create a new one based on seed.
 
-        Prioriza o rng injetado. Se não houver, cria um novo usando a seed.
+        Prioritizes the injected rng. If none provided, creates a new one using the seed.
+        
+        Args:
+            seed: Random seed for reproducibility
+            rng: Existing random number generator
+            
+        Returns:
+            random.Random: Random number generator instance
         """
         return rng if rng is not None else random.Random(seed)
 
@@ -40,18 +90,42 @@ class SyntheticDatasetGenerator:
         seed: Optional[int] = None,
         rng: Optional[random.Random] = None,
     ) -> tuple[Dataset, dict]:
-        # Aplicar valores padrão
+        """
+        Generate completely random sequences.
+        
+        Creates n sequences of specified length using characters from
+        the given alphabet. Each position is independently random.
+        
+        Args:
+            n: Number of sequences to generate
+            length: Length of each sequence
+            alphabet: Character alphabet to use
+            seed: Random seed for reproducibility
+            rng: Existing random number generator
+            
+        Returns:
+            tuple: (Dataset with random sequences, generation parameters)
+            
+        Raises:
+            ValueError: If n or length <= 0, or alphabet is empty
+        """
+        # Apply default values
         n = n if n is not None else SYNTHETIC_DEFAULTS["n"]
         length = length if length is not None else SYNTHETIC_DEFAULTS["length"]
         alphabet = alphabet if alphabet is not None else SYNTHETIC_DEFAULTS["alphabet"]
 
         if n <= 0 or length <= 0:
-            raise ValueError("n e length devem ser > 0")
+            raise ValueError("n and length must be > 0")
         if not alphabet:
-            raise ValueError("alphabet não pode ser vazio")
+            raise ValueError("alphabet cannot be empty")
         _rng = SyntheticDatasetGenerator._ensure_rng(seed, rng)
         seqs = ["".join(_rng.choice(alphabet) for _ in range(length)) for _ in range(n)]
-        ds = Dataset(id="synthetic_random", name="synthetic_random", sequences=seqs, alphabet=alphabet)
+        ds = Dataset(
+            id="synthetic_random",
+            name="synthetic_random",
+            sequences=seqs,
+            alphabet=alphabet,
+        )
         params = {
             "generator": "generate_random",
             "n": n,
@@ -71,25 +145,46 @@ class SyntheticDatasetGenerator:
         seed: Optional[int] = None,
         rng: Optional[random.Random] = None,
     ) -> tuple[Dataset, dict]:
-        # Aplicar valores padrão
+        """
+        Generate sequences with noise variation from a base sequence.
+        
+        Creates n sequences by applying random noise to a base sequence.
+        Each position has a probability of noise_rate to be replaced
+        with a random character from the alphabet.
+        
+        Args:
+            base_sequence: Template sequence for variation (auto-generated if None)
+            n: Number of sequences to generate
+            noise_rate: Probability of noise per position (0.0-1.0)
+            alphabet: Character alphabet to use
+            seed: Random seed for reproducibility
+            rng: Existing random number generator
+            
+        Returns:
+            tuple: (Dataset with noisy sequences, generation parameters)
+            
+        Raises:
+            ValueError: If n <= 0, noise_rate not in [0,1], or base_sequence empty
+        """
+        # Apply default values
         n = n if n is not None else SYNTHETIC_DEFAULTS["n"]
         noise_rate = (
             noise_rate if noise_rate is not None else SYNTHETIC_DEFAULTS["noise_rate"]
         )
         alphabet = alphabet if alphabet is not None else SYNTHETIC_DEFAULTS["alphabet"]
 
-        # Se base_sequence não foi fornecida, gerar uma automaticamente
+        # If base_sequence not provided, generate one automatically
         if base_sequence is None:
             length = SYNTHETIC_DEFAULTS["length"]
             _temp_rng = SyntheticDatasetGenerator._ensure_rng(seed, rng)
             base_sequence = "".join(_temp_rng.choice(alphabet) for _ in range(length))
 
         if n <= 0:
-            raise ValueError("n deve ser > 0")
+            raise ValueError("n must be > 0")
         if not 0.0 <= noise_rate <= 1.0:
-            raise ValueError("noise_rate deve estar em [0,1]")
+            raise ValueError("noise_rate must be in [0,1]")
         if not base_sequence:
-            raise ValueError("base_sequence vazia")
+            raise ValueError("base_sequence empty")
         _rng = SyntheticDatasetGenerator._ensure_rng(seed, rng)
 
         def mutate_char(ch: str) -> str:
@@ -99,7 +194,12 @@ class SyntheticDatasetGenerator:
             return ch
 
         seqs = ["".join(mutate_char(ch) for ch in base_sequence) for _ in range(n)]
-        ds = Dataset(id="synthetic_noise", name="synthetic_noise", sequences=seqs, alphabet=alphabet)
+        ds = Dataset(
+            id="synthetic_noise",
+            name="synthetic_noise",
+            sequences=seqs,
+            alphabet=alphabet,
+        )
         params = {
             "generator": "generate_with_noise",
             "n": n,
@@ -123,7 +223,30 @@ class SyntheticDatasetGenerator:
         rng: Optional[random.Random] = None,
         pad_char: Optional[str] = None,
     ) -> tuple[Dataset, dict]:
-        # Aplicar valores padrão
+        """
+        Generate sequences with mutation operations from a base sequence.
+        
+        Creates n sequences by applying mutation operations (substitution,
+        insertion, deletion) to a base sequence. Supports different
+        mutation types and rates.
+        
+        Args:
+            base_sequence: Template sequence for mutation (auto-generated if None)
+            n: Number of sequences to generate
+            mutation_types: Types of mutations to apply ["substitution", "insertion", "deletion"]
+            mutation_rate: Probability of mutation per position (0.0-1.0)
+            alphabet: Character alphabet to use
+            seed: Random seed for reproducibility
+            rng: Existing random number generator
+            pad_char: Character for padding sequences to uniform length
+            
+        Returns:
+            tuple: (Dataset with mutated sequences, generation parameters)
+            
+        Raises:
+            ValueError: If n <= 0, mutation_rate not in [0,1], or base_sequence empty
+        """
+        # Apply default values
         n = n if n is not None else SYNTHETIC_DEFAULTS["n"]
         mutation_rate = (
             mutation_rate
@@ -136,26 +259,26 @@ class SyntheticDatasetGenerator:
         )
         pad_char = pad_char if pad_char is not None else SYNTHETIC_DEFAULTS["pad_char"]
 
-        # Se base_sequence não foi fornecida, gerar uma automaticamente
+        # If base_sequence not provided, generate one automatically
         if base_sequence is None:
             length = SYNTHETIC_DEFAULTS["length"]
             _temp_rng = SyntheticDatasetGenerator._ensure_rng(seed, rng)
             base_sequence = "".join(_temp_rng.choice(alphabet) for _ in range(length))
 
         if n <= 0:
-            raise ValueError("n deve ser > 0")
+            raise ValueError("n must be > 0")
         if not base_sequence:
-            raise ValueError("base_sequence vazia")
+            raise ValueError("base_sequence empty")
         if mutation_rate < 0 or mutation_rate > 1:
-            raise ValueError("mutation_rate deve estar em [0,1]")
+            raise ValueError("mutation_rate must be in [0,1]")
         _rng = SyntheticDatasetGenerator._ensure_rng(seed, rng)
 
         def mutate(seq: str) -> str:
             s = list(seq)
-            # Itera com índice controlado para suportar inserções/remoções com segurança
+            # Iterate with controlled index to support insertions/deletions safely
             i = 0
             ops = 0
-            max_ops = max(10 * len(s) + 100, 200)  # limite de segurança para término
+            max_ops = max(10 * len(s) + 100, 200)  # safety limit for termination
             while i < len(s) and ops < max_ops:
                 ops += 1
                 if _rng.random() < mutation_rate:
@@ -166,25 +289,25 @@ class SyntheticDatasetGenerator:
                         i += 1
                     elif m == "insertion":
                         s.insert(i, _rng.choice(alphabet))
-                        # Avança duas posições para garantir progresso mesmo com inserções sucessivas
+                        # Advance two positions to ensure progress even with successive insertions
                         i += 2
                     elif m == "deletion":
                         if len(s) > 1:
                             s.pop(i)
-                            # não incrementa i para avaliar o novo item que ocupou a posição
+                            # don't increment i to evaluate the new item that took the position
                         else:
                             i += 1
                     else:
-                        # Tipo desconhecido: apenas avança
+                        # Unknown type: just advance
                         i += 1
                 else:
                     i += 1
             return "".join(s)
 
         seqs = [mutate(base_sequence) for _ in range(n)]
-        # Uniformiza opcionalmente ao maior comprimento via pad para manter Dataset válido
+        # Optionally normalize to largest length via pad to maintain valid Dataset
         L = max(len(s) for s in seqs)
-        # pad_char configurável; se usado e não estiver no alphabet, incluí-lo
+        # Configurable pad_char; if used and not in alphabet, include it
         effective_pad = pad_char if pad_char else "N"
         seqs = [s + (effective_pad * (L - len(s))) for s in seqs]
 
@@ -192,7 +315,12 @@ class SyntheticDatasetGenerator:
         if effective_pad and effective_pad not in out_alphabet:
             out_alphabet = out_alphabet + effective_pad
 
-        ds = Dataset(id="synthetic_mutations", name="synthetic_mutations", sequences=seqs, alphabet=out_alphabet)
+        ds = Dataset(
+            id="synthetic_mutations",
+            name="synthetic_mutations",
+            sequences=seqs,
+            alphabet=out_alphabet,
+        )
         params = {
             "generator": "generate_with_mutations",
             "n": n,
@@ -218,7 +346,29 @@ class SyntheticDatasetGenerator:
         seed: Optional[int] = None,
         rng: Optional[random.Random] = None,
     ) -> tuple[Dataset, dict]:
-        # Aplicar valores padrão
+        """
+        Generate clustered sequences around multiple centers.
+        
+        Creates n sequences organized around num_clusters center sequences.
+        Each sequence is generated by varying the assigned center sequence
+        with a specified cluster_distance probability.
+        
+        Args:
+            n: Number of sequences to generate
+            length: Length of each sequence
+            num_clusters: Number of cluster centers
+            alphabet: Character alphabet to use
+            cluster_distance: Probability of variation from cluster center (0.0-1.0)
+            seed: Random seed for reproducibility
+            rng: Existing random number generator
+            
+        Returns:
+            tuple: (Dataset with clustered sequences, generation parameters)
+            
+        Raises:
+            ValueError: If parameters are invalid or num_clusters > n
+        """
+        # Apply default values
         n = n if n is not None else SYNTHETIC_DEFAULTS["n"]
         length = length if length is not None else SYNTHETIC_DEFAULTS["length"]
         alphabet = alphabet if alphabet is not None else SYNTHETIC_DEFAULTS["alphabet"]
@@ -234,18 +384,18 @@ class SyntheticDatasetGenerator:
         )
 
         if n <= 0 or length <= 0:
-            raise ValueError("n e length devem ser > 0")
+            raise ValueError("n and length must be > 0")
         if num_clusters <= 0 or num_clusters > n:
-            raise ValueError("num_clusters inválido")
+            raise ValueError("num_clusters invalid")
         if not 0.0 <= cluster_distance <= 1.0:
-            raise ValueError("cluster_distance deve estar em [0,1]")
+            raise ValueError("cluster_distance must be in [0,1]")
         _rng = SyntheticDatasetGenerator._ensure_rng(seed, rng)
-        # cria centros
+        # Create centers
         centers = [
             "".join(_rng.choice(alphabet) for _ in range(length))
             for _ in range(num_clusters)
         ]
-        # aloca por round-robin gerando variações ao redor dos centros
+        # Allocate by round-robin generating variations around centers
         seqs: List[str] = []
         for i in range(n):
             c = centers[i % num_clusters]
@@ -253,7 +403,12 @@ class SyntheticDatasetGenerator:
             s = "".join(_rng.choice(alphabet) if _rng.random() < p else ch for ch in c)
             seqs.append(s)
 
-        ds = Dataset(id="synthetic_clustered", name="synthetic_clustered", sequences=seqs, alphabet=alphabet)
+        ds = Dataset(
+            id="synthetic_clustered",
+            name="synthetic_clustered",
+            sequences=seqs,
+            alphabet=alphabet,
+        )
         params = {
             "generator": "generate_clustered",
             "n": n,
@@ -270,7 +425,28 @@ class SyntheticDatasetGenerator:
     def generate_from_config(
         cfg: SyntheticDatasetConfig, rng: Optional[random.Random] = None
     ) -> tuple[Dataset, dict]:
-        """Gera Dataset a partir de SyntheticDatasetConfig (suporta modos)."""
+        """
+        Generate Dataset from SyntheticDatasetConfig (supports modes).
+        
+        Main entry point for configuration-based dataset generation.
+        Supports multiple generation modes as specified in the configuration.
+        
+        Args:
+            cfg: Synthetic dataset configuration
+            rng: Optional random number generator for deterministic generation
+            
+        Returns:
+            tuple: (Generated dataset, generation parameters)
+            
+        Raises:
+            ValueError: If generation mode is invalid
+            
+        Supported Modes:
+            - random: Completely random sequences
+            - noise: Noise-based variation from base sequence
+            - mutations: Mutation-based evolution
+            - clustered: Clustered sequence generation
+        """
         mode = getattr(cfg, "mode", "random")
         alphabet = cfg.alphabet or "ACGT"
         seed = cfg.seed
@@ -290,11 +466,11 @@ class SyntheticDatasetGenerator:
             return ds, p
 
         if mode == "noise":
-            # Extrai parâmetros do parameters_mode
+            # Extract parameters from parameters_mode
             base_sequence = params_mode.get("base_sequence")
             noise = params_mode.get("noise", 0.1)
 
-            # Sem ruído => comporta-se como random
+            # No noise => behaves like random
             if not noise or noise <= 0:
                 ds, p = SyntheticDatasetGenerator.generate_random(
                     cfg.n, cfg.L, alphabet, seed=None, rng=base_rng
@@ -305,14 +481,14 @@ class SyntheticDatasetGenerator:
                 p.update({"mode": "random", "config_seed": seed, "from_config": True})
                 return ds, p
 
-            # Se base_sequence for None, gera sequência aleatória base
+            # If base_sequence is None, generate random base sequence
             if base_sequence is None:
                 ds_tmp, _ = SyntheticDatasetGenerator.generate_random(
                     1, cfg.L, alphabet, seed=None, rng=base_rng
                 )
                 base_sequence = ds_tmp.sequences[0]
 
-            # Gera n sequências com ruído usando o mesmo RNG base (uniformizado)
+            # Generate n sequences with noise using the same base RNG (unified)
             ds, p = SyntheticDatasetGenerator.generate_with_noise(
                 base_sequence=base_sequence,
                 n=int(cfg.n),
@@ -328,14 +504,14 @@ class SyntheticDatasetGenerator:
             return ds, p
 
         if mode == "mutations":
-            # Extrai parâmetros do parameters_mode
+            # Extract parameters from parameters_mode
             base_sequence = params_mode.get("base_sequence")
             mutation_types = params_mode.get("mutation_types", ["substitution"])
             mutation_rate = params_mode.get("mutation_rate", 0.1)
             pad_char = params_mode.get("pad_char", "N")
 
             if not base_sequence:
-                # Gera sequência base aleatória de tamanho L
+                # Generate random base sequence of size L
                 ds_tmp, _ = SyntheticDatasetGenerator.generate_random(
                     1, cfg.L, alphabet, seed=None, rng=base_rng
                 )
@@ -358,7 +534,7 @@ class SyntheticDatasetGenerator:
             return ds, p
 
         if mode == "clustered":
-            # Extrai parâmetros do parameters_mode
+            # Extract parameters from parameters_mode
             num_clusters = params_mode.get("num_clusters", 2)
             cluster_distance = params_mode.get("cluster_distance", 0.2)
             ds, p = SyntheticDatasetGenerator.generate_clustered(
@@ -376,4 +552,4 @@ class SyntheticDatasetGenerator:
             p.update({"mode": mode, "config_seed": seed, "from_config": True})
             return ds, p
 
-        raise ValueError(f"Modo de geração inválido: {mode!r}")
+        raise ValueError(f"Invalid generation mode: {mode!r}")

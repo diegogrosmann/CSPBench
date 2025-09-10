@@ -1,16 +1,29 @@
 """
-Dataset Service simplificado
+Dataset Service - Simplified Dataset Loading.
 
-Apenas uma função pública: load_dataset(cfg) -> Dataset
-- synthetic: gera dataset aleatório com ruído opcional
-- file: lê FASTA por nome lógico/caminho (usa DATASET_DIRECTORY se definido)
-- entrez: suporte via módulo externo (dataset_entrez)
+Provides a unified interface for loading and generating datasets from
+various sources including synthetic generation, file loading, and
+external database retrieval.
+
+This service acts as a facade that coordinates between different dataset
+providers and ensures consistent dataset loading across the application.
+
+Features:
+- Synthetic dataset generation with configurable parameters
+- File-based dataset loading with DATASET_DIRECTORY support
+- External database integration (Entrez)
+- Consistent return format (Dataset, parameters)
+
+Public API:
+    load_dataset(cfg) -> tuple[Dataset, dict]
+        - synthetic: generates random dataset with optional noise
+        - file: reads FASTA by logical name/path (uses DATASET_DIRECTORY if defined)
+        - entrez: support via external module (dataset_entrez)
 """
 
 from __future__ import annotations
 
 from src.application.services.dataset_generator import SyntheticDatasetGenerator
-from src.infrastructure.external.dataset_entrez import EntrezDatasetDownloader
 from src.domain import Dataset
 from src.domain.config import (
     DatasetAny,
@@ -18,14 +31,32 @@ from src.domain.config import (
     FileDatasetConfig,
     SyntheticDatasetConfig,
 )
-
+from src.infrastructure.external.dataset_entrez import EntrezDatasetDownloader
 from src.infrastructure.persistence.dataset_repository import FileDatasetRepository
-from src.domain.errors import DatasetNotFoundError
 
 
 def load_dataset(cfg: DatasetAny) -> tuple[Dataset, dict]:
     """
-    Carrega/gera um Dataset a partir de um DatasetConfig.
+    Load/generate a Dataset from a DatasetConfig.
+    
+    This is the main entry point for dataset loading. It dispatches
+    to the appropriate loader based on the configuration type.
+    
+    Args:
+        cfg: Dataset configuration specifying type and parameters
+        
+    Returns:
+        tuple: (Dataset object, parameters dict)
+            - Dataset: Loaded or generated dataset
+            - dict: Parameters used for loading/generation
+            
+    Raises:
+        TypeError: If dataset configuration type is not supported
+        
+    Supported Types:
+        - SyntheticDatasetConfig: Generates synthetic data
+        - FileDatasetConfig: Loads from file system
+        - EntrezDatasetConfig: Downloads from NCBI Entrez
     """
     if isinstance(cfg, SyntheticDatasetConfig):
         return SyntheticDatasetGenerator.generate_from_config(cfg)
@@ -46,4 +77,4 @@ def load_dataset(cfg: DatasetAny) -> tuple[Dataset, dict]:
             dataset.id = cfg.id
         return dataset, params
 
-    raise TypeError(f"Tipo de dataset não suportado: {type(cfg)!r}")
+    raise TypeError(f"Unsupported dataset type: {type(cfg)!r}")

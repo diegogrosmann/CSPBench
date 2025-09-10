@@ -41,7 +41,9 @@ class TestDatasetCreation:
         """Test creating a dataset with explicit alphabet."""
         sequences = ["ACG", "ATG", "GCG"]
         alphabet = "ACGT"
-        dataset = Dataset(id="test_id", name="test", sequences=sequences, alphabet=alphabet)
+        dataset = Dataset(
+            id="test_id", name="test", sequences=sequences, alphabet=alphabet
+        )
 
         assert dataset.alphabet == alphabet
         assert dataset.validate()
@@ -75,7 +77,7 @@ class TestDatasetProperties:
         # Empty dataset cannot be created without id
         with pytest.raises(TypeError):
             Dataset([])
-        
+
         assert Dataset(id="test_id", name="test", sequences=["A"]).size == 1
         assert Dataset(id="test_id2", name="test", sequences=["A", "T", "G"]).size == 3
 
@@ -116,7 +118,9 @@ class TestDatasetProperties:
         assert dataset1.alphabet == "ACGT"
 
         # Explicit (different order)
-        dataset2 = Dataset(id="test_id", name="test", sequences=sequences, alphabet="TAGC")
+        dataset2 = Dataset(
+            id="test_id", name="test", sequences=sequences, alphabet="TAGC"
+        )
         assert dataset2.alphabet == "TAGC"
 
 
@@ -188,7 +192,9 @@ class TestDatasetManipulation:
 
     def test_add_sequence_invalid_alphabet(self):
         """Test adding sequence with invalid character."""
-        dataset = Dataset(id="test_id", name="test", sequences=["ACGT"], alphabet="ACGT")
+        dataset = Dataset(
+            id="test_id", name="test", sequences=["ACGT"], alphabet="ACGT"
+        )
 
         with pytest.raises(
             ValueError, match="Sequence contains characters not in alphabet"
@@ -244,7 +250,10 @@ class TestDatasetSerialization:
 
     def test_from_dict(self):
         """Test creating dataset from dictionary."""
-        data = {"sequences": ["ACGT", "ATGT"], "metadata": {"alphabet": "ACGT", "id": "test_id"}}
+        data = {
+            "sequences": ["ACGT", "ATGT"],
+            "metadata": {"alphabet": "ACGT", "id": "test_id"},
+        }
 
         dataset = Dataset.from_dict(data)
 
@@ -261,7 +270,9 @@ class TestDatasetSerialization:
 
     def test_round_trip_serialization(self):
         """Test full serialization round trip."""
-        original = Dataset(id="test_id_unique", name="test", sequences=["ACGT", "ATGT", "GCGT"])
+        original = Dataset(
+            id="test_id_unique", name="test", sequences=["ACGT", "ATGT", "GCGT"]
+        )
 
         data = original.to_dict()
         reconstructed = Dataset.from_dict(data)
@@ -274,7 +285,9 @@ class TestDatasetValidation:
 
     def test_validate_valid_dataset(self):
         """Test validation of valid dataset."""
-        dataset = Dataset(id="test_id", name="test", sequences=["ACGT", "ATGT"], alphabet="ACGT")
+        dataset = Dataset(
+            id="test_id", name="test", sequences=["ACGT", "ATGT"], alphabet="ACGT"
+        )
 
         assert dataset.validate() is True
 
@@ -290,7 +303,9 @@ class TestDatasetValidation:
     def test_validate_with_explicit_alphabet(self):
         """Test validation with explicit alphabet constraint."""
         sequences = ["ACGT", "ATGT"]
-        dataset = Dataset(id="test_id", name="test", sequences=sequences, alphabet="ACGT")
+        dataset = Dataset(
+            id="test_id", name="test", sequences=sequences, alphabet="ACGT"
+        )
 
         assert dataset.validate() is True
 

@@ -60,15 +60,15 @@ RUN mkdir -p /app/data && chown -R app:app /app
 # Troca para usuário não-root
 USER app
 
-# Exponha a porta que sua app usa por padrão (PORT vem do .env)
-EXPOSE 8000
+# Exponha a porta padrão (unificado para 8080). A aplicação usa variável PORT.
+EXPOSE 8080
 
 # A aplicação deve carregar .env via python-dotenv internamente.
 # Ex.: load_dotenv("/app/.env"), se .env for montado no contêiner.
 #
 # Exemplos de execução:
-#   docker run --rm -it --env-file ./.env -p 8000:8000 -v cspbench_data:/app/data imagem
-#   docker run --rm -it -p 8000:8000 -v "$(pwd)/.env:/app/.env:ro" -v cspbench_data:/app/data imagem
+#   docker run --rm -it --env-file ./.env -p 8080:8080 -v cspbench_data:/app/data imagem
+#   docker run --rm -it -p 8080:8080 -v "$(pwd)/.env:/app/.env:ro" -v cspbench_data:/app/data imagem
 
 # Comando padrão
 CMD ["python", "main.py", "web"]

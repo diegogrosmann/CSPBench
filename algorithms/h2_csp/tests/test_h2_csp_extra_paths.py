@@ -11,10 +11,9 @@ from __future__ import annotations
 
 import pytest
 
-from src.domain.distance import create_distance_calculator
-from src.domain.algorithms import global_registry
-
 import algorithms.h2_csp.algorithm as h2_mod  # garante registro
+from src.domain.algorithms import global_registry
+from src.domain.distance import create_distance_calculator
 
 
 def _ensure_reg():  # pragma: no cover - simples salvaguarda

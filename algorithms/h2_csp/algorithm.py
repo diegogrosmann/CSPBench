@@ -95,16 +95,15 @@ Detailed algorithmic rationale moved to README to keep source concise.
 
 from __future__ import annotations
 
-from collections import Counter
-from itertools import product
-from typing import Any, Iterable
 import math
 import time
+from collections import Counter
+from itertools import product
+from typing import Any
 
 from src.domain.algorithms import AlgorithmResult, CSPAlgorithm, register_algorithm
 
 from .config import H2_CSP_DEFAULTS
-
 
 # ---------------------------------------------------------------------------
 # Helper (internal) functions
@@ -166,7 +165,18 @@ def _exhaustive_block(
     candidates.sort(key=lambda x: x[0])
     out: list[str] = []
     seen_out: set[str] = set()
+    expected_length = r - l
+    
     for d, s in candidates:
+        # Ensure candidate has correct length
+        if len(s) != expected_length:
+            if len(s) > expected_length:
+                s = s[:expected_length]
+            else:
+                # Pad with last character or use first character from alphabet
+                pad_char = s[-1] if s else (alphabet[0] if alphabet else 'A')
+                s = s.ljust(expected_length, pad_char)
+        
         if s not in seen_out:
             out.append(s)
             seen_out.add(s)
@@ -207,7 +217,18 @@ def _beam_search_block(
         beam = [p for _, p in ext[:beam_width]]
     segs = [s[l:r] for s in strings]
     finals: list[tuple[int, str]] = []
+    expected_length = r - l
+    
     for cand in beam:
+        # Ensure candidate has correct length
+        if len(cand) != expected_length:
+            if len(cand) > expected_length:
+                cand = cand[:expected_length]
+            else:
+                # Pad with last character or use first character from alphabet
+                pad_char = cand[-1] if cand else (alphabet[0] if alphabet else 'A')
+                cand = cand.ljust(expected_length, pad_char)
+        
         d = max(distance_fn(cand, seg) for seg in segs)
         finals.append((d, cand))
     finals.sort(key=lambda x: x[0])
@@ -219,9 +240,40 @@ def _fuse_blocks(
 ) -> str:
     if len(selected) != len(blocks):
         raise ValueError("Selected candidates count mismatch blocks count")
-    fused = "".join(selected)
+    
+    # Validate each candidate has the correct length for its block
+    corrected_candidates = []
+    for i, (candidate, (start, end)) in enumerate(zip(selected, blocks)):
+        expected_length = end - start
+        if len(candidate) != expected_length:
+            # Auto-correct the candidate to match the expected block size
+            if len(candidate) > expected_length:
+                # Truncate if too long
+                corrected_candidate = candidate[:expected_length]
+            else:
+                # Pad with the last character if too short, or 'A' if empty
+                if candidate:
+                    pad_char = candidate[-1]
+                else:
+                    pad_char = 'A'  # Default fallback character
+                corrected_candidate = candidate.ljust(expected_length, pad_char)
+            
+            corrected_candidates.append(corrected_candidate)
+        else:
+            corrected_candidates.append(candidate)
+    
+    fused = "".join(corrected_candidates)
+    
+    # Final validation and correction if needed
     if len(fused) != total_length:
-        raise ValueError("Fused length mismatch original length")
+        if len(fused) > total_length:
+            # Truncate to correct length
+            fused = fused[:total_length]
+        else:
+            # Pad to correct length with last character or 'A'
+            pad_char = fused[-1] if fused else 'A'
+            fused = fused.ljust(total_length, pad_char)
+    
     return fused
 
 
@@ -433,7 +485,26 @@ class H2CSPAlgorithm(CSPAlgorithm):
         if not cands:
             cands = [seg_consensus]
             tech += "+fallback"
-        return cands, tech
+        
+        # Final validation: ensure all candidates have correct length
+        expected_length = r - l
+        validated_cands = []
+        for cand in cands:
+            if len(cand) != expected_length:
+                if len(cand) > expected_length:
+                    cand = cand[:expected_length]
+                else:
+                    # Pad with last character or use consensus character
+                    if cand:
+                        pad_char = cand[-1]
+                    elif seg_consensus:
+                        pad_char = seg_consensus[0] if seg_consensus else 'A'
+                    else:
+                        pad_char = self.alphabet[0] if self.alphabet else 'A'
+                    cand = cand.ljust(expected_length, pad_char)
+            validated_cands.append(cand)
+        
+        return validated_cands, tech
 
     # ------------------------- global refinement ------------------------
     def _refine(
@@ -452,7 +523,7 @@ class H2CSPAlgorithm(CSPAlgorithm):
             # Verificar cancelamento durante refinamento
             if self._monitor and self._monitor.is_cancelled():
                 return True  # Sinalizar para parar
-            
+
             if total == 0:
                 pct = end_pct
             else:

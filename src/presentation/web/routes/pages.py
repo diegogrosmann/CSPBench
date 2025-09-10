@@ -52,10 +52,9 @@ async def get_works_monitor_page(request: Request):
 @router.get("/monitor/work/{work_id}", response_class=HTMLResponse)
 async def get_work_progress_page(request: Request, work_id: str):
     """Work progress monitor page."""
-    return templates.TemplateResponse("monitor_progress.html", {
-        "request": request, 
-        "work_id": work_id
-    })
+    return templates.TemplateResponse(
+        "monitor_progress.html", {"request": request, "work_id": work_id}
+    )
 
 
 @router.get("/results", response_class=HTMLResponse)

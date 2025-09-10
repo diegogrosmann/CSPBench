@@ -19,11 +19,12 @@ Variáveis de ambiente comuns:
   DATASET_DIRECTORY, LOG_LEVEL, OUTPUT_BASE_DIRECTORY, NCBI_EMAIL, NCBI_API_KEY
 """
 
+import os
 import sys
 from pathlib import Path
 from typing import Optional
+
 import typer
-import os
 
 # Early startup notice as soon as possible when running as script
 if __name__ == "__main__":
@@ -93,7 +94,6 @@ def _ensure_runtime_directories():
             if not p.exists():
                 p.mkdir(parents=True, exist_ok=True)
                 msg = f"✅ {var} criada: {p}"
-                print(msg)
                 if logger:
                     logger.info(msg)
                 results.append(f"{var}: CREATED")
@@ -101,7 +101,6 @@ def _ensure_runtime_directories():
                 msg = f"ℹ️  {var} já existe: {p}"
                 if logger:
                     logger.debug(msg)
-                print(msg)
                 results.append(f"{var}: OK")
         except Exception as exc:  # noqa: BLE001
             msg = f"❌ Falha ao garantir diretório para {var}: {exc} (valor='{raw}')"
@@ -112,9 +111,7 @@ def _ensure_runtime_directories():
 
     # Resumo final compacto (útil em logs agregados)
     if logger:
-        logger.info(
-            "Status diretórios base: " + ", ".join(results)
-        )
+        logger.info("Status diretórios base: " + ", ".join(results))
 
 
 # Executa verificação/criação imediatamente após carregar logging & .env
@@ -148,11 +145,14 @@ except Exception as _e:  # noqa: BLE001
 try:
     if logger:
         logger.debug("Inicializando WorkService global")
-    from src.application.services.work_service import initialize_work_service, pause_orphaned_running_work
-    
+    from src.application.services.work_service import (
+        initialize_work_service,
+        pause_orphaned_running_work,
+    )
+
     work_service = initialize_work_service()
     pause_orphaned_running_work(work_service)
-    
+
     if logger:
         logger.info("WorkService inicializado e trabalhos órfãos pausados")
 except Exception as _e:  # noqa: BLE001

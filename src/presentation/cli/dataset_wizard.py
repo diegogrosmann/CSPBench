@@ -17,8 +17,8 @@ Uso: instanciado internamente pelo orchestrator (datasetsave).
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import re
+from dataclasses import dataclass
 from typing import Any, Dict, Optional
 
 

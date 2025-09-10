@@ -8,8 +8,9 @@ This module provides Pydantic models for batch configuration management includin
 """
 
 from typing import List, Optional
-from pydantic import BaseModel, Field, field_validator
+
 import yaml
+from pydantic import BaseModel, Field, field_validator
 
 
 class BatchFileInfo(BaseModel):

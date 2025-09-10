@@ -5,20 +5,19 @@ Gerencia recursos, timeouts e controle de status para execução de tarefas.
 Centraliza toda a lógica de controle de execução em um único ponto.
 """
 
-from pathlib import Path
 import signal
 import threading
 import time
 from contextlib import contextmanager
-from enum import Enum
-from typing import Any, Callable, Dict, List, Optional
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 
 import psutil
 
 from src.domain.config import ResourcesConfig
-from src.infrastructure.logging_config import get_logger
 from src.domain.status import BaseStatus
-from src.infrastructure.persistence.work_state.core import WorkStatePersistence
+from src.infrastructure.logging_config import get_logger
+from src.infrastructure.persistence.work_state.core import WorkPersistence
 
 
 class ExecutionLimitError(Exception):
@@ -38,11 +37,7 @@ class ExecutionController:
     - Monitorar recursos durante execução
     """
 
-    def __init__(
-        self,
-        work_id: str,
-        resources: Optional[ResourcesConfig] = None
-    ):
+    def __init__(self, work_id: str, resources: Optional[ResourcesConfig] = None):
         """
         Initialize execution controller.
 
@@ -56,28 +51,32 @@ class ExecutionController:
         self._active_processes: List[psutil.Process] = []
         self._batch_start_time = time.time()
 
-
         from src.application.services.work_service import get_work_service
+
         self.work_service = get_work_service()
-        
+
         if resources is None:
             # Get work details to access output_path
             work_details = self.work_service.get(work_id)
             if work_details is None:
                 raise ValueError(f"Work {work_id} not found")
-            
-            work_dir = work_details["output_path"]
 
             # Try to get resources from state.db if it exists
             try:
-                base_store = WorkStatePersistence(Path(work_dir) / "state.db")
-                work_config = base_store.get_work_config(work_id)
-                if work_config and work_config.execution and work_config.execution.resources:
-                    self._resources = work_config.execution.resources
+                base_store = WorkPersistence()
+                work_data = base_store.work_get(work_id)
+                if work_data and work_data.get('config_json'):
+                    from src.domain.config import CSPBenchConfig
+                    config = CSPBenchConfig.from_dict(work_data['config_json'])
+                    if config and config.resources:
+                        self._resources = config.resources
+                    else:
+                        # Use defaults if no config found
+                        self._resources = None
                 else:
                     # Use defaults if no config found
                     self._resources = None
-            except Exception:
+            except Exception as e:
                 # If state.db doesn't exist or has issues, use defaults
                 self._resources = None
 
@@ -154,9 +153,9 @@ class ExecutionController:
     def from_config(cls, work_id: str, config: dict[str, Any]) -> "ExecutionController":
         """Create ExecutionController from configuration dictionary."""
         from src.domain.config import (
-            ResourcesConfig,
             CPUConfig,
             MemoryConfig,
+            ResourcesConfig,
             TimeoutsConfig,
         )
 
@@ -221,12 +220,14 @@ class ExecutionController:
                     try:
                         return BaseStatus(status)
                     except ValueError:
-                        self._logger.warning(f"Invalid status from WorkService: {status}")
+                        self._logger.warning(
+                            f"Invalid status from WorkService: {status}"
+                        )
                         return BaseStatus.RUNNING
                 return status
         except Exception as e:
             self._logger.warning(f"Error checking WorkService status: {e}")
-        
+
         # Default to RUNNING if status check fails
         return BaseStatus.RUNNING
 
@@ -328,7 +329,7 @@ class ExecutionController:
             main_process = psutil.Process()
             main_process.cpu_affinity([0])  # Force main application to core 0
             self._logger.info(
-                f"[EXECUTION] Main application restricted to core 0 (exclusive_cores=True)"
+                "[EXECUTION] Main application restricted to core 0 (exclusive_cores=True)"
             )
         except (psutil.NoSuchProcess, psutil.AccessDenied, PermissionError) as e:
             self._logger.warning(
@@ -468,7 +469,7 @@ class ExecutionController:
 
         self._monitor_thread = threading.Thread(target=monitor_memory, daemon=True)
         self._monitor_thread.start()
-        self._logger.info(f"[EXECUTION] Preventive memory monitoring started")
+        self._logger.info("[EXECUTION] Preventive memory monitoring started")
 
     @contextmanager
     def item_timeout(self, timeout_seconds: Optional[int] = None):
@@ -519,7 +520,7 @@ class ExecutionController:
     def get_worker_config(self) -> Dict[str, Any]:
         """
         Alias for create_worker_config for backward compatibility.
-        
+
         Returns:
             Configuration dictionary for ProcessPool workers
         """

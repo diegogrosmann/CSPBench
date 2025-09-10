@@ -12,36 +12,32 @@ import logging
 import os
 import uuid
 from datetime import datetime
-from pathlib import Path
-from typing import List
 
-from fastapi import APIRouter, HTTPException, File, UploadFile, BackgroundTasks, Form
+from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 
-from src.domain.status import BaseStatus
-from src.application.services.dataset_service import load_dataset
 from src.application.services.dataset_generator import SyntheticDatasetGenerator
-from src.infrastructure.external.dataset_entrez import EntrezDatasetDownloader
-from src.infrastructure.persistence.dataset_repository import FileDatasetRepository
 from src.domain.config import (
-    SyntheticDatasetConfig,
-    FileDatasetConfig,
     EntrezDatasetConfig,
+    SyntheticDatasetConfig,
 )
 from src.domain.dataset import Dataset
-from src.domain.errors import DatasetNotFoundError, DatasetValidationError
+from src.domain.errors import DatasetNotFoundError
+from src.domain.status import BaseStatus
+from src.infrastructure.external.dataset_entrez import EntrezDatasetDownloader
+from src.infrastructure.persistence.dataset_repository import FileDatasetRepository
 
 from ..core.dataset_models import (
-    DatasetInfo,
-    DatasetPreview,
-    DatasetUploadRequest,
-    SyntheticDatasetRequest,
-    NCBIDatasetRequest,
-    DatasetListResponse,
-    DatasetUpdateRequest,
-    OperationResponse,
     DatasetGenerationStatus,
+    DatasetInfo,
+    DatasetListResponse,
+    DatasetPreview,
     DatasetType,
+    DatasetUpdateRequest,
+    DatasetUploadRequest,
+    NCBIDatasetRequest,
+    OperationResponse,
+    SyntheticDatasetRequest,
 )
 
 logger = logging.getLogger(__name__)

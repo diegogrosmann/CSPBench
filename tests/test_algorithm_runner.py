@@ -1,10 +1,10 @@
 import time
 from typing import Any, Dict
 
-from src.infrastructure.orchestration.algorithm_runner import run_algorithm
-from src.domain.algorithms import CSPAlgorithm, register_algorithm, global_registry
+from src.domain.algorithms import CSPAlgorithm, global_registry, register_algorithm
 from src.domain.distance import create_distance_calculator
 from src.domain.status import BaseStatus
+from src.infrastructure.orchestration.algorithm_runner import run_algorithm
 
 
 # --- Stubs -----------------------------------------------------------------
@@ -45,11 +45,12 @@ class StubExecutionController:
             self._idx += 1
             return current
         return self._status_sequence[-1]
-    
+
     # Add missing method for compatibility
     def item_timeout(self):
         # Return a no-op context manager
         from contextlib import nullcontext
+
         return nullcontext()
 
 

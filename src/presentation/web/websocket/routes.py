@@ -3,7 +3,9 @@ WebSocket routes for real-time monitoring.
 """
 
 import logging
+
 from fastapi import APIRouter, WebSocket
+
 from .server import websocket_server
 
 logger = logging.getLogger(__name__)

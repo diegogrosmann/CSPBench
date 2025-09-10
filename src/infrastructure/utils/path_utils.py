@@ -60,21 +60,6 @@ def get_output_base_directory() -> Path:
     return get_env_path("OUTPUT_BASE_DIRECTORY", "./outputs")
 
 
-def get_work_db_path() -> Path:
-    """Get the work database path from environment variable."""
-    db_path_str = os.getenv("WORK_DB_PATH", "./data/work_manager.db")
-    db_path = Path(db_path_str)
-    
-    # Convert to absolute path
-    if not db_path.is_absolute():
-        db_path = db_path.resolve()
-    
-    # Create parent directory if it doesn't exist
-    db_path.parent.mkdir(parents=True, exist_ok=True)
-    
-    return db_path
-
-
 def is_relative_path(path: Union[str, Path]) -> bool:
     """
     Check if a path is relative.

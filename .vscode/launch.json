@@ -45,7 +45,7 @@
             "subProcess": true
         },
         {
-            "name": "Debug CSPBench - TEMPLATE",
+            "name": "Debug CSPBench - Batch Run",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/main.py",
@@ -60,7 +60,9 @@
                 "NUMEXPR_NUM_THREADS": "1",
                 "OPENBLAS_NUM_THREADS": "1"
             },
-            "args": ["batches/TEMPLATE.yaml"],
+            "args": [
+                "${input:batchFile}"
+            ],
             "justMyCode": false,
             "stopOnEntry": false,
             "showReturnValue": true,
@@ -122,6 +124,12 @@
             "id": "workId",
             "description": "Digite o ID do trabalho para reiniciar:",
             "default": "",
+            "type": "promptString"
+        },
+        {
+            "id": "batchFile",
+            "description": "Digite o caminho do arquivo batch:",
+            "default": "batches/TEMPLATE.yaml",
             "type": "promptString"
         }
     ]

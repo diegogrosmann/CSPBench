@@ -2,10 +2,10 @@
 Simple test to verify BLF-GA basic functionality without full execution.
 """
 
-import pytest
 from unittest.mock import Mock
 
 from src.domain.distance import HammingDistanceCalculator
+
 from ..algorithm import BLFGAAlgorithm
 from ..config import BLF_GA_DEFAULTS
 

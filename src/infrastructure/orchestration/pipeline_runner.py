@@ -1,31 +1,34 @@
 """PipelineRunner com suporte a controle (pause/cancel/resume) via WorkManager."""
 
 from __future__ import annotations
-import time
+
 import os
-from typing import Any, Dict
-from src.domain.status import BaseStatus
-from src.infrastructure.persistence.work_state.wrappers.combination_scoped import (
-    CombinationScopedPersistence,
-)
-from src.application.services.work_service import get_work_service
-from src.infrastructure.persistence.work_state import (
-    WorkStatePersistence,
-    WorkScopedPersistence,
-)
+import time
+from dataclasses import asdict
+from typing import Any
+
+from src.application.ports.repositories import ExecutionEngine
+from src.application.services.dataset_service import load_dataset
 from src.domain.config import (
     CSPBenchConfig,
     ExperimentTask,
     OptimizationTask,
     SensitivityTask,
-    TasksGroup,
 )
 from src.domain.dataset import Dataset
-
-from src.infrastructure.execution_control import ExecutionController, ExecutionLimitError
+from src.domain.status import BaseStatus
+from src.infrastructure.execution_control import (
+    ExecutionController,
+    ExecutionLimitError,
+)
 from src.infrastructure.logging_config import get_logger
-from src.application.services.dataset_service import load_dataset
-from src.application.ports.repositories import ExecutionEngine
+from src.infrastructure.persistence.work_state import (
+    WorkScopedPersistence,
+    WorkPersistence,
+)
+from src.infrastructure.persistence.work_state.wrappers.combination_scoped import (
+    CombinationScopedPersistence,
+)
 
 from .experiment_executor import ExperimentExecutor
 from .optimization_executor import OptimizationExecutor
@@ -42,7 +45,7 @@ class PipelineRunner:
         # ExecutionController will be initialized in run() with proper resources config
         self.execution_controller: ExecutionController = None
         self.datasets_cache: dict[str, Dataset] = {}
-        
+
         logger.info(f"PipelineRunner inicializado para work_id: {self.work_id}")
 
     def run(self, config: CSPBenchConfig) -> None:
@@ -51,13 +54,12 @@ class PipelineRunner:
         logger.info(
             f"Configuração: {len(config.tasks.items)} tarefas do tipo {config.tasks.type}"
         )
-        
+
         # Initialize ExecutionController with resources configuration
         self.execution_controller = ExecutionController(
-            work_id=self.work_id, 
-            resources=config.resources
+            work_id=self.work_id, resources=config.resources
         )
-        
+
         # Apply resource limits to main process
         if config.resources:
             if config.resources.memory:
@@ -78,8 +80,6 @@ class PipelineRunner:
             self.execution_controller.check_batch_timeout()  # Check timeout before each phase
             self._generate_pipeline_combinations(config)
 
-            time.sleep(2)  # Pequena pausa para garantir que as combinações sejam processadas
-
             # Fase 3: Executar combinações
             logger.info("=== FASE 3: Executando combinações ===")
             self.execution_controller.check_batch_timeout()  # Check timeout before each phase
@@ -96,7 +96,9 @@ class PipelineRunner:
             logger.error(f"Pipeline interrompido por timeout: {timeout_exc}")
             if self.work_store:
                 self.work_store.work_error(timeout_exc)
-                self.work_store.update_work_status(BaseStatus.CANCELED, error=str(timeout_exc))
+                self.work_store.update_work_status(
+                    BaseStatus.CANCELED, error=str(timeout_exc)
+                )
         except Exception as e:
             logger.error(f"Erro durante execução do pipeline: {e}", exc_info=True)
             if self.work_store:
@@ -111,33 +113,34 @@ class PipelineRunner:
                 logger.info("Pipeline finalizado e recursos liberados")
             # Finalization export (raw db + manifest + full_results + summary)
             try:
-                from src.infrastructure.persistence.work_state.core import WorkStatePersistence  # local import to avoid cycles
                 from src.infrastructure.export.finalization_service import (
                     FinalizationConfig,
                     FinalizationService,
                 )
-                # Infer DB path and output path from work_store
-                store: WorkStatePersistence = self.work_store._store  # type: ignore[attr-defined]
-                db_path = store.db_path  # Path object
-                # Attempt to get output directory from work row (output_path field) if present
+
+                # Get output directory from work row (output_path field) if present
                 output_dir = None
                 try:
-                    output_dir = store.get_work_output_path(self.work_id)  # may return Path or None
+                    output_dir = self.work_store.get_work_output_path(
+                        self.work_id
+                    )  # may return Path or None
                 except Exception:
                     output_dir = None
                 if output_dir is None:
                     # fallback: derive from environment OUTPUT_BASE_DIRECTORY
                     from pathlib import Path
+
                     base = os.environ.get("OUTPUT_BASE_DIRECTORY", "./data/outputs")
                     output_dir = Path(base) / self.work_id
                 output_dir.mkdir(parents=True, exist_ok=True)
+                
+                # Use WorkScopedPersistence instead of accessing db_path
                 cfg = FinalizationConfig(
                     work_id=self.work_id,
-                    db_path=db_path,
                     output_dir=output_dir,
                     tool_version=FinalizationService.detect_tool_version(),
                 )
-                FinalizationService(cfg).run()
+                FinalizationService(cfg, work_store=self.work_store).run()
             except Exception as fe:  # pragma: no cover - defensive
                 logger.error(f"Erro durante finalização de exportação: {fe}")
 
@@ -171,9 +174,7 @@ class PipelineRunner:
                 dataset_config = config.datasets[dataset_id]
                 self._process_dataset(dataset_config)
 
-                logger.info(
-                    f"Dataset {dataset_id} processado."
-                )
+                logger.info(f"Dataset {dataset_id} processado.")
 
             except Exception as e:
                 logger.error(f"Erro ao processar dataset {dataset_id}: {e}")
@@ -198,9 +199,13 @@ class PipelineRunner:
                 if isinstance(task, ExperimentTask):
                     total_sequences = task.repetitions
                 elif isinstance(task, OptimizationTask):
-                    total_sequences = task.config.get("trials", 50) if task.config else 50
+                    total_sequences = (
+                        task.config.get("trials", 50) if task.config else 50
+                    )
                 elif isinstance(task, SensitivityTask):
-                    total_sequences = task.config.get("samples", 100) if task.config else 100
+                    total_sequences = (
+                        task.config.get("samples", 100) if task.config else 100
+                    )
 
                 # task.datasets agora é List[str] contendo IDs de datasets
                 for dataset_id in task.datasets:
@@ -264,10 +269,7 @@ class PipelineRunner:
                 logger.info("Todas as combinações foram processadas")
                 break
 
-            work_combination = CombinationScopedPersistence(
-                self.work_store.store,  # store base
-                combination["id"],
-            )
+            work_combination = self.work_store.for_combination(combination["id"])
 
             # Executar combinação e armazenar o status
             status = self._execute_single_combination(
@@ -378,7 +380,6 @@ class PipelineRunner:
         if (
             self.work_store
             and dataset_id
-            and self.work_store.store.has_dataset(dataset_id)
         ):
             try:
                 dataset_obj = self.work_store.get_dataset(dataset_id)
@@ -399,12 +400,14 @@ class PipelineRunner:
             resolver, params = load_dataset(dataset_config)
 
             meta = {
-                "batch_params": dataset_config if dataset_config else {},
+                "batch_params": asdict(dataset_config) if dataset_config else {},
                 "dataset_params": params if params else {},
-                "dataset_statistics": resolver.get_statistics() if resolver else {}
+                "dataset_statistics": resolver.get_statistics() if resolver else {},
             }
 
-            self.work_store.submit_dataset(id= dataset_id, dataset_obj=resolver, meta=meta)
+            self.work_store.submit_dataset(
+                id=dataset_id, dataset_obj=resolver, meta=meta
+            )
             self.datasets_cache[dataset_id] = resolver
 
         except Exception as e:

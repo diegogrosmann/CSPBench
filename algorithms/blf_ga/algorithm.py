@@ -79,11 +79,10 @@ reporting via store callbacks, no separate implementation module).
 
 from __future__ import annotations
 
-from typing import Any
 import time
-import random
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
+from typing import Any
 
 from src.domain.algorithms import AlgorithmResult, CSPAlgorithm, register_algorithm
 
@@ -196,6 +195,7 @@ class BLFGAAlgorithm(CSPAlgorithm):
 
     def _adaptive_blocking(self, pop: list[str]) -> list[tuple[int, int]]:
         import math
+
         import numpy as np
 
         L = len(self.strings[0]) if self.strings else 0
@@ -561,12 +561,12 @@ class BLFGAAlgorithm(CSPAlgorithm):
                     )
 
             end_time = time.time()
-            
+
             # Para execução cancelada, assegurar que temos pelo menos algum resultado
             if termination_reason == "cancelled":
                 if not best:
                     return self._build_cancelled_result(start_time)
-                    
+
             avg_dist = self.average_distance(best)
             total_dist = self.total_distance(best)
             if self._monitor:
@@ -605,7 +605,7 @@ class BLFGAAlgorithm(CSPAlgorithm):
                 "avg_distance": avg_dist,
                 "total_distance": total_dist,
             }
-            
+
             # Se foi cancelado, retornar como falha
             if termination_reason == "cancelled":
                 return AlgorithmResult(
@@ -616,7 +616,7 @@ class BLFGAAlgorithm(CSPAlgorithm):
                     error="Algorithm execution was cancelled",
                     metadata=metadata,
                 )
-            
+
             return AlgorithmResult(
                 success=True,
                 center_string=best,

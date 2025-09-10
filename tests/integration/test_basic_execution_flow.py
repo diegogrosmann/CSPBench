@@ -1,24 +1,25 @@
 """Teste de fluxo básico de execução."""
 
-import pytest
 import tempfile
 import time
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-from src.application.services.execution_manager import ExecutionManager
+import pytest
+
+from src.application.services.work_service import get_work_service
 from src.domain.config import (
+    AlgorithmsPresetConfig,
+    AlgParamsConfig,
     CSPBenchConfig,
+    ExperimentTaskConfig,
     MetadataConfig,
     SyntheticDatasetConfig,
-    AlgParamsConfig,
-    AlgorithmsPresetConfig,
-    ExperimentTaskConfig,
-    TasksGroupConfig,
     SystemConfig,
+    TasksGroupConfig,
 )
 from src.domain.status import BaseStatus
-from src.infrastructure.persistence.work_state import WorkStatePersistence
+from src.infrastructure.persistence.work_state import WorkPersistence
 
 
 class TestBasicExecutionFlow:
@@ -81,12 +82,12 @@ class TestBasicExecutionFlow:
             yield Path(tmpdir)
 
     def test_execution_manager_validates_config(self, minimal_config):
-        """Testa que ExecutionManager valida configuração antes da execução."""
-        execution_manager = ExecutionManager()
+        """Testa que WorkManager valida configuração antes da execução."""
+        work_manager = get_work_service()
 
         # Configuração válida não deve levantar exceção
         try:
-            execution_manager._validate_config(minimal_config)
+            work_manager._validate_config(minimal_config)
         except Exception as e:
             pytest.fail(f"Configuração válida foi rejeitada: {e}")
 
@@ -100,17 +101,17 @@ class TestBasicExecutionFlow:
         )
 
         with pytest.raises(ValueError, match="At least one dataset"):
-            execution_manager._validate_config(invalid_config)
+            work_manager._validate_config(invalid_config)
 
     def test_pipeline_runner_generates_combinations(
         self, minimal_config, temp_work_dir
     ):
         """Testa que PipelineRunner gera combinações corretamente."""
+        from src.domain.work import WorkItem
         from src.infrastructure.orchestration.pipeline_runner import PipelineRunner
         from src.infrastructure.persistence.work_state.wrappers.work_scoped import (
             WorkScopedPersistence,
         )
-        from src.domain.work import WorkItem
 
         # Criar work item e persistence
         work_id = "test_work_123"
@@ -124,9 +125,9 @@ class TestBasicExecutionFlow:
         )
 
         # Inicializar persistence
-        base_store = WorkStatePersistence(temp_work_dir / "state.db")
+        base_store = WorkPersistence(f"sqlite:///{temp_work_dir / 'state.db'}")
         base_store.submit_work(work_item)
-        work_store = WorkScopedPersistence(base_store, work_id)
+        work_store = WorkScopedPersistence(work_id, base_store)
 
         # Criar runner e gerar combinações
         runner = PipelineRunner(work_store=work_store)
@@ -150,11 +151,11 @@ class TestBasicExecutionFlow:
         self, minimal_config, temp_work_dir
     ):
         """Testa que PipelineRunner adiciona novas combinações após reset."""
+        from src.domain.work import WorkItem
         from src.infrastructure.orchestration.pipeline_runner import PipelineRunner
         from src.infrastructure.persistence.work_state.wrappers.work_scoped import (
             WorkScopedPersistence,
         )
-        from src.domain.work import WorkItem
 
         work_id = "test_work_reset"
         work_item = WorkItem(
@@ -166,9 +167,9 @@ class TestBasicExecutionFlow:
             output_path=str(temp_work_dir / "results"),
         )
 
-        base_store = WorkStatePersistence(temp_work_dir / "state.db")
+        base_store = WorkPersistence(f"sqlite:///{temp_work_dir / 'state.db'}")
         base_store.submit_work(work_item)
-        work_store = WorkScopedPersistence(base_store, work_id)
+        work_store = WorkScopedPersistence(work_id, base_store)
         runner = PipelineRunner(work_store=work_store)
 
         # Primeira geração
@@ -257,9 +258,6 @@ class TestBasicExecutionFlow:
     def test_status_normalization_in_pipeline(self, minimal_config, temp_work_dir):
         """Testa que normalização de status funciona no contexto do pipeline."""
         from src.domain.status import normalize_status
-        from src.infrastructure.persistence.work_state.utils.validation import (
-            validate_status,
-        )
 
         # Testar vários formatos de status
         test_statuses = [
@@ -274,15 +272,12 @@ class TestBasicExecutionFlow:
             normalized = normalize_status(input_status)
             assert normalized == expected
 
-            # Validação não deve levantar exceção
-            validate_status(input_status)
-
     def test_combinations_submission_integration(self, temp_work_dir, minimal_config):
         """Testa integração da submissão de combinações no contexto real."""
+        from src.domain.work import WorkItem
         from src.infrastructure.persistence.work_state.wrappers.work_scoped import (
             WorkScopedPersistence,
         )
-        from src.domain.work import WorkItem
 
         work_id = "integration_test"
         work_item = WorkItem(
@@ -294,9 +289,9 @@ class TestBasicExecutionFlow:
             output_path=str(temp_work_dir),
         )
 
-        base_store = WorkStatePersistence(temp_work_dir / "state.db")
+        base_store = WorkPersistence(f"sqlite:///{temp_work_dir / 'state.db'}")
         base_store.submit_work(work_item)
-        work_store = WorkScopedPersistence(base_store, work_id)
+        work_store = WorkScopedPersistence(work_id, base_store)
 
         # Submeter múltiplas combinações
         combinations = [

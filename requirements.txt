@@ -72,6 +72,7 @@ pluggy==1.6.0
 pre_commit==4.2.0
 propcache==0.3.2
 psutil==7.0.0
+psycopg2-binary==2.9.9
 pyarrow==18.1.0
 pycodestyle==2.14.0
 pydantic==2.11.7

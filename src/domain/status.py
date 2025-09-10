@@ -1,45 +1,79 @@
+"""
+Work Status Management.
+
+Defines standardized status enumeration and management for work execution
+across the entire CSPBench system, ensuring consistent status handling
+and proper state transitions.
+
+This module provides:
+- Standardized status enumeration
+- Status validation and normalization
+- Status transition rules
+- Helper functions for status management
+"""
+
 from enum import Enum
 
 
 class BaseStatus(str, Enum):
-    """Standardized work execution statuses across the entire system."""
+    """
+    Standardized work execution statuses across the entire system.
+    
+    This enumeration defines all possible states a work item can be in
+    during its lifecycle, from submission to completion.
+    
+    Status Categories:
+    - Incomplete: QUEUED, RUNNING, PAUSED, CANCELED
+    - Final: COMPLETED, FAILED, ERROR
+    """
 
-    QUEUED = "queued"  # Trabalho na fila, aguardando para começar
-    RUNNING = "running"  # Trabalho em execução atualmente
-    PAUSED = "paused"  # Trabalho pausado, pode ser retomado
-    CANCELED = "canceled"  # Trabalho cancelado antes de terminar
-    COMPLETED = "completed"  # Trabalho finalizado com sucesso
-    FAILED = "failed"  # Falha impediu a execução de prosseguir
-    ERROR = "error"  # Erro durante execução, mas prosseguiu até o fim
+    QUEUED = "queued"      # Work in queue, waiting to start
+    RUNNING = "running"    # Work currently executing
+    PAUSED = "paused"      # Work paused, can be resumed
+    CANCELED = "canceled"  # Work canceled before completion
+    COMPLETED = "completed"  # Work finished successfully
+    FAILED = "failed"      # Failure prevented execution from proceeding
+    ERROR = "error"        # Error during execution, but proceeded to end
 
     @property
     def is_final(self) -> bool:
-        """Indica se o status representa um estado finalizado (terminal)."""
+        """
+        Indicate if status represents a finalized (terminal) state.
+        
+        Returns:
+            bool: True if status is terminal
+        """
         return self in FINAL_STATUSES
 
     @property
     def is_incomplete(self) -> bool:
-        """Indica se o status representa um estado incompleto (não finalizado)."""
+        """
+        Indicate if status represents an incomplete (non-finalized) state.
+        
+        Returns:
+            bool: True if status is incomplete
+        """
         return self in INCOMPLETE_STATUSES
 
 
-# Status finalizados (terminais) - trabalho chegou ao fim
-# Estes status indicam que o trabalho foi concluído de alguma forma
+# Finalized (terminal) statuses - work has reached an end
+# These statuses indicate that work was completed in some way
 FINAL_STATUSES: set[BaseStatus] = {
-    BaseStatus.COMPLETED,  # Sucesso - trabalho executado completamente
-    BaseStatus.FAILED,  # Falha - execução impedida de prosseguir
-    BaseStatus.ERROR,  # Erro - execução prosseguiu mas com problemas
+    BaseStatus.COMPLETED,  # Success - work executed completely
+    BaseStatus.FAILED,     # Failure - execution prevented from proceeding
+    BaseStatus.ERROR,      # Error - execution proceeded but with problems
 }
 
-# Status incompletos (não finalizados) - trabalho não chegou ao fim
-# Estes status indicam que o trabalho ainda não foi concluído
+# Incomplete (non-finalized) statuses - work has not reached an end
+# These statuses indicate that work has not yet been completed
 INCOMPLETE_STATUSES: set[BaseStatus] = {
-    BaseStatus.QUEUED,  # Aguardando - trabalho na fila para execução
-    BaseStatus.RUNNING,  # Ativo - trabalho sendo executado no momento
-    BaseStatus.PAUSED,  # Suspenso - trabalho pausado, pode ser retomado
-    BaseStatus.CANCELED,  # Cancelado - trabalho interrompido antes do fim
+    BaseStatus.QUEUED,     # Waiting - work in queue for execution
+    BaseStatus.RUNNING,    # Active - work being executed at the moment
+    BaseStatus.PAUSED,     # Suspended - work paused, can be resumed
+    BaseStatus.CANCELED,   # Canceled - work interrupted before end
 }
 
+# Status transition rules - defines allowed transitions between statuses
 ALLOWEDSTATUS: dict[BaseStatus, set[BaseStatus]] = {
     BaseStatus.QUEUED: {BaseStatus.RUNNING, BaseStatus.CANCELED},
     BaseStatus.RUNNING: {
@@ -58,21 +92,21 @@ ALLOWEDSTATUS: dict[BaseStatus, set[BaseStatus]] = {
 
 def normalize_status(value) -> str:
     """
-    Normaliza um valor de status para string lowercase.
+    Normalize a status value to lowercase string.
 
-    Aceita:
-    - Instâncias de BaseStatus (retorna .value)
-    - Strings (converte para lowercase e strip)
-    - Outros tipos (converte para string e aplica lowercase)
+    Accepts:
+    - BaseStatus instances (returns .value)
+    - Strings (converts to lowercase and strip)
+    - Other types (converts to string and applies lowercase)
 
     Args:
-        value: Valor a ser normalizado (BaseStatus, str, ou outro)
+        value: Value to be normalized (BaseStatus, str, or other)
 
     Returns:
-        String normalizada em lowercase
+        str: Normalized string in lowercase
 
     Raises:
-        ValueError: Se o valor normalizado não corresponder a um status válido
+        ValueError: If normalized value doesn't correspond to a valid status
     """
     if isinstance(value, BaseStatus):
         return value.value
@@ -82,23 +116,26 @@ def normalize_status(value) -> str:
     else:
         normalized = str(value).strip().lower()
 
-    # Validar se é um status conhecido
+    # Validate if it's a known status
     valid_values = {s.value for s in BaseStatus}
     if normalized not in valid_values:
-        raise ValueError(f"Status inválido: {value}. Válidos: {sorted(valid_values)}")
+        raise ValueError(f"Invalid status: {value}. Valid: {sorted(valid_values)}")
 
     return normalized
 
 
 def normalize_status(value: str | BaseStatus) -> str:
-    """Normaliza um status para string lowercase validada.
+    """
+    Normalize a status to validated lowercase string.
 
     Args:
-        value: Status como BaseStatus ou string (case-insensitive)
+        value: Status as BaseStatus or string (case-insensitive)
+        
     Returns:
-        str normalizada (um dos valores de BaseStatus)
+        str: Normalized string (one of BaseStatus values)
+        
     Raises:
-        ValueError se o valor não representar um status válido
+        ValueError: If value doesn't represent a valid status
     """
     if isinstance(value, BaseStatus):
         return value.value
@@ -106,5 +143,5 @@ def normalize_status(value: str | BaseStatus) -> str:
         value = str(value)
     norm = value.strip().lower()
     if norm not in {s.value for s in BaseStatus}:
-        raise ValueError(f"Status inválido: {value}")
+        raise ValueError(f"Invalid status: {value}")
     return norm

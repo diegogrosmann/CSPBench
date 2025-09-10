@@ -2,18 +2,20 @@
 
 This implementation intentionally drops legacy/export-config driven outputs.
 """
+
 from __future__ import annotations
 
-from dataclasses import dataclass
-from pathlib import Path
-from typing import Any, Dict, List, Tuple
 import json
-import tomllib
-import sqlite3
-from datetime import datetime, timezone
 import math
+import sqlite3
+import tomllib
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Dict, List
 
 import matplotlib
+
 matplotlib.use("Agg")  # headless
 import matplotlib.pyplot as plt
 
@@ -27,27 +29,36 @@ from src.infrastructure.logging_config import get_logger
 logger = get_logger("CSPBench.Finalization")
 
 
-@dataclass
+@dataclass 
 class FinalizationConfig:
     work_id: str
-    db_path: Path
     output_dir: Path
     tool_version: str | None = None
-
-
 class FinalizationService:
-    def __init__(self, config: FinalizationConfig):
+    def __init__(self, config: FinalizationConfig, work_store: Any = None):
         self.config = config
+        self.work_store = work_store  # WorkScopedPersistence instance
         self.output_dir = config.output_dir
         self.raw_dir = self.output_dir / "raw_db"
         self.optuna_dir = self.output_dir / "optuna"
         self.sensitivity_dir = self.output_dir / "sensitivity" / "native"
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.raw_dir.mkdir(exist_ok=True)
+        
+    def _get_db_connection(self):
+        """DEPRECATED: Direct database access should not be used."""
+        logger.warning("Direct database access is deprecated. Use work_store methods instead.")
+        if self.work_store is None:
+            raise ValueError("work_store is required for database operations")
+        # Get the raw database connection from SQLAlchemy engine
+        engine = self.work_store.store._engine
+        return engine.raw_connection()
 
     # -------------- PUBLIC --------------
     def run(self) -> None:
-        logger.info("Starting finalization export (raw db + manifest + full_results + summary)")
+        logger.info(
+            "Starting finalization export (raw db + manifest + full_results + summary)"
+        )
         tables_info = self._dump_sqlite_tables()
 
         # Exportações especiais (Optuna / Sensitivity)
@@ -60,46 +71,93 @@ class FinalizationService:
         manifest_path = self._generate_manifest(
             tables_info, full_results_path, optuna_exports, sensitivity_exports
         )
-        summary_path = self._generate_summary(tables_info, full_results_path, manifest_path)
+        summary_path = self._generate_summary(
+            tables_info, full_results_path, manifest_path
+        )
         logger.info(
             f"Finalization complete: manifest={manifest_path.name}, full_results={full_results_path.name}, summary={summary_path.name}"
         )
 
     # -------------- INTERNAL --------------
     def _dump_sqlite_tables(self) -> Dict[str, Dict[str, Any]]:
+        """Export tables data using work_store methods instead of direct SQL."""
         info: Dict[str, Dict[str, Any]] = {}
-        conn = sqlite3.connect(self.config.db_path)
+        
+        if self.work_store is None:
+            raise ValueError("work_store is required for export operations")
+        
         try:
-            cur = conn.cursor()
-            cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")
-            tables = [r[0] for r in cur.fetchall()]
-            for table in tables:
-                try:
-                    cur.execute(f"SELECT * FROM {table}")
-                    rows = cur.fetchall()
-                    col_names = [d[0] for d in cur.description]
-                    csv_path = self.raw_dir / f"{table}.csv"
-                    # Write CSV manually (avoid pandas dependency here)
-                    with csv_path.open("w", encoding="utf-8") as fh:
-                        fh.write(",".join(col_names) + "\n")
-                        for row in rows:
-                            # Basic escaping: replace newlines/commas inside str
-                            formatted = []
-                            for cell in row:
-                                if cell is None:
-                                    formatted.append("")
-                                else:
-                                    text = str(cell).replace("\n", " ")
-                                    if "," in text:
-                                        text = '"' + text.replace('"', "''") + '"'
-                                    formatted.append(text)
-                            fh.write(",".join(formatted) + "\n")
-                    info[table] = {"rows": len(rows), "file": str(csv_path.relative_to(self.output_dir))}
-                except Exception as te:  # pragma: no cover - defensive
-                    logger.error(f"Error dumping table {table}: {te}")
-        finally:
-            conn.close()
+            # Export work data
+            work_data = self.work_store.store.get_work_export_data(self.config.work_id)
+            if work_data:
+                self._write_csv_data("work", [work_data], info)
+            
+            # Export combinations
+            combinations_data = self.work_store.store.get_combinations_for_export(self.config.work_id)
+            if combinations_data:
+                self._write_csv_data("combinations", combinations_data, info)
+            
+            # Export executions
+            executions_data = self.work_store.store.get_executions_for_export(self.config.work_id)
+            if executions_data:
+                self._write_csv_data("executions", executions_data, info)
+            
+            # Export execution progress
+            progress_data = self.work_store.store.get_execution_progress_for_export(self.config.work_id)
+            if progress_data:
+                self._write_csv_data("execution_progress", progress_data, info)
+            
+            # Export events
+            events_data = self.work_store.store.get_events_for_export(self.config.work_id)
+            if events_data:
+                self._write_csv_data("events", events_data, info)
+            
+            # Export datasets
+            datasets_data = self.work_store.store.get_datasets_for_export(self.config.work_id)
+            if datasets_data:
+                self._write_csv_data("datasets", datasets_data, info)
+            
+            # Export dataset sequences
+            sequences_data = self.work_store.store.get_dataset_sequences_for_export(self.config.work_id)
+            if sequences_data:
+                self._write_csv_data("dataset_sequences", sequences_data, info)
+                
+        except Exception as e:
+            logger.error(f"Error dumping tables: {e}")
+        
         return info
+
+    def _write_csv_data(self, table_name: str, data: List[Dict[str, Any]], info: Dict[str, Dict[str, Any]]) -> None:
+        """Write data to CSV file."""
+        if not data:
+            return
+            
+        csv_path = self.raw_dir / f"{table_name}.csv"
+        
+        # Get column names from first row
+        col_names = list(data[0].keys())
+        
+        # Write CSV manually (avoid pandas dependency here)
+        with csv_path.open("w", encoding="utf-8") as fh:
+            fh.write(",".join(col_names) + "\n")
+            for row in data:
+                # Basic escaping: replace newlines/commas inside str
+                formatted = []
+                for col in col_names:
+                    cell = row.get(col)
+                    if cell is None:
+                        formatted.append("")
+                    else:
+                        text = str(cell).replace("\n", " ")
+                        if "," in text:
+                            text = '"' + text.replace('"', "''") + '"'
+                        formatted.append(text)
+                fh.write(",".join(formatted) + "\n")
+        
+        info[table_name] = {
+            "rows": len(data),
+            "file": str(csv_path.relative_to(self.output_dir)),
+        }
 
     def _generate_full_results(
         self,
@@ -107,31 +165,25 @@ class FinalizationService:
         optuna_exports: Dict[str, Any],
         sensitivity_exports: Dict[str, Any],
     ) -> Path:
-        # Build executions expansion (lightweight) from raw CSV or direct DB
+        # Build executions expansion (lightweight) using work_store
         executions: List[Dict[str, Any]] = []
         try:
-            conn = sqlite3.connect(self.config.db_path)
-            cur = conn.cursor()
-            cur.execute("SELECT id, combination_id, status, params_json, result_json, objective FROM executions")
-            for row in cur.fetchall():
-                exec_id, comb_id, status, params_json, result_json, objective = row
+            # Use the export method instead of direct DB access
+            executions_data = self.work_store.store.get_executions_for_export(self.config.work_id)
+            
+            for exec_row in executions_data:
                 executions.append(
                     {
-                        "execution_id": exec_id,
-                        "combination_id": comb_id,
-                        "status": status,
-                        "objective": objective,
-                        "params": self._safe_parse_json(params_json),
-                        "result": self._safe_parse_json(result_json),
+                        "execution_id": exec_row.get("id"),
+                        "combination_id": exec_row.get("combination_id"),
+                        "status": exec_row.get("status"),
+                        "objective": exec_row.get("objective"),
+                        "params": self._safe_parse_json(exec_row.get("params_json")),
+                        "result": self._safe_parse_json(exec_row.get("result_json")),
                     }
                 )
         except Exception as e:  # pragma: no cover
             logger.error(f"Error building executions section: {e}")
-        finally:
-            try:
-                conn.close()
-            except Exception:  # pragma: no cover
-                pass
 
         data: Dict[str, Any] = {
             "work_id": self.config.work_id,
@@ -218,27 +270,13 @@ class FinalizationService:
           4. Para cada estudo gerar dois plots simples (objective_vs_trial, best_objective_vs_trial)
         """
         try:
-            conn = sqlite3.connect(self.config.db_path)
-            cur = conn.cursor()
-            cur.execute(
-                """
-                SELECT unit_id, sequencia, status, params_json, result_json, objective
-                FROM executions
-                WHERE unit_id LIKE 'optimization:%'
-                ORDER BY unit_id, sequencia
-                """
-            )
-            rows = cur.fetchall()
+            # Use work_store method instead of direct DB access
+            executions_data = self.work_store.store.get_optimization_executions_for_export(self.config.work_id)
         except Exception as e:  # pragma: no cover
             logger.warning(f"Optuna export skipped (query error): {e}")
             return {"studies": []}
-        finally:
-            try:
-                conn.close()
-            except Exception:
-                pass
 
-        if not rows:
+        if not executions_data:
             return {"studies": []}
 
         self.optuna_dir.mkdir(exist_ok=True)
@@ -249,7 +287,14 @@ class FinalizationService:
             fh.write(
                 "study_id,task_id,dataset_id,preset_id,algorithm_id,trial_number,status,objective,params_json,result_json\n"
             )
-            for unit_id, seq, status, params_json, result_json, objective in rows:
+            for exec_data in executions_data:
+                unit_id = exec_data.get("unit_id")
+                seq = exec_data.get("sequencia")
+                status = exec_data.get("status")
+                params_json = exec_data.get("params_json")
+                result_json = exec_data.get("result_json")
+                objective = exec_data.get("objective")
+                
                 # unit pattern: optimization:task:dataset:preset:algorithm:trial
                 parts = unit_id.split(":")
                 if len(parts) < 6:
@@ -288,9 +333,11 @@ class FinalizationService:
             numbers = [t["trial_number"] for t in trials]
             objectives = [t["objective"] for t in trials]
             # Filtrar None
-            numbers_obj, objectives_clean = zip(
-                *[(n, o) for n, o in zip(numbers, objectives) if o is not None]
-            ) if any(o is not None for o in objectives) else ([], [])
+            numbers_obj, objectives_clean = (
+                zip(*[(n, o) for n, o in zip(numbers, objectives) if o is not None])
+                if any(o is not None for o in objectives)
+                else ([], [])
+            )
             if objectives_clean:
                 best_running = []
                 current_best = math.inf
@@ -339,27 +386,13 @@ class FinalizationService:
     def _export_sensitivity_results_and_plots(self) -> Dict[str, Any]:
         """Exporta resultados de sensibilidade baseados em eventos (futuro: integrar SALib nativo)."""
         try:
-            conn = sqlite3.connect(self.config.db_path)
-            cur = conn.cursor()
-            cur.execute(
-                """
-                SELECT entity_data_json, timestamp
-                FROM events
-                WHERE event_type='sensitivity_analysis'
-                ORDER BY timestamp
-                """
-            )
-            rows = cur.fetchall()
+            # Use work_store method instead of direct DB access
+            events_data = self.work_store.store.get_sensitivity_events_for_export(self.config.work_id)
         except Exception as e:  # pragma: no cover
             logger.warning(f"Sensitivity export skipped (query error): {e}")
             return {"analyses": []}
-        finally:
-            try:
-                conn.close()
-            except Exception:
-                pass
 
-        if not rows:
+        if not events_data:
             return {"analyses": []}
 
         self.sensitivity_dir.mkdir(parents=True, exist_ok=True)
@@ -367,7 +400,9 @@ class FinalizationService:
         analyses: List[Dict[str, Any]] = []
         with analyses_csv.open("w", encoding="utf-8") as fh:
             fh.write("unit_id,method,param,score,num_samples,analysis_timestamp\n")
-            for entity_data_json, ts in rows:
+            for event_data in events_data:
+                entity_data_json = event_data.get("entity_data_json")
+                ts = event_data.get("timestamp")
                 try:
                     data = json.loads(entity_data_json)
                 except Exception:
@@ -387,9 +422,7 @@ class FinalizationService:
                         "timestamp": ts,
                     }
                     analyses.append(rec)
-                    fh.write(
-                        f"{unit_id},{method},{param},{score},{num_samples},{ts}\n"
-                    )
+                    fh.write(f"{unit_id},{method},{param},{score},{num_samples},{ts}\n")
 
         # Gerar um plot por unit_id agregando scores
         plots: List[str] = []

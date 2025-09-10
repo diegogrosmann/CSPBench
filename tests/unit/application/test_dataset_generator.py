@@ -1,4 +1,5 @@
 import random
+
 import pytest
 
 from src.application.services.dataset_generator import SyntheticDatasetGenerator

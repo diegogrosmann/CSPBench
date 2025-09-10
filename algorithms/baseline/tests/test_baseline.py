@@ -11,8 +11,6 @@ Covers:
 
 from __future__ import annotations
 
-import pytest
-
 from algorithms.baseline import BaselineAlg
 from src.domain.distance import create_distance_calculator
 

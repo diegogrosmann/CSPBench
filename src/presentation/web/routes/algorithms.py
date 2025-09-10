@@ -24,18 +24,18 @@ async def get_algorithms():
 
         for name, algorithm_cls in global_registry.items():
             try:
-                # Create temporary instance to get metadata
-                temp_instance = algorithm_cls()
+                # Get metadata from class attributes instead of creating instance
+                # This avoids the issue with required constructor arguments
+                
+                # Get default parameters from class attribute
+                default_params = getattr(algorithm_cls, "default_params", {})
 
-                # Get default parameters
-                default_params = getattr(temp_instance, "default_params", {})
-
-                # Get metadata
-                is_deterministic = getattr(temp_instance, "is_deterministic", True)
+                # Get metadata from class attributes
+                is_deterministic = getattr(algorithm_cls, "is_deterministic", True)
                 supports_parallel = getattr(
-                    temp_instance, "supports_internal_parallel", False
+                    algorithm_cls, "supports_internal_parallel", False
                 )
-                category = getattr(temp_instance, "category", "General")
+                category = getattr(algorithm_cls, "category", "General")
 
                 algorithm_info = AlgorithmInfo(
                     name=name,
@@ -78,18 +78,18 @@ async def get_algorithm_info(algorithm_name: str):
                 status_code=404, detail=f"Algorithm '{algorithm_name}' not found"
             )
 
-        # Create temporary instance to get metadata
-        temp_instance = algorithm_cls()
+        # Get metadata from class attributes instead of creating instance
+        # This avoids the issue with required constructor arguments
 
         return {
             "name": algorithm_name,
             "description": algorithm_cls.__doc__ or f"{algorithm_name} algorithm",
-            "default_params": getattr(temp_instance, "default_params", {}),
-            "is_deterministic": getattr(temp_instance, "is_deterministic", True),
+            "default_params": getattr(algorithm_cls, "default_params", {}),
+            "is_deterministic": getattr(algorithm_cls, "is_deterministic", True),
             "supports_internal_parallel": getattr(
-                temp_instance, "supports_internal_parallel", False
+                algorithm_cls, "supports_internal_parallel", False
             ),
-            "category": getattr(temp_instance, "category", "General"),
+            "category": getattr(algorithm_cls, "category", "General"),
             "version": getattr(algorithm_cls, "__version__", "1.0.0"),
         }
 

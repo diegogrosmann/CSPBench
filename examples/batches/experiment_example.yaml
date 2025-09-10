@@ -14,7 +14,7 @@
 # This section contains basic information about the batch.
 # All fields are required for traceability and documentation.
 metadata:
-  name: "sensitivity Example"                  # Descriptive batch name (string)
+  name: "Experiment Example"                  # Descriptive batch name (string)
   description: "Detailed description of what the batch does"
     # Complete description (string)    
   author: "Author Name"               # Responsible author (string)
@@ -109,11 +109,11 @@ experiment:
     - name: "Test Experiment"         # string: Descriptive experiment name
       datasets:
         - "synthetic_small_dataset"
-        - "synthetic_medium_dataset"
+#        - "synthetic_medium_dataset"
       algorithms:
-        - "full_config"
+#        - "full_config"
         - "small_config"
-      repetitions: 20                 # int: Number of repetitions per combination (1-10 recommended)
+      repetitions: 5                 # int: Number of repetitions per combination (1-10 recommended)
                                       # Each dataset+algorithm combination will be executed N times
 
 # =====================================================================
@@ -124,7 +124,7 @@ resources:
   # CPU limitations
   cpu:
     # Do not use the same cores as the main application during tests
-    exclusive_cores: true            # bool: If true, tests do not share cores with the main app
+    exclusive_cores: false            # bool: If true, tests do not share cores with the main app
     max_workers: null                 # int|null: Maximum number of cores to use (null = all available)
     internal_jobs: 4                  # int: Maximum internal parallel jobs per algorithm
                                       # Controls internal algorithm parallelism (threads/processes)

@@ -17,7 +17,7 @@ __all__ = [
     "WorkMonitorManager",
     "work_monitor_manager",
     "WebSocketServer",
-    "websocket_server", 
+    "websocket_server",
     "WebSocketMessage",
     "ProgressMessage",
     "ProgressSnapshot",
