@@ -14,6 +14,11 @@ from src.infrastructure.persistence.work_state.core import WorkPersistence
 router = APIRouter(prefix="/api/monitor", tags=["monitoring"])
 
 
+def _get_persistence() -> WorkPersistence:
+    """Get WorkPersistence instance following console pattern."""
+    return WorkPersistence()
+
+
 @router.get("/works")
 async def get_works(
     page: int = 1,
@@ -25,31 +30,32 @@ async def get_works(
 ) -> Dict[str, Any]:
     """Get list of all works with status information, filtering and pagination."""
     try:
-        work_service = get_work_service()
-        work_items = work_service.list()
+        persistence = _get_persistence()
+        
+        # Get all works using WorkPersistence
+        work_items, _ = persistence.work_list()
 
         # Enrich with status information and batch metadata
         enriched_works = []
         for work_item in work_items:
-            # Convert WorkItem to dict for processing
-            work = work_item.to_dict()
-            
             # Extract config from config_json field
-            config = {}
-            if work.get("config_json"):
+            config = work_item.get("config_json", {})
+            # If config_json is already a dict (SQLAlchemy JSONType), use it directly
+            # If it's a string, parse it as JSON
+            if isinstance(config, str):
                 try:
-                    config = json.loads(work["config_json"])
+                    config = json.loads(config)
                 except json.JSONDecodeError:
                     config = {}
 
             metadata = config.get("metadata", {})
             work_data = {
-                "id": work["id"],
-                "status": work.get("status", "unknown"),
-                "created_at": work.get("created_at", 0),
-                "updated_at": work.get("updated_at", 0),
-                "output_path": work.get("output_path", ""),
-                "error": work.get("error", None),
+                "id": work_item["id"],
+                "status": work_item.get("status", "unknown"),
+                "created_at": work_item.get("created_at", 0),
+                "updated_at": work_item.get("updated_at", 0),
+                "output_path": work_item.get("output_path", ""),
+                "error": work_item.get("error", None),
                 "config_name": metadata.get("name", "Unknown"),
                 "config_description": metadata.get("description", ""),
                 "config_author": metadata.get("author", ""),
@@ -126,22 +132,29 @@ async def get_works(
 async def get_work_status(work_id: str) -> Dict[str, Any]:
     """Get detailed status of a specific work."""
     try:
-        work_service = get_work_service()
-        work = work_service.get(work_id)
+        persistence = _get_persistence()
+        work = persistence.work_get(work_id)
 
         if not work:
             raise HTTPException(status_code=404, detail=f"Work {work_id} not found")
 
-        # Extract config from WorkItem config
-        config = work.config.to_dict() if work.config else {}
+        # Extract config from work data
+        config = work.get("config_json", {})
+        # If config_json is already a dict (SQLAlchemy JSONType), use it directly
+        # If it's a string, parse it as JSON
+        if isinstance(config, str):
+            try:
+                config = json.loads(config)
+            except json.JSONDecodeError:
+                config = {}
 
         return {
             "work_id": work_id,
-            "status": work.status.value if work.status else "unknown",
-            "created_at": work.created_at,
-            "updated_at": work.updated_at,
-            "output_path": work.output_path,
-            "error": work.error,
+            "status": work.get("status", "unknown"),
+            "created_at": work.get("created_at"),
+            "updated_at": work.get("updated_at"),
+            "output_path": work.get("output_path"),
+            "error": work.get("error"),
             "config": config,
         }
 
@@ -157,50 +170,27 @@ async def get_work_status(work_id: str) -> Dict[str, Any]:
 async def get_work_database_status(work_id: str) -> Dict[str, Any]:
     """Check if work database is ready for monitoring."""
     try:
-        # imports movidos para topo
-
-        work_service = get_work_service()
-        work = work_service.get(work_id)
+        persistence = _get_persistence()
+        work = persistence.work_get(work_id)
 
         if not work:
             raise HTTPException(status_code=404, detail=f"Work {work_id} not found")
 
-        db_path = Path(work.output_path) / "state.db"
-
-        if not db_path.exists():
-            return {
-                "ready": False,
-                "reason": "database_not_created",
-                "message": "Database file not yet created",
-            }
-
+        # Check if there's meaningful progress data
         try:
-            persistence = WorkPersistence(f"sqlite:///{db_path}")
-            try:
-                work = persistence.work_get(work_id)
-                if not work:
-                    return {
-                        "ready": False,
-                        "reason": "work_not_in_database",
-                        "message": "Work not yet written to database",
-                    }
-
-                # Check if there's meaningful progress data
-                progress = persistence.get_work_progress_summary(work_id)
-                if not progress:
-                    return {
-                        "ready": False,
-                        "reason": "no_progress_data",
-                        "message": "No progress data available yet",
-                    }
-
+            progress = persistence.get_work_progress_summary(work_id)
+            if not progress:
                 return {
-                    "ready": True,
-                    "reason": "ready",
-                    "message": "Database ready for monitoring",
+                    "ready": False,
+                    "reason": "no_progress_data",
+                    "message": "No progress data available yet",
                 }
-            finally:
-                persistence.close()
+
+            return {
+                "ready": True,
+                "reason": "ready",
+                "message": "Database ready for monitoring",
+            }
 
         except Exception as db_error:
             return {
@@ -257,14 +247,14 @@ async def work_action(work_id: str, action: str) -> Dict[str, Any]:
 async def get_active_works() -> Dict[str, Any]:
     """Get only active (running/queued) works."""
     try:
-        work_service = get_work_service()
-        work_items = work_service.list()
+        persistence = _get_persistence()
+        work_items, _ = persistence.work_list()  # Unpack the tuple
 
         active_statuses = ["queued", "running"]
         active_works = [
-            work_item.to_dict()
+            work_item
             for work_item in work_items
-            if work_item.status.value in active_statuses
+            if work_item.get("status") in active_statuses
         ]
 
         return {"works": active_works, "count": len(active_works)}
@@ -279,21 +269,12 @@ async def get_active_works() -> Dict[str, Any]:
 async def list_work_combinations(work_id: str) -> Dict[str, Any]:
     """Lista combinações de um work para popular filtros de execução."""
     try:
-        work_service = get_work_service()
-        work = work_service.get(work_id)
+        persistence = _get_persistence()
+        work = persistence.work_get(work_id)
         if not work:
             raise HTTPException(status_code=404, detail=f"Work {work_id} not found")
-        db_path = Path(work.output_path) / "state.db"
-        if not db_path.exists():
-            return {"combinations": [], "total": 0}
-        persistence = WorkPersistence(f"sqlite:///{db_path}")
-        try:
-            work = persistence.work_get(work_id)
-            if not work:
-                return {"combinations": [], "total": 0}
-            combos = persistence.list_combinations(work_id)
-        finally:
-            persistence.close()
+        
+        combos = persistence.list_combinations(work_id)
         return {"combinations": combos, "total": len(combos)}
     except HTTPException:
         raise
@@ -309,70 +290,62 @@ async def get_combination_executions(
 ) -> Dict[str, Any]:
     """Detalhes e estatísticas das execuções de uma combinação específica."""
     try:
-        work_service = get_work_service()
-        work = work_service.get(work_id)
+        persistence = _get_persistence()
+        work = persistence.work_get(work_id)
         if not work:
             raise HTTPException(status_code=404, detail=f"Work {work_id} not found")
-        db_path = Path(work.output_path) / "state.db"
-        if not db_path.exists():
-            raise HTTPException(status_code=404, detail="State database not found")
-        persistence = WorkPersistence(f"sqlite:///{db_path}")
-        try:
-            work = persistence.work_get(work_id)
-            if not work:
-                raise HTTPException(
-                    status_code=404, detail="Work not registered in state database"
-                )
-            # Verificar se combinação existe
-            combo_list = persistence.list_combinations(work_id)
-            combo_map = {c["combination_id"]: c for c in combo_list}
-            combo = combo_map.get(combination_id)
-            if not combo:
-                raise HTTPException(
-                    status_code=404,
-                    detail=f"Combination {combination_id} not found for work {work_id}",
-                )
-            executions = persistence.get_combination_executions_detail(combination_id)
-            # Agregar estatísticas
-            stats = {
-                "Running": 0,
-                "Completed": 0,
-                "Queued": 0,
-                "Failed": 0,
-                "Total": combo.get("total_sequences") or 0,
-            }
-            exec_rows = []
-            for ex in executions:
-                status = ex.status
-                if status == "running":
-                    stats["Running"] += 1
-                elif status == "completed":
-                    stats["Completed"] += 1
-                elif status == "queued":
-                    stats["Queued"] += 1
-                elif status in ("failed", "error"):
-                    stats["Failed"] += 1
-                exec_rows.append(
-                    {
-                        "unit_id": ex.unit_id,
-                        "combination_id": ex.combination_id,
-                        "sequencia": ex.sequencia,
-                        "status": ex.status,
-                        "progress": ex.progress,
-                        "progress_message": ex.progress_message,
-                        "started_at": ex.started_at,
-                        "finished_at": ex.finished_at,
-                        "objective": ex.objective,
-                        "task_id": ex.task_id,
-                        "dataset_id": ex.dataset_id,
-                        "preset_id": ex.preset_id,
-                        "algorithm_id": ex.algorithm_id,
-                        "mode": ex.mode,
-                        "total_sequences": ex.total_sequences,
-                    }
-                )
-        finally:
-            persistence.close()
+        
+        # Verificar se combinação existe
+        combo_list = persistence.list_combinations(work_id)
+        combo_map = {c["combination_id"]: c for c in combo_list}
+        combo = combo_map.get(combination_id)
+        if not combo:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Combination {combination_id} not found for work {work_id}",
+            )
+        
+        executions = persistence.get_combination_executions_detail(combination_id)
+        
+        # Agregar estatísticas
+        stats = {
+            "Running": 0,
+            "Completed": 0,
+            "Queued": 0,
+            "Failed": 0,
+            "Total": combo.get("total_sequences") or 0,
+        }
+        exec_rows = []
+        for ex in executions:
+            status = ex.status
+            if status == "running":
+                stats["Running"] += 1
+            elif status == "completed":
+                stats["Completed"] += 1
+            elif status == "queued":
+                stats["Queued"] += 1
+            elif status in ("failed", "error"):
+                stats["Failed"] += 1
+            exec_rows.append(
+                {
+                    "unit_id": ex.unit_id,
+                    "combination_id": ex.combination_id,
+                    "sequencia": ex.sequencia,
+                    "status": ex.status,
+                    "progress": ex.progress,
+                    "progress_message": ex.progress_message,
+                    "started_at": ex.started_at,
+                    "finished_at": ex.finished_at,
+                    "objective": ex.objective,
+                    "task_id": ex.task_id,
+                    "dataset_id": ex.dataset_id,
+                    "preset_id": ex.preset_id,
+                    "algorithm_id": ex.algorithm_id,
+                    "mode": ex.mode,
+                    "total_sequences": ex.total_sequences,
+                }
+            )
+        
         return {
             "work_id": work_id,
             "combination_id": combination_id,

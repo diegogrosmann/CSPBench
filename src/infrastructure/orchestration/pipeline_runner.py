@@ -85,6 +85,10 @@ class PipelineRunner:
             self.execution_controller.check_batch_timeout()  # Check timeout before each phase
             status = self._execute_combinations(config)
 
+            # Aguardar finalização de todas as execuções antes de atualizar o status do work
+            logger.info("Aguardando finalização de todas as execuções em progresso...")
+            self._wait_for_all_executions_to_complete()
+
             if status == BaseStatus.RUNNING:
                 logger.error("Pipeline ainda em execução após finalização")
                 self.work_store.update_work_status(BaseStatus.FAILED)
@@ -458,3 +462,57 @@ class PipelineRunner:
             )
         else:
             raise ValueError(f"Tipo de task não suportado: {type(task)}")
+
+    def _wait_for_all_executions_to_complete(self, max_wait_time: int = 60) -> None:
+        """
+        Aguarda a finalização de todas as execuções em progresso antes de finalizar o pipeline.
+        
+        Args:
+            max_wait_time: Tempo máximo de espera em segundos
+        """
+        logger.info("Verificando execuções em progresso...")
+        
+        start_time = time.time()
+        check_interval = 2.0  # Verificar a cada 2 segundos
+        
+        while time.time() - start_time < max_wait_time:
+            # Buscar execuções ainda em progresso
+            running_executions = self.work_store.get_running_executions()
+            
+            if not running_executions:
+                logger.info("Todas as execuções foram finalizadas")
+                return
+                
+            logger.info(f"Aguardando finalização de {len(running_executions)} execuções em progresso...")
+            
+            # Log das execuções que ainda estão rodando para debug
+            for execution in running_executions[:5]:  # Mostrar apenas as primeiras 5
+                logger.debug(f"Execução em progresso: {execution.get('unit_id', 'unknown')}")
+            
+            time.sleep(check_interval)
+        
+        # Se chegou aqui, timeout foi atingido
+        remaining_executions = self.work_store.get_running_executions()
+        if remaining_executions:
+            logger.warning(
+                f"Timeout atingido aguardando finalização de {len(remaining_executions)} execuções. "
+                f"Algumas execuções podem ficar em estado inconsistente."
+            )
+            
+            # Forçar finalização das execuções pendentes como timeout
+            for execution in remaining_executions:
+                try:
+                    execution_id = execution.get('id')
+                    unit_id = execution.get('unit_id', 'unknown')
+                    logger.warning(f"Forçando timeout para execução: {unit_id}")
+                    
+                    # Usar execution_scoped para atualizar o status
+                    execution_store = self.work_store.for_execution(unit_id)
+                    execution_store.update_execution_status(
+                        status=BaseStatus.FAILED.value,
+                        result={"error": "Execution timeout during pipeline finalization"},
+                    )
+                except Exception as e:
+                    logger.error(f"Erro ao forçar timeout da execução {unit_id}: {e}")
+        else:
+            logger.info("Todas as execuções foram finalizadas durante o período de espera")

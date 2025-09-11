@@ -11,7 +11,7 @@ import time
 import threading
 from contextlib import contextmanager
 from typing import Any, Dict, List, Optional, Tuple, Union
-from sqlalchemy import create_engine, event, text
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker, Session, scoped_session
 from sqlalchemy.pool import StaticPool
 
@@ -185,7 +185,7 @@ class WorkPersistence(
         try:
             yield session
             session.commit()
-        except Exception:
+        except Exception as e:
             session.rollback()
             raise
         finally:
@@ -203,6 +203,7 @@ class WorkPersistence(
         """Close the database engine and clean up resources."""
         if hasattr(self, '_session_factory'):
             self._session_factory.remove()
+            
         if hasattr(self, '_engine'):
             self._engine.dispose()
 

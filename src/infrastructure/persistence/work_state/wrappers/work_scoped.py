@@ -95,7 +95,18 @@ class WorkScopedPersistence:
         status: str,
     ) -> None:
         """Atualiza o status de uma combinação do work atual."""
-        self._store.combination_update(combination_id, status=status)
+        import time
+        
+        fields = {'status': status}
+        
+        # Automatically set timestamps based on status
+        current_time = time.time()
+        if status == "running":
+            fields['started_at'] = current_time
+        elif status in ["completed", "failed", "error", "canceled"]:
+            fields['finished_at'] = current_time
+            
+        self._store.combination_update(combination_id, **fields)
 
     def get_next_queued_combination(self) -> Optional[dict[str, Any]]:
         """Obtém a próxima combinação em fila do work atual."""
@@ -511,3 +522,24 @@ class WorkScopedPersistence:
                 all_executions.append(ExecutionScopedPersistence(unit_id, self._work_id, self._store))
         
         return all_executions
+
+    def get_running_executions(self) -> list[dict[str, Any]]:
+        """
+        Get all executions that are currently in 'running' status.
+        
+        Returns:
+            List of execution dictionaries for executions in running status
+        """
+        running_executions = []
+        
+        # Get all executions across all combinations in this work
+        for combination in self.get_combinations():
+            combination_id = combination["id"]
+            combo_scoped = self.for_combination(combination_id)
+            executions = combo_scoped.get_executions()
+            
+            for execution in executions:
+                if execution.get("status") == "running":
+                    running_executions.append(execution)
+        
+        return running_executions

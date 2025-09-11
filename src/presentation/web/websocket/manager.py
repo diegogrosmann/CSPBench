@@ -31,9 +31,8 @@ logger = logging.getLogger(__name__)
 class WorkMonitorSession:
     """Individual monitoring session for a work."""
 
-    def __init__(self, work_id: str, db_path: Path, update_interval: float = 0.5):
+    def __init__(self, work_id: str, update_interval: float = 0.5):
         self.work_id = work_id
-        self.db_path = db_path
         self.update_interval = update_interval
         self.running = False
 
@@ -59,6 +58,9 @@ class WorkMonitorSession:
         self._lock = asyncio.Lock()
         # Flag para indicar se snapshot inicial já foi enviado
         self._initial_snapshot_sent: bool = False
+
+        # Create persistence instance following console pattern
+        self._persistence = WorkPersistence()
 
     async def add_subscriber(self, queue: asyncio.Queue) -> None:
         """Add a subscriber queue."""
@@ -166,9 +168,8 @@ class WorkMonitorSession:
         self, update_tracking: bool = False
     ) -> Optional[ProgressMessage]:
         """Constroi mensagem de snapshot atual. Se update_tracking, atualiza estado interno."""
-        persistence = WorkPersistence(f"sqlite:///{self.db_path}")
         try:
-            progress_summary = persistence.get_work_progress_summary(self.work_id)
+            progress_summary = self._persistence.get_work_progress_summary(self.work_id)
             if not progress_summary:
                 logger.debug(
                     f"Snapshot build: work {self.work_id} progress_summary not found"
@@ -186,11 +187,11 @@ class WorkMonitorSession:
             # Buscar TODAS as execuções de TODAS as combinações
             all_executions = []
             try:
-                combinations_list = persistence.list_combinations(self.work_id)
+                combinations_list = self._persistence.list_combinations(self.work_id)
                 for combo in combinations_list:
                     combo_id = combo.get("combination_id")
                     if combo_id:
-                        combo_executions = persistence.get_combination_executions_detail(
+                        combo_executions = self._persistence.get_combination_executions_detail(
                             combo_id
                         )
                         all_executions.extend(combo_executions)
@@ -208,7 +209,7 @@ class WorkMonitorSession:
                         "combination_id"
                     )
                     if combination_id:
-                        all_executions = persistence.get_combination_executions_detail(
+                        all_executions = self._persistence.get_combination_executions_detail(
                             combination_id
                         )
                         self._executions_cache[combination_id] = all_executions
@@ -219,16 +220,16 @@ class WorkMonitorSession:
 
             # Lista de combinações para permitir seleção arbitrária
             try:
-                combinations_list = persistence.list_combinations(self.work_id)
+                combinations_list = self._persistence.list_combinations(self.work_id)
             except Exception:
                 combinations_list = []
 
-            errors = persistence.get_error_summary(self.work_id, limit=10)
-            warnings = persistence.get_execution_warnings(self.work_id, limit=10)
+            errors = self._persistence.get_error_summary(self.work_id, limit=10)
+            warnings = self._persistence.get_execution_warnings(self.work_id, limit=10)
 
             # Buscar todos os eventos (se método existir)
             try:
-                events = persistence.event_list_by_work(self.work_id)[-50:]  # últimos 50
+                events = self._persistence.event_list_by_work(self.work_id)[-50:]  # últimos 50
             except AttributeError:
                 events = []
 
@@ -256,43 +257,52 @@ class WorkMonitorSession:
                 timestamp=time.time(),
                 snapshot=snapshot,
             )
-        finally:
-            persistence.close()
+        except Exception as e:
+            logger.error(f"Error building snapshot for work {self.work_id}: {e}")
+            return ProgressMessage(
+                type=MessageType.ERROR,
+                work_id=self.work_id,
+                timestamp=time.time(),
+                error={
+                    "code": "SNAPSHOT_ERROR",
+                    "message": str(e),
+                },
+            )
 
     async def _check_for_updates(self) -> None:
         """Check for updates and send incremental changes."""
         try:
-            with WorkPersistence() as persistence:
-                # Get current state
-                progress_summary = persistence.get_work_progress_summary(self.work_id)
-                if not progress_summary:
-                    return
+            # Get current state
+            progress_summary = self._persistence.get_work_progress_summary(self.work_id)
+            if not progress_summary:
+                return
 
-                current_work_status = persistence.get_work_status(self.work_id)
+            work_data = self._persistence.work_get(self.work_id)
+            current_work_status = work_data.get("status") if work_data else None
 
-                # Check for work status change
-                if self.last_work_status != current_work_status:
-                    await self._send_work_status_event(
-                        self.last_work_status, current_work_status
+            # Check for work status change
+            if self.last_work_status != current_work_status:
+                await self._send_work_status_event(
+                    self.last_work_status, current_work_status
+                )
+                self.last_work_status = current_work_status
+
+            # Check for progress changes
+            progress_hash = self._hash_progress(progress_summary)
+            progress_changed = progress_hash != self.last_progress_hash
+
+            # Execuções atuais
+            executions = []
+            combination_changed = False
+            current_combination_id = None
+
+            previous_combination_id = self.last_combination_id
+            if progress_summary.current_combination_details:
+                current_combination_id = (
+                    progress_summary.current_combination_details.get(
+                        "combination_id"
                     )
-                    self.last_work_status = current_work_status
-
-                # Check for progress changes
-                progress_hash = self._hash_progress(progress_summary)
-                progress_changed = progress_hash != self.last_progress_hash
-
-                # Execuções atuais
-                executions = []
-                combination_changed = False
-                current_combination_id = None
-
-                previous_combination_id = self.last_combination_id
-                if progress_summary.current_combination_details:
-                    current_combination_id = (
-                        progress_summary.current_combination_details.get(
-                            "combination_id"
-                        )
-                    )
+                )
 
                 # Caso de mudança de combinação (existe nova e difere da anterior)
                 if (
@@ -302,7 +312,7 @@ class WorkMonitorSession:
                 ):
                     try:
                         # Flush final da combinação anterior antes de trocar
-                        prev_execs = persistence.get_combination_executions_detail(
+                        prev_execs = self._persistence.get_combination_executions_detail(
                             previous_combination_id
                         )
                         self._executions_cache[previous_combination_id] = prev_execs
@@ -333,7 +343,7 @@ class WorkMonitorSession:
                     and previous_combination_id not in self._flushed_combinations
                 ):
                     try:
-                        prev_execs = persistence.get_combination_executions_detail(
+                        prev_execs = self._persistence.get_combination_executions_detail(
                             previous_combination_id
                         )
                         await self._send_update(
@@ -354,7 +364,7 @@ class WorkMonitorSession:
                 # Agora processa execuções da combinação corrente (se houver)
                 executions = []
                 if current_combination_id:
-                    executions = persistence.get_combination_executions_detail(
+                    executions = self._persistence.get_combination_executions_detail(
                         current_combination_id
                     )
                     if previous_combination_id != current_combination_id:
@@ -371,11 +381,11 @@ class WorkMonitorSession:
                 executions_changed = execution_changes is not None
 
                 # Check for new logs
-                new_logs = await self._check_new_logs(queries)
+                new_logs = await self._check_new_logs(self._persistence)
                 logs_changed = bool(new_logs["errors"] or new_logs["warnings"])
 
                 # Check for new events
-                new_events = await self._check_new_events(queries)
+                new_events = await self._check_new_events(self._persistence)
                 events_changed = bool(new_events)
 
                 # Send updates if anything changed
@@ -391,12 +401,12 @@ class WorkMonitorSession:
                         # Buscar TODAS as execuções para atualização incremental também
                         try:
                             all_executions_for_update = []
-                            combinations_list = persistence.list_combinations(self.work_id)
+                            combinations_list = self._persistence.list_combinations(self.work_id)
                             for combo in combinations_list:
                                 combo_id = combo.get("combination_id")
                                 if combo_id:
                                     combo_executions = (
-                                        persistence.get_combination_executions_detail(
+                                        self._persistence.get_combination_executions_detail(
                                             combo_id
                                         )
                                     )
@@ -638,15 +648,19 @@ class WorkMonitorSession:
         self._update_executions_state(executions)
 
         # Inicializar last_work_status na primeira vez
-        with WorkPersistence() as queries:
-            self.last_work_status = persistence.get_work_status(self.work_id)
+        work_data = self._persistence.work_get(self.work_id)
+        self.last_work_status = work_data.get("status") if work_data else None
 
-            # Atualizar timestamp de eventos para o mais recente
-            events = persistence.get_events(self.work_id, limit=1)
+        # Atualizar timestamp de eventos para o mais recente
+        try:
+            events = self._persistence.get_events(self.work_id, limit=1)
             if events:
                 self.last_event_timestamp = max(
                     self.last_event_timestamp, events[0]["timestamp"]
                 )
+        except AttributeError:
+            # Method may not exist in all versions
+            pass
 
         if progress_summary.current_combination_details:
             self.last_combination_id = progress_summary.current_combination_details.get(
@@ -677,8 +691,8 @@ class WorkMonitorSession:
         try:
             if combination_id not in self._executions_cache:
                 # Carregar do banco
-                with WorkPersistence() as queries:
-                    executions = persistence.get_combination_executions_detail(
+                try:
+                    executions = self._persistence.get_combination_executions_detail(
                         combination_id
                     )
                     self._executions_cache[combination_id] = executions
@@ -686,6 +700,9 @@ class WorkMonitorSession:
                         e.unit_id: {"status": e.status, "progress": e.progress}
                         for e in executions
                     }
+                except Exception as e:
+                    logger.error(f"Error loading executions for combination {combination_id}: {e}")
+                    return None
             return [
                 serialize_execution_detail(e)
                 for e in self._executions_cache.get(combination_id, [])
@@ -735,12 +752,12 @@ class WorkMonitorManager:
         self._lock = asyncio.Lock()
 
     async def get_or_create_session(
-        self, work_id: str, db_path: Path
+        self, work_id: str
     ) -> WorkMonitorSession:
         """Get existing session or create new one."""
         async with self._lock:
             if work_id not in self.sessions:
-                session = WorkMonitorSession(work_id, db_path)
+                session = WorkMonitorSession(work_id)
                 self.sessions[work_id] = session
                 logger.info(f"Created new monitoring session for work {work_id}")
             return self.sessions[work_id]

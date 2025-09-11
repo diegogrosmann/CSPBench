@@ -256,6 +256,69 @@
                     "PYTHONDONTWRITEBYTECODE": "1"
                 }
             }
+        },
+        {
+            "label": "Start PostgreSQL",
+            "type": "shell",
+            "command": "sudo",
+            "args": [
+                "service",
+                "postgresql",
+                "start"
+            ],
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": [],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            }
+        },
+        {
+            "label": "Stop PostgreSQL",
+            "type": "shell",
+            "command": "sudo",
+            "args": [
+                "service",
+                "postgresql",
+                "stop"
+            ],
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": [],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            }
+        },
+        {
+            "label": "PostgreSQL Status",
+            "type": "shell",
+            "command": "sudo",
+            "args": [
+                "service",
+                "postgresql",
+                "status"
+            ],
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": [],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            }
         }
     ]
 }

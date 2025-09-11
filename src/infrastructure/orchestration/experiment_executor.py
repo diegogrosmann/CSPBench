@@ -63,11 +63,6 @@ def _worker_exec(
 
     logger.debug(f"[WORKER][{experiment_unit_id}] Iniciando worker_exec.")
 
-    # Timer aleatório para evitar que vários processos iniciem juntos
-    delay = random.uniform(0, 3)
-    logger.debug(f"[WORKER][{experiment_unit_id}] Aguardando {delay:.2f}s antes de iniciar.")
-    time.sleep(delay)
-
     # Apply CPU configuration to this worker process
     if cpu_config:
         try:
@@ -86,35 +81,25 @@ def _worker_exec(
         except Exception as e:
             logger.warning(f"[WORKER][{experiment_unit_id}] Cannot apply CPU configuration: {e}")
 
-    logger.warning(f"[WORKER][{experiment_unit_id}] Aqui 1")
-
     try:
         # Usar factory method para criar work_scoped diretamente
         work_scoped = WorkScopedPersistence.submit(work_id)
         execution_store = work_scoped.for_execution(experiment_unit_id)
-        logger.warning(f"[WORKER][{experiment_unit_id}] Aqui 1.2")
     except Exception as e:
         logger.error(f"[WORKER][{experiment_unit_id}] Erro ao recriar store: {e}")
         raise
-
-    logger.warning(f"[WORKER][{experiment_unit_id}] Aqui 2")
 
     # Controller with work_id for status checks
     dummy_controller = ExecutionController(work_id=work_id)
     dummy_controller._internal_jobs = internal_jobs  # type: ignore[attr-defined]
 
-    logger.warning(f"[WORKER][{experiment_unit_id}] Aqui 3")
-
     # Apply CPU configuration manually if provided (since we can't pass ResourcesConfig to subprocess)
     if cpu_config:
-
-        logger.warning(f"[WORKER][{experiment_unit_id}] Aqui 4")
         dummy_controller._exclusive_cores = cpu_config.get("exclusive_cores", False)
         if "max_workers" in cpu_config:
             dummy_controller._max_workers = cpu_config["max_workers"]
             dummy_controller._current_workers = cpu_config["max_workers"]
 
-        logger.warning(f"[WORKER][{experiment_unit_id}] Aqui 5")
         # Try to apply CPU affinity in worker process (best effort)
         try:
             if cpu_config.get("exclusive_cores", False) and hasattr(
@@ -126,7 +111,6 @@ def _worker_exec(
                 f"[WORKER][{experiment_unit_id}] CPU configuration parcialmente aplicada: {cpu_exc}"
             )
 
-    logger.warning(f"[WORKER][{experiment_unit_id}] Aqui 6")
     # Create monitor with controller for cancellation checks
     monitor = PersistenceMonitor(execution_store, execution_controller=dummy_controller)
 

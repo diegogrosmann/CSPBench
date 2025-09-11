@@ -39,8 +39,8 @@ datasets:
       mode: "random"
 
       # Parâmetros comuns
-      n: 8
-      L: 10
+      n: 50
+      L: 200
       alphabet: "ACGT"
       seed: null
 
@@ -75,9 +75,9 @@ algorithms:
     algorithm_params:                 # dict: Algorithm parameters (optional - empty dict {} if not needed)
       # Algorithms without parameters listed here will use empty parameters automatically
       # Example with parameters:
-      # "BLF-GA":
+      "BLF-GA":
       #   population_size: 100
-      #   generations: 50
+        max_gens: 20
                                       
   - id: "small_config"              # string: Unique configuration ID
     name: "Small Configuration"                            # string: Descriptive name
@@ -85,7 +85,12 @@ algorithms:
     algorithms:                       # list: List of algorithms included in this configuration
       - "CSC"                         # Closest String with Constraints
       - "H2-CSP"                       # Heuristic Closest String Problem
-    algorithm_params: {}              # dict: Empty parameters - algorithms will use default/empty parameters
+    algorithm_params:                 # dict: Algorithm parameters (optional - empty dict {} if not needed)
+      # Algorithms without parameters listed here will use empty parameters automatically
+      # Example with parameters:
+      "BLF-GA":
+      #   population_size: 100
+        max_gens: 20
     
 # =====================================================================
 # SECTION 4: TASK TYPE (REQUIRED)
@@ -109,11 +114,22 @@ experiment:
     - name: "Test Experiment"         # string: Descriptive experiment name
       datasets:
         - "synthetic_small_dataset"
-#        - "synthetic_medium_dataset"
+        - "synthetic_medium_dataset"
       algorithms:
-#        - "full_config"
+        - "full_config"
         - "small_config"
-      repetitions: 5                 # int: Number of repetitions per combination (1-10 recommended)
+      repetitions: 10                 # int: Number of repetitions per combination (1-10 recommended)
+                                      # Each dataset+algorithm combination will be executed N times
+ 
+   # List of experiment tasks to perform (formerly 'executions')
+    - name: "Test 2"         # string: Descriptive experiment name
+      datasets:
+        - "synthetic_small_dataset"
+        - "synthetic_medium_dataset"
+      algorithms:
+        - "full_config"
+        - "small_config"
+      repetitions: 10                 # int: Number of repetitions per combination (1-10 recommended)
                                       # Each dataset+algorithm combination will be executed N times
 
 # =====================================================================

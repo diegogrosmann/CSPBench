@@ -632,6 +632,24 @@ class QueriesMixin:
             work = session.query(Work).filter(Work.id == work_id).first()
             return work.to_dict() if work else {}
 
+    def list_combinations(self, work_id: str) -> List[Dict[str, Any]]:
+        """List all combinations for a work with combination_id field."""
+        from ..models import Combination
+        
+        with self.session_scope() as session:
+            combinations = session.query(Combination).filter(
+                Combination.work_id == work_id
+            ).order_by(Combination.id).all()
+            
+            result = []
+            for combo in combinations:
+                combo_dict = combo.to_dict()
+                # Ensure combination_id field is present (some code expects this field name)
+                combo_dict['combination_id'] = combo_dict.get('id')
+                result.append(combo_dict)
+            
+            return result
+
     def get_combinations_for_export(self, work_id: str) -> List[Dict[str, Any]]:
         """Get all combinations for a work for export."""
         from ..models import Combination

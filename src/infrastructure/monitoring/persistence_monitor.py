@@ -127,7 +127,8 @@ class PersistenceMonitor(AlgorithmMonitor):
         """Persist warning event."""
         try:
             context = data if data else None
-            self._exec_store.unit_warning(message, context)
+            # Use the execution scoped unit_id as the unit_id parameter
+            self._exec_store.unit_warning(self._exec_store._unit_id, message, context)
         except Exception as e:
             self._logger.error(
                 "Error persisting warning: %s (message=%s, data=%s)",
@@ -144,7 +145,7 @@ class PersistenceMonitor(AlgorithmMonitor):
         try:
             if exc is not None:
                 # Record full error
-                self._exec_store.unit_error(exc)
+                self._exec_store.unit_error(self._exec_store._unit_id, exc)
             else:
                 # No concrete exception -> treat as categorized warning
                 context = (
@@ -152,7 +153,7 @@ class PersistenceMonitor(AlgorithmMonitor):
                     if data
                     else {"as_error_message": message}
                 )
-                self._exec_store.unit_warning(message, context)
+                self._exec_store.unit_warning(self._exec_store._unit_id, message, context)
         except Exception as e:
             self._logger.error(
                 "Error persisting error/warning: %s (message=%s, exc=%s, data=%s)",
@@ -165,13 +166,20 @@ class PersistenceMonitor(AlgorithmMonitor):
 
     def is_cancelled(self) -> bool:
         """Check if execution is cancelled via ExecutionController or internal flag."""
-        # Check ExecutionController first if available
+        # Check internal flag first (explicit cancellation by user/system)
+        if self._cancelled:
+            return True
+            
+        # Check ExecutionController if available
         if self._execution_controller:
             try:
                 from src.domain.status import BaseStatus
 
                 status = self._execution_controller.check_status()
-                # Only CANCELED status means cancelled, not PAUSED
+                # Only CANCELED status means cancelled
+                # Note: We don't cancel on COMPLETED/FAILED work status because
+                # individual executions may still be in progress when the pipeline
+                # finishes and updates the work status
                 if status == BaseStatus.CANCELED:
                     return True
             except Exception as e:
@@ -181,8 +189,8 @@ class PersistenceMonitor(AlgorithmMonitor):
                     exc_info=True,
                 )
 
-        # Fallback to internal flag
-        return self._cancelled
+        # Default to not cancelled
+        return False
 
     # ------------------------------------------------------------------
     # Extension

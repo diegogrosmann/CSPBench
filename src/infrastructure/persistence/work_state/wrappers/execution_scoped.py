@@ -92,6 +92,8 @@ class ExecutionScopedPersistence(CombinationScopedPersistence):
         params: dict[str, Any] | None = None,
     ) -> None:
         """Atualiza status da execução atual."""
+        import time
+        
         fields = {'status': status}
         if result is not None:
             fields['result'] = result
@@ -99,6 +101,13 @@ class ExecutionScopedPersistence(CombinationScopedPersistence):
             fields['objective'] = objective
         if params is not None:
             fields['params'] = params
+        
+        # Automatically set timestamps based on status
+        current_time = time.time()
+        if status == "running":
+            fields['started_at'] = current_time
+        elif status in ["completed", "failed", "error", "canceled"]:
+            fields['finished_at'] = current_time
             
         self.store.execution_update(self._execution_id, **fields)
 

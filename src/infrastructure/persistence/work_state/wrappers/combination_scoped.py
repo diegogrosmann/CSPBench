@@ -96,7 +96,18 @@ class CombinationScopedPersistence(WorkScopedPersistence):
     # === Combinação ===
     def update_combination_status(self, status: str) -> None:
         """Atualiza status da combinação atual."""
-        self._store.combination_update(self._combination_id, status=status)
+        import time
+        
+        fields = {'status': status}
+        
+        # Automatically set timestamps based on status
+        current_time = time.time()
+        if status == "running":
+            fields['started_at'] = current_time
+        elif status in ["completed", "failed", "error", "canceled"]:
+            fields['finished_at'] = current_time
+            
+        self._store.combination_update(self._combination_id, **fields)
 
     def get_combination_data(self) -> dict[str, Any]:
         """Retorna os dados da combinação atual."""

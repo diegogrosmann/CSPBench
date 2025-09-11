@@ -327,12 +327,16 @@ class ProgressMonitor:
                 "%H:%M:%S"
             )
 
+            # Choose color and icon based on event type
             if log_entry["type"] == "error":
-                color = curses.color_pair(1)
+                color = curses.color_pair(1)  # Red
                 icon = "✗"
-            else:
-                color = curses.color_pair(2)
-                icon = "!"
+            elif log_entry["type"] == "warning":
+                color = curses.color_pair(2)  # Yellow
+                icon = "⚠"
+            else:  # info, progress, or other
+                color = curses.color_pair(4)  # Cyan
+                icon = "ℹ"
 
             # Truncate message to fit width
             max_msg_len = w - 15  # Reserve space for time and icon
@@ -448,29 +452,35 @@ class ProgressMonitor:
                         new_executions_count = 0
                         self.executions = []
 
-                    # Fetch and combine logs
-                    errors = self.persistence.get_error_summary(self.work_id, limit=2)
-                    warnings = self.persistence.get_execution_warnings(
-                        self.work_id, limit=2
+                    # Fetch only events from events table (not execution errors)
+                    # Get recent events of relevant types (warnings, errors, info, progress)
+                    recent_events = self.persistence.get_events(
+                        self.work_id, limit=4, event_types=['warning', 'error', 'info', 'progress']
                     )
 
                     logs = []
-                    for e in errors:
+                    # Only show actual events from events table, not algorithm execution errors
+                    for event in recent_events:
+                        event_type = event.get('event_type', 'unknown')
+                        message = event.get('message', 'No message')
+                        unit_id = event.get('entity_data', {}).get('unit_id', 'N/A')
+                        
+                        # Use appropriate icon based on event type
+                        if event_type == 'error':
+                            log_type = 'error'
+                        elif event_type == 'warning':
+                            log_type = 'warning'
+                        else:
+                            log_type = 'info'  # For progress, info, and other types
+                        
                         logs.append(
                             {
-                                "type": "error",
-                                "timestamp": e.timestamp,
-                                "message": f"Unit {e.unit_id[:8]}: {e.error_message}",
+                                "type": log_type,
+                                "timestamp": event.get('timestamp', 0),
+                                "message": f"Unit {unit_id[:8]}: {message}",
                             }
                         )
-                    for w in warnings:
-                        logs.append(
-                            {
-                                "type": "warning",
-                                "timestamp": w["timestamp"],
-                                "message": f"Unit {(w.get('unit_id') or 'N/A')[:8]}: {w.get('message', 'Unknown warning')}",
-                            }
-                        )
+                    
                     self.logs = sorted(
                         logs, key=lambda x: x.get("timestamp", 0), reverse=True
                     )[

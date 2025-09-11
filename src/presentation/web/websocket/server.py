@@ -31,41 +31,8 @@ class WebSocketServer:
         message_queue = asyncio.Queue()
 
         try:
-            # Validate work exists and get database path
-            work_details = self._get_work_details(work_id)
-            if not work_details:
-                await websocket.send_json(
-                    {
-                        "type": "error",
-                        "work_id": work_id,
-                        "timestamp": asyncio.get_event_loop().time(),
-                        "payload": {
-                            "code": "WORK_NOT_FOUND",
-                            "message": f"Work {work_id} not found",
-                        },
-                    }
-                )
-                await websocket.close(code=4004)  # Not Found
-                return
-
-            db_path = Path(work_details.output_path) / "state.db"
-            if not db_path.exists():
-                await websocket.send_json(
-                    {
-                        "type": "error",
-                        "work_id": work_id,
-                        "timestamp": asyncio.get_event_loop().time(),
-                        "payload": {
-                            "code": "DATABASE_NOT_READY",
-                            "message": f"Work {work_id} database not ready yet",
-                        },
-                    }
-                )
-                await websocket.close(code=4003)  # Service Unavailable
-                return
-
             # Get or create monitoring session
-            session = await work_monitor_manager.get_or_create_session(work_id, db_path)
+            session = await work_monitor_manager.get_or_create_session(work_id)
 
             # Add this connection as subscriber
             await session.add_subscriber(message_queue)
