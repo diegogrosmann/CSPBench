@@ -206,20 +206,20 @@ async def get_work_database_status(work_id: str) -> Dict[str, Any]:
             status_code=500, detail=f"Failed to check database status: {str(e)}"
         )
 
-
 @router.post("/work/{work_id}/action/{action}")
 async def work_action(work_id: str, action: str) -> Dict[str, Any]:
-    """Perform action on work (pause, resume, cancel)."""
+    """Perform action on work (pause, cancel, restart)."""
     try:
         work_service = get_work_service()
 
         if action == "pause":
+            # Force immediate pause by canceling current execution and setting status to paused
             success = work_service.pause(work_id)
-        elif action == "resume":
-            # Use WorkManager para retomar execução real
-            success = work_service.resume_execution(work_id)
         elif action == "cancel":
             success = work_service.cancel(work_id)
+        elif action == "restart":
+            # Execute restart with complete cleanup like in console
+            success = work_service.restart(work_id)
         else:
             raise HTTPException(status_code=400, detail=f"Invalid action: {action}")
 

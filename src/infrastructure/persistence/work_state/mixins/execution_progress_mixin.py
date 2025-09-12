@@ -135,3 +135,58 @@ class ExecutionProgressCRUDMixin:
             results = [progress.to_dict() for progress in query.all()]
             
             return results, total_count
+
+    def execution_progress_clear_for_non_finalized(
+        self,
+        *,
+        work_id: Optional[str] = None,
+        combination_id: Optional[int] = None,
+        execution_id: Optional[int] = None,
+    ) -> int:
+        """
+        Clear all progress entries for executions that are not finalized.
+        
+        Non-finalized statuses: 'queued', 'running', 'paused'
+        Finalized statuses: 'completed', 'failed', 'error', 'canceled'
+        
+        Args:
+            work_id: If provided, only clear progress for executions in this work
+            combination_id: If provided, only clear progress for executions in this combination
+            execution_id: If provided, only clear progress for this specific execution (if not finalized)
+            
+        Returns:
+            Number of progress entries deleted
+        """
+        from ..models import ExecutionProgress, Execution, Combination
+        
+        with self.session_scope() as session:
+            # Build base query to find progress entries for non-finalized executions
+            query = session.query(ExecutionProgress).join(
+                Execution, ExecutionProgress.execution_id == Execution.id
+            )
+            
+            # Filter by non-finalized execution statuses
+            non_finalized_statuses = ['queued', 'running', 'paused']
+            query = query.filter(Execution.status.in_(non_finalized_statuses))
+            
+            # Apply additional filters if provided
+            if work_id is not None:
+                # Join with combination to filter by work_id
+                query = query.join(Combination, Execution.combination_id == Combination.id)
+                query = query.filter(Combination.work_id == work_id)
+            
+            if combination_id is not None:
+                query = query.filter(Execution.combination_id == combination_id)
+                
+            if execution_id is not None:
+                query = query.filter(Execution.id == execution_id)
+            
+            # Get the progress entries to delete
+            progress_entries = query.all()
+            deleted_count = len(progress_entries)
+            
+            # Delete the progress entries
+            for progress in progress_entries:
+                session.delete(progress)
+            
+            return deleted_count

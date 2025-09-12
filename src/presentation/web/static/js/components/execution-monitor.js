@@ -10,11 +10,11 @@ class ExecutionMonitor {
         this.updateInterval = null;
         this.selectedWorkId = null;
         this.currentFilter = 'all'; // Track current filter
-        
+
         // Initialize API client and WebSocket client
         this.apiClient = null;
         this.wsClient = null;
-        
+
         // Bind methods
         this.initialize = this.initialize.bind(this);
         this.loadActiveExecutions = this.loadActiveExecutions.bind(this);
@@ -40,88 +40,88 @@ class ExecutionMonitor {
         this.isActiveStatus = this.isActiveStatus.bind(this);
         this.downloadFile = this.downloadFile.bind(this);
     }
-    
+
     async initialize() {
         console.log('Initializing Execution Monitor...');
-        
+
         try {
             // Initialize API client and WebSocket client
             this.apiClient = new APIClient();
             this.wsClient = new WebSocketClient();
-            
+
             // Setup WebSocket connection
             this.wsClient.on('connected', () => {
                 console.log('Execution Monitor: WebSocket connected');
                 this.showConnectionStatus('connected');
             });
-            
+
             this.wsClient.on('disconnected', () => {
                 console.log('Execution Monitor: WebSocket disconnected');
                 this.showConnectionStatus('disconnected');
             });
-            
+
             this.wsClient.on('work_update', this.handleWebSocketMessage);
-            
+
             await this.wsClient.connect();
-            
+
             // Initial load
             await this.loadActiveExecutions();
-            
+
             // Setup filter change listener
             const filterSelect = document.getElementById('status-filter');
             if (filterSelect) {
                 filterSelect.addEventListener('change', this.handleFilterChange);
             }
-            
+
             // Setup periodic refresh (fallback for WebSocket)
             this.updateInterval = setInterval(() => {
                 this.loadActiveExecutions();
             }, 30000); // Every 30 seconds
-            
+
             console.log('Execution Monitor initialized successfully');
-            
+
         } catch (error) {
             console.error('Error initializing Execution Monitor:', error);
             this.showError('Failed to initialize execution monitor: ' + error.message);
         }
     }
-    
+
     async loadActiveExecutions() {
         try {
             console.log('Loading active executions...');
-            
+
             const response = await this.apiClient.request('/api/monitoring/active-executions');
             const data = response.executions || [];
-            
+
             // Update executions map
             this.executions.clear();
             data.forEach(execution => {
                 this.executions.set(execution.work_id, execution);
-                
+
                 // Subscribe to updates for running executions
                 if (execution.status === 'running' && this.wsClient.isConnected()) {
                     this.wsClient.subscribeToWork(execution.work_id);
                 }
             });
-            
+
             this.renderExecutions();
-            
+
         } catch (error) {
             console.error('Error loading active executions:', error);
             this.showError('Failed to load executions: ' + error.message);
         }
     }
-    
+
     renderExecutions() {
         const container = document.getElementById(this.containerId);
         if (!container) {
             console.error('Execution monitor container not found:', this.containerId);
             return;
         }
-        
+
         const allExecutions = Array.from(this.executions.values());
         const filteredExecutions = this.filterExecutions(allExecutions);
-        
+
         if (allExecutions.length === 0) {
             container.innerHTML = `
                 <div class="no-executions">
@@ -132,14 +132,14 @@ class ExecutionMonitor {
             `;
             return;
         }
-        
+
         container.innerHTML = this.renderExecutionTable(filteredExecutions, allExecutions.length);
     }
-    
+
     renderExecutionTable(executions, totalCount) {
         const filterSelect = document.getElementById('status-filter');
         const currentFilter = filterSelect ? filterSelect.value : 'all';
-        
+
         if (executions.length === 0) {
             return `
                 <div class="no-executions">
@@ -150,14 +150,14 @@ class ExecutionMonitor {
                 </div>
             `;
         }
-        
+
         const tableRows = executions.map(execution => {
             const statusColor = this.getStatusColor(execution.status);
             const statusIcon = this.getStatusIcon(execution.status);
             const createdAt = new Date(execution.created_at);
             const timeAgo = this.getTimeAgo(createdAt);
             const isActive = this.isActiveStatus(execution.status);
-            
+
             return `
                 <tr data-work-id="${execution.work_id}" 
                     onclick="executionMonitor.handleExecutionClick('${execution.work_id}', '${execution.status}')"
@@ -209,7 +209,7 @@ class ExecutionMonitor {
                 </tr>
             `;
         }).join('');
-        
+
         return `
             <table class="table executions-table">
                 <thead>
@@ -237,11 +237,11 @@ class ExecutionMonitor {
             </div>
         `;
     }
-    
+
     filterExecutions(executions) {
         const filterSelect = document.getElementById('status-filter');
         const filter = filterSelect ? filterSelect.value : this.currentFilter;
-        
+
         switch (filter) {
             case 'active':
                 return executions.filter(ex => this.isActiveStatus(ex.status));
@@ -255,16 +255,16 @@ class ExecutionMonitor {
                 return executions;
         }
     }
-    
+
     isActiveStatus(status) {
         return ['running', 'paused', 'starting'].includes(status);
     }
-    
+
     handleFilterChange(event) {
         this.currentFilter = event.target.value;
         this.renderExecutions();
     }
-    
+
     handleExecutionClick(workId, status) {
         if (this.isActiveStatus(status)) {
             // Navigate to monitoring view
@@ -274,14 +274,14 @@ class ExecutionMonitor {
             this.showExecutionResults(workId);
         }
     }
-    
+
     renderExecutionCard(execution) {
         const statusColor = this.getStatusColor(execution.status);
         const statusIcon = this.getStatusIcon(execution.status);
-        
+
         const createdAt = new Date(execution.created_at);
         const timeAgo = this.getTimeAgo(createdAt);
-        
+
         return `
             <div class="col-md-6 col-lg-4 mb-3">
                 <div class="card h-100 execution-card" data-work-id="${execution.work_id}">
@@ -323,7 +323,7 @@ class ExecutionMonitor {
             </div>
         `;
     }
-    
+
     getStatusColor(status) {
         const colors = {
             'running': 'primary',
@@ -334,7 +334,7 @@ class ExecutionMonitor {
         };
         return colors[status] || 'secondary';
     }
-    
+
     getStatusIcon(status) {
         const icons = {
             'running': 'play-circle',
@@ -345,32 +345,38 @@ class ExecutionMonitor {
         };
         return icons[status] || 'circle';
     }
-    
+
     getTimeAgo(date) {
         const now = new Date();
         const diffMs = now - date;
         const diffMins = Math.floor(diffMs / 60000);
         const diffHours = Math.floor(diffMins / 60);
         const diffDays = Math.floor(diffHours / 24);
-        
+
         if (diffMins < 1) return 'Just now';
         if (diffMins < 60) return `${diffMins}m ago`;
         if (diffHours < 24) return `${diffHours}h ago`;
         return `${diffDays}d ago`;
     }
-    
+
     handleWebSocketMessage(data) {
         console.log('Received WebSocket message:', data);
-        
+
         if (data.work_id) {
             // Update execution in map
             this.executions.set(data.work_id, data);
-            
-            // Update display
+
+            // Update display immediately
             this.updateExecutionCard(data.work_id, data);
+
+            // Force a refresh if status changed to paused or cancelled
+            if (data.status && ['paused', 'cancelled', 'canceled'].includes(data.status.toLowerCase())) {
+                console.log('Status changed to terminal state, refreshing view');
+                setTimeout(() => this.loadActiveExecutions(), 500);
+            }
         }
     }
-    
+
     updateExecutionCard(workId, execution) {
         const card = document.querySelector(`[data-work-id="${workId}"]`);
         if (card) {
@@ -378,44 +384,44 @@ class ExecutionMonitor {
             this.renderExecutions();
         }
     }
-    
+
     async showExecutionDetails(workId) {
         console.log('Showing execution details for:', workId);
         this.selectedWorkId = workId;
-        
+
         try {
             // Load detailed execution data
             const execution = await this.apiClient.request(`/api/monitoring/execution/${workId}`);
-            
+
             // Show modal with details
             this.showModal('Execution Monitoring', this.renderExecutionDetailsModal(execution));
-            
+
         } catch (error) {
             console.error('Error loading execution details:', error);
             this.showError('Failed to load execution details: ' + error.message);
         }
     }
-    
+
     async showExecutionResults(workId) {
         console.log('Showing execution results for:', workId);
         this.selectedWorkId = workId;
-        
+
         try {
             // Load detailed execution data
             const execution = await this.apiClient.request(`/api/monitoring/execution/${workId}`);
-            
+
             // Show modal with results and download options
             this.showModal('Execution Results', this.renderExecutionResultsModal(execution));
-            
+
         } catch (error) {
             console.error('Error loading execution results:', error);
             this.showError('Failed to load execution results: ' + error.message);
         }
     }
-    
+
     renderExecutionDetailsModal(execution) {
         const metrics = execution.metrics || {};
-        
+
         return `
             <div class="execution-details">
                 <div class="row">
@@ -479,11 +485,11 @@ class ExecutionMonitor {
             </div>
         `;
     }
-    
+
     renderExecutionResultsModal(execution) {
         const metrics = execution.metrics || {};
         const files = execution.files || {};
-        
+
         return `
             <div class="execution-results">
                 <div class="row">
@@ -616,19 +622,19 @@ class ExecutionMonitor {
             </div>
         `;
     }
-    
+
     async downloadFile(filePath) {
         try {
             // Create a temporary link and trigger download
             const response = await fetch(`/api/files/download?path=${encodeURIComponent(filePath)}`);
-            
+
             if (!response.ok) {
                 throw new Error('Failed to download file');
             }
-            
+
             const blob = await response.blob();
             const fileName = filePath.split('/').pop();
-            
+
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
@@ -637,25 +643,25 @@ class ExecutionMonitor {
             a.click();
             window.URL.revokeObjectURL(url);
             document.body.removeChild(a);
-            
+
         } catch (error) {
             console.error('Error downloading file:', error);
             this.showError('Failed to download file: ' + error.message);
         }
     }
-    
+
     async downloadAllFiles(workId) {
         try {
             // Request a zip of all files for this execution
             const response = await fetch(`/api/files/download-zip/${workId}`);
-            
+
             if (!response.ok) {
                 throw new Error('Failed to create download archive');
             }
-            
+
             const blob = await response.blob();
             const fileName = `execution_${workId}_results.zip`;
-            
+
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
@@ -664,19 +670,19 @@ class ExecutionMonitor {
             a.click();
             window.URL.revokeObjectURL(url);
             document.body.removeChild(a);
-            
+
         } catch (error) {
             console.error('Error downloading all files:', error);
             this.showError('Failed to download files: ' + error.message);
         }
     }
-    
+
     async showLogs(workId) {
         console.log('Showing logs for execution:', workId);
-        
+
         try {
             const response = await this.apiClient.request(`/api/monitoring/execution/${workId}/logs?lines=200`);
-            
+
             this.showModal('Execution Logs', `
                 <div class="logs-viewer">
                     <div class="d-flex justify-content-between align-items-center mb-3">
@@ -691,13 +697,13 @@ class ExecutionMonitor {
                     </div>
                 </div>
             `);
-            
+
         } catch (error) {
             console.error('Error loading logs:', error);
             this.showError('Failed to load logs: ' + error.message);
         }
     }
-    
+
     showConnectionStatus(status) {
         const statusElement = document.getElementById('ws-status');
         if (statusElement) {
@@ -710,7 +716,7 @@ class ExecutionMonitor {
             }
         }
     }
-    
+
     showModal(title, content) {
         // Create or update modal
         let modal = document.getElementById('execution-details-modal');
@@ -731,10 +737,10 @@ class ExecutionMonitor {
             `;
             document.body.appendChild(modal);
         }
-        
+
         modal.querySelector('.modal-title').textContent = title;
         modal.querySelector('.modal-body').innerHTML = content;
-        
+
         // Ensure close button works
         const closeButton = modal.querySelector('.btn-close');
         if (closeButton) {
@@ -745,11 +751,11 @@ class ExecutionMonitor {
                 }
             });
         }
-        
+
         const bsModal = new bootstrap.Modal(modal);
         bsModal.show();
     }
-    
+
     showError(message) {
         const container = document.getElementById(this.containerId);
         if (container) {
@@ -761,14 +767,14 @@ class ExecutionMonitor {
             `;
         }
     }
-    
+
     destroy() {
         console.log('Destroying Execution Monitor...');
-        
+
         if (this.updateInterval) {
             clearInterval(this.updateInterval);
         }
-        
+
         if (this.wsClient) {
             this.wsClient.disconnect();
         }

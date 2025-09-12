@@ -227,6 +227,18 @@ class WorkPersistence(
             }
         )
 
+    def clear_all_progress_for_non_finalized_executions(self) -> int:
+        """
+        Limpa entradas de progresso de todas as execuções não finalizadas em todo o sistema.
+        
+        Este método remove todas as entradas de progresso de execuções que não estão finalizadas
+        (status: 'queued', 'running', 'paused').
+        
+        Returns:
+            Número total de entradas de progresso removidas
+        """
+        return self.execution_progress_clear_for_non_finalized()
+
 
 # Export for external imports
 __all__ = [

@@ -152,3 +152,91 @@ class CombinationCRUDMixin:
             results = [combination.to_dict() for combination in query.all()]
             
             return results, total_count
+
+    def combination_bulk_create(self, combinations: List[Dict[str, Any]]) -> int:
+        """
+        Create multiple combinations in a single transaction for better performance.
+        
+        Args:
+            combinations: List of combination dictionaries with required fields
+            
+        Returns:
+            Number of combinations successfully inserted
+        """
+        from ..models import Combination
+        
+        if not combinations:
+            return 0
+        
+        # Set created_at timestamp for all combinations if not provided
+        current_time = time.time()
+        for combo in combinations:
+            if 'created_at' not in combo or combo['created_at'] is None:
+                combo['created_at'] = current_time
+            # Set default status if not provided
+            if 'status' not in combo:
+                combo['status'] = 'queued'
+        
+        with self.session_scope() as session:
+            try:
+                # Use SQLAlchemy's bulk_insert_mappings for better performance
+                session.bulk_insert_mappings(Combination, combinations)
+                return len(combinations)
+            except Exception as e:
+                # If bulk insert fails (e.g., duplicate key constraint), 
+                # fallback to individual inserts with ignore duplicates
+                session.rollback()
+                inserted_count = 0
+                
+                for combo in combinations:
+                    try:
+                        # Try to insert individually
+                        combination = Combination(**combo)
+                        session.add(combination)
+                        session.flush()  # Force execution to catch constraint violations
+                        inserted_count += 1
+                    except Exception:
+                        # Ignore duplicates and other constraint violations
+                        session.rollback()
+                        continue
+                
+                return inserted_count
+
+    def combination_bulk_update(
+        self, 
+        filters: Dict[str, Any], 
+        update_fields: Dict[str, Any]
+    ) -> int:
+        """
+        Bulk update combinations matching the filters.
+        
+        Args:
+            filters: Dictionary with filter conditions (e.g., {'work_id': 'abc', 'status': ['running', 'paused']})
+            update_fields: Dictionary with fields to update (e.g., {'status': 'queued', 'started_at': None})
+            
+        Returns:
+            int: Number of combinations updated
+        """
+        from ..models import Combination
+        from sqlalchemy import and_
+        
+        if not filters or not update_fields:
+            return 0
+        
+        with self.session_scope() as session:
+            query = session.query(Combination)
+            
+            # Apply filters
+            filter_conditions = []
+            for key, value in filters.items():
+                if isinstance(value, list):
+                    filter_conditions.append(getattr(Combination, key).in_(value))
+                else:
+                    filter_conditions.append(getattr(Combination, key) == value)
+            
+            if filter_conditions:
+                query = query.filter(and_(*filter_conditions))
+            
+            # Perform bulk update
+            result = query.update(update_fields, synchronize_session=False)
+            return result

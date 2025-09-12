@@ -3,70 +3,312 @@
 {% block title %}Work Progress Monitor - CSPBench{% endblock %}
 
 {% block breadcrumb_items %}
-<li class="breadcrumb-item"><a href="/monitor/works" class="text-decoration-none"><i class="bi bi-speedometer2 me-1"></i>Work Monitor</a></li>
-<li class="breadcrumb-item active" aria-current="page"><i class="bi bi-activity me-1"></i>{{ work_id or 'work_id' }}</li>
+<li class="breadcrumb-item"><a href="/monitor/works" class="text-decoration-none"><i
+      class="bi bi-speedometer2 me-1"></i>Work Monitor</a></li>
+<li class="breadcrumb-item active" aria-current="page"><i class="bi bi-activity me-1"></i>{{ work_id or 'work_id' }}
+</li>
 {% endblock %}
 
 {% block header %}{% endblock %}
 
 {% block extra_css %}
 <style>
-  .monitor-progress-bg { background: linear-gradient(135deg,#667eea 0%,#764ba2 100%); min-height: 100vh; padding: 2rem 0; }
-  .monitor-container { max-width: 1400px; margin: 0 auto; }
-  .monitor-card { background:#fff; border-radius:12px; box-shadow:0 4px 20px rgba(0,0,0,.08); margin-bottom:1.75rem; overflow:hidden; }
-  .monitor-card .card-header { background:#f8f9fa; border-bottom:1px solid #e5e7eb; font-weight:600; }
+  .monitor-progress-bg {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+    padding: 2rem 0;
+  }
+
+  .monitor-container {
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+
+  .monitor-card {
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, .08);
+    margin-bottom: 1.75rem;
+    overflow: hidden;
+  }
+
+  .monitor-card .card-header {
+    background: #f8f9fa;
+    border-bottom: 1px solid #e5e7eb;
+    font-weight: 600;
+  }
+
   /* Painéis internos do resumo */
-  .summary-panel { background:#fff; border:1px solid #e5e7eb; border-radius:14px; padding:1.1rem 1.2rem; height:100%; display:flex; flex-direction:column; box-shadow:0 2px 6px rgba(0,0,0,.04); }
-  .summary-panel h6 { font-size:.8rem; text-transform:uppercase; letter-spacing:.6px; font-weight:600; color:#6c757d; margin:0 0 .85rem 0; display:flex; align-items:center; gap:.4rem; }
-  .summary-panel h6 i { font-size:.9rem; }
-  .summary-panel:not(.no-hover) { transition:box-shadow .25s ease, transform .25s ease; }
-  .summary-panel:not(.no-hover):hover { box-shadow:0 6px 18px rgba(0,0,0,.08); transform:translateY(-2px); }
+  .summary-panel {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 14px;
+    padding: 1.1rem 1.2rem;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, .04);
+  }
+
+  .summary-panel h6 {
+    font-size: .8rem;
+    text-transform: uppercase;
+    letter-spacing: .6px;
+    font-weight: 600;
+    color: #6c757d;
+    margin: 0 0 .85rem 0;
+    display: flex;
+    align-items: center;
+    gap: .4rem;
+  }
+
+  .summary-panel h6 i {
+    font-size: .9rem;
+  }
+
+  .summary-panel:not(.no-hover) {
+    transition: box-shadow .25s ease, transform .25s ease;
+  }
+
+  .summary-panel:not(.no-hover):hover {
+    box-shadow: 0 6px 18px rgba(0, 0, 0, .08);
+    transform: translateY(-2px);
+  }
+
   /* Métricas */
-  .metric-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:.9rem; width:100%; }
-  .metric-box { background:linear-gradient(180deg,#fafbfc 0%,#f1f3f5 100%); border:1px solid #e5e7eb; border-radius:12px; padding:.75rem .85rem; display:flex; gap:.65rem; align-items:center; position:relative; overflow:hidden; }
-  .metric-box:before { content:""; position:absolute; inset:0; background:radial-gradient(circle at top left,rgba(102,126,234,.15),transparent 70%); pointer-events:none; }
-  .metric-icon { width:42px; height:42px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:1.1rem; }
-  .metric-value { font-size:1.25rem; font-weight:600; margin:0; }
-  .metric-label { font-size:.75rem; text-transform:uppercase; letter-spacing:.5px; margin:0; color:#6c757d }
-  .progress-slim { height:10px; border-radius:5px; }
-  .nav-tabs .nav-link { font-weight:500; }
-  .placeholder-box { border:2px dashed #ced4da; border-radius:10px; padding:2rem; text-align:center; color:#6c757d; }
-  .status-badge { font-size:.75rem; letter-spacing:.5px; }
-  .hierarchy-list { list-style:none; padding:0; margin:0; }
-  .hierarchy-list li { display:flex; justify-content:space-between; padding:.35rem .5rem; font-size:.85rem; border-radius:6px; }
-  .hierarchy-list li span { max-width:60%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .hierarchy-list li.active { background:#eef5ff; font-weight:600; }
-  .table-placeholder { min-height:240px; }
-  .event-log-placeholder { min-height:220px; }
-  .progress-ring-wrapper { width:140px; height:140px; position:relative; }
-  .progress-ring-wrapper .percent { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-weight:600; font-size:1.25rem; }
+  .metric-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: .9rem;
+    width: 100%;
+  }
+
+  .metric-box {
+    background: linear-gradient(180deg, #fafbfc 0%, #f1f3f5 100%);
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: .75rem .85rem;
+    display: flex;
+    gap: .65rem;
+    align-items: center;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .metric-box:before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at top left, rgba(102, 126, 234, .15), transparent 70%);
+    pointer-events: none;
+  }
+
+  .metric-icon {
+    width: 42px;
+    height: 42px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+  }
+
+  .metric-value {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin: 0;
+  }
+
+  .metric-label {
+    font-size: .75rem;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    margin: 0;
+    color: #6c757d
+  }
+
+  .progress-slim {
+    height: 10px;
+    border-radius: 5px;
+  }
+
+  .nav-tabs .nav-link {
+    font-weight: 500;
+  }
+
+  .placeholder-box {
+    border: 2px dashed #ced4da;
+    border-radius: 10px;
+    padding: 2rem;
+    text-align: center;
+    color: #6c757d;
+  }
+
+  .status-badge {
+    font-size: .75rem;
+    letter-spacing: .5px;
+  }
+
+  .hierarchy-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  .hierarchy-list li {
+    display: flex;
+    justify-content: space-between;
+    padding: .35rem .5rem;
+    font-size: .85rem;
+    border-radius: 6px;
+  }
+
+  .hierarchy-list li span {
+    max-width: 60%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .hierarchy-list li.active {
+    background: #eef5ff;
+    font-weight: 600;
+  }
+
+  .table-placeholder {
+    min-height: 240px;
+  }
+
+  .event-log-placeholder {
+    min-height: 220px;
+  }
+
+  .progress-ring-wrapper {
+    width: 140px;
+    height: 140px;
+    position: relative;
+  }
+
+  .progress-ring-wrapper .percent {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 1.25rem;
+  }
+
   /* Auto-follow button styles */
-  #autoFollowBtn.active { background-color: #667eea; border-color: #667eea; color: white; }
-  #autoFollowBtn.active:hover { background-color: #5a6fd8; border-color: #5a6fd8; }
+  #autoFollowBtn.active {
+    background-color: #667eea;
+    border-color: #667eea;
+    color: white;
+  }
+
+  #autoFollowBtn.active:hover {
+    background-color: #5a6fd8;
+    border-color: #5a6fd8;
+  }
+
   /* Highlight current running execution */
-  .table-info { background-color: rgba(102, 126, 234, 0.1) !important; }
+  .table-info {
+    background-color: rgba(102, 126, 234, 0.1) !important;
+  }
+
   /* Scroll containers */
-  .scroll-y { max-height:260px; overflow-y:auto; }
+  .scroll-y {
+    max-height: 260px;
+    overflow-y: auto;
+  }
+
   /* Executions table with fixed header */
-  #executionsContainer { position: relative; }
-  #executionsContainer .sticky-top { position: sticky; top: 0; z-index: 10; background: #f8f9fa; }
-  #executionsContainer::-webkit-scrollbar { width: 6px; }
-  #executionsContainer::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 3px; }
-  #executionsContainer::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 3px; }
-  #executionsContainer::-webkit-scrollbar-thumb:hover { background: #a8a8a8; }
-  .small-label { font-size:.65rem; text-transform:uppercase; letter-spacing:.5px; color:#6c757d; }
+  #executionsContainer {
+    position: relative;
+  }
+
+  #executionsContainer .sticky-top {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: #f8f9fa;
+  }
+
+  #executionsContainer::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  #executionsContainer::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 3px;
+  }
+
+  #executionsContainer::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 3px;
+  }
+
+  #executionsContainer::-webkit-scrollbar-thumb:hover {
+    background: #a8a8a8;
+  }
+
+  .small-label {
+    font-size: .65rem;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    color: #6c757d;
+  }
+
   /* Event log styles */
-  .event-type-error { background-color: #dc3545; color: white; }
-  .event-type-warning { background-color: #ffc107; color: #212529; }
-  .event-type-progress { background-color: #0dcaf0; color: #212529; }
-  .event-timestamp { font-family: 'Courier New', monospace; font-size: 0.75rem; }
-  .event-data { font-size: 0.8rem; max-width: 300px; overflow: hidden; text-overflow: ellipsis; }
-  .event-data-expanded { max-width: none; white-space: pre-wrap; word-break: break-word; }
-  #btnAutoScroll.active { background-color: #198754; border-color: #198754; color: white; }
+  .event-type-error {
+    background-color: #dc3545;
+    color: white;
+  }
+
+  .event-type-warning {
+    background-color: #ffc107;
+    color: #212529;
+  }
+
+  .event-type-progress {
+    background-color: #0dcaf0;
+    color: #212529;
+  }
+
+  .event-timestamp {
+    font-family: 'Courier New', monospace;
+    font-size: 0.75rem;
+  }
+
+  .event-data {
+    font-size: 0.8rem;
+    max-width: 300px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .event-data-expanded {
+    max-width: none;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  #btnAutoScroll.active {
+    background-color: #198754;
+    border-color: #198754;
+    color: white;
+  }
+
   /* Ajustes responsivos */
   @media (max-width: 1199.98px) {
-    .progress-ring-wrapper { width:120px; height:120px; }
-    .metric-value { font-size:1.1rem; }
+    .progress-ring-wrapper {
+      width: 120px;
+      height: 120px;
+    }
+
+    .metric-value {
+      font-size: 1.1rem;
+    }
   }
 </style>
 {% endblock %}
@@ -86,7 +328,8 @@
         <div class="d-flex align-items-center gap-2">
           <h5 class="mb-0"><i class="bi bi-graph-up me-2"></i>Resumo</h5>
           <span class="badge bg-secondary status-badge" id="workStatusBadge">STATUS</span>
-          <span class="ms-3 small text-muted d-flex align-items-center" id="startTimeWrapper"><i class="bi bi-play-circle me-1"></i><span id="startTime">--</span></span>
+          <span class="ms-3 small text-muted d-flex align-items-center" id="startTimeWrapper"><i
+              class="bi bi-play-circle me-1"></i><span id="startTime">--</span></span>
         </div>
         <div class="d-flex flex-column align-items-end gap-1">
           <div class="small text-muted">
@@ -94,20 +337,29 @@
             <span id="batchName">Carregando...</span>
           </div>
           <div class="d-flex flex-wrap gap-2" id="workActions">
-            <!-- Botões de ação -->
-            <div class="btn-group btn-group-sm" role="group">
-              <button class="btn btn-outline-warning" id="btnPause"><i class="bi bi-pause-fill me-1"></i>Pausar</button>
-              <button class="btn btn-outline-success d-none" id="btnResume"><i class="bi bi-play-fill me-1"></i>Retomar</button>
-              <button class="btn btn-outline-danger" id="btnCancel"><i class="bi bi-x-circle me-1"></i>Cancelar</button>
-            </div>
+            <!-- Botões de controle -->
+            <button class="btn btn-outline-warning btn-sm" id="btnPauseWork" title="Pausar execução"
+              style="display: none;">
+              <span class="btn-content"><i class="bi bi-pause-fill me-1"></i>Pausar</span>
+              <span class="btn-loading d-none"><span class="spinner-border spinner-border-sm me-1" role="status"
+                  aria-hidden="true"></span>Pausando...</span>
+            </button>
+            <button class="btn btn-outline-success btn-sm" id="btnContinueWork" title="Continuar execução"
+              style="display: none;">
+              <span class="btn-content"><i class="bi bi-play-fill me-1"></i>Continuar</span>
+              <span class="btn-loading d-none"><span class="spinner-border spinner-border-sm me-1" role="status"
+                  aria-hidden="true"></span>Continuando...</span>
+            </button>
             <!-- Botão para ir ao resultado -->
-            <button class="btn btn-outline-info btn-sm" id="btnGoToResult" title="Ver resultado"><i class="bi bi-box-arrow-up-right me-1"></i>Resultado</button>
-            <a href="/monitor/works" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Voltar</a>
+            <button class="btn btn-outline-info btn-sm" id="btnGoToResult" title="Ver resultado"><i
+                class="bi bi-box-arrow-up-right me-1"></i>Resultado</button>
+            <a href="/monitor/works" class="btn btn-outline-secondary btn-sm"><i
+                class="bi bi-arrow-left me-1"></i>Voltar</a>
           </div>
         </div>
       </div>
       <div class="card-body">
-  <!-- Linha removida: Current Context movido para coluna direita -->
+        <!-- Linha removida: Current Context movido para coluna direita -->
         <div class="row g-4 align-items-stretch">
           <!-- Hierarchy (agora à esquerda) -->
           <div class="col-xl-4 d-flex">
@@ -124,12 +376,14 @@
           </div>
           <!-- Progress Ring (centro) simplificado -->
           <div class="col-xl-4 d-flex">
-            <div class="summary-panel w-100 d-flex flex-column align-items-center justify-content-center" id="panelProgress">
+            <div class="summary-panel w-100 d-flex flex-column align-items-center justify-content-center"
+              id="panelProgress">
               <div class="progress-ring-wrapper mb-2">
                 <div class="percent" id="progressPercent">0%</div>
                 <svg width="140" height="140">
                   <circle cx="70" cy="70" r="60" stroke="#e9ecef" stroke-width="12" fill="none" />
-                  <circle cx="70" cy="70" r="60" stroke="#667eea" stroke-width="12" fill="none" stroke-dasharray="0 999" stroke-linecap="round" id="progressCircle" />
+                  <circle cx="70" cy="70" r="60" stroke="#667eea" stroke-width="12" fill="none" stroke-dasharray="0 999"
+                    stroke-linecap="round" id="progressCircle" />
                 </svg>
               </div>
               <div class="small text-muted" id="progressRatio">0/0</div>
@@ -155,8 +409,12 @@
     <div class="monitor-card">
       <div class="card-header">
         <ul class="nav nav-tabs card-header-tabs" id="monitorTabs" role="tablist">
-          <li class="nav-item" role="presentation"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-executions" type="button" role="tab"><i class="bi bi-list-task me-1"></i>Executions</button></li>
-          <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-events" type="button" role="tab"><i class="bi bi-journal-text me-1"></i>Events</button></li>
+          <li class="nav-item" role="presentation"><button class="nav-link active" data-bs-toggle="tab"
+              data-bs-target="#tab-executions" type="button" role="tab"><i
+                class="bi bi-list-task me-1"></i>Executions</button></li>
+          <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="tab"
+              data-bs-target="#tab-events" type="button" role="tab"><i
+                class="bi bi-journal-text me-1"></i>Events</button></li>
         </ul>
       </div>
       <div class="card-body tab-content">
@@ -164,10 +422,12 @@
         <div class="tab-pane fade show active" id="tab-executions" role="tabpanel">
           <div class="row g-2 mb-3 align-items-center">
             <div class="col-lg-4 col-md-5">
-              <label class="form-label small text-uppercase fw-semibold text-muted mb-1 d-flex align-items-center"><i class="bi bi-filter-square me-1"></i>Combinação</label>
+              <label class="form-label small text-uppercase fw-semibold text-muted mb-1 d-flex align-items-center"><i
+                  class="bi bi-filter-square me-1"></i>Combinação</label>
               <div class="d-flex gap-2 align-items-center combo-filter-wrapper">
                 <select class="form-select form-select-sm" id="combinationSelect"></select>
-                <button class="btn btn-sm btn-outline-secondary" id="autoFollowBtn" title="Seguir execução atual automaticamente">
+                <button class="btn btn-sm btn-outline-secondary" id="autoFollowBtn"
+                  title="Seguir execução atual automaticamente">
                   <i class="bi bi-magnet" id="autoFollowIcon"></i>
                 </button>
               </div>
@@ -210,7 +470,8 @@
               </div>
             </div>
           </div>
-          <div class="table-responsive table-placeholder border rounded" style="min-height:260px; max-height:400px; overflow-y:auto;" id="executionsContainer">
+          <div class="table-responsive table-placeholder border rounded"
+            style="min-height:260px; max-height:400px; overflow-y:auto;" id="executionsContainer">
             <table class="table table-sm align-middle mb-0" id="executionsTable">
               <thead class="table-light sticky-top">
                 <tr>
@@ -223,11 +484,14 @@
                 </tr>
               </thead>
               <tbody id="executionsTableBody">
-                <tr><td colspan="6" class="text-center text-muted py-4"><i class="bi bi-inbox me-1"></i>Nenhuma execução</td></tr>
+                <tr>
+                  <td colspan="6" class="text-center text-muted py-4"><i class="bi bi-inbox me-1"></i>Nenhuma execução
+                  </td>
+                </tr>
               </tbody>
             </table>
           </div>
-          
+
           <!-- Info de execuções sem paginação -->
           <div class="d-flex justify-content-between align-items-center mt-2">
             <div class="text-muted small">
@@ -263,7 +527,8 @@
             </div>
             <div class="col-md-3">
               <label class="form-label small text-uppercase fw-semibold text-muted mb-1">Filtro de Texto</label>
-              <input type="text" class="form-control form-control-sm" id="eventTextFilter" placeholder="Buscar no entity_data...">
+              <input type="text" class="form-control form-control-sm" id="eventTextFilter"
+                placeholder="Buscar no entity_data...">
             </div>
             <div class="col-md-2">
               <label class="form-label small text-uppercase fw-semibold text-muted mb-1">Data Início</label>
@@ -274,12 +539,13 @@
               <input type="datetime-local" class="form-control form-control-sm" id="eventDateToFilter">
             </div>
             <div class="col-md-1 d-flex align-items-end">
-              <button class="btn btn-outline-success btn-sm" id="btnAutoScroll" title="Auto-refresh para primeira página">
+              <button class="btn btn-outline-success btn-sm" id="btnAutoScroll"
+                title="Auto-refresh para primeira página">
                 <i class="bi bi-arrow-clockwise"></i>
               </button>
             </div>
           </div>
-          
+
           <!-- Event Log Container -->
           <div class="border rounded">
             <div class="table-responsive">
@@ -302,7 +568,7 @@
               </table>
             </div>
           </div>
-          
+
           <!-- Paginação para Events -->
           <div class="d-flex justify-content-between align-items-center mt-3">
             <div class="text-muted small">
@@ -314,7 +580,7 @@
               </ul>
             </nav>
           </div>
-          
+
           <!-- Statistics -->
           <div class="row g-2 mt-2">
             <div class="col-md-3">
@@ -370,815 +636,77 @@
 
 {% block extra_js %}
 <script>
-// === Variáveis Globais ===
-const ITEMS_PER_PAGE = 10; // Mantido apenas para Events
+  // === Variáveis Globais ===
+  const ITEMS_PER_PAGE = 10; // Mantido apenas para Events
 
-let allExecutions = [];
-let filteredExecutions = [];
+  let allExecutions = [];
+  let filteredExecutions = [];
 
-let allEvents = [];
-let filteredEvents = [];
-let currentEventsPage = 1;
-
-// === Dados de Teste para Paginação ===
-// Adicionar dados fake para testar paginação
-function addTestData() {
-  // Adicionar 25 execuções fake
-  for (let i = 1; i <= 25; i++) {
-    allExecutions.push({
-      id: `exec_${i}`,
-      status: i % 4 === 0 ? 'failed' : i % 3 === 0 ? 'completed' : i % 2 === 0 ? 'running' : 'queued',
-      algorithm: `Algorithm ${i}`,
-      dataset: `Dataset ${i}`,
-      config: `Config ${i}`,
-      task: `Task ${i}`,
-      started_at: Date.now() - (i * 60000),
-      completed_at: i % 2 === 0 ? Date.now() - (i * 30000) : null
-    });
-  }
-  
-  // Adicionar 30 eventos fake
-  for (let i = 1; i <= 30; i++) {
-    allEvents.push({
-      id: i,
-      event_type: i % 4 === 0 ? 'error' : i % 3 === 0 ? 'warning' : i % 2 === 0 ? 'info' : 'progress',
-      event_category: `category_${i % 5}`,
-      timestamp: Date.now() - (i * 30000),
-      entity_data: { message: `Mensagem de teste ${i}`, details: `Detalhes ${i}` }
-    });
-  }
-  
-  // Aplicar dados iniciais
-  filteredExecutions = [...allExecutions];
-  filteredEvents = [...allEvents];
-  
-  console.log('Dados de teste adicionados:', { executions: allExecutions.length, events: allEvents.length });
-  
-  // Renderizar dados de teste imediatamente
-  renderExecutionsTable();
-  renderEventsPagination();
-  renderEventsTable();
-}
-
-// Chamar função de teste na inicialização (comentar para usar dados reais)
-// addTestData();
-
-// === Funções Globais de Paginação ===
-// Funções de formatação (movidas para escopo global)
-function formatStatusBadge(status) {
-  const map = {running:'primary',completed:'success',queued:'info',failed:'danger',error:'danger',paused:'warning'};
-  const cls = map[status] || 'secondary';
-  return `<span class="badge bg-${cls} small">${(status||'').toUpperCase()}</span>`;
-}
-
-function formatTime(ts) {
-  const d = new Date(ts*1000);
-  return d.toLocaleTimeString();
-}
-
-function escapeHtml(str) {
-  return str.replace(/[&<>'"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;","\"":"&quot;"}[c]));
-}
-
-// Funções de formatação para eventos
-function formatEventTime(timestamp) {
-  const date = new Date(timestamp * 1000);
-  return date.toLocaleTimeString('pt-BR', { hour12: false });
-}
-
-function formatEventType(type) {
-  const typeClass = `event-type-${type}`;
-  return `<span class="badge ${typeClass}">${type.toUpperCase()}</span>`;
-}
-
-function formatEventData(entityData) {
-  try {
-    const jsonStr = JSON.stringify(entityData, null, 2);
-    const truncated = jsonStr.length > 100 ? jsonStr.substring(0, 100) + '...' : jsonStr;
-    return `<code class="event-data" title="${jsonStr.replace(/"/g, '&quot;')}">${truncated.replace(/[&<>'"]/g, c => ({'&':'&amp;', '<':'&lt;', '>':'&gt;', "'":"&#39;", '"':'&quot;'}[c]))}</code>`;
-  } catch {
-    return '<code class="event-data">Invalid JSON</code>';
-  }
-}
-
-function changeEventsPage(page) {
-  const totalPages = Math.ceil(filteredEvents.length / ITEMS_PER_PAGE);
-  if (page < 1 || page > totalPages) return;
-  
-  currentEventsPage = page;
-  renderEventsPagination();
-  renderEventsTable();
-}
-
-function renderEventsPagination() {
-  const totalPages = Math.ceil(filteredEvents.length / ITEMS_PER_PAGE);
-  const paginationContainer = document.getElementById('eventsPagination');
-  const infoContainer = document.getElementById('eventsInfo');
-  
-  if (!paginationContainer) return;
-  
-  // Atualizar informações
-  const start = (currentEventsPage - 1) * ITEMS_PER_PAGE + 1;
-  const end = Math.min(currentEventsPage * ITEMS_PER_PAGE, filteredEvents.length);
-  if (infoContainer) infoContainer.textContent = `Mostrando ${start}-${end} de ${filteredEvents.length} eventos`;
-  
-  if (totalPages <= 1) {
-    paginationContainer.innerHTML = '';
-    return;
-  }
-  
-  let html = '';
-  
-  // Botão anterior
-  html += `<li class="page-item ${currentEventsPage === 1 ? 'disabled' : ''}">
-    <a class="page-link" href="#" onclick="changeEventsPage(${currentEventsPage - 1}); return false;">Anterior</a>
-  </li>`;
-  
-  // Páginas
-  for (let i = 1; i <= totalPages; i++) {
-    if (i === currentEventsPage) {
-      html += `<li class="page-item active"><span class="page-link">${i}</span></li>`;
-    } else {
-      html += `<li class="page-item"><a class="page-link" href="#" onclick="changeEventsPage(${i}); return false;">${i}</a></li>`;
-    }
-  }
-  
-  // Botão próximo
-  html += `<li class="page-item ${currentEventsPage === totalPages ? 'disabled' : ''}">
-    <a class="page-link" href="#" onclick="changeEventsPage(${currentEventsPage + 1}); return false;">Próximo</a>
-  </li>`;
-  
-  paginationContainer.innerHTML = html;
-}
-
-function renderExecutionsTable() {
-  // Ordenar execuções por sequência (igual à função original)
-  const sortedExecutions = [...filteredExecutions].sort((a, b) => (a.sequencia || 0) - (b.sequencia || 0));
-  
-  // Renderizar todas as execuções sem paginação
-  const tbody = document.getElementById('executionsTableBody');
-  if (!tbody) return;
-  
-  if (sortedExecutions.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4"><i class="bi bi-inbox me-1"></i>Nenhuma execução</td></tr>';
-    return;
-  }
-
-  // Renderizar todas as execuções
-  tbody.innerHTML = sortedExecutions.map(exec => {
-    const progressWidth = Math.round((exec.progress || 0) * 100);
-    const tableClass = exec.status === 'running' ? ' class="table-info"' : '';
-    
-    return `<tr${tableClass}>
-        <td class="text-muted">${exec.sequencia || '—'}</td>
-        <td>${formatStatusBadge(exec.status)}</td>
-        <td><div class="progress" style="height:6px;"><div class="progress-bar" style="width:${progressWidth}%"></div></div></td>
-        <td>${exec.started_at ? formatTime(exec.started_at) : '—'}</td>
-        <td>${exec.finished_at ? formatTime(exec.finished_at) : '—'}</td>
-        <td class="small">${escapeHtml(exec.progress_message || '')}</td>
-      </tr>`;
-  }).join('');
-  
-  // Atualizar informações de contagem
-  const infoContainer = document.getElementById('executionsInfo');
-  if (infoContainer) {
-    infoContainer.textContent = `Mostrando ${sortedExecutions.length} execuções`;
-  }
-}
-
-function renderEventsTable() {
-  const tbody = document.getElementById('eventLogTableBody');
-  if (!tbody) return;
-  
-  if (filteredEvents.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-4"><i class="bi bi-inbox me-1"></i>Nenhum evento encontrado</td></tr>';
-    return;
-  }
-
-  // Ordenar por timestamp (mais novos primeiro) - igual à função original
-  const sortedEvents = [...filteredEvents].sort((a, b) => b.timestamp - a.timestamp);
-  
-  // Aplicar paginação
-  const start = (currentEventsPage - 1) * ITEMS_PER_PAGE;
-  const end = start + ITEMS_PER_PAGE;
-  const pageEvents = sortedEvents.slice(start, end);
-
-  // Renderizar eventos usando a mesma estrutura da função original
-  tbody.innerHTML = pageEvents.map(event => `<tr>
-        <td class="event-timestamp">${formatEventTime(event.timestamp)}</td>
-        <td>${formatEventType(event.event_type)}</td>
-        <td><span class="badge bg-secondary">${event.event_category}</span></td>
-        <td class="event-data">${formatEventData(event.entity_data)}</td>
-      </tr>`).join('');
-}
-
-// === Nova implementação de monitoramento de progresso ===
-(() => {
-  const WORK_ID = '{{ work_id }}';
-  
-  // Referencias dos elementos
-  const els = {
-    statusBadge: document.getElementById('workStatusBadge'),
-    startTime: document.getElementById('startTime'),
-    // Hierarchy
-    taskProgress: document.getElementById('taskProgress'),
-    datasetProgress: document.getElementById('datasetProgress'),
-    configProgress: document.getElementById('configProgress'),
-    algorithmProgress: document.getElementById('algorithmProgress'),
-    // Current combination
-    currentTask: document.getElementById('currentTaskValue'),
-    currentDataset: document.getElementById('currentDatasetValue'),
-    currentConfig: document.getElementById('currentConfigValue'),
-    currentAlgorithm: document.getElementById('currentAlgorithmValue'),
-    // Progress ring
-    progressPercent: document.getElementById('progressPercent'),
-    progressCircle: document.getElementById('progressCircle'),
-    progressRatio: document.getElementById('progressRatio'),
-    // Execution controls
-    comboSelect: document.getElementById('combinationSelect'),
-    autoFollowBtn: document.getElementById('autoFollowBtn'),
-    statRunning: document.getElementById('statRunning'),
-    statCompleted: document.getElementById('statCompleted'),
-    statQueued: document.getElementById('statQueued'),
-    statFailed: document.getElementById('statFailed'),
-    comboProgressBar: document.getElementById('comboProgressBar'),
-    comboProgressLabel: document.getElementById('comboProgressLabel'),
-    // Action buttons
-    btnGoToResult: document.getElementById('btnGoToResult'),
-  };
-
-  // Estado global
-  let workStatusCache = null;
-  let progressCache = null;
-  let ws = null;
-  let wsRetry = 0;
-  const CIRCUMFERENCE = 2 * Math.PI * 60; // r=60
-  
-  // Dados de execuções - agora recebemos todas do backend
-  let allCombinations = []; // todas as combinações
+  let allEvents = [];
   let filteredEvents = [];
-  let currentCombinationId = null; // combinação que está executando
-  
-  // Controles de filtro
-  let selectedCombinationId = null; // combinação selecionada no dropdown
-  let autoFollow = true; // se deve seguir a execução atual automaticamente
+  let currentEventsPage = 1;
 
-    // Utilitários
-  function formatStatusBadge(status){
-    const map = {running:'primary',completed:'success',queued:'info',failed:'danger',error:'danger',paused:'warning'};
-    const cls = map[status] || 'secondary';
-    return `<span class="badge bg-${cls} small">${(status||'').toUpperCase()}</span>`;
+  // === Dados de Teste para Paginação ===
+  // Adicionar dados fake para testar paginação
+  function addTestData() {
+    // Adicionar 25 execuções fake
+    for (let i = 1; i <= 25; i++) {
+      allExecutions.push({
+        id: `exec_${i}`,
+        status: i % 4 === 0 ? 'failed' : i % 3 === 0 ? 'completed' : i % 2 === 0 ? 'running' : 'queued',
+        algorithm: `Algorithm ${i}`,
+        dataset: `Dataset ${i}`,
+        config: `Config ${i}`,
+        task: `Task ${i}`,
+        started_at: Date.now() - (i * 60000),
+        completed_at: i % 2 === 0 ? Date.now() - (i * 30000) : null
+      });
+    }
+
+    // Adicionar 30 eventos fake
+    for (let i = 1; i <= 30; i++) {
+      allEvents.push({
+        id: i,
+        event_type: i % 4 === 0 ? 'error' : i % 3 === 0 ? 'warning' : i % 2 === 0 ? 'info' : 'progress',
+        event_category: `category_${i % 5}`,
+        timestamp: Date.now() - (i * 30000),
+        entity_data: { message: `Mensagem de teste ${i}`, details: `Detalhes ${i}` }
+      });
+    }
+
+    // Aplicar dados iniciais
+    filteredExecutions = [...allExecutions];
+    filteredEvents = [...allEvents];
+
+    console.log('Dados de teste adicionados:', { executions: allExecutions.length, events: allEvents.length });
+
+    // Renderizar dados de teste imediatamente
+    renderExecutionsTable();
+    renderEventsPagination();
+    renderEventsTable();
   }
 
-  function formatTime(ts){
-    const d = new Date(ts*1000);
+  // Chamar função de teste na inicialização (comentar para usar dados reais)
+  // addTestData();
+
+  // === Funções Globais de Paginação ===
+  // Funções de formatação (movidas para escopo global)
+  function formatStatusBadge(status) {
+    const map = { running: 'primary', completed: 'success', queued: 'info', failed: 'danger', error: 'danger', paused: 'warning' };
+    const cls = map[status] || 'secondary';
+    return `<span class="badge bg-${cls} small">${(status || '').toUpperCase()}</span>`;
+  }
+
+  function formatTime(ts) {
+    const d = new Date(ts * 1000);
     return d.toLocaleTimeString();
   }
 
-  function escapeHtml(str){
-    return str.replace(/[&<>'"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;","\"":"&quot;"}[c]));
+  function escapeHtml(str) {
+    return str.replace(/[&<>'"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", "\"": "&quot;" }[c]));
   }
 
-  // Buscar status do work
-  async function fetchWorkStatus() {
-    try {
-      const resp = await fetch(`/api/monitor/work/${WORK_ID}/status`);
-      if (!resp.ok) return;
-      const data = await resp.json();
-      workStatusCache = data;
-      updateStatusBadge(data.status);
-      updateStartTime();
-      updateActionButtons(data.status);
-      
-      // Buscar nome do batch
-      await fetchBatchName();
-    } catch (_) { /* ignore */ }
-  }
-
-  // Buscar nome do batch
-  async function fetchBatchName() {
-    try {
-      const resp = await fetch(`/api/monitor/works`);
-      if (!resp.ok) return;
-      const data = await resp.json();
-      const work = data.works.find(w => w.id === WORK_ID);
-      if (work && work.config_name) {
-        document.getElementById('batchName').textContent = work.config_name;
-      }
-    } catch (_) { /* ignore */ }
-  }
-
-  function updateStatusBadge(status) {
-    if (!els.statusBadge) return;
-    const map = {
-      running: 'bg-primary',
-      queued: 'bg-info',
-      completed: 'bg-success',
-      failed: 'bg-danger',
-      error: 'bg-danger',
-      paused: 'bg-warning',
-      cancelled: 'bg-secondary'
-    };
-    els.statusBadge.className = 'badge status-badge ' + (map[status] || 'bg-secondary');
-    els.statusBadge.textContent = status?.toUpperCase() || 'UNKNOWN';
-  }
-
-  function updateActionButtons(status){
-    const pauseBtn = document.getElementById('btnPause');
-    const resumeBtn = document.getElementById('btnResume');
-    const cancelBtn = document.getElementById('btnCancel');
-    if(!pauseBtn) return;
-    
-    const terminal = ['completed','failed','error','cancelled'].includes(status);
-    
-    if(status==='paused'){
-      pauseBtn.classList.add('d-none');
-      resumeBtn.classList.remove('d-none');
-    } else {
-      resumeBtn.classList.add('d-none');
-      pauseBtn.classList.remove('d-none');
-    }
-    
-    pauseBtn.disabled = terminal || status==='paused';
-    resumeBtn.disabled = terminal || status!=='paused';
-    cancelBtn.disabled = terminal;
-  }
-
-  async function postAction(action){
-    const btns = ['btnPause','btnResume','btnCancel'].map(id=>document.getElementById(id));
-    btns.forEach(b=>b && (b.disabled=true));
-    try {
-      const resp = await fetch(`/api/monitor/work/${WORK_ID}/action/${action}`, {method:'POST'});
-      if(!resp.ok){
-        console.warn('Action failed', action);
-      } else {
-        await fetchWorkStatus();
-      }
-    } catch(e){ 
-      console.warn('Action error',action,e);
-    } finally { 
-      btns.forEach(b=>b && (b.disabled=false)); 
-    }
-  }
-
-  function updateStartTime() {
-    if (!workStatusCache || !els.startTime) return;
-    const { created_at } = workStatusCache;
-    if (!created_at) return;
-    const startDate = new Date(created_at * 1000);
-    const startTimeStr = startDate.toLocaleString('pt-BR', { 
-      day: '2-digit',
-      month: '2-digit', 
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-    els.startTime.textContent = startTimeStr;
-  }
-
-  // Aplicar dados de progresso do backend
-  function applyProgress(progress) {
-    progressCache = progress;
-    try {
-      // Hierarchy counts
-      if (progress.tasks && els.taskProgress) {
-        const fin = progress.tasks.Finished || 0;
-        const runPlus = progress.tasks.Running ? 1 : 0;
-        els.taskProgress.textContent = `${fin + runPlus}/${progress.tasks.Total || 0}`;
-      }
-      if (progress.datasets && els.datasetProgress) {
-        const fin = progress.datasets.Finished || 0;
-        const runPlus = progress.datasets.Running ? 1 : 0;
-        els.datasetProgress.textContent = `${fin + runPlus}/${progress.datasets.Total || 0}`;
-      }
-      if (progress.configs && els.configProgress) {
-        const fin = progress.configs.Finished || 0;
-        const runPlus = progress.configs.Running ? 1 : 0;
-        els.configProgress.textContent = `${fin + runPlus}/${progress.configs.Total || 0}`;
-      }
-      if (progress.algorithms && els.algorithmProgress) {
-        const fin = progress.algorithms.Finished || 0;
-        const runPlus = progress.algorithms.Running ? 1 : 0;
-        els.algorithmProgress.textContent = `${fin + runPlus}/${progress.algorithms.Total || 0}`;
-      }
-
-      // Current combination context
-      const cur = progress.current_combination_details || {};
-      if (els.currentTask) els.currentTask.textContent = cur.task_id || '—';
-      if (els.currentDataset) els.currentDataset.textContent = cur.dataset_id || '—';
-      if (els.currentConfig) els.currentConfig.textContent = cur.preset_id || '—';
-      if (els.currentAlgorithm) els.currentAlgorithm.textContent = cur.algorithm_id || '—';
-      
-      // Atualizar combinação atual
-      const newCurrentCombinationId = cur.combination_id || null;
-      if (newCurrentCombinationId !== currentCombinationId) {
-        currentCombinationId = newCurrentCombinationId;
-        // Se auto-follow está ativo, atualizar seleção
-        if (autoFollow && currentCombinationId) {
-          selectedCombinationId = currentCombinationId;
-          updateCombinationSelect();
-          filterAndRenderExecutions();
-        }
-      }
-
-      // Global progress ring
-      const gp = progress.global_progress || 0;
-      const pct = Math.round(gp * 100);
-      if (els.progressPercent) els.progressPercent.textContent = pct + '%';
-      if (els.progressCircle) {
-        const dash = (gp * CIRCUMFERENCE).toFixed(2);
-        els.progressCircle.setAttribute('stroke-dasharray', `${dash} ${CIRCUMFERENCE}`);
-      }
-      if (progress.global_execution && els.progressRatio) {
-        const f = progress.global_execution.Finished || 0;
-        const t = progress.global_execution.Total || 0;
-        els.progressRatio.textContent = `${f}/${t}`;
-      }
-
-    } catch (err) {
-      console.warn('Failed to apply progress summary', err);
-    }
-  }
-
-  // Atualizar dropdown de combinações
-  function updateCombinationSelect() {
-    if (!els.comboSelect) return;
-    const prev = els.comboSelect.value;
-    els.comboSelect.innerHTML = '';
-    
-    // Opção vazia
-    const emptyOpt = document.createElement('option');
-    emptyOpt.value = '';
-    emptyOpt.textContent = 'Todas as combinações';
-    els.comboSelect.appendChild(emptyOpt);
-    
-    // Opções das combinações
-    allCombinations.forEach(c => {
-      const opt = document.createElement('option');
-      opt.value = c.combination_id;
-      opt.textContent = `${c.task_id}/${c.dataset_id}/${c.preset_id}/${c.algorithm_id}`;
-      els.comboSelect.appendChild(opt);
-    });
-    
-    // Restaurar seleção ou definir baseado no estado atual
-    if (selectedCombinationId) {
-      els.comboSelect.value = selectedCombinationId;
-    } else if (prev && [...els.comboSelect.options].some(o => o.value === prev)) {
-      els.comboSelect.value = prev;
-      selectedCombinationId = prev || null;
-    }
-  }
-
-  // Atualizar estado visual do botão auto-follow
-  function updateAutoFollowButton() {
-    if (!els.autoFollowBtn) return;
-    if (autoFollow) {
-      els.autoFollowBtn.classList.add('active');
-      els.autoFollowBtn.title = 'Auto-follow ativo - clique para desativar';
-    } else {
-      els.autoFollowBtn.classList.remove('active');
-      els.autoFollowBtn.title = 'Auto-follow inativo - clique para ativar';
-    }
-  }
-
-  // Filtrar e renderizar execuções baseado na seleção atual
-  function filterAndRenderExecutions() {
-    filteredExecutions = allExecutions;
-    
-    // Filtrar por combinação se uma estiver selecionada
-    if (selectedCombinationId) {
-      filteredExecutions = allExecutions.filter(exec => 
-        idsEqual(exec.combination_id, selectedCombinationId)
-      );
-    }
-    
-    // Calcular estatísticas
-    const stats = computeExecutionStats(filteredExecutions);
-    
-    // Renderizar sem paginação
-    renderExecutions(filteredExecutions, stats);
-  }
-
-  function idsEqual(a, b) {
-    if (a == null || b == null) return false;
-    return String(a) === String(b);
-  }
-
-  function computeExecutionStats(executions) {
-    const stats = {Running: 0, Completed: 0, Queued: 0, Failed: 0, Total: 0};
-    
-    // Total é o número de execuções
-    stats.Total = executions.length;
-    
-    executions.forEach(exec => {
-      if (exec.status === 'running') stats.Running++;
-      else if (exec.status === 'completed') stats.Completed++;
-      else if (exec.status === 'queued') stats.Queued++;
-      else if (exec.status === 'failed' || exec.status === 'error') stats.Failed++;
-    });
-    
-    return stats;
-  }
-
-  function renderExecutions(executions, stats) {
-    // Atualizar estatísticas
-    if (els.statRunning) els.statRunning.textContent = stats.Running || 0;
-    if (els.statCompleted) els.statCompleted.textContent = stats.Completed || 0;
-    if (els.statQueued) els.statQueued.textContent = stats.Queued || 0;
-    if (els.statFailed) els.statFailed.textContent = stats.Failed || 0;
-    
-    // Atualizar barra de progresso
-    const tot = stats.Total || 0;
-    const done = (stats.Completed || 0) + (stats.Failed || 0);
-    if (els.comboProgressBar) {
-      const pct = tot ? Math.round((done / tot) * 100) : 0;
-      els.comboProgressBar.style.width = pct + '%';
-      els.comboProgressBar.textContent = pct + '%';
-    }
-    if (els.comboProgressLabel) els.comboProgressLabel.textContent = `${done}/${tot}`;
-    
-    // Renderizar tabela
-    const tbody = document.getElementById('executionsTableBody');
-    if (!tbody) return;
-    
-    tbody.innerHTML = '';
-    
-    if (!executions.length) {
-      tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4"><i class="bi bi-inbox me-1"></i>Nenhuma execução encontrada</td></tr>';
-      return;
-    }
-    
-    // Ordenar execuções por sequência
-    const sortedExecutions = [...executions].sort((a, b) => (a.sequencia || 0) - (b.sequencia || 0));
-    
-    // Renderizar tabela usando a função global para consistência
-    renderExecutionsTable();
-    
-    // Auto-scroll para execução em andamento se auto-follow estiver ativo
-    if (autoFollow && currentCombinationId && selectedCombinationId === currentCombinationId) {
-      // Procurar por execução em andamento (running)
-      const runningExecution = sortedExecutions.find(exec => exec.status === 'running');
-      if (runningExecution) {
-        // Encontrar a linha correspondente na tabela
-        const rows = tbody.querySelectorAll('tr');
-        for (let i = 0; i < rows.length; i++) {
-          if (rows[i].classList.contains('table-info')) {
-            // Fazer scroll suave para a execução em andamento
-            const container = document.getElementById('executionsContainer');
-            if (container) {
-              const rowTop = rows[i].offsetTop;
-              const containerHeight = container.clientHeight;
-              const scrollTop = rowTop - (containerHeight / 2) + (rows[i].offsetHeight / 2);
-              container.scrollTo({
-                top: Math.max(0, scrollTop),
-                behavior: 'smooth'
-              });
-            }
-            break;
-          }
-        }
-      }
-    }
-  }
-
-  // Merge parcial de dados de progresso
-  function mergePartialProgress(partial) {
-    if (!progressCache) return;
-    
-    const keys = ['tasks','datasets','configs','algorithms','execution','global_execution','current_combination_details','global_progress'];
-    for (const k of keys) {
-      if (partial[k] !== undefined) {
-        if (typeof partial[k] === 'object' && partial[k] !== null && !Array.isArray(partial[k]) && typeof progressCache[k] === 'object') {
-          progressCache[k] = { ...progressCache[k], ...partial[k] };
-        } else {
-          progressCache[k] = partial[k];
-        }
-      }
-    }
-    applyProgress(progressCache);
-  }
-
-  // Merge de execuções - acumula execuções sem duplicar
-  function mergeExecutions(newExecutions) {
-    if (!Array.isArray(newExecutions)) return;
-    
-    // Criar um mapa das execuções existentes por chave única
-    const existingMap = new Map();
-    allExecutions.forEach(exec => {
-      // Usar combination_id + sequencia como chave única
-      const key = `${exec.combination_id || 'null'}_${exec.sequencia || 'null'}`;
-      existingMap.set(key, exec);
-    });
-    
-    // Adicionar ou atualizar execuções
-    newExecutions.forEach(newExec => {
-      const key = `${newExec.combination_id || 'null'}_${newExec.sequencia || 'null'}`;
-      
-      if (existingMap.has(key)) {
-        // Atualizar execução existente (merge dos dados)
-        const existing = existingMap.get(key);
-        Object.assign(existing, newExec);
-      } else {
-        // Adicionar nova execução
-        allExecutions.push(newExec);
-        existingMap.set(key, newExec);
-      }
-    });
-  }
-
-  // WebSocket
-  function initWebSocket() {
-    try {
-      const scheme = location.protocol === 'https:' ? 'wss' : 'ws';
-      const url = `${scheme}://${location.host}/ws/work/${WORK_ID}`;
-      ws = new WebSocket(url);
-      
-      ws.onopen = () => { 
-        wsRetry = 0;
-        console.log('WebSocket conectado');
-      };
-      
-      ws.onmessage = (evt) => {
-        try {
-          const msg = JSON.parse(evt.data);
-          
-          if (msg.type === 'snapshot') {
-            // Snapshot inicial com todos os dados
-            if (msg.payload?.progress) {
-              applyProgress(msg.payload.progress);
-            }
-            if (msg.payload?.executions) {
-              allExecutions = msg.payload.executions;
-              filterAndRenderExecutions();
-            }
-            if (msg.payload?.combinations) {
-              allCombinations = msg.payload.combinations;
-              updateCombinationSelect();
-            }
-            if (msg.payload?.events) {
-              window.eventsManager?.setEvents(msg.payload.events);
-            }
-          } else if (msg.type === 'update') {
-            // Atualizações incrementais
-            if (msg.payload?.progress || msg.update?.progress) {
-              const progressUpdate = msg.payload?.progress || msg.update?.progress;
-              mergePartialProgress(progressUpdate);
-            }
-            if (msg.payload?.executions || msg.update?.executions) {
-              // Atualização das execuções - merge com existentes
-              const newExecutions = msg.payload?.executions || msg.update?.executions;
-              mergeExecutions(newExecutions);
-              filterAndRenderExecutions();
-            }
-            if (msg.payload?.combinations || msg.update?.combinations) {
-              allCombinations = msg.payload?.combinations || msg.update?.combinations;
-              updateCombinationSelect();
-            }
-            if (msg.payload?.events_appended || msg.update?.events_appended) {
-              const newEvents = msg.payload?.events_appended || msg.update?.events_appended;
-              window.eventsManager?.addEvents(newEvents);
-            }
-          } else if (msg.type === 'event') {
-            // Eventos do sistema
-            if (msg.payload?.event_type === 'work_status_changed') {
-              const newStatus = msg.payload.new_status;
-              console.log(`Status do work mudou para: ${newStatus}`);
-              
-              // Atualizar cache de status
-              if (workStatusCache) {
-                workStatusCache.status = newStatus;
-                workStatusCache.updated_at = msg.timestamp || Date.now() / 1000;
-              }
-              
-              // Atualizar interface
-              updateStatusBadge(newStatus);
-              updateActionButtons(newStatus);
-              updateStartTime();
-            }
-          }
-        } catch (e) {
-          console.warn('Erro ao processar mensagem WebSocket:', e);
-        }
-      };
-      
-      ws.onclose = () => {
-        console.log('WebSocket desconectado');
-        scheduleReconnect();
-      };
-      
-      ws.onerror = (err) => {
-        console.warn('Erro no WebSocket:', err);
-        try { ws.close(); } catch(_){}
-      };
-    } catch (err) {
-      console.warn('Erro ao inicializar WebSocket:', err);
-      scheduleReconnect();
-    }
-  }
-
-  function scheduleReconnect() {
-    if (wsRetry > 6) return;
-    const delay = Math.min(10000, 500 * Math.pow(2, wsRetry++));
-    setTimeout(initWebSocket, delay);
-  }
-
-  // Event listeners
-  function setupEventListeners() {
-    // Dropdown de combinações
-    els.comboSelect?.addEventListener('change', (e) => {
-      selectedCombinationId = e.target.value || null;
-      // Se selecionou uma combinação específica, desativar auto-follow
-      if (selectedCombinationId) {
-        autoFollow = false;
-        updateAutoFollowButton();
-      }
-      filterAndRenderExecutions();
-    });
-
-    // Botão auto-follow
-    els.autoFollowBtn?.addEventListener('click', () => {
-      autoFollow = !autoFollow;
-      updateAutoFollowButton();
-      
-      if (autoFollow && currentCombinationId) {
-        // Ativar auto-follow: selecionar combinação atual
-        selectedCombinationId = currentCombinationId;
-        updateCombinationSelect();
-        filterAndRenderExecutions();
-      } else if (!autoFollow) {
-        // Desativar auto-follow: mostrar todas
-        selectedCombinationId = null;
-        updateCombinationSelect();
-        filterAndRenderExecutions();
-      }
-    });
-
-    // Botões de ação
-    document.getElementById('btnPause')?.addEventListener('click', (e) => {
-      e.preventDefault();
-      postAction('pause');
-    });
-    
-    document.getElementById('btnResume')?.addEventListener('click', (e) => {
-      e.preventDefault();
-      postAction('resume');
-    });
-    
-    document.getElementById('btnCancel')?.addEventListener('click', (e) => {
-      e.preventDefault();
-      if (confirm('Cancelar este work?')) {
-        postAction('cancel');
-      }
-    });
-  }
-
-  // Inicialização
-  function init() {
-    // Configurar estado inicial
-    updateAutoFollowButton();
-    
-    // Configurar event listeners
-    setupEventListeners();
-    
-    // Configurar botão "Resultado"
-    if (els.btnGoToResult) {
-      els.btnGoToResult.addEventListener('click', () => {
-  // Redireciona para a página de resultados com work_id em hash para futura seleção automática
-  window.open(`/results#work=${WORK_ID}`, '_blank');
-      });
-    }
-    
-    // Buscar dados iniciais
-    fetchWorkStatus();
-    initWebSocket();
-  }
-
-  // Inicializar quando o DOM estiver pronto
-  init();
-})();
-
-// === Event Log Management ===
-(() => {
-  // Estado dos eventos
-  let autoScroll = false;
-  
-  // Referencias dos elementos
-  const eventElements = {
-    typeFilter: document.getElementById('eventTypeFilter'),
-    categoryFilter: document.getElementById('eventCategoryFilter'),
-    textFilter: document.getElementById('eventTextFilter'),
-    dateFromFilter: document.getElementById('eventDateFromFilter'),
-    dateToFilter: document.getElementById('eventDateToFilter'),
-    autoScrollBtn: document.getElementById('btnAutoScroll'),
-    table: document.getElementById('eventLogTable'),
-    tableBody: document.getElementById('eventLogTableBody'),
-    statsTotal: document.getElementById('eventStatsTotal'),
-    statsErrors: document.getElementById('eventStatsErrors'),
-    statsWarnings: document.getElementById('eventStatsWarnings'),
-    statsProgress: document.getElementById('eventStatsProgress')
-  };
-
-  // Utilitários
+  // Funções de formatação para eventos
   function formatEventTime(timestamp) {
     const date = new Date(timestamp * 1000);
     return date.toLocaleTimeString('pt-BR', { hour12: false });
@@ -1193,150 +721,942 @@ function renderEventsTable() {
     try {
       const jsonStr = JSON.stringify(entityData, null, 2);
       const truncated = jsonStr.length > 100 ? jsonStr.substring(0, 100) + '...' : jsonStr;
-      return `<code class="event-data" title="${jsonStr.replace(/"/g, '&quot;')}">${truncated.replace(/[&<>'"]/g, c => ({'&':'&amp;', '<':'&lt;', '>':'&gt;', "'":"&#39;", '"':'&quot;'}[c]))}</code>`;
+      return `<code class="event-data" title="${jsonStr.replace(/"/g, '&quot;')}">${truncated.replace(/[&<>'"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": "&#39;", '"': '&quot;' }[c]))}</code>`;
     } catch {
       return '<code class="event-data">Invalid JSON</code>';
     }
   }
 
-  // Filtros
-  function matchesFilters(event) {
-    // Filtro por tipo
-    if (eventElements.typeFilter.value && event.event_type !== eventElements.typeFilter.value) {
-      return false;
-    }
-    
-    // Filtro por categoria
-    if (eventElements.categoryFilter.value && event.event_category !== eventElements.categoryFilter.value) {
-      return false;
-    }
-    
-    // Filtro por texto (busca no entity_data)
-    if (eventElements.textFilter.value) {
-      const searchText = eventElements.textFilter.value.toLowerCase();
-      const entityDataStr = JSON.stringify(event.entity_data || {}).toLowerCase();
-      if (!entityDataStr.includes(searchText)) {
-        return false;
-      }
-    }
-    
-    // Filtro por data (faixa de datas)
-    const eventDate = new Date(event.timestamp * 1000);
-    
-    if (eventElements.dateFromFilter.value) {
-      const fromDate = new Date(eventElements.dateFromFilter.value);
-      if (eventDate < fromDate) {
-        return false;
-      }
-    }
-    
-    if (eventElements.dateToFilter.value) {
-      const toDate = new Date(eventElements.dateToFilter.value);
-      if (eventDate > toDate) {
-        return false;
-      }
-    }
-    
-    return true;
+  function changeEventsPage(page) {
+    const totalPages = Math.ceil(filteredEvents.length / ITEMS_PER_PAGE);
+    if (page < 1 || page > totalPages) return;
+
+    currentEventsPage = page;
+    renderEventsPagination();
+    renderEventsTable();
   }
 
-  function applyFilters() {
-    filteredEvents = allEvents.filter(matchesFilters);
-    currentEventsPage = 1; // Resetar para primeira página
-    renderEvents();
-    updateStatistics();
-  }
+  function renderEventsPagination() {
+    const totalPages = Math.ceil(filteredEvents.length / ITEMS_PER_PAGE);
+    const paginationContainer = document.getElementById('eventsPagination');
+    const infoContainer = document.getElementById('eventsInfo');
 
-  // Renderização
-  function renderEvents() {
-    if (!eventElements.tableBody) return;
-    
-    if (!filteredEvents.length) {
-      eventElements.tableBody.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-4"><i class="bi bi-inbox me-1"></i>Nenhum evento encontrado</td></tr>';
-      renderEventsPagination();
+    if (!paginationContainer) return;
+
+    // Atualizar informações
+    const start = (currentEventsPage - 1) * ITEMS_PER_PAGE + 1;
+    const end = Math.min(currentEventsPage * ITEMS_PER_PAGE, filteredEvents.length);
+    if (infoContainer) infoContainer.textContent = `Mostrando ${start}-${end} de ${filteredEvents.length} eventos`;
+
+    if (totalPages <= 1) {
+      paginationContainer.innerHTML = '';
       return;
     }
-    
-    // Ordenar por timestamp (mais novos primeiro)
-    const sortedEvents = [...filteredEvents].sort((a, b) => b.timestamp - a.timestamp);
-    
-    // Renderizar tabela usando a função global para consistência
-    renderEventsTable();
-    
-    // Renderizar paginação
-    renderEventsPagination();
-  }
 
-  function updateStatistics() {
-    const stats = {
-      total: filteredEvents.length,
-      errors: filteredEvents.filter(e => e.event_type === 'error').length,
-      warnings: filteredEvents.filter(e => e.event_type === 'warning').length,
-      progress: filteredEvents.filter(e => e.event_type === 'progress').length
-    };
-    
-    if (eventElements.statsTotal) eventElements.statsTotal.textContent = stats.total;
-    if (eventElements.statsErrors) eventElements.statsErrors.textContent = stats.errors;
-    if (eventElements.statsWarnings) eventElements.statsWarnings.textContent = stats.warnings;
-    if (eventElements.statsProgress) eventElements.statsProgress.textContent = stats.progress;
-  }
+    let html = '';
 
-  // Funções públicas para o WebSocket
-  window.eventsManager = {
-    setEvents: function(events) {
-      allEvents = events || [];
-      applyFilters();
-    },
-    
-    addEvents: function(newEvents) {
-      if (!Array.isArray(newEvents)) return;
-      
-      // Adicionar novos eventos (evitar duplicatas por ID)
-      const existingIds = new Set(allEvents.map(e => e.id));
-      const uniqueNewEvents = newEvents.filter(e => !existingIds.has(e.id));
-      
-      if (uniqueNewEvents.length > 0) {
-        allEvents.push(...uniqueNewEvents);
-        
-        // Se auto-refresh estiver ativo, ir para a primeira página
-        if (autoScroll) {
-          currentEventsPage = 1;
-        }
-        
-        applyFilters();
+    // Botão anterior
+    html += `<li class="page-item ${currentEventsPage === 1 ? 'disabled' : ''}">
+    <a class="page-link" href="#" onclick="changeEventsPage(${currentEventsPage - 1}); return false;">Anterior</a>
+  </li>`;
+
+    // Páginas
+    for (let i = 1; i <= totalPages; i++) {
+      if (i === currentEventsPage) {
+        html += `<li class="page-item active"><span class="page-link">${i}</span></li>`;
+      } else {
+        html += `<li class="page-item"><a class="page-link" href="#" onclick="changeEventsPage(${i}); return false;">${i}</a></li>`;
       }
     }
-  };
 
-  // Event listeners
-  function setupEventListeners() {
-    // Filtros
-    eventElements.typeFilter?.addEventListener('change', applyFilters);
-    eventElements.categoryFilter?.addEventListener('change', applyFilters);
-    eventElements.textFilter?.addEventListener('input', applyFilters);
-    eventElements.dateFromFilter?.addEventListener('change', applyFilters);
-    eventElements.dateToFilter?.addEventListener('change', applyFilters);
-    
-    // Botão auto-scroll
-    eventElements.autoScrollBtn?.addEventListener('click', () => {
-      autoScroll = !autoScroll;
-      if (autoScroll) {
-        eventElements.autoScrollBtn.classList.add('active');
-        eventElements.autoScrollBtn.title = 'Auto-refresh ativo - vai para primeira página quando houver novos eventos';
-        // Ir para a primeira página
-        currentEventsPage = 1;
-        renderEventsPagination();
-        renderEventsTable();
-      } else {
-        eventElements.autoScrollBtn.classList.remove('active');
-        eventElements.autoScrollBtn.title = 'Auto-refresh inativo';
-      }
-    });
+    // Botão próximo
+    html += `<li class="page-item ${currentEventsPage === totalPages ? 'disabled' : ''}">
+    <a class="page-link" href="#" onclick="changeEventsPage(${currentEventsPage + 1}); return false;">Próximo</a>
+  </li>`;
+
+    paginationContainer.innerHTML = html;
   }
 
-  // Funções de paginação
-  // Inicialização
-  setupEventListeners();
-})();
+  function renderExecutionsTable() {
+    // Ordenar execuções por sequência (igual à função original)
+    const sortedExecutions = [...filteredExecutions].sort((a, b) => (a.sequencia || 0) - (b.sequencia || 0));
+
+    // Renderizar todas as execuções sem paginação
+    const tbody = document.getElementById('executionsTableBody');
+    if (!tbody) return;
+
+    if (sortedExecutions.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4"><i class="bi bi-inbox me-1"></i>Nenhuma execução</td></tr>';
+      return;
+    }
+
+    // Renderizar todas as execuções
+    tbody.innerHTML = sortedExecutions.map(exec => {
+      const progressWidth = Math.round((exec.progress || 0) * 100);
+      const tableClass = exec.status === 'running' ? ' class="table-info"' : '';
+
+      return `<tr${tableClass}>
+        <td class="text-muted">${exec.sequencia || '—'}</td>
+        <td>${formatStatusBadge(exec.status)}</td>
+        <td><div class="progress" style="height:6px;"><div class="progress-bar" style="width:${progressWidth}%"></div></div></td>
+        <td>${exec.started_at ? formatTime(exec.started_at) : '—'}</td>
+        <td>${exec.finished_at ? formatTime(exec.finished_at) : '—'}</td>
+        <td class="small">${escapeHtml(exec.progress_message || '')}</td>
+      </tr>`;
+    }).join('');
+
+    // Atualizar informações de contagem
+    const infoContainer = document.getElementById('executionsInfo');
+    if (infoContainer) {
+      infoContainer.textContent = `Mostrando ${sortedExecutions.length} execuções`;
+    }
+  }
+
+  function renderEventsTable() {
+    const tbody = document.getElementById('eventLogTableBody');
+    if (!tbody) return;
+
+    if (filteredEvents.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-4"><i class="bi bi-inbox me-1"></i>Nenhum evento encontrado</td></tr>';
+      return;
+    }
+
+    // Ordenar por timestamp (mais novos primeiro) - igual à função original
+    const sortedEvents = [...filteredEvents].sort((a, b) => b.timestamp - a.timestamp);
+
+    // Aplicar paginação
+    const start = (currentEventsPage - 1) * ITEMS_PER_PAGE;
+    const end = start + ITEMS_PER_PAGE;
+    const pageEvents = sortedEvents.slice(start, end);
+
+    // Renderizar eventos usando a mesma estrutura da função original
+    tbody.innerHTML = pageEvents.map(event => `<tr>
+        <td class="event-timestamp">${formatEventTime(event.timestamp)}</td>
+        <td>${formatEventType(event.event_type)}</td>
+        <td><span class="badge bg-secondary">${event.event_category}</span></td>
+        <td class="event-data">${formatEventData(event.entity_data)}</td>
+      </tr>`).join('');
+  }
+
+  // === Nova implementação de monitoramento de progresso ===
+  (() => {
+    const WORK_ID = '{{ work_id }}';
+
+    // Referencias dos elementos
+    const els = {
+      statusBadge: document.getElementById('workStatusBadge'),
+      startTime: document.getElementById('startTime'),
+      // Hierarchy
+      taskProgress: document.getElementById('taskProgress'),
+      datasetProgress: document.getElementById('datasetProgress'),
+      configProgress: document.getElementById('configProgress'),
+      algorithmProgress: document.getElementById('algorithmProgress'),
+      // Current combination
+      currentTask: document.getElementById('currentTaskValue'),
+      currentDataset: document.getElementById('currentDatasetValue'),
+      currentConfig: document.getElementById('currentConfigValue'),
+      currentAlgorithm: document.getElementById('currentAlgorithmValue'),
+      // Progress ring
+      progressPercent: document.getElementById('progressPercent'),
+      progressCircle: document.getElementById('progressCircle'),
+      progressRatio: document.getElementById('progressRatio'),
+      // Execution controls
+      comboSelect: document.getElementById('combinationSelect'),
+      autoFollowBtn: document.getElementById('autoFollowBtn'),
+      statRunning: document.getElementById('statRunning'),
+      statCompleted: document.getElementById('statCompleted'),
+      statQueued: document.getElementById('statQueued'),
+      statFailed: document.getElementById('statFailed'),
+      comboProgressBar: document.getElementById('comboProgressBar'),
+      comboProgressLabel: document.getElementById('comboProgressLabel'),
+      // Action buttons
+      btnGoToResult: document.getElementById('btnGoToResult'),
+      btnPauseWork: document.getElementById('btnPauseWork'),
+      btnContinueWork: document.getElementById('btnContinueWork'),
+    };
+
+    // Estado global
+    let workStatusCache = null;
+    let progressCache = null;
+    let ws = null;
+    let wsRetry = 0;
+    const CIRCUMFERENCE = 2 * Math.PI * 60; // r=60
+
+    // Dados de execuções - agora recebemos todas do backend
+    let allCombinations = []; // todas as combinações
+    let filteredEvents = [];
+    let currentCombinationId = null; // combinação que está executando
+
+    // Controles de filtro
+    let selectedCombinationId = null; // combinação selecionada no dropdown
+    let autoFollow = true; // se deve seguir a execução atual automaticamente
+
+    // Utilitários
+    function formatStatusBadge(status) {
+      const map = { running: 'primary', completed: 'success', queued: 'info', failed: 'danger', error: 'danger', paused: 'warning' };
+      const cls = map[status] || 'secondary';
+      return `<span class="badge bg-${cls} small">${(status || '').toUpperCase()}</span>`;
+    }
+
+    function formatTime(ts) {
+      const d = new Date(ts * 1000);
+      return d.toLocaleTimeString();
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/[&<>'"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", "\"": "&quot;" }[c]));
+    }
+
+    // Buscar status do work
+    async function fetchWorkStatus() {
+      try {
+        const resp = await fetch(`/api/monitor/work/${WORK_ID}/status`);
+        if (!resp.ok) return;
+        const data = await resp.json();
+        workStatusCache = data;
+        updateStatusBadge(data.status);
+        updateStartTime();
+
+        // Buscar nome do batch
+        await fetchBatchName();
+      } catch (_) { /* ignore */ }
+    }
+
+    // Buscar nome do batch
+    async function fetchBatchName() {
+      try {
+        const resp = await fetch(`/api/monitor/works`);
+        if (!resp.ok) return;
+        const data = await resp.json();
+        const work = data.works.find(w => w.id === WORK_ID);
+        if (work && work.config_name) {
+          document.getElementById('batchName').textContent = work.config_name;
+        }
+      } catch (_) { /* ignore */ }
+    }
+
+    function updateStatusBadge(status) {
+      if (!els.statusBadge) return;
+      const map = {
+        running: 'bg-primary',
+        queued: 'bg-info',
+        completed: 'bg-success',
+        failed: 'bg-danger',
+        error: 'bg-danger',
+        paused: 'bg-warning',
+        cancelled: 'bg-secondary'
+      };
+      els.statusBadge.className = 'badge status-badge ' + (map[status] || 'bg-secondary');
+      els.statusBadge.textContent = status?.toUpperCase() || 'UNKNOWN';
+
+      // Atualizar visibilidade dos botões de controle
+      updateWorkActionButtons(status);
+    }
+
+
+
+
+
+
+
+    function updateStartTime() {
+      if (!workStatusCache || !els.startTime) return;
+      const { created_at } = workStatusCache;
+      if (!created_at) return;
+      const startDate = new Date(created_at * 1000);
+      const startTimeStr = startDate.toLocaleString('pt-BR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+      els.startTime.textContent = startTimeStr;
+    }
+
+    // Funções de controle de work (pausar/continuar)
+    async function pauseWork() {
+      if (!WORK_ID || !els.btnPauseWork) return;
+
+      // Desabilitar botão e mostrar loading
+      els.btnPauseWork.disabled = true;
+      const contentEl = els.btnPauseWork.querySelector('.btn-content');
+      const loadingEl = els.btnPauseWork.querySelector('.btn-loading');
+      contentEl?.classList.add('d-none');
+      loadingEl?.classList.remove('d-none');
+
+      try {
+        const response = await fetch(`/api/monitor/work/${WORK_ID}/action/pause`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+          throw new Error(result.detail || 'Erro ao pausar work');
+        }
+
+        console.log('Work pausado com sucesso:', result);
+
+        // Não desabilitar o botão aqui - apenas restaurar o estado original
+        // O status será atualizado via WebSocket
+
+      } catch (error) {
+        console.error('Erro ao pausar work:', error);
+        alert(`Erro ao pausar work: ${error.message}`);
+      } finally {
+        // Restaurar o botão (sempre executado)
+        els.btnPauseWork.disabled = false;
+        contentEl?.classList.remove('d-none');
+        loadingEl?.classList.add('d-none');
+      }
+    }
+
+    async function continueWork() {
+      if (!WORK_ID || !els.btnContinueWork) return;
+
+      // Desabilitar botão e mostrar loading
+      els.btnContinueWork.disabled = true;
+      const contentEl = els.btnContinueWork.querySelector('.btn-content');
+      const loadingEl = els.btnContinueWork.querySelector('.btn-loading');
+      contentEl?.classList.add('d-none');
+      loadingEl?.classList.remove('d-none');
+
+      try {
+        const response = await fetch(`/api/monitor/work/${WORK_ID}/action/restart`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+          throw new Error(result.detail || 'Erro ao continuar work');
+        }
+
+        console.log('Work continuado com sucesso:', result);
+
+        // Não desabilitar o botão aqui - apenas restaurar o estado original
+        // O status será atualizado via WebSocket
+
+      } catch (error) {
+        console.error('Erro ao continuar work:', error);
+        alert(`Erro ao continuar work: ${error.message}`);
+      } finally {
+        // Restaurar o botão (sempre executado)
+        els.btnContinueWork.disabled = false;
+        contentEl?.classList.remove('d-none');
+        loadingEl?.classList.add('d-none');
+      }
+    }
+
+    // Atualizar visibilidade dos botões baseado no status
+    function updateWorkActionButtons(status) {
+      if (!els.btnPauseWork || !els.btnContinueWork) return;
+
+      // Ocultar ambos por padrão
+      els.btnPauseWork.style.display = 'none';
+      els.btnContinueWork.style.display = 'none';
+
+      // Mostrar botão apropriado baseado no status
+      if (status === 'running') {
+        els.btnPauseWork.style.display = 'inline-block';
+      } else if (status === 'paused') {
+        els.btnContinueWork.style.display = 'inline-block';
+      }
+    }
+
+    // Aplicar dados de progresso do backend
+    function applyProgress(progress) {
+      progressCache = progress;
+      try {
+        // Hierarchy counts
+        if (progress.tasks && els.taskProgress) {
+          const fin = progress.tasks.Finished || 0;
+          const runPlus = progress.tasks.Running ? 1 : 0;
+          els.taskProgress.textContent = `${fin + runPlus}/${progress.tasks.Total || 0}`;
+        }
+        if (progress.datasets && els.datasetProgress) {
+          const fin = progress.datasets.Finished || 0;
+          const runPlus = progress.datasets.Running ? 1 : 0;
+          els.datasetProgress.textContent = `${fin + runPlus}/${progress.datasets.Total || 0}`;
+        }
+        if (progress.configs && els.configProgress) {
+          const fin = progress.configs.Finished || 0;
+          const runPlus = progress.configs.Running ? 1 : 0;
+          els.configProgress.textContent = `${fin + runPlus}/${progress.configs.Total || 0}`;
+        }
+        if (progress.algorithms && els.algorithmProgress) {
+          const fin = progress.algorithms.Finished || 0;
+          const runPlus = progress.algorithms.Running ? 1 : 0;
+          els.algorithmProgress.textContent = `${fin + runPlus}/${progress.algorithms.Total || 0}`;
+        }
+
+        // Current combination context
+        const cur = progress.current_combination_details || {};
+        if (els.currentTask) els.currentTask.textContent = cur.task_id || '—';
+        if (els.currentDataset) els.currentDataset.textContent = cur.dataset_id || '—';
+        if (els.currentConfig) els.currentConfig.textContent = cur.preset_id || '—';
+        if (els.currentAlgorithm) els.currentAlgorithm.textContent = cur.algorithm_id || '—';
+
+        // Atualizar combinação atual
+        const newCurrentCombinationId = cur.combination_id || null;
+        if (newCurrentCombinationId !== currentCombinationId) {
+          currentCombinationId = newCurrentCombinationId;
+          // Se auto-follow está ativo, atualizar seleção
+          if (autoFollow && currentCombinationId) {
+            selectedCombinationId = currentCombinationId;
+            updateCombinationSelect();
+            filterAndRenderExecutions();
+          }
+        }
+
+        // Global progress ring
+        const gp = progress.global_progress || 0;
+        const pct = Math.round(gp * 100);
+        if (els.progressPercent) els.progressPercent.textContent = pct + '%';
+        if (els.progressCircle) {
+          const dash = (gp * CIRCUMFERENCE).toFixed(2);
+          els.progressCircle.setAttribute('stroke-dasharray', `${dash} ${CIRCUMFERENCE}`);
+        }
+        if (progress.global_execution && els.progressRatio) {
+          const f = progress.global_execution.Finished || 0;
+          const t = progress.global_execution.Total || 0;
+          els.progressRatio.textContent = `${f}/${t}`;
+        }
+
+      } catch (err) {
+        console.warn('Failed to apply progress summary', err);
+      }
+    }
+
+    // Atualizar dropdown de combinações
+    function updateCombinationSelect() {
+      if (!els.comboSelect) return;
+      const prev = els.comboSelect.value;
+      els.comboSelect.innerHTML = '';
+
+      // Opção vazia
+      const emptyOpt = document.createElement('option');
+      emptyOpt.value = '';
+      emptyOpt.textContent = 'Todas as combinações';
+      els.comboSelect.appendChild(emptyOpt);
+
+      // Opções das combinações
+      allCombinations.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c.combination_id;
+        opt.textContent = `${c.task_id}/${c.dataset_id}/${c.preset_id}/${c.algorithm_id}`;
+        els.comboSelect.appendChild(opt);
+      });
+
+      // Restaurar seleção ou definir baseado no estado atual
+      if (selectedCombinationId) {
+        els.comboSelect.value = selectedCombinationId;
+      } else if (prev && [...els.comboSelect.options].some(o => o.value === prev)) {
+        els.comboSelect.value = prev;
+        selectedCombinationId = prev || null;
+      }
+    }
+
+    // Atualizar estado visual do botão auto-follow
+    function updateAutoFollowButton() {
+      if (!els.autoFollowBtn) return;
+      if (autoFollow) {
+        els.autoFollowBtn.classList.add('active');
+        els.autoFollowBtn.title = 'Auto-follow ativo - clique para desativar';
+      } else {
+        els.autoFollowBtn.classList.remove('active');
+        els.autoFollowBtn.title = 'Auto-follow inativo - clique para ativar';
+      }
+    }
+
+    // Filtrar e renderizar execuções baseado na seleção atual
+    function filterAndRenderExecutions() {
+      filteredExecutions = allExecutions;
+
+      // Filtrar por combinação se uma estiver selecionada
+      if (selectedCombinationId) {
+        filteredExecutions = allExecutions.filter(exec =>
+          idsEqual(exec.combination_id, selectedCombinationId)
+        );
+      }
+
+      // Calcular estatísticas
+      const stats = computeExecutionStats(filteredExecutions);
+
+      // Renderizar sem paginação
+      renderExecutions(filteredExecutions, stats);
+    }
+
+    function idsEqual(a, b) {
+      if (a == null || b == null) return false;
+      return String(a) === String(b);
+    }
+
+    function computeExecutionStats(executions) {
+      const stats = { Running: 0, Completed: 0, Queued: 0, Failed: 0, Total: 0 };
+
+      // Total é o número de execuções
+      stats.Total = executions.length;
+
+      executions.forEach(exec => {
+        if (exec.status === 'running') stats.Running++;
+        else if (exec.status === 'completed') stats.Completed++;
+        else if (exec.status === 'queued') stats.Queued++;
+        else if (exec.status === 'failed' || exec.status === 'error') stats.Failed++;
+      });
+
+      return stats;
+    }
+
+    function renderExecutions(executions, stats) {
+      // Atualizar estatísticas
+      if (els.statRunning) els.statRunning.textContent = stats.Running || 0;
+      if (els.statCompleted) els.statCompleted.textContent = stats.Completed || 0;
+      if (els.statQueued) els.statQueued.textContent = stats.Queued || 0;
+      if (els.statFailed) els.statFailed.textContent = stats.Failed || 0;
+
+      // Atualizar barra de progresso
+      const tot = stats.Total || 0;
+      const done = (stats.Completed || 0) + (stats.Failed || 0);
+      if (els.comboProgressBar) {
+        const pct = tot ? Math.round((done / tot) * 100) : 0;
+        els.comboProgressBar.style.width = pct + '%';
+        els.comboProgressBar.textContent = pct + '%';
+      }
+      if (els.comboProgressLabel) els.comboProgressLabel.textContent = `${done}/${tot}`;
+
+      // Renderizar tabela
+      const tbody = document.getElementById('executionsTableBody');
+      if (!tbody) return;
+
+      tbody.innerHTML = '';
+
+      if (!executions.length) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4"><i class="bi bi-inbox me-1"></i>Nenhuma execução encontrada</td></tr>';
+        return;
+      }
+
+      // Ordenar execuções por sequência
+      const sortedExecutions = [...executions].sort((a, b) => (a.sequencia || 0) - (b.sequencia || 0));
+
+      // Renderizar tabela usando a função global para consistência
+      renderExecutionsTable();
+
+      // Auto-scroll para execução em andamento se auto-follow estiver ativo
+      if (autoFollow && currentCombinationId && selectedCombinationId === currentCombinationId) {
+        // Procurar por execução em andamento (running)
+        const runningExecution = sortedExecutions.find(exec => exec.status === 'running');
+        if (runningExecution) {
+          // Encontrar a linha correspondente na tabela
+          const rows = tbody.querySelectorAll('tr');
+          for (let i = 0; i < rows.length; i++) {
+            if (rows[i].classList.contains('table-info')) {
+              // Fazer scroll suave para a execução em andamento
+              const container = document.getElementById('executionsContainer');
+              if (container) {
+                const rowTop = rows[i].offsetTop;
+                const containerHeight = container.clientHeight;
+                const scrollTop = rowTop - (containerHeight / 2) + (rows[i].offsetHeight / 2);
+                container.scrollTo({
+                  top: Math.max(0, scrollTop),
+                  behavior: 'smooth'
+                });
+              }
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    // Merge parcial de dados de progresso
+    function mergePartialProgress(partial) {
+      if (!progressCache) return;
+
+      const keys = ['tasks', 'datasets', 'configs', 'algorithms', 'execution', 'global_execution', 'current_combination_details', 'global_progress'];
+      for (const k of keys) {
+        if (partial[k] !== undefined) {
+          if (typeof partial[k] === 'object' && partial[k] !== null && !Array.isArray(partial[k]) && typeof progressCache[k] === 'object') {
+            progressCache[k] = { ...progressCache[k], ...partial[k] };
+          } else {
+            progressCache[k] = partial[k];
+          }
+        }
+      }
+      applyProgress(progressCache);
+    }
+
+    // Merge de execuções - acumula execuções sem duplicar
+    function mergeExecutions(newExecutions) {
+      if (!Array.isArray(newExecutions)) return;
+
+      // Criar um mapa das execuções existentes por chave única
+      const existingMap = new Map();
+      allExecutions.forEach(exec => {
+        // Usar combination_id + sequencia como chave única
+        const key = `${exec.combination_id || 'null'}_${exec.sequencia || 'null'}`;
+        existingMap.set(key, exec);
+      });
+
+      // Adicionar ou atualizar execuções
+      newExecutions.forEach(newExec => {
+        const key = `${newExec.combination_id || 'null'}_${newExec.sequencia || 'null'}`;
+
+        if (existingMap.has(key)) {
+          // Atualizar execução existente (merge dos dados)
+          const existing = existingMap.get(key);
+          Object.assign(existing, newExec);
+        } else {
+          // Adicionar nova execução
+          allExecutions.push(newExec);
+          existingMap.set(key, newExec);
+        }
+      });
+    }
+
+    // WebSocket
+    function initWebSocket() {
+      try {
+        const scheme = location.protocol === 'https:' ? 'wss' : 'ws';
+        const url = `${scheme}://${location.host}/ws/work/${WORK_ID}`;
+        ws = new WebSocket(url);
+
+        ws.onopen = () => {
+          wsRetry = 0;
+          console.log('WebSocket conectado');
+        };
+
+        ws.onmessage = (evt) => {
+          try {
+            const msg = JSON.parse(evt.data);
+
+            if (msg.type === 'snapshot') {
+              // Snapshot inicial com todos os dados
+              if (msg.payload?.progress) {
+                applyProgress(msg.payload.progress);
+              }
+              if (msg.payload?.executions) {
+                allExecutions = msg.payload.executions;
+                filterAndRenderExecutions();
+              }
+              if (msg.payload?.combinations) {
+                allCombinations = msg.payload.combinations;
+                updateCombinationSelect();
+              }
+              if (msg.payload?.events) {
+                window.eventsManager?.setEvents(msg.payload.events);
+              }
+            } else if (msg.type === 'update') {
+              // Atualizações incrementais
+              if (msg.payload?.progress || msg.update?.progress) {
+                const progressUpdate = msg.payload?.progress || msg.update?.progress;
+                mergePartialProgress(progressUpdate);
+              }
+              if (msg.payload?.executions || msg.update?.executions) {
+                // Atualização das execuções - merge com existentes
+                const newExecutions = msg.payload?.executions || msg.update?.executions;
+                mergeExecutions(newExecutions);
+                filterAndRenderExecutions();
+              }
+              if (msg.payload?.combinations || msg.update?.combinations) {
+                allCombinations = msg.payload?.combinations || msg.update?.combinations;
+                updateCombinationSelect();
+              }
+              if (msg.payload?.events_appended || msg.update?.events_appended) {
+                const newEvents = msg.payload?.events_appended || msg.update?.events_appended;
+                window.eventsManager?.addEvents(newEvents);
+              }
+            } else if (msg.type === 'event') {
+              // Eventos do sistema
+              if (msg.payload?.event_type === 'work_status_changed') {
+                const newStatus = msg.payload.new_status;
+                console.log(`Status do work mudou para: ${newStatus}`);
+
+                // Atualizar cache de status
+                if (workStatusCache) {
+                  workStatusCache.status = newStatus;
+                  workStatusCache.updated_at = msg.timestamp || Date.now() / 1000;
+                }
+
+                // Atualizar interface
+                updateStatusBadge(newStatus);
+                updateStartTime();
+              }
+            }
+          } catch (e) {
+            console.warn('Erro ao processar mensagem WebSocket:', e);
+          }
+        };
+
+        ws.onclose = () => {
+          console.log('WebSocket desconectado');
+          scheduleReconnect();
+        };
+
+        ws.onerror = (err) => {
+          console.warn('Erro no WebSocket:', err);
+          try { ws.close(); } catch (_) { }
+        };
+      } catch (err) {
+        console.warn('Erro ao inicializar WebSocket:', err);
+        scheduleReconnect();
+      }
+    }
+
+    function scheduleReconnect() {
+      if (wsRetry > 6) return;
+      const delay = Math.min(10000, 500 * Math.pow(2, wsRetry++));
+      setTimeout(initWebSocket, delay);
+    }
+
+    // Event listeners
+    function setupEventListeners() {
+      // Dropdown de combinações
+      els.comboSelect?.addEventListener('change', (e) => {
+        selectedCombinationId = e.target.value || null;
+        // Se selecionou uma combinação específica, desativar auto-follow
+        if (selectedCombinationId) {
+          autoFollow = false;
+          updateAutoFollowButton();
+        }
+        filterAndRenderExecutions();
+      });
+
+      // Botão auto-follow
+      els.autoFollowBtn?.addEventListener('click', () => {
+        autoFollow = !autoFollow;
+        updateAutoFollowButton();
+
+        if (autoFollow && currentCombinationId) {
+          // Ativar auto-follow: selecionar combinação atual
+          selectedCombinationId = currentCombinationId;
+          updateCombinationSelect();
+          filterAndRenderExecutions();
+        } else if (!autoFollow) {
+          // Desativar auto-follow: mostrar todas
+          selectedCombinationId = null;
+          updateCombinationSelect();
+          filterAndRenderExecutions();
+        }
+      });
+
+      // Botões de controle do work
+      els.btnPauseWork?.addEventListener('click', pauseWork);
+      els.btnContinueWork?.addEventListener('click', continueWork);
+    }
+
+    // Inicialização
+    function init() {
+      // Configurar estado inicial
+      updateAutoFollowButton();
+
+      // Configurar event listeners
+      setupEventListeners();
+
+      // Configurar botão "Resultado"
+      if (els.btnGoToResult) {
+        els.btnGoToResult.addEventListener('click', () => {
+          // Redireciona para a página de resultados com work_id em hash para futura seleção automática
+          window.open(`/results#work=${WORK_ID}`, '_blank');
+        });
+      }
+
+      // Buscar dados iniciais
+      fetchWorkStatus();
+      initWebSocket();
+    }
+
+    // Inicializar quando o DOM estiver pronto
+    init();
+  })();
+
+  // === Event Log Management ===
+  (() => {
+    // Estado dos eventos
+    let autoScroll = false;
+
+    // Referencias dos elementos
+    const eventElements = {
+      typeFilter: document.getElementById('eventTypeFilter'),
+      categoryFilter: document.getElementById('eventCategoryFilter'),
+      textFilter: document.getElementById('eventTextFilter'),
+      dateFromFilter: document.getElementById('eventDateFromFilter'),
+      dateToFilter: document.getElementById('eventDateToFilter'),
+      autoScrollBtn: document.getElementById('btnAutoScroll'),
+      table: document.getElementById('eventLogTable'),
+      tableBody: document.getElementById('eventLogTableBody'),
+      statsTotal: document.getElementById('eventStatsTotal'),
+      statsErrors: document.getElementById('eventStatsErrors'),
+      statsWarnings: document.getElementById('eventStatsWarnings'),
+      statsProgress: document.getElementById('eventStatsProgress')
+    };
+
+    // Utilitários
+    function formatEventTime(timestamp) {
+      const date = new Date(timestamp * 1000);
+      return date.toLocaleTimeString('pt-BR', { hour12: false });
+    }
+
+    function formatEventType(type) {
+      const typeClass = `event-type-${type}`;
+      return `<span class="badge ${typeClass}">${type.toUpperCase()}</span>`;
+    }
+
+    function formatEventData(entityData) {
+      try {
+        const jsonStr = JSON.stringify(entityData, null, 2);
+        const truncated = jsonStr.length > 100 ? jsonStr.substring(0, 100) + '...' : jsonStr;
+        return `<code class="event-data" title="${jsonStr.replace(/"/g, '&quot;')}">${truncated.replace(/[&<>'"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": "&#39;", '"': '&quot;' }[c]))}</code>`;
+      } catch {
+        return '<code class="event-data">Invalid JSON</code>';
+      }
+    }
+
+    // Filtros
+    function matchesFilters(event) {
+      // Filtro por tipo
+      if (eventElements.typeFilter.value && event.event_type !== eventElements.typeFilter.value) {
+        return false;
+      }
+
+      // Filtro por categoria
+      if (eventElements.categoryFilter.value && event.event_category !== eventElements.categoryFilter.value) {
+        return false;
+      }
+
+      // Filtro por texto (busca no entity_data)
+      if (eventElements.textFilter.value) {
+        const searchText = eventElements.textFilter.value.toLowerCase();
+        const entityDataStr = JSON.stringify(event.entity_data || {}).toLowerCase();
+        if (!entityDataStr.includes(searchText)) {
+          return false;
+        }
+      }
+
+      // Filtro por data (faixa de datas)
+      const eventDate = new Date(event.timestamp * 1000);
+
+      if (eventElements.dateFromFilter.value) {
+        const fromDate = new Date(eventElements.dateFromFilter.value);
+        if (eventDate < fromDate) {
+          return false;
+        }
+      }
+
+      if (eventElements.dateToFilter.value) {
+        const toDate = new Date(eventElements.dateToFilter.value);
+        if (eventDate > toDate) {
+          return false;
+        }
+      }
+
+      return true;
+    }
+
+    function applyFilters() {
+      filteredEvents = allEvents.filter(matchesFilters);
+      currentEventsPage = 1; // Resetar para primeira página
+      renderEvents();
+      updateStatistics();
+    }
+
+    // Renderização
+    function renderEvents() {
+      if (!eventElements.tableBody) return;
+
+      if (!filteredEvents.length) {
+        eventElements.tableBody.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-4"><i class="bi bi-inbox me-1"></i>Nenhum evento encontrado</td></tr>';
+        renderEventsPagination();
+        return;
+      }
+
+      // Ordenar por timestamp (mais novos primeiro)
+      const sortedEvents = [...filteredEvents].sort((a, b) => b.timestamp - a.timestamp);
+
+      // Renderizar tabela usando a função global para consistência
+      renderEventsTable();
+
+      // Renderizar paginação
+      renderEventsPagination();
+    }
+
+    function updateStatistics() {
+      const stats = {
+        total: filteredEvents.length,
+        errors: filteredEvents.filter(e => e.event_type === 'error').length,
+        warnings: filteredEvents.filter(e => e.event_type === 'warning').length,
+        progress: filteredEvents.filter(e => e.event_type === 'progress').length
+      };
+
+      if (eventElements.statsTotal) eventElements.statsTotal.textContent = stats.total;
+      if (eventElements.statsErrors) eventElements.statsErrors.textContent = stats.errors;
+      if (eventElements.statsWarnings) eventElements.statsWarnings.textContent = stats.warnings;
+      if (eventElements.statsProgress) eventElements.statsProgress.textContent = stats.progress;
+    }
+
+    // Funções públicas para o WebSocket
+    window.eventsManager = {
+      setEvents: function (events) {
+        allEvents = events || [];
+        applyFilters();
+      },
+
+      addEvents: function (newEvents) {
+        if (!Array.isArray(newEvents)) return;
+
+        // Adicionar novos eventos (evitar duplicatas por ID)
+        const existingIds = new Set(allEvents.map(e => e.id));
+        const uniqueNewEvents = newEvents.filter(e => !existingIds.has(e.id));
+
+        if (uniqueNewEvents.length > 0) {
+          allEvents.push(...uniqueNewEvents);
+
+          // Se auto-refresh estiver ativo, ir para a primeira página
+          if (autoScroll) {
+            currentEventsPage = 1;
+          }
+
+          applyFilters();
+        }
+      }
+    };
+
+    // Event listeners
+    function setupEventListeners() {
+      // Filtros
+      eventElements.typeFilter?.addEventListener('change', applyFilters);
+      eventElements.categoryFilter?.addEventListener('change', applyFilters);
+      eventElements.textFilter?.addEventListener('input', applyFilters);
+      eventElements.dateFromFilter?.addEventListener('change', applyFilters);
+      eventElements.dateToFilter?.addEventListener('change', applyFilters);
+
+      // Botão auto-scroll
+      eventElements.autoScrollBtn?.addEventListener('click', () => {
+        autoScroll = !autoScroll;
+        if (autoScroll) {
+          eventElements.autoScrollBtn.classList.add('active');
+          eventElements.autoScrollBtn.title = 'Auto-refresh ativo - vai para primeira página quando houver novos eventos';
+          // Ir para a primeira página
+          currentEventsPage = 1;
+          renderEventsPagination();
+          renderEventsTable();
+        } else {
+          eventElements.autoScrollBtn.classList.remove('active');
+          eventElements.autoScrollBtn.title = 'Auto-refresh inativo';
+        }
+      });
+    }
+
+    // Funções de paginação
+    // Inicialização
+    setupEventListeners();
+  })();
 </script>
 {% endblock %}

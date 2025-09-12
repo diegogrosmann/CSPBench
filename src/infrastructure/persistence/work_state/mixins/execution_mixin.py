@@ -151,3 +151,101 @@ class ExecutionCRUDMixin:
             results = [execution.to_dict() for execution in query.all()]
             
             return results, total_count
+
+    def execution_bulk_create(self, executions: List[Dict[str, Any]]) -> int:
+        """
+        Create multiple executions in a single transaction for better performance.
+        
+        Args:
+            executions: List of execution dictionaries with required fields
+            
+        Returns:
+            Number of executions successfully inserted
+        """
+        from ..models import Execution
+        
+        if not executions:
+            return 0
+        
+        # Set default values for all executions if not provided
+        for exec_data in executions:
+            if 'status' not in exec_data:
+                exec_data['status'] = 'queued'
+            if 'params_json' not in exec_data:
+                exec_data['params_json'] = {}
+            if 'result_json' not in exec_data:
+                exec_data['result_json'] = {}
+        
+        with self.session_scope() as session:
+            try:
+                # Use SQLAlchemy's bulk_insert_mappings for better performance
+                session.bulk_insert_mappings(Execution, executions)
+                return len(executions)
+            except Exception as e:
+                # If bulk insert fails (e.g., duplicate key constraint), 
+                # fallback to individual inserts with ignore duplicates
+                session.rollback()
+                inserted_count = 0
+                
+                for exec_data in executions:
+                    try:
+                        # Try to insert individually
+                        execution = Execution(**exec_data)
+                        session.add(execution)
+                        session.flush()  # Force execution to catch constraint violations
+                        inserted_count += 1
+                    except Exception:
+                        # Ignore duplicates and other constraint violations
+                        session.rollback()
+                        continue
+                
+                return inserted_count
+
+    def execution_bulk_update(
+        self, 
+        filters: Dict[str, Any], 
+        update_fields: Dict[str, Any]
+    ) -> int:
+        """
+        Bulk update executions matching the filters.
+        
+        Args:
+            filters: Dictionary with filter conditions (e.g., {'combination_id': [1,2,3], 'status': ['running', 'paused']})
+            update_fields: Dictionary with fields to update (e.g., {'status': 'queued', 'started_at': None})
+            
+        Returns:
+            int: Number of executions updated
+        """
+        from ..models import Execution
+        from sqlalchemy import and_
+        
+        if not filters or not update_fields:
+            return 0
+        
+        # Handle JSON fields properly
+        processed_fields = {}
+        for key, value in update_fields.items():
+            if key == 'result':
+                processed_fields['result_json'] = value
+            elif key == 'params':
+                processed_fields['params_json'] = value
+            else:
+                processed_fields[key] = value
+        
+        with self.session_scope() as session:
+            query = session.query(Execution)
+            
+            # Apply filters
+            filter_conditions = []
+            for key, value in filters.items():
+                if isinstance(value, list):
+                    filter_conditions.append(getattr(Execution, key).in_(value))
+                else:
+                    filter_conditions.append(getattr(Execution, key) == value)
+            
+            if filter_conditions:
+                query = query.filter(and_(*filter_conditions))
+            
+            # Perform bulk update
+            result = query.update(processed_fields, synchronize_session=False)
+            return result

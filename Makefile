@@ -6,9 +6,8 @@
 # Configurações padrão
 APP_NAME = cspbench
 VERSION ?= latest
-REGISTRY ?= gcr.io
-PROJECT_ID ?= your-gcp-project-id
-IMAGE_NAME = $(REGISTRY)/$(PROJECT_ID)/$(APP_NAME)
+REGISTRY ?= localhost:5000
+IMAGE_NAME = $(REGISTRY)/$(APP_NAME)
 IMAGE_TAG = $(IMAGE_NAME):$(VERSION)
 CONTAINER_NAME = $(APP_NAME)-container
 PORT ?= 8080
@@ -45,7 +44,6 @@ help: ## Mostra esta mensagem de ajuda
 	@echo ""
 	@echo "$(YELLOW)Variáveis de ambiente:$(NC)"
 	@echo "  $(GREEN)VERSION$(NC)     = $(VERSION)"
-	@echo "  $(GREEN)PROJECT_ID$(NC)  = $(PROJECT_ID)"
 	@echo "  $(GREEN)REGISTRY$(NC)    = $(REGISTRY)"
 	@echo "  $(GREEN)PORT$(NC)        = $(PORT)"
 	@echo "  $(GREEN)DATA_DIR$(NC)    = $(DATA_DIR)"
@@ -125,6 +123,10 @@ lint-fix: setup ## Corrige automaticamente problemas de lint (ruff --fix, isort,
 	@.venv/bin/python -m ruff check . --fix || true
 	@.venv/bin/python -m isort .
 	@.venv/bin/python -m black .
+
+deps-check: setup ## Verifica dependências não utilizadas
+	@echo "$(BLUE)=== Verificando dependências não utilizadas ===$(NC)"
+	@.venv/bin/deptry .
 
 clean-dev: ## Limpa arquivos de desenvolvimento
 	@echo "$(YELLOW)Limpando cache e arquivos temporários...$(NC)"
@@ -208,10 +210,6 @@ logs: ## Mostra logs do container
 # Docker Registry
 # ===================================================================
 
-login: ## Faz login no registry (GCR)
-	@echo "$(BLUE)=== Fazendo login no registry ===$(NC)"
-	@gcloud auth configure-docker
-
 push: build ## Envia imagem para registry
 	@echo "$(BLUE)=== Enviando imagem para registry ===$(NC)"
 	@docker push $(IMAGE_TAG)
@@ -222,31 +220,6 @@ pull: ## Baixa imagem do registry
 	@echo "$(BLUE)=== Baixando imagem do registry ===$(NC)"
 	@docker pull $(IMAGE_TAG)
 	@echo "$(GREEN)✓ Imagem baixada: $(IMAGE_TAG)$(NC)"
-
-# ===================================================================
-# Cloud Deployment
-# ===================================================================
-
-deploy-cloud-run: ## Deploy no Google Cloud Run (PORT é reservado; ajustar MAX_INSTANCES conforme quota)
-	@echo "$(BLUE)=== Deploy no Google Cloud Run ===$(NC)"
-	@gcloud run deploy $(APP_NAME) \
-		--image $(IMAGE_TAG) \
-		--platform managed \
-		--region us-central1 \
-		--allow-unauthenticated \
-		--memory $(MEMORY) \
-		--cpu $(CPU) \
-		--max-instances $(MAX_INSTANCES) \
-		--min-instances $(MIN_INSTANCES) \
-		--concurrency $(CONCURRENCY)
-	@echo "$(GREEN)✓ Deploy realizado!$(NC)"
-
-deploy-update: push ## Atualiza deployment no Cloud Run
-	@echo "$(BLUE)=== Atualizando deployment ===$(NC)"
-	@gcloud run services update $(APP_NAME) \
-		--image $(IMAGE_TAG) \
-		--region us-central1
-	@echo "$(GREEN)✓ Deployment atualizado!$(NC)"
 
 # ===================================================================
 # Monitoring & Maintenance
@@ -284,6 +257,39 @@ clean-all: clean clean-dev ## Limpa tudo (containers, imagens, cache)
 	@docker system prune -f
 	@echo "$(GREEN)✓ Cleanup completo realizado!$(NC)"
 
+clean-docker: ## Limpeza completa do Docker (imagens, containers, volumes, cache)
+	@echo "$(YELLOW)Realizando limpeza completa do Docker...$(NC)"
+	@docker stop $$(docker ps -aq) 2>/dev/null || true
+	@docker rm $$(docker ps -aq) 2>/dev/null || true
+	@docker image prune -af
+	@docker volume prune -f
+	@docker builder prune -af
+	@docker system prune -af --volumes
+	@echo "$(GREEN)✓ Docker completamente limpo!$(NC)"
+
+clean-cache: ## Limpa todos os caches (Python, projeto, bancos temporários)
+	@echo "$(YELLOW)Limpando caches e arquivos temporários...$(NC)"
+	@find . -type f -name "*.pyc" -delete 2>/dev/null || true
+	@find . -type f -name "*.pyo" -delete 2>/dev/null || true
+	@find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+	@find . -type d -name ".pytest_cache" -exec rm -rf {} + 2>/dev/null || true
+	@rm -f .coverage 2>/dev/null || true
+	@rm -rf htmlcov logs outputs cache data 2>/dev/null || true
+	@rm -f *.db test_*.db work_state.db 2>/dev/null || true
+	@echo "$(GREEN)✓ Cache limpo!$(NC)"
+
+clean-full: ## Limpeza completa (Docker + projeto + sistema) - USE COM CUIDADO
+	@echo "$(RED)ATENÇÃO: Limpeza completa do sistema!$(NC)"
+	@echo "$(YELLOW)Isso removerá TODAS as imagens Docker e dados temporários.$(NC)"
+	@read -p "Tem certeza? (y/N): " -n 1 -r; \
+	if [[ $$REPLY =~ ^[Yy]$$ ]]; then \
+		echo ""; \
+		./deploy/cleanup.sh --force; \
+	else \
+		echo ""; \
+		echo "$(GREEN)Operação cancelada.$(NC)"; \
+	fi
+
 # ===================================================================
 # Utilities
 # ===================================================================
@@ -306,15 +312,7 @@ dive: ## Analisa camadas da imagem (requer dive)
 
 .PHONY: help info setup clean-setup dev dev-web test test-cov format lint lint-fix clean-dev \
 	build build-no-cache build-multi run run-detached run-shell stop logs \
-	login push pull deploy-cloud-run deploy-update health ps images stats \
-	clean clean-all size inspect dive .env
+	push pull health ps images stats \
+	clean clean-all clean-docker clean-cache clean-full size inspect dive .env
 
-# Previne a execução se variáveis críticas não estiverem definidas
-check-project-id:
-	@if [ "$(PROJECT_ID)" = "your-gcp-project-id" ]; then \
-		echo "$(RED)❌ Configure PROJECT_ID antes de usar comandos de deploy!$(NC)"; \
-		echo "$(YELLOW)Exemplo: make deploy-cloud-run PROJECT_ID=meu-projeto$(NC)"; \
-		exit 1; \
-	fi
 
-deploy-cloud-run deploy-update push: check-project-id

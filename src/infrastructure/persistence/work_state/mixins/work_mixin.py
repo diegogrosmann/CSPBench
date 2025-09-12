@@ -49,8 +49,9 @@ class WorkCRUDMixin:
             return work.to_dict() if work else None
 
     def work_update(self, id: str, **fields: Any) -> bool:
-        """Update work entry."""
+        """Update work entry with status transition validation."""
         from ..models import Work
+        from src.domain.status import BaseStatus, ALLOWEDSTATUS
         
         if not fields:
             return True
@@ -60,14 +61,34 @@ class WorkCRUDMixin:
         
         with self.session_scope() as session:
             work = session.query(Work).filter(Work.id == id).first()
-            if work:
-                for key, value in fields.items():
-                    if key.endswith('_json') or key in {'config_json', 'extra_json'}:
-                        setattr(work, key, value)
-                    else:
-                        setattr(work, key, value)
-                return True
-            return False
+            if not work:
+                return False
+            
+            # Validate status transition if status is being updated
+            if 'status' in fields:
+                new_status = fields['status']
+                current_status = work.status
+                
+                try:
+                    current_status_enum = BaseStatus(current_status)
+                    new_status_enum = BaseStatus(new_status)
+                    
+                    # Check if transition is allowed using only the defined rules
+                    allowed_transitions = ALLOWEDSTATUS.get(current_status_enum, set())
+                    if new_status_enum not in allowed_transitions:
+                        return False  # Invalid transition
+                    
+                except ValueError:
+                    # Invalid status value
+                    return False
+            
+            # Apply updates
+            for key, value in fields.items():
+                if key.endswith('_json') or key in {'config_json', 'extra_json'}:
+                    setattr(work, key, value)
+                else:
+                    setattr(work, key, value)
+            return True
 
     def work_delete(self, id: str) -> None:
         """Delete work entry."""

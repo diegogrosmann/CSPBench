@@ -90,7 +90,7 @@ algorithms:
       # Example with parameters:
       "BLF-GA":
       #   population_size: 100
-        max_gens: 20
+        max_gens: 10
     
 # =====================================================================
 # SECTION 4: TASK TYPE (REQUIRED)
@@ -114,24 +114,13 @@ experiment:
     - name: "Test Experiment"         # string: Descriptive experiment name
       datasets:
         - "synthetic_small_dataset"
-        - "synthetic_medium_dataset"
+#        - "synthetic_medium_dataset"
       algorithms:
-        - "full_config"
+#        - "full_config"
         - "small_config"
-      repetitions: 10                 # int: Number of repetitions per combination (1-10 recommended)
+      repetitions: 30                 # int: Number of repetitions per combination (1-10 recommended)
                                       # Each dataset+algorithm combination will be executed N times
  
-   # List of experiment tasks to perform (formerly 'executions')
-    - name: "Test 2"         # string: Descriptive experiment name
-      datasets:
-        - "synthetic_small_dataset"
-        - "synthetic_medium_dataset"
-      algorithms:
-        - "full_config"
-        - "small_config"
-      repetitions: 10                 # int: Number of repetitions per combination (1-10 recommended)
-                                      # Each dataset+algorithm combination will be executed N times
-
 # =====================================================================
 # SECTION 7: RESOURCE SETTINGS (OPTIONAL)
 # =====================================================================

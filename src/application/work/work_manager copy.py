@@ -44,10 +44,6 @@ class WorkManager:
         _lock: Thread lock for concurrent access protection
     """
 
-    # ==============================================
-    # INITIALIZATION AND LIFECYCLE MANAGEMENT
-    # ==============================================
-
     def __init__(self, repository: Optional[WorkPersistence] = None):
         """Initialize WorkManager with persistence repository.
 
@@ -98,6 +94,153 @@ class WorkManager:
             
             return summary
 
+    def _pause_running_works(self) -> int:
+        """
+        Pause all work items that are in RUNNING status.
+        
+        This is used during initialization to handle orphaned works from
+        abrupt application shutdowns.
+        
+        Returns:
+            int: Number of work items paused
+        """
+        try:
+            from src.domain.status import BaseStatus
+            
+            # Get all running works using direct SQL for better performance
+            with self._repo.session_scope() as session:
+                from src.infrastructure.persistence.work_state.models import Work
+                
+                # Bulk update running works to paused status
+                result = session.query(Work).filter(
+                    Work.status == BaseStatus.RUNNING.value
+                ).update(
+                    {
+                        Work.status: BaseStatus.PAUSED.value,
+                        Work.updated_at: self._now()
+                    },
+                    synchronize_session=False
+                )
+                
+                if result > 0:
+                    logger.info(f"Paused {result} orphaned running work items")
+                else:
+                    logger.debug("No orphaned running work items found")
+                return result
+                
+        except Exception as e:
+            logger.error(f"Error pausing running works: {e}")
+            return 0
+
+    def _clear_non_finalized_progress(self) -> int:
+        """
+        Clear all progress entries for non-finalized executions.
+        
+        Returns:
+            int: Number of progress entries cleared
+        """
+        try:
+            # Use the existing repository method for clearing progress
+            cleared_count = self._repo.execution_progress_clear_for_non_finalized()
+            logger.info(f"Cleared {cleared_count} progress entries for non-finalized executions")
+            return cleared_count
+            
+        except Exception as e:
+            logger.error(f"Error clearing non-finalized progress: {e}")
+            return 0
+
+    def _reset_work_combinations(self, work_id: str) -> int:
+        """
+        Reset all non-finalized combinations for a specific work to queued status.
+        
+        Args:
+            work_id: Work identifier to reset combinations for
+            
+        Returns:
+            int: Number of combinations reset
+        """
+        try:
+            from src.domain.status import BaseStatus
+            
+            with self._repo.session_scope() as session:
+                from src.infrastructure.persistence.work_state.models import Combination
+                
+                non_finalized_statuses = [
+                    BaseStatus.RUNNING.value,
+                    BaseStatus.PAUSED.value,
+                ]
+                
+                # Bulk update combinations for this work to queued status
+                result = session.query(Combination).filter(
+                    Combination.work_id == work_id,
+                    Combination.status.in_(non_finalized_statuses)
+                ).update(
+                    {
+                        Combination.status: BaseStatus.QUEUED.value,
+                        Combination.started_at: None,
+                        Combination.finished_at: None,
+                    },
+                    synchronize_session=False
+                )
+                
+                return result
+                
+        except Exception as e:
+            logger.error(f"Error resetting combinations for work {work_id}: {e}")
+            return 0
+
+    def _reset_work_executions(self, work_id: str) -> int:
+        """
+        Reset all non-finalized executions for a specific work to queued status 
+        and clear runtime data.
+        
+        Args:
+            work_id: Work identifier to reset executions for
+            
+        Returns:
+            int: Number of executions reset
+        """
+        try:
+            from src.domain.status import BaseStatus
+            
+            with self._repo.session_scope() as session:
+                from src.infrastructure.persistence.work_state.models import Execution, Combination
+                
+                non_finalized_statuses = [
+                    BaseStatus.RUNNING.value,
+                    BaseStatus.PAUSED.value,
+                ]
+                
+                # First, get combination IDs for this work
+                combination_ids_query = session.query(Combination.id).filter(
+                    Combination.work_id == work_id
+                )
+                combination_ids = [row[0] for row in combination_ids_query.all()]
+                
+                # Then update executions using those combination IDs
+                if not combination_ids:
+                    return 0
+                    
+                result = session.query(Execution).filter(
+                    Execution.combination_id.in_(combination_ids),
+                    Execution.status.in_(non_finalized_statuses)
+                ).update(
+                    {
+                        Execution.status: BaseStatus.QUEUED.value,
+                        Execution.started_at: None,
+                        Execution.finished_at: None,
+                        Execution.result_json: {},
+                        Execution.objective: None,
+                    },
+                    synchronize_session=False
+                )
+                
+                return result
+                
+        except Exception as e:
+            logger.error(f"Error resetting executions for work {work_id}: {e}")
+            return 0
+
     def __enter__(self):
         """Context manager entry."""
         return self
@@ -120,10 +263,16 @@ class WorkManager:
             
             logger.info("WorkManager shutdown completed")
 
-    # ==============================================
-    # CORE WORK ITEM CRUD OPERATIONS
-    # ==============================================
+    # Utility methods
+    def _now(self) -> float:
+        """Get current timestamp."""
+        return time.time()
 
+    def _new_id(self) -> str:
+        """Generate new unique work ID."""
+        return uuid.uuid4().hex[:12]
+
+    # --- Public API ---
     def submit(
         self, *, config: CSPBenchConfig, extra: dict[str, Any] | None = None
     ) -> str:
@@ -241,10 +390,6 @@ class WorkManager:
                     break
             
             return all_work_items
-
-    # ==============================================
-    # STATUS MANAGEMENT OPERATIONS
-    # ==============================================
 
     def get_status(self, work_id: str) -> Optional[str]:
         """
@@ -367,56 +512,6 @@ class WorkManager:
                 logger.error(f"Failed to update work {work_id} status: {e}")
                 return False
 
-    # ==============================================
-    # EXECUTION CONTROL OPERATIONS
-    # ==============================================
-
-    def execute(
-        self, config: CSPBenchConfig, extra: Optional[Dict[str, Any]] = None
-    ) -> str:
-        """
-        Execute pipeline configuration with unified workflow.
-
-        Validates configuration, submits work item, and starts execution
-        in a separate thread for non-blocking operation.
-
-        Args:
-            config: Pipeline configuration to execute
-            extra: Additional metadata to store with work item
-
-        Returns:
-            str: Work ID for tracking execution progress
-            
-        Raises:
-            ValueError: If configuration validation fails
-            RuntimeError: If work submission fails
-        """
-        if extra is None:
-            extra = {}
-
-        try:
-            # Validate configuration before execution
-            self._validate_config(config)
-
-            # Submit work to persistent storage
-            work_id = self.submit(config=config, extra=extra)
-
-            logger.info(f"Work submitted: {work_id}")
-            logger.info(f"Starting execution thread for work: {work_id}")
-
-            thread = threading.Thread(
-                target=self._execute_work, args=(work_id, config), daemon=True
-            )
-            thread.start()
-            
-            logger.info(f"Thread started for work: {work_id}")
-
-            return work_id
-
-        except Exception as e:
-            logger.error(f"Failed to execute work: {e}")
-            raise
-
     def pause(self, work_id: str) -> bool:
         """
         Pause work item execution.
@@ -485,26 +580,27 @@ class WorkManager:
 
     def restart(self, work_id: str) -> bool:
         """
-        Restart an existing work item execution.
-
-        Retrieves the work item configuration and starts a new execution
-        thread after validating the configuration and resetting the status.
+        Restart work item with complete cleanup and reset to QUEUED status.
+        
+        Performs comprehensive cleanup operations:
+        - Resets all non-finalized combinations to queued status
+        - Resets all non-finalized executions and clears runtime data
+        - Clears all progress entries for non-finalized executions
+        - Resets work status to QUEUED
 
         Args:
-            work_id: ID of the work item to restart
+            work_id: Unique work identifier
 
         Returns:
-            bool: True if restart was successful, False otherwise
+            bool: True if restart successful, False otherwise
+
+        Thread Safety:
+            This method is thread-safe.
         """
         with self._lock:
             item_data = self._repo.work_get(work_id)
             if not item_data:
                 logger.error(f"Work item {work_id} not found")
-                return False
-            
-            work = WorkItem.from_dict(item_data)
-            if not work:
-                logger.error(f"Failed to parse work item {work_id}")
                 return False
                 
             # Check if current status allows restarting
@@ -530,26 +626,26 @@ class WorkManager:
                 progress_cleared = self._repo.execution_progress_clear_for_non_finalized(work_id=work_id)
                 if progress_cleared > 0:
                     logger.info(f"Cleared {progress_cleared} progress entries for work {work_id}")
-
-                # Validate configuration before restart
-                try:
-                    self._validate_config(work.config)
-                except ValueError as e:
-                    logger.error(f"Configuration validation failed for work {work_id}: {e}")
-                    return False
-
-                logger.info(f"Work restarted: {work_id}")
-
-                # Start execution thread
-                thread = threading.Thread(
-                    target=self._execute_work, args=(work_id, work.config), daemon=True
+                
+                # 4. Finally, reset work status to QUEUED and update timestamp
+                success = self._repo.work_update(
+                    work_id,
+                    status=BaseStatus.QUEUED.value,
+                    updated_at=self._now(),
+                    error=None  # Clear any previous error
                 )
-                thread.start()
-
-                return True
-
+                
+                # Consider restart successful if cleanup operations completed,
+                # even if work status update returns False (e.g., already in QUEUED)
+                if success or current_status == BaseStatus.QUEUED.value:
+                    logger.info(f"Work {work_id} restart completed successfully")
+                    return True
+                else:
+                    logger.error(f"Failed to update work {work_id} status during restart")
+                    return False
+                
             except Exception as e:
-                logger.error(f"Failed to restart work {work_id}: {e}")
+                logger.error(f"Failed to restart work {work_id}: {e}", exc_info=True)
                 return False
 
     def wait_until_terminal(
@@ -596,8 +692,189 @@ class WorkManager:
             time.sleep(poll_interval)
 
     # ==============================================
-    # CONFIGURATION AND VALIDATION UTILITIES
+    # EXECUTION MANAGEMENT (from ExecutionManager)
     # ==============================================
+
+    def execute(
+        self, config: CSPBenchConfig, extra: Optional[Dict[str, Any]] = None
+    ) -> str:
+        """
+        Execute pipeline configuration with unified workflow.
+
+        Validates configuration, submits work item, and starts execution
+        in a separate thread for non-blocking operation.
+
+        Args:
+            config: Pipeline configuration to execute
+            extra: Additional metadata to store with work item
+
+        Returns:
+            str: Work ID for tracking execution progress
+            
+        Raises:
+            ValueError: If configuration validation fails
+            RuntimeError: If work submission fails
+        """
+        if extra is None:
+            extra = {}
+
+        try:
+            # Validate configuration before execution
+            self._validate_config(config)
+
+            # Submit work to persistent storage
+            work_id = self.submit(config=config, extra=extra)
+
+            logger.info(f"Work submitted: {work_id}")
+            logger.info(f"Starting execution thread for work: {work_id}")
+
+            thread = threading.Thread(
+                target=self._execute_work, args=(work_id, config), daemon=True
+            )
+            thread.start()
+            
+            logger.info(f"Thread started for work: {work_id}")
+
+            return work_id
+
+        except Exception as e:
+            logger.error(f"Failed to execute work: {e}")
+            raise
+
+    def restart_execution(self, work_id: str) -> bool:
+        """
+        Restart an existing work item execution.
+
+        Retrieves the work item configuration and starts a new execution
+        thread after validating the configuration and resetting the status.
+
+        Args:
+            work_id: ID of the work item to restart
+
+        Returns:
+            bool: True if restart was successful, False otherwise
+        """
+        try:
+            # Get work item
+            work_item = self.get(work_id)
+            if not work_item:
+                logger.error(f"Work item {work_id} not found")
+                return False
+                
+            config = work_item.config
+            if not config:
+                logger.error(f"No config found for work item {work_id}")
+                return False
+
+            # Validate configuration before restart
+            try:
+                self._validate_config(config)
+            except ValueError as e:
+                logger.error(f"Configuration validation failed for work {work_id}: {e}")
+                return False
+
+            # Restart the work item (resets status to QUEUED and clears progress)
+            if not self.restart(work_id):
+                logger.error(f"Failed to restart work item {work_id}")
+                return False
+
+            logger.info(f"Work restarted: {work_id}")
+
+            # Start execution thread
+            thread = threading.Thread(
+                target=self._execute_work, args=(work_id, config), daemon=True
+            )
+            thread.start()
+
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to restart work {work_id}: {e}")
+            return False
+
+    def _execute_work(self, work_id: str, config: CSPBenchConfig) -> Dict[str, Any]:
+        """
+        Execute a work item with proper error handling and status management.
+
+        Args:
+            work_id: Work item identifier
+            config: Pipeline configuration
+
+        Returns:
+            dict: Execution result summary
+        """
+        try:
+            logger.info(f"=== Starting work execution thread: {work_id} ===")
+            logger.info(f"Thread ID: {threading.current_thread().ident}")
+            
+            # Get work item
+            work = self.get(work_id)
+            if not work:
+                raise RuntimeError(f"Work item {work_id} not found")
+
+            # Mark as running
+            logger.info(f"Marking work {work_id} as running")
+            if not self.mark_running(work_id):
+                raise RuntimeError(f"Failed to mark work {work_id} as running")
+
+            # Execute the pipeline
+            logger.info(f"Starting pipeline execution for work {work_id}")
+            self._run_pipeline(work, config)
+
+            # Mark as completed
+            logger.info(f"Marking work {work_id} as completed")
+            if not self.mark_completed(work_id):
+                logger.error(f"Failed to mark work {work_id} as completed")
+
+            result = {
+                "work_id": work_id,
+                "status": "completed",
+                "message": "Work executed successfully"
+            }
+            logger.info(f"Work completed successfully: {work_id}")
+            return result
+
+        except Exception as e:
+            error_msg = f"Work execution failed: {e}"
+            logger.error(f"Work {work_id} failed: {e}")
+            logger.error(f"Full traceback:", exc_info=True)
+            
+            # Mark as failed
+            if not self.mark_error(work_id, error_msg):
+                logger.error(f"Failed to mark work {work_id} as failed")
+
+            return {
+                "work_id": work_id,
+                "status": "failed",
+                "error": error_msg
+            }
+
+    def _run_pipeline(self, work: WorkItem, config: CSPBenchConfig) -> None:
+        """
+        Run the pipeline for a work item.
+
+        Args:
+            work: Work item to execute
+            config: Pipeline configuration
+        """
+        try:
+            logger.info(f"Running pipeline for work {work.id}")
+            
+            # Create work-scoped persistence for the pipeline
+            scoped_persistence = WorkScopedPersistence(
+                work_id=work.id,
+                store=self._repo
+            )
+            
+            # Create pipeline runner and execute
+            runner = PipelineRunner(work_store=scoped_persistence)
+            
+            runner.run(config)
+            logger.info(f"Pipeline completed for work {work.id}")
+            
+        except Exception as e:
+            logger.error(f"Pipeline failed for work {work.id}: {e}")
+            raise
 
     def _validate_config(self, config: CSPBenchConfig) -> None:
         """
@@ -667,262 +944,3 @@ class WorkManager:
         except Exception as e:
             logger.warning(f"Failed to generate config summary: {e}")
             return {"error": f"Failed to generate summary: {e}"}
-
-    # ==============================================
-    # INTERNAL EXECUTION ENGINE
-    # ==============================================
-
-    def _execute_work(self, work_id: str, config: CSPBenchConfig) -> Dict[str, Any]:
-        """
-        Execute a work item with proper error handling and status management.
-
-        Args:
-            work_id: Work item identifier
-            config: Pipeline configuration
-
-        Returns:
-            dict: Execution result summary
-        """
-        try:
-            logger.info(f"=== Starting work execution thread: {work_id} ===")
-            logger.info(f"Thread ID: {threading.current_thread().ident}")
-            
-            # Get work item
-            work = self.get(work_id)
-            if not work:
-                raise RuntimeError(f"Work item {work_id} not found")
-
-            # Mark as running
-            logger.info(f"Marking work {work_id} as running")
-            if not self.mark_running(work_id):
-                raise RuntimeError(f"Failed to mark work {work_id} as running")
-
-            # Execute the pipeline
-            logger.info(f"Starting pipeline execution for work {work_id}")
-            self._run_pipeline(work, config)
-
-            return {"work_id": work_id, "status": "completed"}
-
-        except Exception as e:
-            error_msg = f"Work execution failed: {e}"
-            logger.error(f"Work {work_id} failed: {e}")
-            logger.error(f"Full traceback:", exc_info=True)
-            
-            # Mark as failed
-            if not self.mark_error(work_id, error_msg):
-                logger.error(f"Failed to mark work {work_id} as failed")
-
-            return {
-                "work_id": work_id,
-                "status": "failed",
-                "error": error_msg
-            }
-
-    def _run_pipeline(self, work: WorkItem, config: CSPBenchConfig) -> None:
-        """
-        Run the pipeline for a work item.
-
-        Args:
-            work: Work item to execute
-            config: Pipeline configuration
-        """
-        try:
-            logger.info(f"Running pipeline for work {work.id}")
-            
-            # Create work-scoped persistence for the pipeline
-            scoped_persistence = WorkScopedPersistence(
-                work_id=work.id,
-                store=self._repo
-            )
-            
-            # Create pipeline runner and execute
-            runner = PipelineRunner(work_store=scoped_persistence)
-            
-            runner.run(config)
-            logger.info(f"Pipeline completed for work {work.id}")
-            
-        except Exception as e:
-            logger.error(f"Pipeline failed for work {work.id}: {e}")
-            raise
-
-    # ==============================================
-    # INTERNAL CLEANUP AND RESET OPERATIONS
-    # ==============================================
-
-    def _pause_running_works(self) -> int:
-        """
-        Pause all work items that are not in finalized status.
-        
-        This is used during initialization to handle orphaned works from
-        abrupt application shutdowns. Pauses all works that are not in
-        finalized states (COMPLETED, FAILED, ERROR).
-        
-        Returns:
-            int: Number of work items paused
-        """
-        try:
-            from src.domain.status import BaseStatus, INCOMPLETE_STATUSES
-            
-            # Get all non-finalized works
-            non_finalized_status_values = [status.value for status in INCOMPLETE_STATUSES]
-            works_data, _ = self._repo.work_list(
-                filters={'status': non_finalized_status_values}
-            )
-            
-            paused_count = 0
-            
-            # Update each work using the proper mixin method
-            for work_data in works_data:
-                work_id = work_data['id']
-                current_status = work_data['status']
-                
-                # Only update if not already paused
-                if current_status != BaseStatus.PAUSED.value:
-                    success = self._repo.work_update(
-                        work_id,
-                        status=BaseStatus.PAUSED.value,
-                        updated_at=self._now()
-                    )
-                    
-                    if success:
-                        paused_count += 1
-                        logger.debug(f"Paused work {work_id} (was {current_status})")
-                    else:
-                        logger.warning(f"Failed to pause work {work_id}")
-            
-            if paused_count > 0:
-                logger.info(f"Paused {paused_count} orphaned work items")
-            else:
-                logger.debug("No orphaned work items found to pause")
-            
-            return paused_count
-                
-        except Exception as e:
-            logger.error(f"Error pausing non-finalized works: {e}")
-            return 0
-
-    def _clear_non_finalized_progress(self) -> int:
-        """
-        Clear all progress entries for non-finalized executions.
-        
-        Returns:
-            int: Number of progress entries cleared
-        """
-        try:
-            # Use the existing repository method for clearing progress
-            cleared_count = self._repo.execution_progress_clear_for_non_finalized()
-            logger.info(f"Cleared {cleared_count} progress entries for non-finalized executions")
-            return cleared_count
-            
-        except Exception as e:
-            logger.error(f"Error clearing non-finalized progress: {e}")
-            return 0
-
-    def _reset_work_combinations(self, work_id: str) -> int:
-        """
-        Reset all non-finalized combinations for a specific work to queued status.
-        
-        Args:
-            work_id: Work identifier to reset combinations for
-            
-        Returns:
-            int: Number of combinations reset
-        """
-        try:
-            from src.domain.status import BaseStatus
-            
-            non_finalized_statuses = [
-                BaseStatus.RUNNING.value,
-                BaseStatus.PAUSED.value,
-            ]
-            
-            # Use bulk update for better performance
-            reset_count = self._repo.combination_bulk_update(
-                filters={
-                    'work_id': work_id, 
-                    'status': non_finalized_statuses
-                },
-                update_fields={
-                    'status': BaseStatus.QUEUED.value,
-                    'started_at': None,
-                    'finished_at': None
-                }
-            )
-            
-            if reset_count > 0:
-                logger.info(f"Reset {reset_count} combinations to queued status for work {work_id}")
-            else:
-                logger.debug(f"No combinations to reset for work {work_id}")
-            
-            return reset_count
-                
-        except Exception as e:
-            logger.error(f"Error resetting combinations for work {work_id}: {e}")
-            return 0
-
-    def _reset_work_executions(self, work_id: str) -> int:
-        """
-        Reset all non-finalized executions for a specific work to queued status 
-        and clear runtime data.
-        
-        Args:
-            work_id: Work identifier to reset executions for
-            
-        Returns:
-            int: Number of executions reset
-        """
-        try:
-            from src.domain.status import BaseStatus
-            
-            non_finalized_statuses = [
-                BaseStatus.RUNNING.value,
-                BaseStatus.PAUSED.value,
-            ]
-            
-            # First, get combination IDs for this work using the proper mixin method
-            combinations_data, _ = self._repo.combination_list(
-                filters={'work_id': work_id}
-            )
-            
-            if not combinations_data:
-                return 0
-                
-            combination_ids = [combo['id'] for combo in combinations_data]
-            
-            # Use bulk update for better performance
-            reset_count = self._repo.execution_bulk_update(
-                filters={
-                    'combination_id': combination_ids,
-                    'status': non_finalized_statuses
-                },
-                update_fields={
-                    'status': BaseStatus.QUEUED.value,
-                    'started_at': None,
-                    'finished_at': None,
-                    'result': {},  # This will be handled as result_json in the mixin
-                    'objective': None
-                }
-            )
-            
-            if reset_count > 0:
-                logger.info(f"Reset {reset_count} executions to queued status for work {work_id}")
-            else:
-                logger.debug(f"No executions to reset for work {work_id}")
-            
-            return reset_count
-                
-        except Exception as e:
-            logger.error(f"Error resetting executions for work {work_id}: {e}")
-            return 0
-
-    # ==============================================
-    # UTILITY HELPER METHODS
-    # ==============================================
-
-    def _now(self) -> float:
-        """Get current timestamp."""
-        return time.time()
-
-    def _new_id(self) -> str:
-        """Generate new unique work ID."""
-        return uuid.uuid4().hex[:12]

@@ -27,27 +27,31 @@ classifiers = [
 requires-python = ">=3.8"
 dependencies = [
     "typer>=0.9.0",
-    # Pin de compatibilidade: Typer 0.9 não suporta mudança de assinatura em click 8.2+
-    "click>=8.0,<8.2",
     "PyYAML>=6.0",
     "biopython>=1.80",
     "numpy>=1.20.0",
     "optuna>=3.0.0",
-    "rich>=10.0.0",
+    # Web dependencies
+    "fastapi>=0.100.0",
+    "uvicorn>=0.20.0",
+    "pydantic>=2.0.0",
+    "python-multipart>=0.0.5",
+    "jinja2>=3.0.0",
+    "websockets>=11.0.0",
+    "websockets>=15.0.0",
+    # Database dependencies  
+    "SQLAlchemy>=2.0.0",
+    # Utilities
+    "python-dotenv>=1.0.0",
+    "matplotlib>=3.6.0",
+    "scikit-learn>=1.3.0",
+    "psutil>=5.9.0",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0.0",
-    "pytest-cov>=4.0.0",
-    "black>=23.0.0",
-    "ruff>=0.1.0",
-    "isort>=5.12.0",
-    "mypy>=1.0.0",
-]
-docs = [
-    "sphinx>=5.0.0",
-    "sphinx-rtd-theme>=1.2.0",
+    "pytest-asyncio>=0.21.0",
 ]
 
 [project.urls]
@@ -183,3 +187,8 @@ exclude_lines = [
     "class .*\\bProtocol\\):",
     "@(abc\\.)?abstractmethod",
 ]
+
+[tool.deptry]
+per_rule_ignores = { DEP002 = ["python-multipart", "pytest-asyncio", "jinja2", "websockets"] }
+
+

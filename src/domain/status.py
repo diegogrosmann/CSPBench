@@ -75,7 +75,7 @@ INCOMPLETE_STATUSES: set[BaseStatus] = {
 
 # Status transition rules - defines allowed transitions between statuses
 ALLOWEDSTATUS: dict[BaseStatus, set[BaseStatus]] = {
-    BaseStatus.QUEUED: {BaseStatus.RUNNING, BaseStatus.CANCELED},
+    BaseStatus.QUEUED: {BaseStatus.RUNNING, BaseStatus.CANCELED, BaseStatus.PAUSED},
     BaseStatus.RUNNING: {
         BaseStatus.PAUSED,
         BaseStatus.COMPLETED,
@@ -83,10 +83,8 @@ ALLOWEDSTATUS: dict[BaseStatus, set[BaseStatus]] = {
         BaseStatus.CANCELED,
         BaseStatus.ERROR,
     },
-    BaseStatus.PAUSED: {
-        BaseStatus.RUNNING,
-        BaseStatus.CANCELED,
-    },
+    BaseStatus.PAUSED: {BaseStatus.RUNNING, BaseStatus.CANCELED, BaseStatus.QUEUED},
+    BaseStatus.CANCELED: {BaseStatus.QUEUED, BaseStatus.PAUSED},
 }
 
 
@@ -141,6 +139,10 @@ def normalize_status(value: str | BaseStatus) -> str:
         return value.value
     if not isinstance(value, str):  # fallback
         value = str(value)
+    norm = value.strip().lower()
+    if norm not in {s.value for s in BaseStatus}:
+        raise ValueError(f"Invalid status: {value}")
+    return norm
     norm = value.strip().lower()
     if norm not in {s.value for s in BaseStatus}:
         raise ValueError(f"Invalid status: {value}")

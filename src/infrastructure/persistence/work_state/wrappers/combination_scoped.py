@@ -139,6 +139,21 @@ class CombinationScopedPersistence(WorkScopedPersistence):
             sequencia=sequencia,
         )
 
+    def submit_executions(self, executions: list[dict[str, Any]]) -> int:
+        """Submete execuções para a combinação atual usando inserção em lote."""
+        if not executions:
+            return 0
+        
+        # Adiciona combination_id para todas as execuções
+        executions_with_combination_id = []
+        for exec_data in executions:
+            exec_with_combination_id = exec_data.copy()
+            exec_with_combination_id['combination_id'] = self._combination_id
+            executions_with_combination_id.append(exec_with_combination_id)
+        
+        # Usa inserção em lote para melhor performance
+        return self.store.execution_bulk_create(executions_with_combination_id)
+
     def get_executions(
         self,
         *,
@@ -241,3 +256,15 @@ class CombinationScopedPersistence(WorkScopedPersistence):
         
         executions = self.get_executions()
         return [ExecutionScopedPersistence(exec["unit_id"], self.work_id, self.store) for exec in executions]
+
+    # === Limpeza de Progresso ===
+    def clear_progress_for_non_finalized_executions(self) -> int:
+        """
+        Limpa entradas de progresso de todas as execuções não finalizadas desta combinação.
+        
+        Returns:
+            Número de entradas de progresso removidas
+        """
+        return self.store.execution_progress_clear_for_non_finalized(
+            combination_id=self._combination_id
+        )

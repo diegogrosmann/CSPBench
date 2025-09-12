@@ -73,6 +73,10 @@ def initialize_work_service() -> WorkManager:
 
     try:
         _global_work_service = WorkManager()
+        
+        # Perform initialization cleanup and recovery
+        init_summary = _global_work_service.initialize()
+        logger.info(f"WorkManager initialization completed: {init_summary}")
 
         logger.info("WorkService initialized successfully with persistent storage")
         return _global_work_service
@@ -80,55 +84,6 @@ def initialize_work_service() -> WorkManager:
     except Exception as e:
         logger.error(f"Failed to initialize WorkService: {e}")
         raise RuntimeError(f"WorkService initialization failed: {e}") from e
-
-
-def pause_orphaned_running_work(work_service: WorkManager) -> None:
-    """
-    Pause any work items in 'running' state from previous sessions.
-    
-    This prevents orphaned work items that can't be controlled after
-    application restart. Running work items are automatically paused
-    to allow manual intervention.
-    
-    Args:
-        work_service: WorkManager instance to check for orphaned work
-    """
-    try:
-        from src.domain.status import BaseStatus
-
-        # Get all work items
-        all_work_items = work_service.list()
-
-        running_count = 0
-        paused_count = 0
-
-        for work_item in all_work_items:
-            work_id = work_item.id
-            status = work_item.status
-
-            if status == BaseStatus.RUNNING:
-                running_count += 1
-                try:
-                    # Pause the orphaned running work
-                    success = work_service.pause(work_id)
-                    if success:
-                        paused_count += 1
-                        logger.info(f"Paused orphaned running work: {work_id}")
-                    else:
-                        logger.warning(f"Failed to pause orphaned work: {work_id}")
-                except Exception as e:
-                    logger.error(f"Error pausing orphaned work {work_id}: {e}")
-
-        if running_count > 0:
-            logger.info(
-                f"Found {running_count} orphaned running work items, paused {paused_count}"
-            )
-        else:
-            logger.debug("No orphaned running work items found")
-
-    except Exception as e:
-        logger.error(f"Error during orphaned work cleanup: {e}")
-        # Don't fail initialization due to cleanup errors
 
 
 def cleanup_work_service() -> None:
@@ -219,11 +174,11 @@ def list_all_work():
 
 def control_work(work_id: str, action: str) -> bool:
     """
-    Control work execution (pause, resume, cancel, restart).
+    Control work execution (pause, cancel, restart).
     
     Args:
         work_id: Unique work identifier
-        action: Control action ('pause', 'resume', 'cancel', 'restart')
+        action: Control action ('pause', 'cancel', 'restart')
         
     Returns:
         bool: True if action successful, False otherwise
@@ -232,8 +187,6 @@ def control_work(work_id: str, action: str) -> bool:
 
     if action == "pause":
         return work_service.pause(work_id)
-    elif action == "resume":
-        return work_service.resume(work_id)
     elif action == "cancel":
         return work_service.cancel(work_id)
     elif action == "restart":

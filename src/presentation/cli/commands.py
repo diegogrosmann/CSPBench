@@ -185,7 +185,7 @@ def register_commands(app: typer.Typer) -> None:
 
             work_manager = get_work_service()
 
-            work_manager.restart_execution(work_id)
+            work_manager.restart(work_id)
 
             if not no_monitor:
                 # Use the reusable monitor function

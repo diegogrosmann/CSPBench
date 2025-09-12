@@ -9,7 +9,6 @@ Migração:
 - Substitua ExecutionManager() por get_work_service()
 - O método execute() está disponível no WorkManager
 - O método restart() foi renomeado para restart_execution()
-- O método resume() foi renomeado para resume_execution()
 
 Exemplo de migração:
     # Antes:
@@ -58,7 +57,3 @@ class ExecutionManager:
     def restart(self, work_id: str) -> bool:
         """Delegate to WorkManager.restart_execution()"""
         return self._work_service.restart_execution(work_id)
-    
-    def resume(self, work_id: str) -> bool:
-        """Delegate to WorkManager.resume_execution()"""
-        return self._work_service.resume_execution(work_id)

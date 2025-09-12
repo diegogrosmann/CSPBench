@@ -110,7 +110,26 @@ class ProgressMonitor:
         return False
 
     def signal_handler(self, signum, frame):
-        """Handle Ctrl+C gracefully by canceling the work."""
+        """Handle Ctrl+C gracefully by pausing the work."""
+        try:
+            # Importar e usar o WorkService para pausar o trabalho
+            from src.application.services.work_service import get_work_service
+            
+            work_service = get_work_service()
+            success = work_service.pause(self.work_id)
+            
+            if success:
+                pm_logger.info(f"Trabalho {self.work_id} pausado via Ctrl+C")
+                print(f"\n✅ Trabalho {self.work_id} pausado com sucesso!")
+                print("🔄 Use 'cspbench monitor {work_id}' para continuar monitorando")
+            else:
+                pm_logger.warning(f"Falha ao pausar trabalho {self.work_id} via Ctrl+C")
+                print(f"\n⚠️  Não foi possível pausar o trabalho {self.work_id}")
+                
+        except Exception as e:
+            pm_logger.error(f"Erro ao pausar trabalho {self.work_id} via Ctrl+C: {e}")
+            print(f"\n❌ Erro ao pausar trabalho: {e}")
+        
         self.running = False
 
     def format_progress_bar(
@@ -286,7 +305,7 @@ class ProgressMonitor:
         if h <= 1:
             return
 
-        controls = "Q:Quit P:Pause C:Cancel ↑↓:Scroll"
+        controls = "Q:Quit P:Pause Ctrl+C:Pause ↑↓:Scroll"
         legend = "✓:Done ▶:Running ✗:Failed ⋯:Queued"
         timestamp = datetime.now().strftime("%H:%M:%S")
 
@@ -372,8 +391,6 @@ class ProgressMonitor:
                 break
             elif key in [ord("p"), ord("P")]:
                 self.handle_pause(stdscr)
-            elif key in [ord("c"), ord("C")]:
-                self.handle_cancel(stdscr)
             elif key == curses.KEY_UP:
                 self.scroll_pos = max(0, self.scroll_pos - 1)
             elif key == curses.KEY_DOWN:
@@ -602,12 +619,23 @@ class ProgressMonitor:
 
         if confirm_key in [ord("y"), ord("Y")]:
             try:
-                # Nota: Para pausar o trabalho, seria necessário usar o WorkService
-                # Por enquanto, apenas sai do monitor
-                self.show_paused_confirmation_screen(stdscr)
-                self.running = False
-            except Exception:
-                pass  # Ignore errors, will be reflected in status
+                # Importar e usar o WorkService para realmente pausar o trabalho
+                from src.application.services.work_service import get_work_service
+                
+                work_service = get_work_service()
+                success = work_service.pause(self.work_id)
+                
+                if success:
+                    self.show_paused_confirmation_screen(stdscr)
+                    self.running = False
+                else:
+                    # Mostrar erro se não conseguiu pausar
+                    self.show_action_error_screen(stdscr, "pausar")
+                    
+            except Exception as e:
+                pm_logger.error(f"Erro ao pausar trabalho {self.work_id}: {e}")
+                self.show_action_error_screen(stdscr, "pausar")
+                pass  # Continue monitoring in case of error
 
     def show_paused_confirmation_screen(self, stdscr):
         """Displays a screen when the work is successfully paused."""
@@ -656,81 +684,6 @@ class ProgressMonitor:
         stdscr.addstr(
             h // 2 + 2, (w - 40) // 2, "Monitor será finalizado em 3 segundos..."
         )
-        stdscr.refresh()
-
-        for _ in range(30):
-            if stdscr.getch() != -1:
-                break
-            time.sleep(0.1)
-
-    def handle_cancel(self, stdscr):
-        """Shows a confirmation dialog for cancelling the work."""
-        h, w = stdscr.getmaxyx()
-
-        # Criar caixa de diálogo com fundo
-        dialog_width = 50
-        dialog_height = 7
-        start_y = (h - dialog_height) // 2
-        start_x = (w - dialog_width) // 2
-
-        # Criar janela de diálogo
-        dialog_win = curses.newwin(dialog_height, dialog_width, start_y, start_x)
-        dialog_win.bkgd(" ", curses.color_pair(1))  # Fundo vermelho
-        dialog_win.box()
-
-        # Título
-        title = "🛑 CANCELAR TRABALHO"
-        dialog_win.addstr(1, (dialog_width - len(title)) // 2, title, curses.A_BOLD)
-
-        # Mensagem
-        msg1 = f"Cancelar work '{self.work_id[:20]}...'?"
-        msg2 = "Pressione Y para confirmar ou N para cancelar"
-        dialog_win.addstr(3, (dialog_width - len(msg1)) // 2, msg1)
-        dialog_win.addstr(4, (dialog_width - len(msg2)) // 2, msg2)
-
-        # Opções
-        options = "[Y] Sim    [N] Não"
-        dialog_win.addstr(5, (dialog_width - len(options)) // 2, options, curses.A_BOLD)
-
-        dialog_win.refresh()
-
-        confirm_key = -1
-        while confirm_key not in [
-            ord("y"),
-            ord("Y"),
-            ord("n"),
-            ord("N"),
-            27,
-        ]:  # 27 = ESC
-            confirm_key = stdscr.getch()
-            time.sleep(0.1)
-
-        if confirm_key in [ord("y"), ord("Y")]:
-            try:
-                # Nota: Para cancelar o trabalho, seria necessário usar o WorkService
-                # Por enquanto, apenas sai do monitor
-                self.show_canceled_screen(stdscr)
-                self.running = False
-            except Exception:
-                pass  # Ignore errors, will be reflected in status
-
-    def show_canceled_screen(self, stdscr):
-        """Displays a screen when the work is successfully canceled."""
-        stdscr.clear()
-        h, w = stdscr.getmaxyx()
-
-        title = "🛑 TRABALHO CANCELADO"
-        msg1 = f"O work '{self.work_id}' foi cancelado com sucesso."
-        msg2 = "Monitor será finalizado em 3 segundos..."
-
-        stdscr.addstr(
-            h // 2 - 1,
-            (w - len(title)) // 2,
-            title,
-            curses.color_pair(1) | curses.A_BOLD,
-        )
-        stdscr.addstr(h // 2, (w - len(msg1)) // 2, msg1)
-        stdscr.addstr(h // 2 + 1, (w - len(msg2)) // 2, msg2)
         stdscr.refresh()
 
         for _ in range(30):
@@ -821,6 +774,30 @@ class ProgressMonitor:
             if stdscr.getch() != -1:
                 break
             time.sleep(0.1)
+
+    def show_action_error_screen(self, stdscr, action: str):
+        """Displays an error screen when an action fails."""
+        stdscr.clear()
+        h, w = stdscr.getmaxyx()
+
+        title = f"❌ ERRO AO {action.upper()}"
+        msg1 = f"Não foi possível {action} o trabalho '{self.work_id}'"
+        msg2 = "Verifique os logs ou tente novamente"
+        msg3 = "Pressione qualquer tecla para continuar..."
+
+        stdscr.addstr(
+            h // 2 - 2,
+            (w - len(title)) // 2,
+            title,
+            curses.color_pair(1) | curses.A_BOLD,
+        )
+        stdscr.addstr(h // 2 - 1, (w - len(msg1)) // 2, msg1)
+        stdscr.addstr(h // 2, (w - len(msg2)) // 2, msg2)
+        stdscr.addstr(h // 2 + 2, (w - len(msg3)) // 2, msg3, curses.A_BOLD)
+        stdscr.refresh()
+
+        # Aguardar tecla
+        stdscr.getch()
 
     def start(self):
         """Start the monitor."""

@@ -212,7 +212,8 @@ class WorkItem:
         """
         Restart work item (reset to QUEUED status).
 
-        Only allows restart from terminal states (COMPLETED, FAILED).
+        Only allows restart from terminal states (COMPLETED, FAILED) and 
+        non-terminal states (PAUSED, CANCELED).
 
         Returns:
             bool: True if restart successful
@@ -220,11 +221,13 @@ class WorkItem:
         if self.status in (
             BaseStatus.COMPLETED,
             BaseStatus.FAILED,
+            BaseStatus.PAUSED,
+            BaseStatus.CANCELED,
         ):
-            return False
-        self.status = BaseStatus.QUEUED
-        self._touch()
-        return True
+            self.status = BaseStatus.QUEUED
+            self._touch()
+            return True
+        return False
 
     # --- Representation ---
     def to_dict(self) -> dict[str, Any]:

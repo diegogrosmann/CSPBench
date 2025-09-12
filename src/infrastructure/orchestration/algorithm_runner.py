@@ -58,6 +58,20 @@ def run_algorithm(
     if params is None:
         params = {}
 
+    # Verificar primeiro se não está pausado ou cancelado
+    initial_status = execution_controller.check_status()
+    if initial_status in [BaseStatus.PAUSED, BaseStatus.CANCELED]:
+        logger.info(f"Algoritmo '{algorithm_name}' não será executado - status atual: {initial_status.value}")
+        return {
+            "status": initial_status,
+            "algorithm_result": None,
+            "error": f"Execução não iniciada - trabalho está {initial_status.value.lower()}",
+            "duration_s": 0.0,
+            "execution_time_s": 0.0,
+            "timeout_triggered": False,
+            "actual_params": params,
+        }
+
     logger.info(f"Iniciando execução do algoritmo: {algorithm_name}")
     logger.debug(
         f"Parâmetros de entrada: strings={len(strings)}, alphabet='{alphabet}', params={params}"
@@ -94,6 +108,21 @@ def run_algorithm(
             **filtered_params,
         )
         logger.info(f"Instância do algoritmo '{algorithm_name}' criada com sucesso")
+
+        # Verificar novamente o status antes de iniciar a execução
+        pre_execution_status = execution_controller.check_status()
+        if pre_execution_status in [BaseStatus.PAUSED, BaseStatus.CANCELED]:
+            duration = time.time() - t0
+            logger.info(f"Algoritmo '{algorithm_name}' não será executado - status mudou para: {pre_execution_status.value}")
+            return {
+                "status": pre_execution_status,
+                "algorithm_result": None,
+                "error": f"Execução interrompida - trabalho foi {pre_execution_status.value.lower()}",
+                "duration_s": duration,
+                "execution_time_s": 0.0,
+                "timeout_triggered": False,
+                "actual_params": params,
+            }
 
         # Algorithm execution with timing and timeout control
         logger.info(f"Iniciando execução do algoritmo '{algorithm_name}'")

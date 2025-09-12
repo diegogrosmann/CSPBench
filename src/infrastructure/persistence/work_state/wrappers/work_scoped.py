@@ -3,6 +3,7 @@
 from typing import Any, Optional, TYPE_CHECKING
 
 from src.infrastructure.persistence.work_state.core import WorkPersistence
+from src.domain.dataset import Dataset
 
 if TYPE_CHECKING:
     from src.infrastructure.persistence.work_state.wrappers.combination_scoped import CombinationScopedPersistence
@@ -79,15 +80,19 @@ class WorkScopedPersistence:
 
     # === COMBINATIONS ===
     def submit_combinations(self, tasks_combinations: list[dict[str, Any]]) -> int:
-        """Submete combinações para o work atual."""
-        count = 0
+        """Submete combinações para o work atual usando inserção em lote."""
+        if not tasks_combinations:
+            return 0
+        
+        # Adiciona work_id para todas as combinações
+        combinations_with_work_id = []
         for combo in tasks_combinations:
-            self._store.combination_create(
-                work_id=self._work_id,
-                **combo
-            )
-            count += 1
-        return count
+            combo_with_work_id = combo.copy()
+            combo_with_work_id['work_id'] = self._work_id
+            combinations_with_work_id.append(combo_with_work_id)
+        
+        # Usa inserção em lote para melhor performance
+        return self._store.combination_bulk_create(combinations_with_work_id)
 
     def update_combination_status(
         self,
@@ -112,7 +117,6 @@ class WorkScopedPersistence:
         """Obtém a próxima combinação em fila do work atual."""
         combinations, _ = self._store.combination_list(
             filters={'work_id': self._work_id, 'status': 'queued'},
-            order_by='created_at',
             limit=1
         )
         return combinations[0] if combinations else None
@@ -292,14 +296,13 @@ class WorkScopedPersistence:
             order_by='seq_index'
         )
         
-        # Return a simple object with the data
-        class DatasetResult:
-            def __init__(self, data, sequences):
-                self.name = data.get('name')
-                self.meta = data.get('meta', {})
-                self.sequences = [seq['sequence'] for seq in sequences]
-                
-        return DatasetResult(dataset, sequences)
+        # Create Dataset instance with the retrieved data
+        sequence_list = [seq['sequence'] for seq in sequences]
+        return Dataset(
+            id=dataset_id,
+            name=dataset.get('name', 'unnamed_dataset'),
+            sequences=sequence_list
+        )
 
     # Preset
     def preset_warning(
@@ -543,3 +546,15 @@ class WorkScopedPersistence:
                     running_executions.append(execution)
         
         return running_executions
+
+    # === Limpeza de Progresso ===
+    def clear_progress_for_non_finalized_executions(self) -> int:
+        """
+        Limpa entradas de progresso de todas as execuções não finalizadas deste trabalho.
+        
+        Returns:
+            Número de entradas de progresso removidas
+        """
+        return self._store.execution_progress_clear_for_non_finalized(
+            work_id=self._work_id
+        )

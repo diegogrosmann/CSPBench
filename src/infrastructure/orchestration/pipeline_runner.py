@@ -89,7 +89,13 @@ class PipelineRunner:
             logger.info("Aguardando finalização de todas as execuções em progresso...")
             self._wait_for_all_executions_to_complete()
 
-            if status == BaseStatus.RUNNING:
+            # Verificar se o work foi pausado ou cancelado durante a execução
+            current_work_status = self.work_store.get_work_status()
+            
+            if current_work_status in [BaseStatus.PAUSED, BaseStatus.CANCELED]:
+                logger.info(f"Pipeline foi {current_work_status.lower()} durante a execução")
+                # Não atualizar o status - manter como está (pausado/cancelado)
+            elif status == BaseStatus.RUNNING:
                 logger.error("Pipeline ainda em execução após finalização")
                 self.work_store.update_work_status(BaseStatus.FAILED)
             else:
@@ -115,38 +121,48 @@ class PipelineRunner:
                 logger.debug("Limpando ExecutionController")
                 self.execution_controller.cleanup()
                 logger.info("Pipeline finalizado e recursos liberados")
-            # Finalization export (raw db + manifest + full_results + summary)
-            try:
-                from src.infrastructure.export.finalization_service import (
-                    FinalizationConfig,
-                    FinalizationService,
-                )
-
-                # Get output directory from work row (output_path field) if present
-                output_dir = None
+            
+            # Verificar se deve fazer exportação final
+            final_work_status = self.work_store.get_work_status()
+            should_export = final_work_status in [BaseStatus.COMPLETED, BaseStatus.ERROR, BaseStatus.FAILED]
+            
+            if should_export:
+                logger.info(f"Iniciando exportação final (status: {final_work_status.value})")
+                # Finalization export (raw db + manifest + full_results + summary)
                 try:
-                    output_dir = self.work_store.get_work_output_path(
-                        self.work_id
-                    )  # may return Path or None
-                except Exception:
-                    output_dir = None
-                if output_dir is None:
-                    # fallback: derive from environment OUTPUT_BASE_DIRECTORY
-                    from pathlib import Path
+                    from src.infrastructure.export.finalization_service import (
+                        FinalizationConfig,
+                        FinalizationService,
+                    )
 
-                    base = os.environ.get("OUTPUT_BASE_DIRECTORY", "./data/outputs")
-                    output_dir = Path(base) / self.work_id
-                output_dir.mkdir(parents=True, exist_ok=True)
-                
-                # Use WorkScopedPersistence instead of accessing db_path
-                cfg = FinalizationConfig(
-                    work_id=self.work_id,
-                    output_dir=output_dir,
-                    tool_version=FinalizationService.detect_tool_version(),
-                )
-                FinalizationService(cfg, work_store=self.work_store).run()
-            except Exception as fe:  # pragma: no cover - defensive
-                logger.error(f"Erro durante finalização de exportação: {fe}")
+                    # Get output directory from work row (output_path field) if present
+                    output_dir = None
+                    try:
+                        output_dir = self.work_store.get_work_output_path(
+                            self.work_id
+                        )  # may return Path or None
+                    except Exception:
+                        output_dir = None
+                    if output_dir is None:
+                        # fallback: derive from environment OUTPUT_BASE_DIRECTORY
+                        from pathlib import Path
+
+                        base = os.environ.get("OUTPUT_BASE_DIRECTORY", "./data/outputs")
+                        output_dir = Path(base) / self.work_id
+                    output_dir.mkdir(parents=True, exist_ok=True)
+                    
+                    # Use WorkScopedPersistence instead of accessing db_path
+                    cfg = FinalizationConfig(
+                        work_id=self.work_id,
+                        output_dir=output_dir,
+                        tool_version=FinalizationService.detect_tool_version(),
+                    )
+                    FinalizationService(cfg, work_store=self.work_store).run()
+                    logger.info("Exportação final concluída com sucesso")
+                except Exception as fe:  # pragma: no cover - defensive
+                    logger.error(f"Erro durante finalização de exportação: {fe}")
+            else:
+                logger.info(f"Exportação final ignorada devido ao status: {final_work_status}")
 
     def _generate_all_datasets(self, config: CSPBenchConfig) -> None:
         """Fase 1: Gera todos os datasets necessários."""

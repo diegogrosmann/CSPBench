@@ -93,7 +93,7 @@ class BatchResultsResponse(BaseModel):
 
 
 class BatchControlResponse(BaseModel):
-    """Response model for batch control operations (cancel, pause, resume)."""
+    """Response model for batch control operations (cancel, pause, restart)."""
 
     work_id: str = Field(..., description="Unique work identifier")
     operation: str = Field(..., description="Operation performed")

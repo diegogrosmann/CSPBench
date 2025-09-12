@@ -226,3 +226,13 @@ class ExecutionScopedPersistence(CombinationScopedPersistence):
             limit=limit
         )
         return results
+
+    def clear_progress_if_not_finalized(self) -> int:
+        """
+        Limpa entradas de progresso da execução atual se ela não estiver finalizada.
+        
+        Retorna o número de entradas removidas (0 se a execução estiver finalizada).
+        """
+        return self.store.execution_progress_clear_for_non_finalized(
+            execution_id=self._execution_id
+        )

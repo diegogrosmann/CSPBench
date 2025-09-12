@@ -171,7 +171,7 @@ class ExperimentExecutor(AbstractExecutionEngine):
         dataset_obj: Dataset,
         alg: AlgParams,
     ) -> BaseStatus:
-        """Executa o experimento (simplificado)."""
+        """Executa o experimento seguindo o novo processo passo a passo."""
 
         repetitions = max(1, int(getattr(task, "repetitions", 1)))
         strings = dataset_obj.sequences
@@ -182,6 +182,162 @@ class ExperimentExecutor(AbstractExecutionEngine):
         if global_seed is None:
             global_seed = alg.params.get("seed", None)
 
+        logger.info(f"Iniciando experimento para {alg.name} no dataset {dataset_id} com {repetitions} repetições")
+
+        # PASSO 1: Identificar todas as execuções necessárias
+        logger.info("PASSO 1: Identificando execuções necessárias")
+        all_needed_executions = self._identify_needed_executions(
+            task, dataset_id, alg, repetitions
+        )
+        
+        # PASSO 2: Listar execuções já finalizadas 
+        logger.info("PASSO 2: Verificando execuções já finalizadas")
+        completed_executions = self._get_completed_executions(all_needed_executions)
+        
+        # PASSO 3: Determinar execuções pendentes
+        logger.info("PASSO 3: Determinando execuções pendentes")
+        pending_executions = self._get_pending_executions(
+            all_needed_executions, completed_executions
+        )
+        
+        if not pending_executions:
+            logger.info("Nenhuma execução pendente encontrada - todas já foram finalizadas")
+            return BaseStatus.COMPLETED
+            
+        logger.info(f"Encontradas {len(pending_executions)} execuções pendentes de {len(all_needed_executions)} totais")
+        
+        # PASSO 4: Persistir execuções pendentes em lote
+        logger.info("PASSO 4: Persistindo execuções pendentes em lote")
+        self._persist_pending_executions(pending_executions)
+        
+        # PASSO 5: Executar as execuções pendentes
+        logger.info("PASSO 5: Executando execuções pendentes")
+        results = self._execute_pending_executions(
+            pending_executions, strings, alphabet, global_seed
+        )
+
+        status = self._execution_controller.check_status()
+        if status != BaseStatus.RUNNING:
+            return status
+
+        # Avaliar resultados (considera enum BaseStatus)
+        if not results:
+            return BaseStatus.COMPLETED
+            
+        flat_results = [list(item.values())[0] for item in results]
+        failed_repetitions = [
+            r
+            for r in flat_results
+            if r.get("status")
+            not in (BaseStatus.COMPLETED, BaseStatus.COMPLETED.value, "completed")
+        ]
+        final_result = BaseStatus.ERROR if failed_repetitions else BaseStatus.COMPLETED
+        return final_result
+
+    def _identify_needed_executions(
+        self, task: ExperimentTask, dataset_id: str, alg: AlgParams, repetitions: int
+    ) -> list[dict[str, Any]]:
+        """PASSO 1: Identifica todas as execuções que precisam ser realizadas."""
+        needed_executions = []
+        
+        config_id = (
+            getattr(self._combination_store, "_preset_id", None) or "default"
+        )
+        config_id = str(config_id).replace(":", "_")
+        
+        for r in range(1, repetitions + 1):
+            experiment_unit_id = (
+                f"experiment:{task.id}:{dataset_id}:{config_id}:{alg.name}:{r}"
+            )
+            
+            execution_data = {
+                "unit_id": experiment_unit_id,
+                "sequencia": r,
+                "task_id": task.id,
+                "dataset_id": dataset_id,
+                "config_id": config_id,
+                "algorithm_name": alg.name,
+                "algorithm_params": alg.params
+            }
+            needed_executions.append(execution_data)
+            
+        logger.debug(f"Identificadas {len(needed_executions)} execuções necessárias")
+        return needed_executions
+
+    def _get_completed_executions(self, all_executions: list[dict[str, Any]]) -> set[str]:
+        """PASSO 2: Lista todas as execuções que já estão com status finalizado."""
+        # Status finais que consideramos como "completos"
+        final_statuses = [
+            BaseStatus.COMPLETED.value,
+            "completed",
+            BaseStatus.FAILED.value,
+            "failed", 
+            BaseStatus.ERROR.value,
+            "error",
+        ]
+        
+        # Buscar todas as execuções da combinação atual de uma só vez
+        all_existing_executions = self._combination_store.get_executions()
+        
+        # Filtrar apenas execuções com status finais
+        completed_executions = [
+            ex for ex in all_existing_executions 
+            if ex.get("status") in final_statuses
+        ]
+        
+        # Criar um set com os unit_ids das execuções já finalizadas
+        completed_unit_ids = {ex["unit_id"] for ex in completed_executions}
+        
+        # Filtrar apenas as que estão na nossa lista de execuções necessárias
+        needed_unit_ids = {ex["unit_id"] for ex in all_executions}
+        relevant_completed = completed_unit_ids.intersection(needed_unit_ids)
+        
+        logger.debug(f"Encontradas {len(relevant_completed)} execuções já finalizadas de {len(completed_executions)} com status final, de {len(all_existing_executions)} totais no banco")
+        return relevant_completed
+
+    def _get_pending_executions(
+        self, all_executions: list[dict[str, Any]], completed: set[str]
+    ) -> list[dict[str, Any]]:
+        """PASSO 3: Compara e retorna apenas as execuções que não foram realizadas."""
+        pending = []
+        
+        for execution in all_executions:
+            if execution["unit_id"] not in completed:
+                pending.append(execution)
+                
+        logger.debug(f"Determinadas {len(pending)} execuções pendentes")
+        return pending
+
+    def _persist_pending_executions(self, pending_executions: list[dict[str, Any]]) -> None:
+        """PASSO 4: Persiste a lista de execuções pendentes em lote."""
+        if not pending_executions:
+            return
+            
+        # Preparar dados para inserção em lote
+        executions_to_insert = []
+        for execution in pending_executions:
+            execution_data = {
+                "unit_id": execution["unit_id"],
+                "sequencia": execution["sequencia"],
+                # combination_id será adicionado automaticamente pelo submit_executions
+            }
+            executions_to_insert.append(execution_data)
+            
+        # Usar inserção em lote para melhor performance
+        inserted_count = self._combination_store.submit_executions(executions_to_insert)
+        logger.info(f"Persistidas {inserted_count} execuções pendentes em lote")
+
+    def _execute_pending_executions(
+        self, 
+        pending_executions: list[dict[str, Any]], 
+        strings: list[str], 
+        alphabet: str,
+        global_seed: int | None
+    ) -> list[dict[str, Any]]:
+        """PASSO 5: Executa a lista de execuções pendentes (sequencial ou paralela)."""
+        if not pending_executions:
+            return []
+            
         results: list[dict[str, Any]] = []
 
         try:
@@ -192,155 +348,121 @@ class ExperimentExecutor(AbstractExecutionEngine):
             max_workers = 1
 
         if max_workers > 1:
-            # Execução paralela: submeter todas as tarefas de uma vez
-
-            # Get CPU configuration for worker processes
-            cpu_config = self._execution_controller.create_worker_config()
-
-            # Add memory configuration to be passed to workers
-            worker_config = cpu_config.copy()
-            if self._batch_config.resources and self._batch_config.resources.memory:
-                worker_config["max_memory_gb"] = (
-                    self._batch_config.resources.memory.max_memory_gb
-                )
-
-            with ProcessPoolExecutor(max_workers=max_workers) as executor:
-                # Preparar todas as tarefas
-                futures = []
-                for r in range(1, repetitions + 1):
-                    if self._execution_controller.check_status() != BaseStatus.RUNNING:
-                        break
-
-                    # Construir unit_id padronizado: type:task:dataset:config:name:r
-                    config_id = (
-                        getattr(self._combination_store, "_preset_id", None)
-                        or "default"
-                    )
-                    config_id = str(config_id).replace(":", "_")
-                    experiment_unit_id = (
-                        f"experiment:{task.id}:{dataset_id}:{config_id}:{alg.name}:{r}"
-                    )
-
-                    ex = self._combination_store.get_executions(
-                        unit_id=experiment_unit_id
-                    )
-                    if ex and ex[0]["status"] in (
-                        BaseStatus.COMPLETED.value,
-                        "completed",
-                        BaseStatus.FAILED.value,
-                        "failed",
-                    ):
-                        continue
-
-                    self._combination_store.submit_execution(
-                        unit_id=experiment_unit_id, sequencia=r
-                    )
-
-                    # Calcular seed para esta repetição
-                    seed = None
-                    if global_seed is not None:
-                        seed = global_seed
-                        if self._batch_config.system.seed_increment:
-                            seed += r
-
-                    future = executor.submit(
-                        _worker_exec,
-                        experiment_unit_id,
-                        seed,
-                        strings,
-                        alphabet,
-                        self._batch_config.system.distance_method,
-                        self._batch_config.system.enable_distance_cache,
-                        alg.params,
-                        self._combination_store.work_id,  # Usar work_id em vez de db_path
-                        self._execution_controller.internal_jobs,
-                        alg.name,  # Adicionar nome do algoritmo
-                        worker_config.get(
-                            "cpu"
-                        ),  # Pass full worker configuration including memory
-                    )
-                    futures.append((r, future))
-
-                # Coletar resultados
-                for r, future in futures:
-                    result, unit_id = future.result()
-
-                    results.append({unit_id: result})
-
+            # Execução paralela
+            logger.info(f"Executando {len(pending_executions)} execuções em paralelo com {max_workers} workers")
+            results = self._execute_parallel(pending_executions, strings, alphabet, global_seed)
         else:
             # Execução sequencial
+            logger.info(f"Executando {len(pending_executions)} execuções sequencialmente")
+            results = self._execute_sequential(pending_executions, strings, alphabet, global_seed)
+            
+        return results
 
-            # Get CPU configuration for sequential execution
-            cpu_config = self._execution_controller.create_worker_config()
+    def _execute_parallel(
+        self, 
+        pending_executions: list[dict[str, Any]], 
+        strings: list[str], 
+        alphabet: str,
+        global_seed: int | None
+    ) -> list[dict[str, Any]]:
+        """Executa as execuções pendentes em paralelo."""
+        results = []
+        
+        # Get CPU configuration for worker processes
+        cpu_config = self._execution_controller.create_worker_config()
+        worker_config = cpu_config.copy()
+        if self._batch_config.resources and self._batch_config.resources.memory:
+            worker_config["max_memory_gb"] = (
+                self._batch_config.resources.memory.max_memory_gb
+            )
 
-            # Add memory configuration to be passed to workers
-            worker_config = cpu_config.copy()
-            if self._batch_config.resources and self._batch_config.resources.memory:
-                worker_config["max_memory_gb"] = (
-                    self._batch_config.resources.memory.max_memory_gb
-                )
+        try:
+            max_workers = self._execution_controller.get_worker_config()["cpu"][
+                "max_workers"
+            ]
+        except Exception:
+            max_workers = 1
 
-            for r in range(1, repetitions + 1):
-                status = self._execution_controller.check_status()
-                if status != BaseStatus.RUNNING:
-                    return status
-
-                # Construir unit_id padronizado: type:task:dataset:config:name:r
-                config_id = (
-                    getattr(self._combination_store, "_preset_id", None) or "default"
-                )
-                config_id = str(config_id).replace(":", "_")
-                experiment_unit_id = (
-                    f"experiment:{task.id}:{dataset_id}:{config_id}:{alg.name}:{r}"
-                )
-                ex = self._combination_store.get_executions(unit_id=experiment_unit_id)
-                if ex and ex[0]["status"] in (
-                    BaseStatus.COMPLETED.value,
-                    "completed",
-                    BaseStatus.FAILED.value,
-                    "failed",
-                ):
-                    continue
-
-                self._combination_store.submit_execution(
-                    unit_id=experiment_unit_id, sequencia=r
-                )
+        with ProcessPoolExecutor(max_workers=max_workers) as executor:
+            futures = []
+            
+            for execution in pending_executions:
+                if self._execution_controller.check_status() != BaseStatus.RUNNING:
+                    break
 
                 # Calcular seed para esta repetição
                 seed = None
                 if global_seed is not None:
                     seed = global_seed
                     if self._batch_config.system.seed_increment:
-                        seed += r
+                        seed += execution["sequencia"]
 
-                result, _ = _worker_exec(
-                    experiment_unit_id,
+                future = executor.submit(
+                    _worker_exec,
+                    execution["unit_id"],
                     seed,
                     strings,
                     alphabet,
                     self._batch_config.system.distance_method,
                     self._batch_config.system.enable_distance_cache,
-                    alg.params,
-                    self._combination_store.work_id,  # Usar work_id em vez de db_path
+                    execution["algorithm_params"],
+                    self._combination_store.work_id,
                     self._execution_controller.internal_jobs,
-                    alg.name,  # Adicionar nome do algoritmo
-                    worker_config.get(
-                        "cpu"
-                    ),  # Pass full worker configuration including memory
+                    execution["algorithm_name"],
+                    worker_config.get("cpu"),
                 )
-                results.append({experiment_unit_id: result})
+                futures.append((execution["sequencia"], future))
 
-        status = self._execution_controller.check_status()
-        if status != BaseStatus.RUNNING:
-            return status
+            # Coletar resultados
+            for sequencia, future in futures:
+                result, unit_id = future.result()
+                results.append({unit_id: result})
+                
+        return results
 
-        # Avaliar resultados (considera enum BaseStatus)
-        flat_results = [list(item.values())[0] for item in results]
-        failed_repetitions = [
-            r
-            for r in flat_results
-            if r.get("status")
-            not in (BaseStatus.COMPLETED, BaseStatus.COMPLETED.value, "completed")
-        ]
-        final_result = BaseStatus.ERROR if failed_repetitions else BaseStatus.COMPLETED
-        return final_result
+    def _execute_sequential(
+        self, 
+        pending_executions: list[dict[str, Any]], 
+        strings: list[str], 
+        alphabet: str,
+        global_seed: int | None
+    ) -> list[dict[str, Any]]:
+        """Executa as execuções pendentes sequencialmente."""
+        results = []
+        
+        # Get CPU configuration for sequential execution
+        cpu_config = self._execution_controller.create_worker_config()
+        worker_config = cpu_config.copy()
+        if self._batch_config.resources and self._batch_config.resources.memory:
+            worker_config["max_memory_gb"] = (
+                self._batch_config.resources.memory.max_memory_gb
+            )
+
+        for execution in pending_executions:
+            status = self._execution_controller.check_status()
+            if status != BaseStatus.RUNNING:
+                break
+
+            # Calcular seed para esta repetição
+            seed = None
+            if global_seed is not None:
+                seed = global_seed
+                if self._batch_config.system.seed_increment:
+                    seed += execution["sequencia"]
+
+            result, _ = _worker_exec(
+                execution["unit_id"],
+                seed,
+                strings,
+                alphabet,
+                self._batch_config.system.distance_method,
+                self._batch_config.system.enable_distance_cache,
+                execution["algorithm_params"],
+                self._combination_store.work_id,
+                self._execution_controller.internal_jobs,
+                execution["algorithm_name"],
+                worker_config.get("cpu"),
+            )
+            results.append({execution["unit_id"]: result})
+            
+        return results

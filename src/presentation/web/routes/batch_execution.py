@@ -168,12 +168,12 @@ async def list_batches(
                     "status": work_item.status.value,
                     "created_at": datetime.fromtimestamp(work_item.created_at),
                     "updated_at": datetime.fromtimestamp(work_item.updated_at),
-                    "config_name": work.get("config", {})
+                    "config_name": work_item.get("config", {})
                     .get("metadata", {})
                     .get("name", "Unknown"),
-                    "batch_file": work.get("extra", {}).get("batch_file", ""),
-                    "description": work.get("extra", {}).get("description", ""),
-                    "origin": work.get("extra", {}).get("origin", "unknown"),
+                    "batch_file": work_item.get("extra", {}).get("batch_file", ""),
+                    "description": work_item.get("extra", {}).get("description", ""),
+                    "origin": work_item.get("extra", {}).get("origin", "unknown"),
                 }
             )
 
@@ -191,11 +191,11 @@ async def control_batch(
     work_id: str, action: str, work_manager: WorkManager = Depends(get_work_service)
 ) -> BatchControlResponse:
     """
-    Control batch execution (pause, resume, cancel).
+    Control batch execution (pause, restart, cancel).
 
     Args:
         work_id: Work item ID
-        action: Control action (pause, resume, cancel)
+        action: Control action (pause, restart, cancel)
 
     Returns:
         Control response
@@ -203,10 +203,10 @@ async def control_batch(
     try:
         if action == "pause":
             success = work_manager.pause(work_id)
-        elif action == "resume":
-            success = work_manager.resume(work_id)
         elif action == "cancel":
             success = work_manager.cancel(work_id)
+        elif action == "restart":
+            success = work_manager.restart(work_id)
         else:
             raise HTTPException(status_code=400, detail=f"Invalid action: {action}")
 

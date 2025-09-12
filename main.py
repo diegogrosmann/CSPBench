@@ -147,14 +147,12 @@ try:
         logger.debug("Inicializando WorkService global")
     from src.application.services.work_service import (
         initialize_work_service,
-        pause_orphaned_running_work,
     )
 
     work_service = initialize_work_service()
-    pause_orphaned_running_work(work_service)
 
     if logger:
-        logger.info("WorkService inicializado e trabalhos órfãos pausados")
+        logger.info("WorkService inicializado com sucesso")
 except Exception as _e:  # noqa: BLE001
     # Falha ao inicializar WorkService não deve impedir CLI básica
     error_msg = f"⚠️  Aviso: não foi possível inicializar WorkService: {_e}"
