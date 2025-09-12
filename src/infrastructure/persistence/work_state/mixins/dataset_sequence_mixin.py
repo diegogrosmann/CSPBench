@@ -1,14 +1,29 @@
-"""Dataset Sequence CRUD mixin."""
+"""Dataset Sequence CRUD operations mixin.
+
+This module provides CRUD operations for the DatasetSequence table,
+which stores individual sequences within datasets for CSP benchmark problems.
+"""
 
 from typing import Any, Dict, List, Optional, Tuple
 from sqlalchemy import and_, or_
 
 
 class DatasetSequenceCRUDMixin:
-    """CRUD operations for DatasetSequence table."""
+    """Mixin providing CRUD operations for DatasetSequence table.
+    
+    This mixin handles individual sequence data within datasets. Each sequence
+    represents a specific problem instance or data point within a larger dataset
+    used for CSP benchmarking and algorithm evaluation.
+    """
 
     def dataset_sequence_create(self, *, dataset_id: int, seq_index: int, sequence: str) -> None:
-        """Create dataset sequence using auto-generated dataset ID."""
+        """Create a new dataset sequence entry.
+        
+        Args:
+            dataset_id: Auto-generated ID of the dataset this sequence belongs to
+            seq_index: Index/position of this sequence within the dataset
+            sequence: The actual sequence data/content
+        """
         from ..models import DatasetSequence
         
         with self.session_scope() as session:
@@ -20,7 +35,15 @@ class DatasetSequenceCRUDMixin:
             session.add(seq)
 
     def dataset_sequence_get(self, dataset_id: int, seq_index: int) -> Optional[Dict[str, Any]]:
-        """Get dataset sequence using auto-generated dataset ID."""
+        """Retrieve a dataset sequence by dataset ID and sequence index.
+        
+        Args:
+            dataset_id: Auto-generated ID of the dataset
+            seq_index: Index of the sequence within the dataset
+            
+        Returns:
+            Dictionary containing sequence data if found, None otherwise.
+        """
         from ..models import DatasetSequence
         
         with self.session_scope() as session:
@@ -30,7 +53,16 @@ class DatasetSequenceCRUDMixin:
             return seq.to_dict() if seq else None
 
     def dataset_sequence_update(self, dataset_id: int, seq_index: int, *, sequence: str) -> None:
-        """Update dataset sequence using auto-generated dataset ID."""
+        """Update a dataset sequence's content.
+        
+        Args:
+            dataset_id: Auto-generated ID of the dataset
+            seq_index: Index of the sequence within the dataset
+            sequence: New sequence content to update
+            
+        Note:
+            This operation is idempotent - no error if sequence doesn't exist.
+        """
         from ..models import DatasetSequence
         
         with self.session_scope() as session:
@@ -41,7 +73,15 @@ class DatasetSequenceCRUDMixin:
                 seq.sequence = sequence
 
     def dataset_sequence_delete(self, dataset_id: int, seq_index: int) -> None:
-        """Delete dataset sequence using auto-generated dataset ID."""
+        """Delete a dataset sequence.
+        
+        Args:
+            dataset_id: Auto-generated ID of the dataset
+            seq_index: Index of the sequence within the dataset
+            
+        Note:
+            This operation is idempotent - no error if sequence doesn't exist.
+        """
         from ..models import DatasetSequence
         
         with self.session_scope() as session:
@@ -60,18 +100,27 @@ class DatasetSequenceCRUDMixin:
         order_by: Optional[str] = None,
         order_desc: bool = False
     ) -> Tuple[List[Dict[str, Any]], int]:
-        """
-        List dataset sequences with generic filtering and pagination.
+        """List dataset sequences with filtering and pagination.
         
         Args:
-            filters: Dictionary of field:value pairs for filtering
-            offset: Number of records to skip
+            filters: Dictionary of field:value pairs for filtering. Supports:
+                - Simple values: {'dataset_id': 123}
+                - List values: {'dataset_id': [123, 456]}
+                - Advanced operators: {'seq_index': {'operator': 'gte', 'value': 10}}
+            offset: Number of records to skip (for pagination)
             limit: Maximum number of records to return
-            order_by: Field to order by
+            order_by: Field name to order results by (typically 'seq_index')
             order_desc: Whether to order in descending order
             
         Returns:
-            Tuple of (records, total_count)
+            Tuple containing:
+                - List of dataset sequence dictionaries
+                - Total count of matching records (before pagination)
+                
+        Note:
+            Advanced operators supported: 'like', 'ilike', 'gt', 'gte', 
+            'lt', 'lte', 'ne' for flexible querying. Useful for filtering
+            sequences by content patterns or index ranges.
         """
         from ..models import DatasetSequence
         

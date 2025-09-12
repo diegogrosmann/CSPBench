@@ -1,3 +1,22 @@
+"""
+Domain Work Entity.
+
+This module contains the WorkItem domain entity representing a work execution
+unit in the CSPBench system. It handles the complete lifecycle of work items
+including status management, configuration storage, and persistence operations.
+
+The WorkItem entity encapsulates all information needed to track and manage
+work execution from submission through completion, including configuration,
+status transitions, timing information, and execution metadata.
+
+Features:
+    - Status transition management with validation
+    - Configuration serialization and deserialization  
+    - Timestamp tracking for lifecycle events
+    - Error handling and metadata storage
+    - Dictionary conversion for persistence operations
+"""
+
 from __future__ import annotations
 
 import json
@@ -16,23 +35,26 @@ WorkStatus = BaseStatus
 @dataclass
 class WorkItem:
     """
-    WorkItem - Domain entity representing a work execution unit.
+    Domain entity representing a work execution unit.
 
     Represents a single work item in the CSPBench system, containing
     configuration, status, timing information, and execution metadata.
-
     This entity handles status transitions, configuration management,
     and serialization to/from dictionary format for persistence.
 
+    The WorkItem follows domain-driven design principles, encapsulating
+    business logic for work lifecycle management while remaining independent
+    of infrastructure concerns.
+
     Attributes:
-        id: Unique work identifier
-        config: CSPBench configuration for execution
-        status: Current execution status
-        created_at: Creation timestamp (Unix time)
-        updated_at: Last update timestamp (Unix time)
-        output_path: Path for work output files
-        error: Error message if execution failed
-        extra: Additional metadata dictionary
+        id (str): Unique work identifier.
+        config (CSPBenchConfig): CSPBench configuration for execution.
+        status (BaseStatus): Current execution status.
+        created_at (float): Creation timestamp (Unix time).
+        updated_at (float): Last update timestamp (Unix time).
+        output_path (str): Path for work output files.
+        error (Optional[str]): Error message if execution failed.
+        extra (Optional[Dict[str, Any]]): Additional metadata dictionary.
     """
 
     id: str
@@ -49,10 +71,11 @@ class WorkItem:
         Validate and convert config to CSPBenchConfig if needed.
 
         Ensures that the config attribute is always a proper CSPBenchConfig
-        instance, converting from dict if necessary.
+        instance, converting from dict if necessary. This provides flexibility
+        in work item creation while maintaining type safety.
 
         Raises:
-            TypeError: If config is not CSPBenchConfig or dict
+            TypeError: If config is not CSPBenchConfig or dict.
         """
         if isinstance(self.config, dict):
             self.config = CSPBenchConfig.from_dict(self.config)
@@ -64,19 +87,29 @@ class WorkItem:
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> WorkItem:
         """
-        Create WorkItem from dictionary, ensuring proper config type.
+        Create WorkItem from dictionary representation.
 
         Factory method that creates a WorkItem instance from a dictionary
         representation, typically used when loading from persistence storage.
+        Handles JSON deserialization and type conversion for all fields.
 
         Args:
-            data: Dictionary containing work item data
+            data (Dict[str, Any]): Dictionary containing work item data with keys:
+                - id: Work identifier
+                - config_json: Configuration as JSON string or dict
+                - status: Status string value
+                - created_at: Creation timestamp  
+                - updated_at: Update timestamp
+                - output_path: Output path string
+                - error: Optional error message
+                - extra_json: Extra metadata as JSON string or dict
 
         Returns:
-            WorkItem: Created work item instance
+            WorkItem: Created work item instance.
 
         Raises:
-            TypeError: If config data is not in expected format
+            TypeError: If config data is not in expected format.
+            ValueError: If required fields are missing or invalid.
         """
         config_data = data.get("config_json")
 
@@ -115,18 +148,26 @@ class WorkItem:
 
     # --- Internal helpers ---
     def _touch(self) -> None:
-        """Update the last modified timestamp."""
+        """
+        Update the last modified timestamp.
+        
+        Updates the updated_at field with the current timestamp to track
+        when the work item was last modified.
+        """
         self.updated_at = time.time()
 
     def can_transition(self, new: BaseStatus) -> bool:
         """
         Check if transition to new status is allowed.
 
+        Validates whether a status transition is permitted based on the
+        current status and the defined transition rules in ALLOWEDSTATUS.
+
         Args:
-            new: Target status for transition
+            new (BaseStatus): Target status for transition.
 
         Returns:
-            bool: True if transition is allowed
+            bool: True if transition is allowed, False otherwise.
         """
         return new in ALLOWEDSTATUS.get(self.status, set())
 
@@ -134,11 +175,15 @@ class WorkItem:
         """
         Attempt to set new status with validation.
 
+        Internal method that attempts to change the work item status
+        after validating that the transition is allowed. Updates the
+        timestamp if the transition is successful.
+
         Args:
-            new: Target status
+            new (BaseStatus): Target status.
 
         Returns:
-            bool: True if status change was successful
+            bool: True if status change was successful, False otherwise.
         """
         if not self.can_transition(new):
             return False
@@ -151,8 +196,11 @@ class WorkItem:
         """
         Mark work item as running.
 
+        Transitions the work item to RUNNING status if the current status
+        allows this transition.
+
         Returns:
-            bool: True if transition successful
+            bool: True if transition successful, False otherwise.
         """
         return self._set_status(BaseStatus.RUNNING)
 
@@ -160,8 +208,11 @@ class WorkItem:
         """
         Mark work item as finished/completed.
 
+        Transitions the work item to COMPLETED status if the current status
+        allows this transition.
+
         Returns:
-            bool: True if transition successful
+            bool: True if transition successful, False otherwise.
         """
         ok = self._set_status(BaseStatus.COMPLETED)
         return ok
@@ -170,11 +221,14 @@ class WorkItem:
         """
         Mark work item as failed with error message.
 
+        Transitions the work item to FAILED status and stores the provided
+        error message if the current status allows this transition.
+
         Args:
-            error: Error message to store
+            error (str): Error message to store.
 
         Returns:
-            bool: True if transition successful
+            bool: True if transition successful, False otherwise.
         """
         ok = self._set_status(BaseStatus.FAILED)
         if ok:
@@ -185,8 +239,11 @@ class WorkItem:
         """
         Pause work item execution.
 
+        Transitions the work item to PAUSED status if the current status
+        allows this transition.
+
         Returns:
-            bool: True if transition successful
+            bool: True if transition successful, False otherwise.
         """
         return self._set_status(BaseStatus.PAUSED)
 
@@ -194,8 +251,11 @@ class WorkItem:
         """
         Resume paused work item.
 
+        Transitions the work item from PAUSED to RUNNING status if the
+        current status allows this transition.
+
         Returns:
-            bool: True if transition successful
+            bool: True if transition successful, False otherwise.
         """
         return self._set_status(BaseStatus.RUNNING)
 
@@ -203,8 +263,11 @@ class WorkItem:
         """
         Cancel work item execution.
 
+        Transitions the work item to CANCELED status if the current status
+        allows this transition.
+
         Returns:
-            bool: True if transition successful
+            bool: True if transition successful, False otherwise.
         """
         return self._set_status(BaseStatus.CANCELED)
 
@@ -212,11 +275,12 @@ class WorkItem:
         """
         Restart work item (reset to QUEUED status).
 
-        Only allows restart from terminal states (COMPLETED, FAILED) and 
-        non-terminal states (PAUSED, CANCELED).
+        Resets the work item to QUEUED status, allowing it to be executed
+        again. Only allows restart from terminal states (COMPLETED, FAILED)
+        and non-terminal states (PAUSED, CANCELED).
 
         Returns:
-            bool: True if restart successful
+            bool: True if restart successful, False otherwise.
         """
         if self.status in (
             BaseStatus.COMPLETED,
@@ -232,13 +296,22 @@ class WorkItem:
     # --- Representation ---
     def to_dict(self) -> dict[str, Any]:
         """
-        Convert WorkItem to dictionary with raw timestamp values.
+        Convert WorkItem to dictionary with serialized fields.
 
         Creates a dictionary representation suitable for persistence,
-        with proper JSON serialization of complex fields.
+        with proper JSON serialization of complex fields like configuration
+        and extra metadata.
 
         Returns:
-            dict: Dictionary representation of work item
+            Dict[str, Any]: Dictionary representation of work item with keys:
+                - id: Work identifier
+                - config_json: Configuration as JSON string
+                - status: Status value string
+                - created_at: Creation timestamp as float
+                - updated_at: Update timestamp as float
+                - output_path: Output path string
+                - error: Error message or None
+                - extra_json: Extra metadata as JSON string
         """
         return {
             "id": self.id,

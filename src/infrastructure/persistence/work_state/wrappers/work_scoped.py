@@ -11,61 +11,108 @@ if TYPE_CHECKING:
 
 
 class WorkScopedPersistence:
-    """
-    Wrapper para WorkPersistence com work_id preconfigurado.
+    """Wrapper for WorkPersistence with pre-configured work_id.
 
-    Evita repetir work_id em cada chamada, facilitando operações
-    focadas em um trabalho específico.
+    Avoids repeating work_id in each call, facilitating operations
+    focused on a specific work.
+    
+    Args:
+        work_id: The work identifier
+        store: Optional WorkPersistence instance. If None, creates a new one.
     """
 
     def __init__(self, work_id: str, store: Optional[WorkPersistence] = None):
+        """Initialize WorkScopedPersistence.
+        
+        Args:
+            work_id: The work identifier
+            store: Optional WorkPersistence instance
+        """
         self._store = store if store is not None else WorkPersistence()
         self._work_id = work_id
 
     @staticmethod
     def submit(work_id: str) -> "WorkScopedPersistence":
-        """
-        Método estático para criar um WorkScopedPersistence com store padrão.
+        """Static method to create a WorkScopedPersistence with default store.
         
         Args:
-            work_id: ID do trabalho
+            work_id: The work identifier
             
         Returns:
-            Nova instância de WorkScopedPersistence
+            New WorkScopedPersistence instance
         """
         return WorkScopedPersistence(work_id)
 
     @property
     def work_id(self) -> str:
+        """Get the work ID."""
         return self._work_id
 
     @property
     def store(self) -> WorkPersistence:
+        """Get the underlying WorkPersistence store."""
         return self._store
 
     def __repr__(self) -> str:
+        """Return string representation."""
         return f"WorkScopedPersistence(work_id={self._work_id})"
 
-    # Permite acessar métodos/atributos não sobrescritos diretamente no store
+    # Allows accessing non-overridden methods/attributes directly on the store
     def __getattr__(self, name: str):
+        """Delegate attribute access to the underlying store."""
         return getattr(self._store, name)
 
     # === WORK ===
     def update_work_status(self, status: str, **fields: Any) -> None:
-        """Atualiza status do work atual."""
+        """Update the status of the current work.
+        
+        Args:
+            status: New status value
+            **fields: Additional fields to update
+        """
         self._store.work_update(self._work_id, status=status, **fields)
 
     def get_work_status(self) -> str | None:
-        """Obtém status do work atual."""
+        """Get the status of the current work.
+        
+        Returns:
+            Work status or None if work not found
+        """
         work = self._store.work_get(self._work_id)
         return work['status'] if work else None
 
     def get_work_data(self) -> dict[str, Any] | None:
-        """Obtém dados completos do work atual."""
+        """Get complete data for the current work.
+        
+        Returns:
+            Work data dictionary or None if work not found
+        """
         return self._store.work_get(self._work_id)
 
+    def get_work_output_path(self, work_id: str | None = None):
+        """Get output_path for a work, defaulting to current work.
+        
+        Args:
+            work_id: Optional explicit work id. If None, uses self.work_id.
+        Returns:
+            Path or None if not set.
+        """
+        from pathlib import Path
+
+        target_id = work_id or self._work_id
+        data = self._store.work_get(target_id)
+        if not data:
+            return None
+        out = data.get("output_path")
+        return Path(out) if out else None
+
     def algorithm_error(self, algorithm_id: str, error: Exception) -> None:
-        """Log algorithm error for the current work."""
+        """Log algorithm error for the current work.
+        
+        Args:
+            algorithm_id: Algorithm identifier
+            error: Exception that occurred
+        """
         # Use event logging for algorithm errors
         self._store.event_create(
             work_id=self._work_id,
@@ -80,41 +127,73 @@ class WorkScopedPersistence:
 
     # === COMBINATIONS ===
     def submit_combinations(self, tasks_combinations: list[dict[str, Any]]) -> int:
-        """Submete combinações para o work atual usando inserção em lote."""
+        """Submit combinations for the current work using batch insertion.
+        
+        Args:
+            tasks_combinations: List of combination dictionaries
+            
+        Returns:
+            Number of combinations created
+        """
         if not tasks_combinations:
             return 0
         
-        # Adiciona work_id para todas as combinações
+        # Add work_id to all combinations
         combinations_with_work_id = []
         for combo in tasks_combinations:
             combo_with_work_id = combo.copy()
             combo_with_work_id['work_id'] = self._work_id
             combinations_with_work_id.append(combo_with_work_id)
         
-        # Usa inserção em lote para melhor performance
+        # Use batch insertion for better performance
         return self._store.combination_bulk_create(combinations_with_work_id)
 
-    def update_combination_status(
-        self,
-        combination_id: int,
-        status: str,
-    ) -> None:
-        """Atualiza o status de uma combinação do work atual."""
+    def update_combination_status(self, *args):
+        """Update the status of a combination in the current work.
+        
+        Supports two call styles for backward compatibility:
+        - update_combination_status(combination_id: int, status: str)
+        - update_combination_status(task_id, dataset_id, preset_id, algorithm_id, status)
+        """
         import time
-        
+
+        # Parse arguments
+        if len(args) == 2 and isinstance(args[0], int):
+            combination_id, status = args
+        elif len(args) == 5:
+            task_id, dataset_id, preset_id, algorithm_id, status = args
+            # Find combination id by composite keys
+            combos, _ = self._store.combination_list(
+                filters={
+                    'work_id': self._work_id,
+                    'task_id': task_id,
+                    'dataset_id': dataset_id,
+                    'preset_id': preset_id,
+                    'algorithm_id': algorithm_id,
+                },
+                limit=1,
+            )
+            if not combos:
+                return
+            combination_id = combos[0]['id']
+        else:
+            raise TypeError("update_combination_status expects (id, status) or (task_id, dataset_id, preset_id, algorithm_id, status)")
+
         fields = {'status': status}
-        
-        # Automatically set timestamps based on status
         current_time = time.time()
         if status == "running":
             fields['started_at'] = current_time
         elif status in ["completed", "failed", "error", "canceled"]:
             fields['finished_at'] = current_time
-            
+
         self._store.combination_update(combination_id, **fields)
 
     def get_next_queued_combination(self) -> Optional[dict[str, Any]]:
-        """Obtém a próxima combinação em fila do work atual."""
+        """Get the next queued combination for the current work.
+        
+        Returns:
+            Next queued combination or None if none available
+        """
         combinations, _ = self._store.combination_list(
             filters={'work_id': self._work_id, 'status': 'queued'},
             limit=1
@@ -122,7 +201,11 @@ class WorkScopedPersistence:
         return combinations[0] if combinations else None
 
     def get_next_pending_combination(self) -> Optional[dict[str, Any]]:
-        """Compat: próxima combinação pendente do work atual."""
+        """Compatibility: get next pending combination for the current work.
+        
+        Returns:
+            Next pending combination or None if none available
+        """
         return self.get_next_queued_combination()
 
     def get_combinations(
@@ -139,7 +222,23 @@ class WorkScopedPersistence:
         limit: Optional[int] = None,
         offset: Optional[int] = None,
     ) -> list[dict[str, Any]]:
-        """Lista combinações do work atual com filtros opcionais."""
+        """List combinations for the current work with optional filters.
+        
+        Args:
+            status: Filter by status
+            task_id: Filter by task ID
+            dataset_id: Filter by dataset ID
+            preset_id: Filter by preset ID
+            algorithm_id: Filter by algorithm ID
+            mode: Filter by mode
+            order_by: Field to order by
+            order_direction: Order direction (ASC/DESC)
+            limit: Maximum number of results
+            offset: Number of results to skip
+            
+        Returns:
+            List of combination dictionaries
+        """
         # Build filters dict
         filters = {'work_id': self._work_id}
         if status is not None:
@@ -167,7 +266,11 @@ class WorkScopedPersistence:
         return results
 
     def init_combination(self) -> bool:
-        """Reinicia combinações em andamento/pausadas/canceladas do work atual para 'queued'."""
+        """Reset running/paused/canceled combinations for the current work to 'queued'.
+        
+        Returns:
+            True if any combinations were reset, False otherwise
+        """
         # Get combinations to reset
         combinations, _ = self._store.combination_list(
             filters={
@@ -185,15 +288,30 @@ class WorkScopedPersistence:
     # === EVENTS ===
     # Work-level events
     def log_warning(self, message: str, context: dict[str, Any] | None = None) -> None:
-        """Log warning for the current work."""
+        """Log warning for the current work.
+        
+        Args:
+            message: Warning message
+            context: Additional context data
+        """
         self.work_warning(message, context)
 
     def log_error(self, error: Exception) -> None:
-        """Log error for the current work."""
+        """Log error for the current work.
+        
+        Args:
+            error: Exception that occurred
+        """
         self.work_error(error)
 
     # Work
     def work_warning(self, message: str, context: dict[str, Any] | None = None) -> None:
+        """Log a work-level warning.
+        
+        Args:
+            message: Warning message
+            context: Additional context data
+        """
         self._store.event_create(
             work_id=self._work_id,
             event_type="warning",
@@ -202,6 +320,11 @@ class WorkScopedPersistence:
         )
 
     def work_error(self, error: Exception) -> None:
+        """Log a work-level error.
+        
+        Args:
+            error: Exception that occurred
+        """
         self._store.event_create(
             work_id=self._work_id,
             event_type="error",
@@ -216,6 +339,13 @@ class WorkScopedPersistence:
     def task_warning(
         self, task_id: str, message: str, context: dict[str, Any] | None = None
     ) -> None:
+        """Log a task-level warning.
+        
+        Args:
+            task_id: Task identifier
+            message: Warning message
+            context: Additional context data
+        """
         self._store.event_create(
             work_id=self._work_id,
             event_type="warning",
@@ -224,6 +354,12 @@ class WorkScopedPersistence:
         )
 
     def task_error(self, task_id: str, error: Exception) -> None:
+        """Log a task-level error.
+        
+        Args:
+            task_id: Task identifier
+            error: Exception that occurred
+        """
         self._store.event_create(
             work_id=self._work_id,
             event_type="error",
@@ -239,6 +375,13 @@ class WorkScopedPersistence:
     def dataset_warning(
         self, dataset_id: str, message: str, context: dict[str, Any] | None = None
     ) -> None:
+        """Log a dataset-level warning.
+        
+        Args:
+            dataset_id: Dataset identifier
+            message: Warning message
+            context: Additional context data
+        """
         self._store.event_create(
             work_id=self._work_id,
             event_type="warning",
@@ -247,6 +390,12 @@ class WorkScopedPersistence:
         )
 
     def dataset_error(self, dataset_id: str, error: Exception) -> None:
+        """Log a dataset-level error.
+        
+        Args:
+            dataset_id: Dataset identifier
+            error: Exception that occurred
+        """
         self._store.event_create(
             work_id=self._work_id,
             event_type="error",
@@ -259,7 +408,13 @@ class WorkScopedPersistence:
         )
 
     def submit_dataset(self, id: str, dataset_obj, meta: dict[str, Any] | None = None) -> None:
-        """Submit a dataset for the current work."""
+        """Submit a dataset for the current work.
+        
+        Args:
+            id: Dataset identifier
+            dataset_obj: Dataset object containing sequences
+            meta: Additional metadata
+        """
         # Create dataset entry with auto-generated ID
         dataset_auto_id = self._store.dataset_create(
             dataset_id=id,
@@ -278,7 +433,14 @@ class WorkScopedPersistence:
                 )
 
     def get_dataset(self, dataset_id: str):
-        """Get a dataset for the current work."""
+        """Get a dataset for the current work.
+        
+        Args:
+            dataset_id: Dataset identifier
+            
+        Returns:
+            Dataset object or None if not found
+        """
         # Find dataset by dataset_id and work_id
         datasets, _ = self._store.dataset_list(
             filters={'dataset_id': dataset_id, 'work_id': self._work_id},
@@ -308,6 +470,13 @@ class WorkScopedPersistence:
     def preset_warning(
         self, preset_id: str, message: str, context: dict[str, Any] | None = None
     ) -> None:
+        """Log a preset-level warning.
+        
+        Args:
+            preset_id: Preset identifier
+            message: Warning message
+            context: Additional context data
+        """
         self._store.event_create(
             work_id=self._work_id,
             event_type="warning",
@@ -316,6 +485,12 @@ class WorkScopedPersistence:
         )
 
     def preset_error(self, preset_id: str, error: Exception) -> None:
+        """Log a preset-level error.
+        
+        Args:
+            preset_id: Preset identifier
+            error: Exception that occurred
+        """
         self._store.event_create(
             work_id=self._work_id,
             event_type="error",
@@ -331,6 +506,13 @@ class WorkScopedPersistence:
     def combination_warning(
         self, combination_id: str, message: str, context: dict[str, Any] | None = None
     ) -> None:
+        """Log a combination-level warning.
+        
+        Args:
+            combination_id: Combination identifier
+            message: Warning message
+            context: Additional context data
+        """
         self._store.event_create(
             work_id=self._work_id,
             event_type="warning",
@@ -339,6 +521,12 @@ class WorkScopedPersistence:
         )
 
     def combination_error(self, combination_id: str, error: Exception) -> None:
+        """Log a combination-level error.
+        
+        Args:
+            combination_id: Combination identifier
+            error: Exception that occurred
+        """
         self._store.event_create(
             work_id=self._work_id,
             event_type="error",
@@ -354,6 +542,13 @@ class WorkScopedPersistence:
     def unit_warning(
         self, unit_id: str, message: str, context: dict[str, Any] | None = None
     ) -> None:
+        """Log a unit-level warning.
+        
+        Args:
+            unit_id: Unit identifier
+            message: Warning message
+            context: Additional context data
+        """
         self._store.event_create(
             work_id=self._work_id,
             event_type="warning",
@@ -362,6 +557,12 @@ class WorkScopedPersistence:
         )
 
     def unit_error(self, unit_id: str, error: Exception) -> None:
+        """Log a unit-level error.
+        
+        Args:
+            unit_id: Unit identifier
+            error: Exception that occurred
+        """
         self._store.event_create(
             work_id=self._work_id,
             event_type="error",
@@ -373,7 +574,7 @@ class WorkScopedPersistence:
             }
         )
 
-    # Genérico
+    # Generic
     def generic_event(
         self,
         unit_id: str,
@@ -381,6 +582,14 @@ class WorkScopedPersistence:
         message: str,
         context: dict[str, Any] | None = None,
     ) -> None:
+        """Log a generic unit-level event.
+        
+        Args:
+            unit_id: Unit identifier
+            event_type: Type of event
+            message: Event message
+            context: Additional context data
+        """
         self._store.event_create(
             work_id=self._work_id,
             event_type=event_type,
@@ -388,7 +597,7 @@ class WorkScopedPersistence:
             entity_data={"unit_id": unit_id, "message": message, **(context or {})}
         )
 
-    # Consultas de eventos
+    # Event queries
     def get_events(
         self,
         *,
@@ -397,6 +606,17 @@ class WorkScopedPersistence:
         unit_id: str | None = None,
         limit: int = 100,
     ) -> list[dict[str, Any]]:
+        """Get events for the current work with optional filters.
+        
+        Args:
+            event_category: Filter by event category
+            event_type: Filter by event type
+            unit_id: Filter by unit ID
+            limit: Maximum number of events to return
+            
+        Returns:
+            List of event dictionaries
+        """
         filters = {'work_id': self._work_id}
         if event_category:
             filters['event_category'] = event_category
@@ -417,19 +637,51 @@ class WorkScopedPersistence:
     def get_events_by_category(
         self, event_category: str, limit: int = 100
     ) -> list[dict[str, Any]]:
+        """Get events for the current work filtered by category.
+        
+        Args:
+            event_category: Event category to filter by
+            limit: Maximum number of events to return
+            
+        Returns:
+            List of event dictionaries
+        """
         return self.get_events(event_category=event_category, limit=limit)
 
     def get_warnings(
         self, event_category: str | None = None, limit: int = 100
     ) -> list[dict[str, Any]]:
+        """Get warning events for the current work.
+        
+        Args:
+            event_category: Optional category filter
+            limit: Maximum number of warnings to return
+            
+        Returns:
+            List of warning event dictionaries
+        """
         return self.get_events(event_type="warning", event_category=event_category, limit=limit)
 
     def get_errors(
         self, event_category: str | None = None, limit: int = 100
     ) -> list[dict[str, Any]]:
+        """Get error events for the current work.
+        
+        Args:
+            event_category: Optional category filter
+            limit: Maximum number of errors to return
+            
+        Returns:
+            List of error event dictionaries
+        """
         return self.get_events(event_type="error", event_category=event_category, limit=limit)
 
     def get_event_summary_by_category(self) -> dict[str, dict[str, int]]:
+        """Get event summary grouped by category and type.
+        
+        Returns:
+            Dictionary with event counts by category and type
+        """
         # Get all events for this work
         events, _ = self._store.event_list(
             filters={'work_id': self._work_id},
@@ -452,8 +704,7 @@ class WorkScopedPersistence:
 
     # === FACTORY METHODS ===
     def for_combination(self, combination_id: int) -> "CombinationScopedPersistence":
-        """
-        Create a CombinationScopedPersistence for the specified combination within this work.
+        """Create a CombinationScopedPersistence for the specified combination within this work.
         
         Args:
             combination_id: ID of the combination
@@ -479,8 +730,7 @@ class WorkScopedPersistence:
         return CombinationScopedPersistence(combination_id, self._store)
 
     def for_execution(self, unit_id: str) -> "ExecutionScopedPersistence":
-        """
-        Create an ExecutionScopedPersistence for the specified execution unit within this work.
+        """Create an ExecutionScopedPersistence for the specified execution unit within this work.
         
         Args:
             unit_id: ID of the execution unit
@@ -496,8 +746,7 @@ class WorkScopedPersistence:
         return ExecutionScopedPersistence(unit_id, self._work_id, self._store)
 
     def get_all_combinations(self) -> list["CombinationScopedPersistence"]:
-        """
-        Get all combinations in this work as CombinationScopedPersistence instances.
+        """Get all combinations in this work as CombinationScopedPersistence instances.
         
         Returns:
             List of CombinationScopedPersistence instances
@@ -506,8 +755,7 @@ class WorkScopedPersistence:
         return [self.for_combination(combo["id"]) for combo in combinations]
 
     def get_all_executions(self) -> list["ExecutionScopedPersistence"]:
-        """
-        Get all executions in this work as ExecutionScopedPersistence instances.
+        """Get all executions in this work as ExecutionScopedPersistence instances.
         
         Returns:
             List of ExecutionScopedPersistence instances
@@ -527,8 +775,7 @@ class WorkScopedPersistence:
         return all_executions
 
     def get_running_executions(self) -> list[dict[str, Any]]:
-        """
-        Get all executions that are currently in 'running' status.
+        """Get all executions that are currently in 'running' status.
         
         Returns:
             List of execution dictionaries for executions in running status
@@ -547,13 +794,12 @@ class WorkScopedPersistence:
         
         return running_executions
 
-    # === Limpeza de Progresso ===
+    # === Progress Cleanup ===
     def clear_progress_for_non_finalized_executions(self) -> int:
-        """
-        Limpa entradas de progresso de todas as execuções não finalizadas deste trabalho.
+        """Clear progress entries for all non-finalized executions in this work.
         
         Returns:
-            Número de entradas de progresso removidas
+            Number of progress entries removed
         """
         return self._store.execution_progress_clear_for_non_finalized(
             work_id=self._work_id

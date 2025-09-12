@@ -26,6 +26,56 @@
             }
         },
         {
+            "label": "Generate Docs",
+            "type": "shell",
+            "command": "${workspaceFolder}/.venv/bin/python",
+            "args": [
+                "scripts/generate_docs.py"
+            ],
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": [],
+            "options": {
+                "cwd": "${workspaceFolder}",
+                "env": {
+                    "PYTHONPATH": "${workspaceFolder}",
+                    "PYTHONDONTWRITEBYTECODE": "1"
+                }
+            }
+        },
+        {
+            "label": "Serve Docs",
+            "type": "shell",
+            "command": "${workspaceFolder}/.venv/bin/python",
+            "args": [
+                "scripts/generate_docs.py",
+                "--serve",
+                "--port",
+                "8081"
+            ],
+            "group": "build",
+            "isBackground": true,
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": [],
+            "options": {
+                "cwd": "${workspaceFolder}",
+                "env": {
+                    "PYTHONPATH": "${workspaceFolder}",
+                    "PYTHONDONTWRITEBYTECODE": "1"
+                }
+            }
+        },
+        {
             "label": "Run Tests",
             "type": "shell",
             "command": "${workspaceFolder}/.venv/bin/python",

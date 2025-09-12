@@ -9,10 +9,10 @@ This service acts as a facade that coordinates between different dataset
 providers and ensures consistent dataset loading across the application.
 
 Features:
-- Synthetic dataset generation with configurable parameters
-- File-based dataset loading with DATASET_DIRECTORY support
-- External database integration (Entrez)
-- Consistent return format (Dataset, parameters)
+    - Synthetic dataset generation with configurable parameters
+    - File-based dataset loading with DATASET_DIRECTORY support
+    - External database integration (Entrez)
+    - Consistent return format (Dataset, parameters)
 
 Public API:
     load_dataset(cfg) -> tuple[Dataset, dict]
@@ -37,25 +37,25 @@ from src.infrastructure.persistence.dataset_repository import FileDatasetReposit
 
 def load_dataset(cfg: DatasetAny) -> tuple[Dataset, dict]:
     """
-    Load/generate a Dataset from a DatasetConfig.
+    Load or generate a Dataset from a DatasetConfig.
     
     This is the main entry point for dataset loading. It dispatches
     to the appropriate loader based on the configuration type.
     
     Args:
-        cfg: Dataset configuration specifying type and parameters
+        cfg (DatasetAny): Dataset configuration specifying type and parameters.
         
     Returns:
-        tuple: (Dataset object, parameters dict)
-            - Dataset: Loaded or generated dataset
+        Tuple[Dataset, dict]: A tuple containing:
+            - Dataset: Loaded or generated dataset object
             - dict: Parameters used for loading/generation
             
     Raises:
-        TypeError: If dataset configuration type is not supported
+        TypeError: If dataset configuration type is not supported.
         
     Supported Types:
         - SyntheticDatasetConfig: Generates synthetic data
-        - FileDatasetConfig: Loads from file system
+        - FileDatasetConfig: Loads from file system  
         - EntrezDatasetConfig: Downloads from NCBI Entrez
     """
     if isinstance(cfg, SyntheticDatasetConfig):

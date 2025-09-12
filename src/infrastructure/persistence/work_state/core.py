@@ -51,6 +51,20 @@ class WorkPersistence(
     - Connection pooling for performance
     - Proper transaction management
     - Automatic session cleanup
+
+    Attributes:
+        _logger: Logger instance for this class
+        _local: Thread-local storage
+        _database_url: Database connection URL
+        _engine: SQLAlchemy engine instance
+        _session_factory: Scoped session factory
+
+    Example:
+        >>> persistence = WorkPersistence("sqlite:///work.db")
+        >>> with persistence.session_scope() as session:
+        ...     work = Work(...)
+        ...     session.add(work)
+        >>> persistence.close()
     """
 
     def __init__(self, database_url: Optional[str] = None):
@@ -60,6 +74,10 @@ class WorkPersistence(
         Args:
             database_url: Database URL. If None, will try to get from environment
                          or use default SQLite path.
+                         
+        Raises:
+            ValueError: If database URL is invalid
+            ConnectionError: If database connection fails
         """
         self._logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}")
         self._local = threading.local()
@@ -84,7 +102,22 @@ class WorkPersistence(
         self._logger.info(f"Initialized SQLAlchemy persistence with URL: {database_url}")
 
     def _create_engine(self, database_url: str):
-        """Create SQLAlchemy engine with appropriate configuration."""
+        """
+        Create SQLAlchemy engine with appropriate configuration.
+        
+        Configures engine based on database type (SQLite, PostgreSQL, etc.)
+        with optimal settings for concurrency and performance.
+        
+        Args:
+            database_url: Database connection URL
+            
+        Returns:
+            Engine: Configured SQLAlchemy engine
+            
+        Note:
+            SQLite databases get WAL mode and busy timeout configuration.
+            Other databases get connection pooling configuration.
+        """
         engine_kwargs = {
             'echo': False,  # Set to True for SQL debugging
             'future': True,  # Use SQLAlchemy 2.0+ features
@@ -121,7 +154,18 @@ class WorkPersistence(
         return engine
 
     def _configure_sqlite_pragmas(self, engine) -> None:
-        """Configure SQLite pragmas for better concurrency and performance."""
+        """
+        Configure SQLite pragmas for better concurrency and performance.
+        
+        Sets up event listeners to configure SQLite-specific settings:
+        - WAL mode for better concurrency
+        - Normal synchronous mode for performance
+        - Foreign key constraints enabled
+        - Busy timeout for locked database handling
+        
+        Args:
+            engine: SQLAlchemy engine for SQLite database
+        """
         @event.listens_for(engine, "connect")
         def set_sqlite_pragma(dbapi_connection, connection_record):
             """Configure SQLite for better concurrency and performance."""
@@ -137,7 +181,17 @@ class WorkPersistence(
             cursor.close()
 
     def _get_database_url(self) -> str:
-        """Get database URL from environment or use default."""
+        """
+        Get database URL from environment or use default.
+        
+        Checks environment variables in order:
+        1. DB_URL - Full database URL
+        2. DB_PATH - Path for SQLite database
+        3. Default to 'work_state.db' in current directory
+        
+        Returns:
+            str: Database connection URL
+        """
         # Try environment variables first
         db_url = os.getenv('DB_URL')
         if db_url:
@@ -148,7 +202,12 @@ class WorkPersistence(
         return f"sqlite:///{db_path}"
 
     def _init_schema(self) -> None:
-        """Initialize database schema."""
+        """
+        Initialize database schema.
+        
+        Creates all tables defined in the Base metadata if they don't exist.
+        This is safe to call multiple times.
+        """
         Base.metadata.create_all(self._engine)
 
     def get_session(self) -> Session:
@@ -156,6 +215,14 @@ class WorkPersistence(
         Get a new database session.
         
         Returns a scoped session that is thread-safe and properly managed.
+        The session is tied to the current thread and will be reused for
+        subsequent calls within the same thread.
+        
+        Returns:
+            Session: Thread-scoped SQLAlchemy session
+            
+        Note:
+            Use session_scope() context manager for automatic transaction management.
         """
         return self._session_factory()
     
@@ -163,7 +230,15 @@ class WorkPersistence(
         """
         Get a new session instance (for testing purposes).
         
-        This creates a new unscoped session instance.
+        This creates a new unscoped session instance that is not tied to
+        the thread-local scoped session factory. Useful for testing scenarios
+        where you need fresh sessions.
+        
+        Returns:
+            Session: New SQLAlchemy session instance
+            
+        Warning:
+            Remember to close this session manually when done.
         """
         return sessionmaker(bind=self._engine)()
 
@@ -175,11 +250,17 @@ class WorkPersistence(
         This is the recommended way to handle database operations as it
         ensures proper transaction management and cleanup.
         
-        Usage:
-            with persistence.session_scope() as session:
-                work = Work(...)
-                session.add(work)
-                # Automatic commit on success, rollback on exception
+        Yields:
+            Session: Database session within transaction scope
+            
+        Raises:
+            Exception: Any exception raised within the context will cause rollback
+            
+        Example:
+            >>> with persistence.session_scope() as session:
+            ...     work = Work(...)
+            ...     session.add(work)
+            ...     # Automatic commit on success, rollback on exception
         """
         session = self.get_session()
         try:
@@ -192,15 +273,34 @@ class WorkPersistence(
             session.close()
 
     def __enter__(self):
-        """Context manager entry."""
+        """
+        Context manager entry.
+        
+        Returns:
+            WorkPersistence: Self instance for context manager protocol
+        """
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        """Context manager exit."""
+        """
+        Context manager exit.
+        
+        Ensures proper cleanup of resources when exiting context.
+        
+        Args:
+            exc_type: Exception type if exception occurred
+            exc_val: Exception value if exception occurred  
+            exc_tb: Exception traceback if exception occurred
+        """
         self.close()
 
     def close(self):
-        """Close the database engine and clean up resources."""
+        """
+        Close the database engine and clean up resources.
+        
+        Removes scoped sessions and disposes of the engine connection pool.
+        Call this when shutting down the application to ensure clean resource cleanup.
+        """
         if hasattr(self, '_session_factory'):
             self._session_factory.remove()
             
@@ -208,13 +308,22 @@ class WorkPersistence(
             self._engine.dispose()
 
     # === COMPATIBILITY METHODS ===
-    # Métodos para compatibilidade com wrappers que esperam métodos específicos
+    # Methods for compatibility with wrappers that expect specific methods
     
     def combination_error(self, work_id: str, combination_id: str, error: Exception) -> None:
         """
-        Registra um erro de combinação como evento.
+        Register a combination error as an event.
         
-        Método de compatibilidade para wrappers CombinationScopedPersistence.
+        Compatibility method for CombinationScopedPersistence wrappers.
+        Creates an error event associated with the combination for tracking purposes.
+        
+        Args:
+            work_id: Work identifier
+            combination_id: Combination identifier where error occurred
+            error: Exception that occurred during combination processing
+            
+        Note:
+            This method provides backward compatibility with existing wrapper interfaces.
         """
         self.event_create(
             work_id=work_id,
@@ -229,13 +338,17 @@ class WorkPersistence(
 
     def clear_all_progress_for_non_finalized_executions(self) -> int:
         """
-        Limpa entradas de progresso de todas as execuções não finalizadas em todo o sistema.
+        Clear progress entries for all non-finalized executions system-wide.
         
-        Este método remove todas as entradas de progresso de execuções que não estão finalizadas
-        (status: 'queued', 'running', 'paused').
+        Removes all progress entries for executions that are not finalized
+        (status: 'queued', 'running', 'paused') across all works in the system.
         
         Returns:
-            Número total de entradas de progresso removidas
+            int: Total number of progress entries removed
+            
+        Note:
+            This is a system-wide cleanup operation that affects all works.
+            Use with caution in multi-work environments.
         """
         return self.execution_progress_clear_for_non_finalized()
 

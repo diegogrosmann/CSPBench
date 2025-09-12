@@ -637,7 +637,55 @@
 {% block extra_js %}
 <script>
   // === Variáveis Globais ===
-  const ITEMS_PER_PAGE = 10; // Mantido apenas para Events
+  const ITEMS_PER_PAGE = 10;
+
+  // === Scheduler de DOM Assíncrono (coalescente) ===
+  const DOMScheduler = (() => {
+    const jobs = new Map(); // key -> fn
+    let scheduled = false;
+    let lastRun = 0;
+    const minIntervalMs = 50; // limita ~20fps para reduzir carga
+
+    function flush() {
+      scheduled = false;
+      const now = performance.now();
+      const delay = Math.max(0, minIntervalMs - (now - lastRun));
+      setTimeout(() => {
+        requestAnimationFrame(() => {
+          lastRun = performance.now();
+          const pending = Array.from(jobs.values());
+          jobs.clear();
+          for (const fn of pending) {
+            try { fn(); } catch (e) { console.warn('DOMScheduler job error:', e); }
+          }
+        });
+      }, delay);
+    }
+
+    return {
+      schedule(key, fn) {
+        jobs.set(key, fn);
+        if (!scheduled) {
+          scheduled = true;
+          flush();
+        }
+      }
+    };
+  })();
+
+  // Wrappers para renderizações pesadas (globais, apenas para funções globais)
+  function scheduleRenderExecutionsTable() {
+    DOMScheduler.schedule('executionsTable', () => {
+      renderExecutionsTable();
+    });
+  }
+
+  function scheduleRenderEvents() {
+    DOMScheduler.schedule('eventsRender', () => {
+      renderEventsPagination();
+      renderEventsTable();
+    });
+  }
 
   let allExecutions = [];
   let filteredExecutions = [];
@@ -680,17 +728,15 @@
 
     console.log('Dados de teste adicionados:', { executions: allExecutions.length, events: allEvents.length });
 
-    // Renderizar dados de teste imediatamente
-    renderExecutionsTable();
-    renderEventsPagination();
-    renderEventsTable();
+    // Renderizar dados de teste imediatamente (agendado)
+    scheduleRenderExecutionsTable();
+    scheduleRenderEvents();
   }
 
   // Chamar função de teste na inicialização (comentar para usar dados reais)
   // addTestData();
 
-  // === Funções Globais de Paginação ===
-  // Funções de formatação (movidas para escopo global)
+  // === Funções Globais de Paginação/Render ===
   function formatStatusBadge(status) {
     const map = { running: 'primary', completed: 'success', queued: 'info', failed: 'danger', error: 'danger', paused: 'warning' };
     const cls = map[status] || 'secondary';
@@ -882,16 +928,16 @@
     let wsRetry = 0;
     const CIRCUMFERENCE = 2 * Math.PI * 60; // r=60
 
-    // Dados de execuções - agora recebemos todas do backend
-    let allCombinations = []; // todas as combinações
+    // Execuções/combo
+    let allCombinations = [];
     let filteredEvents = [];
-    let currentCombinationId = null; // combinação que está executando
+    let currentCombinationId = null;
 
-    // Controles de filtro
-    let selectedCombinationId = null; // combinação selecionada no dropdown
-    let autoFollow = true; // se deve seguir a execução atual automaticamente
+    // Filtros
+    let selectedCombinationId = null;
+    let autoFollow = true;
 
-    // Utilitários
+    // Utils locais (mantidos)
     function formatStatusBadge(status) {
       const map = { running: 'primary', completed: 'success', queued: 'info', failed: 'danger', error: 'danger', paused: 'warning' };
       const cls = map[status] || 'secondary';
@@ -907,7 +953,7 @@
       return str.replace(/[&<>'"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", "\"": "&quot;" }[c]));
     }
 
-    // Buscar status do work
+    // Funções de API
     async function fetchWorkStatus() {
       try {
         const resp = await fetch(`/api/monitor/work/${WORK_ID}/status`);
@@ -935,6 +981,7 @@
       } catch (_) { /* ignore */ }
     }
 
+    // Funções de UI
     function updateStatusBadge(status) {
       if (!els.statusBadge) return;
       const map = {
@@ -952,12 +999,6 @@
       // Atualizar visibilidade dos botões de controle
       updateWorkActionButtons(status);
     }
-
-
-
-
-
-
 
     function updateStartTime() {
       if (!workStatusCache || !els.startTime) return;
@@ -1215,6 +1256,7 @@
       return stats;
     }
 
+    // Corrigido: renderExecutions sem variáveis indefinidas e auto-scroll assíncrono
     function renderExecutions(executions, stats) {
       // Atualizar estatísticas
       if (els.statRunning) els.statRunning.textContent = stats.Running || 0;
@@ -1232,51 +1274,26 @@
       }
       if (els.comboProgressLabel) els.comboProgressLabel.textContent = `${done}/${tot}`;
 
-      // Renderizar tabela
-      const tbody = document.getElementById('executionsTableBody');
-      if (!tbody) return;
+      // Render da tabela (assíncrono/coalescente)
+      DOMScheduler.schedule('executionsTable', () => renderExecutionsTable());
 
-      tbody.innerHTML = '';
-
-      if (!executions.length) {
-        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4"><i class="bi bi-inbox me-1"></i>Nenhuma execução encontrada</td></tr>';
-        return;
-      }
-
-      // Ordenar execuções por sequência
-      const sortedExecutions = [...executions].sort((a, b) => (a.sequencia || 0) - (b.sequencia || 0));
-
-      // Renderizar tabela usando a função global para consistência
-      renderExecutionsTable();
-
-      // Auto-scroll para execução em andamento se auto-follow estiver ativo
+      // Auto-scroll após render (assíncrono)
       if (autoFollow && currentCombinationId && selectedCombinationId === currentCombinationId) {
-        // Procurar por execução em andamento (running)
-        const runningExecution = sortedExecutions.find(exec => exec.status === 'running');
-        if (runningExecution) {
-          // Encontrar a linha correspondente na tabela
-          const rows = tbody.querySelectorAll('tr');
-          for (let i = 0; i < rows.length; i++) {
-            if (rows[i].classList.contains('table-info')) {
-              // Fazer scroll suave para a execução em andamento
-              const container = document.getElementById('executionsContainer');
-              if (container) {
-                const rowTop = rows[i].offsetTop;
-                const containerHeight = container.clientHeight;
-                const scrollTop = rowTop - (containerHeight / 2) + (rows[i].offsetHeight / 2);
-                container.scrollTo({
-                  top: Math.max(0, scrollTop),
-                  behavior: 'smooth'
-                });
-              }
-              break;
-            }
+        DOMScheduler.schedule('executionsAutoscroll', () => {
+          const container = document.getElementById('executionsContainer');
+          const tbody = document.getElementById('executionsTableBody');
+          if (!container || !tbody) return;
+          const runningRow = tbody.querySelector('tr.table-info');
+          if (runningRow) {
+            const rowTop = runningRow.offsetTop;
+            const containerHeight = container.clientHeight;
+            const scrollTop = rowTop - (containerHeight / 2) + (runningRow.offsetHeight / 2);
+            container.scrollTo({ top: Math.max(0, scrollTop), behavior: 'smooth' });
           }
-        }
+        });
       }
     }
 
-    // Merge parcial de dados de progresso
     function mergePartialProgress(partial) {
       if (!progressCache) return;
 
@@ -1321,7 +1338,7 @@
       });
     }
 
-    // WebSocket
+    // WebSocket - usando DOMScheduler diretamente
     function initWebSocket() {
       try {
         const scheme = location.protocol === 'https:' ? 'wss' : 'ws';
@@ -1330,78 +1347,119 @@
 
         ws.onopen = () => {
           wsRetry = 0;
-          console.log('WebSocket conectado');
+          console.log('[WEBSOCKET] 🟢 WebSocket conectado para work:', WORK_ID, 'timestamp:', new Date().toISOString());
         };
 
         ws.onmessage = (evt) => {
           try {
             const msg = JSON.parse(evt.data);
+            console.log('[WEBSOCKET] 📨 Mensagem recebida:', {
+              type: msg.type,
+              work_id: msg.work_id,
+              timestamp: new Date().toISOString(),
+              message_timestamp: msg.timestamp ? new Date(msg.timestamp * 1000).toISOString() : null,
+              payload_keys: msg.payload ? Object.keys(msg.payload) : null
+            });
 
             if (msg.type === 'snapshot') {
-              // Snapshot inicial com todos os dados
               if (msg.payload?.progress) {
-                applyProgress(msg.payload.progress);
+                DOMScheduler.schedule('applyProgress', () => applyProgress(msg.payload.progress));
               }
               if (msg.payload?.executions) {
                 allExecutions = msg.payload.executions;
-                filterAndRenderExecutions();
+                DOMScheduler.schedule('executions', () => filterAndRenderExecutions());
               }
               if (msg.payload?.combinations) {
                 allCombinations = msg.payload.combinations;
-                updateCombinationSelect();
+                DOMScheduler.schedule('comboSelect', () => updateCombinationSelect());
               }
               if (msg.payload?.events) {
                 window.eventsManager?.setEvents(msg.payload.events);
               }
             } else if (msg.type === 'update') {
-              // Atualizações incrementais
               if (msg.payload?.progress || msg.update?.progress) {
                 const progressUpdate = msg.payload?.progress || msg.update?.progress;
-                mergePartialProgress(progressUpdate);
+                DOMScheduler.schedule('mergeProgress', () => mergePartialProgress(progressUpdate));
               }
               if (msg.payload?.executions || msg.update?.executions) {
-                // Atualização das execuções - merge com existentes
                 const newExecutions = msg.payload?.executions || msg.update?.executions;
-                mergeExecutions(newExecutions);
-                filterAndRenderExecutions();
+                DOMScheduler.schedule('mergeExecutions', () => {
+                  mergeExecutions(newExecutions);
+                  filterAndRenderExecutions();
+                });
               }
               if (msg.payload?.combinations || msg.update?.combinations) {
                 allCombinations = msg.payload?.combinations || msg.update?.combinations;
-                updateCombinationSelect();
+                DOMScheduler.schedule('comboSelect', () => updateCombinationSelect());
               }
               if (msg.payload?.events_appended || msg.update?.events_appended) {
                 const newEvents = msg.payload?.events_appended || msg.update?.events_appended;
                 window.eventsManager?.addEvents(newEvents);
               }
             } else if (msg.type === 'event') {
-              // Eventos do sistema
               if (msg.payload?.event_type === 'work_status_changed') {
+                const oldStatus = msg.payload.old_status;
                 const newStatus = msg.payload.new_status;
-                console.log(`Status do work mudou para: ${newStatus}`);
+                console.log('[WEBSOCKET] 🔄 Status do work mudou:', {
+                  old_status: oldStatus,
+                  new_status: newStatus,
+                  timestamp: new Date().toISOString(),
+                  message_timestamp: msg.timestamp ? new Date(msg.timestamp * 1000).toISOString() : null,
+                  work_id: WORK_ID
+                });
 
-                // Atualizar cache de status
+                // Verificar se é um status final
+                const finalStatuses = ['completed', 'failed', 'cancelled', 'error'];
+                if (finalStatuses.includes(newStatus)) {
+                  console.log('[WEBSOCKET] ⚠️ Status final detectado:', newStatus, '- WebSocket pode ser fechado em breve');
+                }
+
                 if (workStatusCache) {
                   workStatusCache.status = newStatus;
                   workStatusCache.updated_at = msg.timestamp || Date.now() / 1000;
                 }
 
-                // Atualizar interface
                 updateStatusBadge(newStatus);
                 updateStartTime();
               }
             }
           } catch (e) {
-            console.warn('Erro ao processar mensagem WebSocket:', e);
+            console.error('[WEBSOCKET] ❌ Erro ao processar mensagem WebSocket:', e, 'dados:', evt.data);
           }
         };
 
-        ws.onclose = () => {
-          console.log('WebSocket desconectado');
+        ws.onclose = (event) => {
+          console.log('[WEBSOCKET] 🔴 WebSocket desconectado:', {
+            code: event.code,
+            reason: event.reason || 'Sem razão específica',
+            wasClean: event.wasClean,
+            timestamp: new Date().toISOString(),
+            work_id: WORK_ID,
+            retry_count: wsRetry
+          });
+
+          // Códigos de fechamento mais comuns:
+          // 1000 = Normal closure
+          // 1001 = Going away (e.g., server shutdown, browser navigation)
+          // 1006 = Abnormal closure (no close frame received)
+          if (event.code === 1000) {
+            console.log('[WEBSOCKET] ℹ️ Fechamento normal - provavelmente trabalho finalizado');
+          } else if (event.code === 1001) {
+            console.log('[WEBSOCKET] ⚠️ Servidor indo embora ou navegação');
+          } else if (event.code === 1006) {
+            console.log('[WEBSOCKET] ⚠️ Fechamento anormal - conexão perdida');
+          }
+
           scheduleReconnect();
         };
 
         ws.onerror = (err) => {
-          console.warn('Erro no WebSocket:', err);
+          console.error('[WEBSOCKET] ❌ Erro no WebSocket:', {
+            error: err,
+            timestamp: new Date().toISOString(),
+            work_id: WORK_ID,
+            readyState: ws?.readyState
+          });
           try { ws.close(); } catch (_) { }
         };
       } catch (err) {
@@ -1411,12 +1469,15 @@
     }
 
     function scheduleReconnect() {
-      if (wsRetry > 6) return;
+      if (wsRetry > 6) {
+        console.log('[WEBSOCKET] ⛔ Máximo de tentativas de reconexão atingido (6)');
+        return;
+      }
       const delay = Math.min(10000, 500 * Math.pow(2, wsRetry++));
+      console.log('[WEBSOCKET] 🔄 Agendando reconexão em', delay, 'ms (tentativa', wsRetry, 'de 6)');
       setTimeout(initWebSocket, delay);
     }
 
-    // Event listeners
     function setupEventListeners() {
       // Dropdown de combinações
       els.comboSelect?.addEventListener('change', (e) => {
@@ -1573,18 +1634,15 @@
 
       if (!filteredEvents.length) {
         eventElements.tableBody.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-4"><i class="bi bi-inbox me-1"></i>Nenhum evento encontrado</td></tr>';
-        renderEventsPagination();
+        DOMScheduler.schedule('eventsPagination', () => renderEventsPagination());
         return;
       }
 
       // Ordenar por timestamp (mais novos primeiro)
       const sortedEvents = [...filteredEvents].sort((a, b) => b.timestamp - a.timestamp);
 
-      // Renderizar tabela usando a função global para consistência
-      renderEventsTable();
-
-      // Renderizar paginação
-      renderEventsPagination();
+      // Renderizar tabelas e paginação (agendado)
+      scheduleRenderEvents();
     }
 
     function updateStatistics() {

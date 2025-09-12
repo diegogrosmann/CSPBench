@@ -1,4 +1,12 @@
-"""CRUD mixins package for work state persistence."""
+"""CRUD mixins package for work state persistence.
+
+This module provides a collection of mixin classes that implement CRUD operations
+for different entities in the work state persistence layer. Each mixin focuses
+on operations for a specific database table or domain concept.
+
+The mixins can be combined to create a complete persistence layer by multiple
+inheritance, providing a modular and maintainable approach to database operations.
+"""
 
 from .work_mixin import WorkCRUDMixin
 from .combination_mixin import CombinationCRUDMixin

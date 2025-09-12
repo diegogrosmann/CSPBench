@@ -25,7 +25,7 @@ class WebSocketServer:
     async def handle_work_monitor(self, websocket: WebSocket, work_id: str) -> None:
         """Handle WebSocket connection for work monitoring."""
         await websocket.accept()
-        logger.info(f"WebSocket connected for work monitoring: {work_id}")
+        logger.info(f"[WEBSOCKET] 🟢 WebSocket conectado para monitoramento do work: {work_id}")
 
         # Create message queue for this connection
         message_queue = asyncio.Queue()
@@ -65,10 +65,10 @@ class WebSocketServer:
                 websocket, message_queue, session, work_id
             )
 
-        except WebSocketDisconnect:
-            logger.info(f"WebSocket disconnected for work: {work_id}")
+        except WebSocketDisconnect as e:
+            logger.info(f"[WEBSOCKET] 🔴 WebSocket desconectado para work {work_id}: code={e.code}, reason='{e.reason}'")
         except Exception as e:
-            logger.error(f"WebSocket error for work {work_id}: {e}")
+            logger.error(f"[WEBSOCKET] ❌ Erro no WebSocket para work {work_id}: {e}")
             try:
                 await websocket.send_json(
                     {
@@ -84,9 +84,12 @@ class WebSocketServer:
             # Clean up
             try:
                 if "session" in locals():
+                    logger.info(f"[WEBSOCKET] 🧹 Limpando subscriber para work {work_id}")
                     await session.remove_subscriber(message_queue)
+                else:
+                    logger.warning(f"[WEBSOCKET] ⚠️ Session não encontrada durante cleanup para work {work_id}")
             except Exception as e:
-                logger.error(f"Error during WebSocket cleanup: {e}")
+                logger.error(f"[WEBSOCKET] ❌ Erro durante cleanup do WebSocket para work {work_id}: {e}")
 
     async def _handle_websocket_communication(
         self, websocket: WebSocket, message_queue: asyncio.Queue, session, work_id: str
@@ -95,12 +98,29 @@ class WebSocketServer:
 
         async def send_messages():
             """Send messages from queue to WebSocket."""
+            import json
+            message_count = 0
             try:
+                logger.debug(f"[WEBSOCKET] 📤 Iniciando loop de envio de mensagens para work {work_id}")
                 while True:
                     message = await message_queue.get()
+                    message_count += 1
+                    
+                    # Log detalhado para mensagens importantes
+                    try:
+                        parsed_msg = json.loads(message)
+                        msg_type = parsed_msg.get('type', 'unknown')
+                        if msg_type in ['event', 'error'] or message_count % 10 == 0:  # Log eventos importantes ou a cada 10 mensagens
+                            logger.debug(f"[WEBSOCKET] 📨 Enviando mensagem #{message_count} tipo '{msg_type}' para work {work_id}")
+                    except:
+                        pass
+                    
                     await websocket.send_text(message)
+            except WebSocketDisconnect as e:
+                logger.info(f"[WEBSOCKET] 🔌 Cliente desconectou durante envio para work {work_id} (msg #{message_count}): code={e.code}, reason='{e.reason}'")
+                raise  # Re-raise to be handled by the main task handler
             except Exception as e:
-                logger.debug(f"Send messages loop ended for work {work_id}: {e}")
+                logger.info(f"[WEBSOCKET] 📤 Loop de envio finalizado para work {work_id} após {message_count} mensagens: {e}")
 
         async def receive_messages():
             """Receive messages from client (heartbeat / control)."""
@@ -165,8 +185,9 @@ class WebSocketServer:
                         except Exception as e:
                             logger.warning(f"Failed {action} action: {e}")
                     # futuro: ping, pause stream, etc.
-            except WebSocketDisconnect:
-                raise
+            except WebSocketDisconnect as e:
+                logger.debug(f"Client disconnected from work {work_id}: code={e.code}, reason='{e.reason}'")
+                raise  # Re-raise to be handled by the main task handler
             except Exception as e:
                 logger.debug(f"Receive messages loop ended for work {work_id}: {e}")
 
@@ -188,11 +209,36 @@ class WebSocketServer:
                 except asyncio.CancelledError:
                     pass
 
+            # Check for exceptions in completed tasks
+            for task in done:
+                try:
+                    task.result()  # This will re-raise any exception that occurred
+                except WebSocketDisconnect as e:
+                    logger.debug(f"WebSocket disconnected for work {work_id}: code={e.code}, reason='{e.reason}'")
+                    # This is expected behavior, don't re-raise
+                    break
+                except Exception as e:
+                    logger.error(f"Task exception for work {work_id}: {e}")
+                    raise
+
+        except WebSocketDisconnect as e:
+            logger.debug(f"WebSocket disconnected for work {work_id}: code={e.code}, reason='{e.reason}'")
+            # Cancel both tasks gracefully
+            send_task.cancel()
+            receive_task.cancel()
+            try:
+                await asyncio.gather(send_task, receive_task, return_exceptions=True)
+            except Exception:
+                pass  # Ignore cancellation exceptions
         except Exception as e:
             logger.error(f"Error in WebSocket communication for work {work_id}: {e}")
             # Cancel both tasks
             send_task.cancel()
             receive_task.cancel()
+            try:
+                await asyncio.gather(send_task, receive_task, return_exceptions=True)
+            except Exception:
+                pass  # Ignore cancellation exceptions
             raise
 
     def _get_work_details(self, work_id: str) -> Optional[Any]:

@@ -1,22 +1,21 @@
 """Persistence wrapper classes.
 
-Este módulo expõe as classes wrapper de persistência com suporte a um alias
-retrocompatível: ``UnitScopedPersistence`` que aponta para
-``ExecutionScopedPersistence``. O nome antigo ainda é importado em diversos
-locais do código e testes; manter o alias evita quebrar estes pontos enquanto
-o restante do refactor avança.
+This module exposes persistence wrapper classes with support for a backward-compatible
+alias: ``UnitScopedPersistence`` which points to ``ExecutionScopedPersistence``. 
+The old name is still imported in various places in the code and tests; maintaining 
+the alias prevents breaking these points while the rest of the refactor progresses.
 """
 
 from .combination_scoped import CombinationScopedPersistence
 from .execution_scoped import ExecutionScopedPersistence
 from .work_scoped import WorkScopedPersistence
 
-# Alias backward-compatible
+# Backward-compatible alias
 UnitScopedPersistence = ExecutionScopedPersistence  # type: ignore
 
 __all__ = [
     "WorkScopedPersistence",
     "ExecutionScopedPersistence",
-    "UnitScopedPersistence",  # alias legado
+    "UnitScopedPersistence",  # legacy alias
     "CombinationScopedPersistence",
 ]

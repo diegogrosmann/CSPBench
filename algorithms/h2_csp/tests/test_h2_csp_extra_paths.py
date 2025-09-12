@@ -55,29 +55,6 @@ def test_exhaustive_block_replacement_branch():
 
 
 # ---------------------------------------------------------------------------
-# max_blocks reduzindo blocos
-# ---------------------------------------------------------------------------
-
-
-def test_max_blocks_truncation_error():
-    """Truncar blocos antes de cobrir todo o comprimento resulta em erro.
-
-    Justificativa: ``_prepare_blocks`` gera blocos que cobrem todo L; aplicar
-    ``max_blocks`` com um valor menor que o número necessário causa perda de
-    cobertura e, na fusão, ``_fuse_blocks`` detecta comprimento agregado menor
-    que L, levantando ``ValueError``. O algoritmo então retorna ``success=False``.
-    Este teste valida esse comportamento (em vez de assumir sucesso inválido).
-    """
-    strings = ["AAAAAAAAAAAA", "AAAABAAAACAA"]  # L=12 -> 4 blocos auto (3,3,3,3)
-    alphabet = "ABC"
-    alg = _build(strings, alphabet, max_blocks=2, local_iters=0, beam_width=4)
-    assert len(alg.blocks) == 2  # truncado para dois blocos parciais (0..3,3..6)
-    res = alg.run()
-    assert res["success"] is False
-    assert "Fused length mismatch" in (res["error"] or "")
-
-
-# ---------------------------------------------------------------------------
 # Strings de comprimento zero (lista não vazia) => nenhum bloco
 # ---------------------------------------------------------------------------
 

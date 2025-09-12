@@ -34,7 +34,7 @@ def migrate_to_sqlalchemy(
         new_database_url: New database URL for SQLAlchemy (optional)
         
     Returns:
-        Configured SQLAlchemy persistence instance
+        SQLAlchemyWorkPersistence: Configured SQLAlchemy persistence instance
         
     Example:
         # Simple migration
@@ -65,12 +65,18 @@ class MigrationGuide:
     """
     Migration guide for transitioning from custom drivers to SQLAlchemy.
     
-    This class provides documentation and examples for the migration process.
+    This class provides documentation and examples for the migration process,
+    helping developers understand the changes and verify successful migration.
     """
     
     @staticmethod
     def print_migration_guide():
-        """Print comprehensive migration guide."""
+        """
+        Print comprehensive migration guide to console.
+        
+        This method displays detailed information about the migration process,
+        changes made, and instructions for updating existing code.
+        """
         guide = """
         ═══════════════════════════════════════════════════════════════
                         SQLAlchemy Migration Guide
@@ -169,7 +175,12 @@ class MigrationGuide:
     
     @staticmethod
     def check_migration_status():
-        """Check if migration is working correctly."""
+        """
+        Check if migration is working correctly by running verification tests.
+        
+        This method performs basic operations to verify that the SQLAlchemy
+        migration was successful and the persistence layer is functioning properly.
+        """
         try:
             # Test creating a persistence instance
             persistence = SQLAlchemyWorkPersistence()

@@ -15,31 +15,7 @@ from typing import Optional, List
 
 from src.presentation.web.app import app
 from src.presentation.web.websocket import work_monitor_manager
-
-
-@dataclass
-class ProgressSummary:
-    """Progress summary data class."""
-    work_id: str
-    total_combinations: int
-    completed_combinations: int
-    running_combinations: int
-    failed_combinations: int
-    progress_percentage: float
-    estimated_completion: Optional[str] = None
-
-
-@dataclass
-class ExecutionDetail:
-    """Execution detail data class."""
-    unit_id: str
-    combination_id: int
-    status: str
-    progress: float
-    started_at: Optional[str] = None
-    finished_at: Optional[str] = None
-    objective: Optional[float] = None
-    error_message: Optional[str] = None
+from src.infrastructure.persistence.work_state.mixins.queries_mixin import ProgressSummary, ExecutionDetail
 
 
 @pytest.fixture
@@ -69,10 +45,10 @@ def sample_progress_summary():
     """Sample progress summary for testing."""
     return ProgressSummary(
         work_id="test_work",
-        tasks={"finished": [], "running": ["task1"], "queued": ["task2"]},
-        datasets={"finished": [], "running": ["dataset1"], "queued": []},
-        configs={"finished": [], "running": ["config1"], "queued": []},
-        algorithms={"finished": [], "running": ["algorithm1"], "queued": []},
+        tasks={"finished": 0, "running": 1, "queued": 2},
+        datasets={"finished": 0, "running": 1, "queued": 0},
+        configs={"finished": 0, "running": 1, "queued": 0},
+        algorithms={"finished": 0, "running": 1, "queued": 0},
         execution={"finished": 5, "running": 3, "queued": 2, "total": 10},
         global_execution={"Finished": 5, "Total": 10},
         global_progress=0.5,

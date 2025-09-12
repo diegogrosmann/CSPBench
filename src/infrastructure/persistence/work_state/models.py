@@ -1,7 +1,8 @@
 """
 SQLAlchemy models for work state persistence.
 
-Defines ORM models that replace the custom database driver implementation.
+This module defines ORM models that replace the custom database driver implementation,
+providing type-safe database operations and automatic schema management.
 """
 
 import json
@@ -27,26 +28,64 @@ Base = declarative_base()
 
 
 class JSONType(TypeDecorator):
-    """Custom type for storing JSON data in database."""
+    """
+    Custom SQLAlchemy type for storing JSON data in database.
+    
+    This type automatically serializes Python dictionaries and lists to JSON strings
+    for storage and deserializes them back when retrieving from the database.
+    """
     
     impl = Text
     cache_ok = True
 
     def process_bind_param(self, value, dialect):
-        """Convert Python dict/list to JSON string."""
+        """
+        Convert Python dict/list to JSON string for database storage.
+        
+        Args:
+            value: Python object to serialize
+            dialect: SQLAlchemy dialect (unused)
+            
+        Returns:
+            str: JSON string representation, or None if value is None
+        """
         if value is not None:
             return json.dumps(value)
         return value
 
     def process_result_value(self, value, dialect):
-        """Convert JSON string back to Python dict/list."""
+        """
+        Convert JSON string back to Python dict/list when retrieving from database.
+        
+        Args:
+            value: JSON string from database
+            dialect: SQLAlchemy dialect (unused)
+            
+        Returns:
+            Any: Deserialized Python object, or None if value is None
+        """
         if value is not None:
             return json.loads(value)
         return value
 
 
 class Work(Base):
-    """Work table model."""
+    """
+    Work table model representing a benchmark work unit.
+    
+    A work represents a complete benchmark execution containing multiple datasets,
+    algorithm combinations, and their results.
+    
+    Attributes:
+        id: Unique identifier for the work
+        config_json: JSON configuration for the work
+        status: Current execution status
+        created_at: Timestamp when work was created
+        updated_at: Timestamp when work was last updated
+        output_path: Path where results are stored
+        error: Error message if work failed
+        extra_json: Additional metadata
+    """
     
     __tablename__ = 'work'
     
@@ -65,7 +104,12 @@ class Work(Base):
     events = relationship("Event", back_populates="work", cascade="all, delete-orphan")
 
     def to_dict(self) -> Dict[str, Any]:
-        """Convert model to dictionary."""
+        """
+        Convert work model to dictionary representation.
+        
+        Returns:
+            Dict[str, Any]: Dictionary containing all work attributes
+        """
         return {
             "id": self.id,
             "config_json": self.config_json or {},
@@ -79,7 +123,19 @@ class Work(Base):
 
 
 class Dataset(Base):
-    """Dataset table model."""
+    """
+    Dataset table model representing a collection of sequences.
+    
+    Datasets contain the input sequences used for CSP algorithm benchmarking.
+    Each dataset belongs to a specific work and can contain multiple sequences.
+    
+    Attributes:
+        id: Auto-incremented primary key
+        dataset_id: Original string identifier
+        work_id: Foreign key to the parent work
+        name: Human-readable dataset name
+        meta_json: Metadata about the dataset
+    """
     
     __tablename__ = 'datasets'
     
@@ -99,7 +155,12 @@ class Dataset(Base):
     sequences = relationship("DatasetSequence", back_populates="dataset", cascade="all, delete-orphan")
 
     def to_dict(self) -> Dict[str, Any]:
-        """Convert model to dictionary."""
+        """
+        Convert dataset model to dictionary representation.
+        
+        Returns:
+            Dict[str, Any]: Dictionary containing all dataset attributes
+        """
         return {
             "id": self.id,
             "dataset_id": self.dataset_id,
@@ -110,7 +171,17 @@ class Dataset(Base):
 
 
 class DatasetSequence(Base):
-    """Dataset sequence table model."""
+    """
+    Dataset sequence table model representing individual sequences within a dataset.
+    
+    Each sequence is stored separately to enable efficient querying and processing
+    of large datasets.
+    
+    Attributes:
+        dataset_id: Foreign key to the parent dataset
+        seq_index: Index of the sequence within the dataset
+        sequence: The actual sequence string
+    """
     
     __tablename__ = 'dataset_sequences'
     
@@ -122,7 +193,12 @@ class DatasetSequence(Base):
     dataset = relationship("Dataset", back_populates="sequences")
 
     def to_dict(self) -> Dict[str, Any]:
-        """Convert model to dictionary."""
+        """
+        Convert dataset sequence model to dictionary representation.
+        
+        Returns:
+            Dict[str, Any]: Dictionary containing all sequence attributes
+        """
         return {
             "dataset_id": self.dataset_id,
             "seq_index": self.seq_index,
@@ -131,7 +207,26 @@ class DatasetSequence(Base):
 
 
 class Combination(Base):
-    """Combination table model."""
+    """
+    Combination table model representing an algorithm-dataset-preset combination.
+    
+    A combination defines a specific test case within a work, pairing a dataset
+    with an algorithm configuration (preset) for execution.
+    
+    Attributes:
+        id: Auto-incremented primary key
+        work_id: Foreign key to the parent work
+        task_id: Identifier for the task
+        dataset_id: Identifier for the dataset
+        preset_id: Identifier for the algorithm preset
+        algorithm_id: Identifier for the algorithm
+        mode: Execution mode
+        status: Current execution status
+        total_sequences: Total number of sequences to process
+        created_at: Timestamp when combination was created
+        started_at: Timestamp when execution started
+        finished_at: Timestamp when execution finished
+    """
     
     __tablename__ = 'combinations'
     
@@ -158,7 +253,12 @@ class Combination(Base):
     executions = relationship("Execution", back_populates="combination", cascade="all, delete-orphan")
 
     def to_dict(self) -> Dict[str, Any]:
-        """Convert model to dictionary."""
+        """
+        Convert combination model to dictionary representation.
+        
+        Returns:
+            Dict[str, Any]: Dictionary containing all combination attributes
+        """
         return {
             "id": self.id,
             "work_id": self.work_id,
@@ -176,7 +276,24 @@ class Combination(Base):
 
 
 class Execution(Base):
-    """Execution table model."""
+    """
+    Execution table model representing a single algorithm execution.
+    
+    An execution represents the processing of one sequence by one algorithm
+    configuration, containing the parameters used and results obtained.
+    
+    Attributes:
+        id: Auto-incremented primary key
+        unit_id: Unique identifier for the execution unit
+        combination_id: Foreign key to the parent combination
+        sequencia: Sequence index being processed
+        status: Current execution status
+        started_at: Timestamp when execution started
+        finished_at: Timestamp when execution finished
+        params_json: Algorithm parameters used
+        result_json: Results obtained from execution
+        objective: Objective function value
+    """
     
     __tablename__ = 'executions'
     
@@ -201,7 +318,12 @@ class Execution(Base):
     progress = relationship("ExecutionProgress", back_populates="execution", cascade="all, delete-orphan")
 
     def to_dict(self) -> Dict[str, Any]:
-        """Convert model to dictionary."""
+        """
+        Convert execution model to dictionary representation.
+        
+        Returns:
+            Dict[str, Any]: Dictionary containing all execution attributes
+        """
         return {
             "id": self.id,
             "unit_id": self.unit_id,
@@ -217,7 +339,19 @@ class Execution(Base):
 
 
 class ExecutionProgress(Base):
-    """Execution progress table model."""
+    """
+    Execution progress table model for tracking algorithm execution progress.
+    
+    This table stores progress updates during algorithm execution, allowing
+    real-time monitoring of long-running operations.
+    
+    Attributes:
+        id: Auto-incremented primary key
+        execution_id: Foreign key to the parent execution
+        progress: Progress value between 0.0 and 1.0
+        message: Progress message or description
+        timestamp: Timestamp when progress was recorded
+    """
     
     __tablename__ = 'execution_progress'
     
@@ -231,7 +365,12 @@ class ExecutionProgress(Base):
     execution = relationship("Execution", back_populates="progress")
 
     def to_dict(self) -> Dict[str, Any]:
-        """Convert model to dictionary."""
+        """
+        Convert execution progress model to dictionary representation.
+        
+        Returns:
+            Dict[str, Any]: Dictionary containing all progress attributes
+        """
         return {
             "id": self.id,
             "execution_id": self.execution_id,
@@ -242,7 +381,20 @@ class ExecutionProgress(Base):
 
 
 class Event(Base):
-    """Event table model."""
+    """
+    Event table model for logging system events and errors.
+    
+    Events provide audit trail and debugging information for work execution,
+    capturing errors, progress updates, and other significant occurrences.
+    
+    Attributes:
+        id: Auto-incremented primary key
+        work_id: Foreign key to the parent work
+        event_type: Type of event (error, progress, warning)
+        event_category: Category of the event source
+        entity_data_json: JSON data about the event entity
+        timestamp: Timestamp when event occurred
+    """
     
     __tablename__ = 'events'
     
@@ -257,7 +409,12 @@ class Event(Base):
     work = relationship("Work", back_populates="events")
 
     def to_dict(self) -> Dict[str, Any]:
-        """Convert model to dictionary."""
+        """
+        Convert event model to dictionary representation.
+        
+        Returns:
+            Dict[str, Any]: Dictionary containing all event attributes
+        """
         return {
             "id": self.id,
             "work_id": self.work_id,

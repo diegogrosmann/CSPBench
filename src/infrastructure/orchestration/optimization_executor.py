@@ -1,10 +1,10 @@
-"""OptimizationExecutor: executa OptimizationTask com Optuna.
+"""OptimizationExecutor: executes OptimizationTask with Optuna.
 
-Refatorado para seguir o padrão do ExperimentExecutor:
-- Cada trial é armazenado como uma execução na tabela executions
-- Implementa controle de recursos e status checking
-- Suporta paralelização de trials
-- Integração completa com sistema de persistência
+Refactored to follow ExperimentExecutor pattern:
+- Each trial is stored as an execution in the executions table
+- Implements resource control and status checking
+- Supports trial parallelization
+- Full integration with persistence system
 """
 
 from __future__ import annotations
@@ -54,7 +54,25 @@ def _trial_worker(
     cpu_config: dict[str, Any] | None = None,
     work_id: str | None = None,
 ) -> tuple[dict[str, Any], str]:
-    """Função executada em subprocesso para um trial de otimização (precisa ser picklable)."""
+    """Function executed in subprocess for an optimization trial (needs to be picklable).
+    
+    Args:
+        optimization_unit_id: Unique identifier for this optimization unit
+        trial_number: Trial sequence number
+        trial_params: Parameters for this trial
+        strings: Input strings for the algorithm
+        alphabet: Alphabet used
+        distance_method: Distance calculation method
+        use_cache: Whether to use distance cache
+        base_params: Base algorithm parameters
+        internal_jobs: Number of internal jobs for algorithms
+        algorithm_name: Name of algorithm to execute
+        cpu_config: CPU configuration for worker process
+        work_id: Work identifier for status checking
+        
+    Returns:
+        Tuple of (trial_result_dict, optimization_unit_id)
+    """
     import psutil
 
     from src.domain.distance import create_distance_calculator
@@ -137,7 +155,7 @@ def _trial_worker(
 
     try:
         execution_store.update_execution_status(_BaseStatus.RUNNING)
-        monitor.on_progress(0.0, f"Iniciando trial {trial_number} do algoritmo")
+        monitor.on_progress(0.0, f"Starting trial {trial_number} of algorithm")
 
         result = run_algorithm(
             algorithm_name=algorithm_name,
@@ -150,7 +168,7 @@ def _trial_worker(
             params=final_params,
         )
 
-        monitor.on_progress(1.0, f"Trial {trial_number} finalizado")
+        monitor.on_progress(1.0, f"Trial {trial_number} finished")
         status_value = result.get("status")
         if hasattr(status_value, "value"):
             status_value = status_value.value
@@ -188,7 +206,7 @@ def _trial_worker(
 
 
 class OptimizationExecutor(AbstractExecutionEngine):
-    """Executor para tarefas de otimização usando Optuna."""
+    """Executor for optimization tasks using Optuna."""
 
     def run(
         self,
@@ -196,10 +214,19 @@ class OptimizationExecutor(AbstractExecutionEngine):
         dataset_obj: Dataset,
         alg: AlgParams,
     ) -> BaseStatus:
-        """Executa a otimização usando Optuna."""
+        """Execute optimization using Optuna.
+        
+        Args:
+            task: Optimization task configuration
+            dataset_obj: Dataset to optimize on
+            alg: Algorithm parameters configuration
+            
+        Returns:
+            Final execution status
+        """
 
         if optuna is None:
-            logger.error("Optuna não está instalado. Execute: pip install optuna")
+            logger.error("Optuna is not installed. Run: pip install optuna")
             return BaseStatus.FAILED
 
         try:
@@ -209,12 +236,12 @@ class OptimizationExecutor(AbstractExecutionEngine):
             direction = config.get("direction", "minimize")
             timeout_per_trial = config.get("timeout_per_trial", 300)
 
-            # Criar nome único do estudo baseado na combinação atual
-            # Usar informações da combinação: task_id, dataset_id, preset_id, algorithm_id
+            # Create unique study name based on current combination
+            # Use combination information: task_id, dataset_id, preset_id, algorithm_id
             combination_info = self._get_combination_info()
             study_name = self._create_study_name(task, combination_info)
 
-            logger.info(f"Iniciando otimização para combinação: {study_name}")
+            logger.info(f"Starting optimization for combination: {study_name}")
             logger.info(f"Config: trials={trials}, direction={direction}")
 
             strings = dataset_obj.sequences
@@ -230,9 +257,9 @@ class OptimizationExecutor(AbstractExecutionEngine):
             # Setup Optuna study with unique name per combination
             study = self._create_optuna_study(study_name, direction, config)
 
-            logger.info(f"Estudo Optuna criado: {study_name}")
+            logger.info(f"Optuna study created: {study_name}")
 
-            logger.info(f"Iniciando otimização: {trials} trials, direção: {direction}")
+            logger.info(f"Starting optimization: {trials} trials, direction: {direction}")
 
             try:
                 max_workers = self._execution_controller.get_worker_config()["cpu"][
@@ -244,7 +271,7 @@ class OptimizationExecutor(AbstractExecutionEngine):
             completed_trials = 0
             failed_trials = 0
 
-            logger.info(f"Configuração: max_workers={max_workers}")
+            logger.info(f"Configuration: max_workers={max_workers}")
 
             if max_workers > 1:
                 # Parallel execution
@@ -284,29 +311,38 @@ class OptimizationExecutor(AbstractExecutionEngine):
 
             # Determine final result
             if completed_trials == 0:
-                logger.error("Nenhum trial foi completado com sucesso")
+                logger.error("No trial was completed successfully")
                 return BaseStatus.FAILED
             elif failed_trials > completed_trials:
                 logger.warning(
-                    f"Mais trials falharam ({failed_trials}) do que completaram ({completed_trials})"
+                    f"More trials failed ({failed_trials}) than completed ({completed_trials})"
                 )
                 return BaseStatus.ERROR
             else:
                 logger.info(
-                    f"Otimização concluída: {completed_trials} trials completados, {failed_trials} falharam"
+                    f"Optimization completed: {completed_trials} trials completed, {failed_trials} failed"
                 )
                 return BaseStatus.COMPLETED
 
         except Exception as e:
-            logger.error(f"Erro durante otimização: {e}")
-            logger.error(f"Tipo do erro: {type(e)}")
-            logger.error("Stack trace completa:", exc_info=True)
+            logger.error(f"Error during optimization: {e}")
+            logger.error(f"Error type: {type(e)}")
+            logger.error("Full stack trace:", exc_info=True)
             return BaseStatus.FAILED
 
     def _create_optuna_study(
         self, study_name: str, direction: str, config: dict
     ) -> Any:
-        """Cria um estudo Optuna com a configuração especificada."""
+        """Create an Optuna study with specified configuration.
+        
+        Args:
+            study_name: Name for the study
+            direction: Optimization direction ('minimize' or 'maximize')
+            config: Configuration dictionary with sampler/pruner settings
+            
+        Returns:
+            Configured Optuna study object
+        """
 
         # Configure sampler
         sampler_name = config.get("sampler", "TPESampler")
@@ -348,7 +384,7 @@ class OptimizationExecutor(AbstractExecutionEngine):
         storage_config = config.get("storage")
         storage = self._configure_storage(storage_config, study_name)
 
-        # Suprimir logs verbosos do Optuna
+        # Suppress verbose Optuna logs
         optuna_logger = logging.getLogger("optuna")
         original_level = optuna_logger.level
         optuna_logger.setLevel(logging.WARNING)
@@ -363,16 +399,24 @@ class OptimizationExecutor(AbstractExecutionEngine):
                 load_if_exists=True,
             )
         finally:
-            # Restaurar nível original do logger
+            # Restore original logger level
             optuna_logger.setLevel(original_level)
 
-        logger.info(f"Estudo Optuna criado: {study_name}")
+        logger.info(f"Optuna study created: {study_name}")
         return study
 
     def _generate_trial_params(
         self, trial: Any, optimization_params: dict
     ) -> dict[str, Any]:
-        """Gera parâmetros do trial baseado na configuração de otimização."""
+        """Generate trial parameters based on optimization configuration.
+        
+        Args:
+            trial: Optuna trial object
+            optimization_params: Parameter space configuration
+            
+        Returns:
+            Generated parameters for this trial
+        """
         params = {}
 
         # Handle case where optimization_params might contain algorithm name as key
@@ -418,7 +462,7 @@ class OptimizationExecutor(AbstractExecutionEngine):
                     param_name, param_config["low"], param_config["high"]
                 )
             else:
-                logger.warning(f"Tipo de parâmetro desconhecido: {param_type}")
+                logger.warning(f"Unknown parameter type: {param_type}")
 
         return params
 
@@ -437,7 +481,25 @@ class OptimizationExecutor(AbstractExecutionEngine):
         optimization_params,
         max_workers,
     ) -> tuple[int, int]:
-        """Executa otimização em paralelo."""
+        """Execute optimization in parallel.
+        
+        Args:
+            study: Optuna study object
+            task: Optimization task configuration
+            dataset_obj: Dataset object
+            alg: Algorithm parameters
+            trials: Number of trials to run
+            timeout_per_trial: Timeout per trial in seconds
+            strings: Input strings
+            alphabet: Alphabet used
+            dataset_id: Dataset identifier
+            base_params: Base algorithm parameters
+            optimization_params: Optimization parameter configuration
+            max_workers: Maximum number of worker processes
+            
+        Returns:
+            Tuple of (completed_trials, failed_trials)
+        """
 
         # Get CPU configuration for worker processes
         cpu_config = self._execution_controller.create_worker_config()
@@ -463,7 +525,7 @@ class OptimizationExecutor(AbstractExecutionEngine):
                 trial = study.ask()
                 trial_params = self._generate_trial_params(trial, optimization_params)
 
-                # Construir unit_id padronizado: type:task:dataset:config:name:trial_X
+                # Build standardized unit_id: type:task:dataset:config:name:trial_X
                 config_id = (
                     getattr(self._combination_store, "_preset_id", None) or "default"
                 )
@@ -537,7 +599,24 @@ class OptimizationExecutor(AbstractExecutionEngine):
         base_params,
         optimization_params,
     ) -> tuple[int, int]:
-        """Executa otimização sequencial."""
+        """Execute optimization sequentially.
+        
+        Args:
+            study: Optuna study object
+            task: Optimization task configuration
+            dataset_obj: Dataset object
+            alg: Algorithm parameters
+            trials: Number of trials to run
+            timeout_per_trial: Timeout per trial in seconds
+            strings: Input strings
+            alphabet: Alphabet used
+            dataset_id: Dataset identifier
+            base_params: Base algorithm parameters
+            optimization_params: Optimization parameter configuration
+            
+        Returns:
+            Tuple of (completed_trials, failed_trials)
+        """
 
         # Get CPU configuration for sequential execution
         cpu_config = self._execution_controller.create_worker_config()
@@ -561,7 +640,7 @@ class OptimizationExecutor(AbstractExecutionEngine):
             trial = study.ask()
             trial_params = self._generate_trial_params(trial, optimization_params)
 
-            # Construir unit_id padronizado: type:task:dataset:config:name:trial_X
+            # Build standardized unit_id: type:task:dataset:config:name:trial_X
             config_id = (
                 getattr(self._combination_store, "_preset_id", None) or "default"
             )
@@ -614,33 +693,33 @@ class OptimizationExecutor(AbstractExecutionEngine):
         return completed_trials, failed_trials
 
     def _configure_storage(self, storage_config: Any, study_name: str) -> Optional[str]:
-        """Configura o storage do Optuna baseado na configuração fornecida.
+        """Configure Optuna storage based on provided configuration.
 
         Args:
-            storage_config: Configuração de storage (string, boolean ou None)
-            study_name: Nome do estudo para gerar filename automático
+            storage_config: Storage configuration (string, boolean or None)
+            study_name: Study name for automatic filename generation
 
         Returns:
-            String de conexão SQLite ou None para storage em memória
+            SQLite connection string or None for in-memory storage
         """
         if not storage_config:
-            return None  # Storage em memória
+            return None  # In-memory storage
 
-        # Para qualquer valor de storage (True ou string), salvar no diretório do work
+        # For any storage value (True or string), save in work directory
         from pathlib import Path
         from src.infrastructure.utils.path_utils import get_output_base_directory
 
-        # Usar o diretório de saída do work atual (onde ficam os resultados)
+        # Use current work's output directory (where results are stored)
         work_output_dir = get_output_base_directory() / self._combination_store.work_id
         optuna_dir = work_output_dir / "optuna"
         optuna_dir.mkdir(parents=True, exist_ok=True)
 
-        # Se for string específica, usar como nome do arquivo
+        # If specific string, use as filename
         if isinstance(storage_config, str) and not storage_config.startswith("sqlite:"):
             db_filename = storage_config
         else:
-            # Para manter todos os estudos de uma task no mesmo arquivo,
-            # usar o task_id ao invés do study_name individual
+            # To keep all studies of a task in the same file,
+            # use task_id instead of individual study_name
             task_id = self._combination_store._task_id or "unknown_task"
             db_filename = f"{task_id}_optuna_studies.db"
 
@@ -648,7 +727,11 @@ class OptimizationExecutor(AbstractExecutionEngine):
         return f"sqlite:///{storage_path}"
 
     def _get_combination_info(self) -> dict[str, str]:
-        """Obtém informações da combinação atual."""
+        """Get current combination information.
+        
+        Returns:
+            Dictionary with combination identifiers
+        """
         return {
             "task_id": self._combination_store._task_id or "unknown",
             "dataset_id": self._combination_store._dataset_id or "unknown",
@@ -657,12 +740,20 @@ class OptimizationExecutor(AbstractExecutionEngine):
         }
 
     def _create_study_name(self, task: Any, combination_info: dict[str, str]) -> str:
-        """Cria nome único do estudo baseado na combinação."""
+        """Create unique study name based on combination.
+        
+        Args:
+            task: Task configuration object
+            combination_info: Dictionary with combination identifiers
+            
+        Returns:
+            Unique study name string
+        """
         task_id = combination_info["task_id"]
         dataset_id = combination_info["dataset_id"]
         preset_id = combination_info["preset_id"]
         algorithm_id = combination_info["algorithm_id"]
 
-        # Formato: task_id|dataset_id|preset_id|algorithm_id
+        # Format: task_id|dataset_id|preset_id|algorithm_id
         study_name = f"{task_id}|{dataset_id}|{preset_id}|{algorithm_id}"
         return study_name

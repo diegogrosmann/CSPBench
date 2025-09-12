@@ -1,27 +1,29 @@
 """
-DEPRECATED: ExecutionManager
+DEPRECATED: ExecutionManager.
 
-Esta classe foi movida para WorkManager como parte da refatoração de simplificação
-da arquitetura. O ExecutionManager foi incorporado ao WorkManager para unificar
-a gestão de trabalhos e execução de pipelines.
+This class has been moved to WorkManager as part of the architecture
+simplification refactoring. The ExecutionManager was incorporated into
+WorkManager to unify work management and pipeline execution.
 
-Migração:
-- Substitua ExecutionManager() por get_work_service()
-- O método execute() está disponível no WorkManager
-- O método restart() foi renomeado para restart_execution()
+Migration:
+    - Replace ExecutionManager() with get_work_service()
+    - The execute() method is available in WorkManager
+    - The restart() method has been renamed to restart_execution()
 
-Exemplo de migração:
-    # Antes:
-    from src.application.services.execution_manager import ExecutionManager
-    manager = ExecutionManager()
-    work_id = manager.execute(config)
+Example:
+    Before::
     
-    # Depois:
-    from src.application.services.work_service import get_work_service
-    manager = get_work_service()
-    work_id = manager.execute(config)
+        from src.application.services.execution_manager import ExecutionManager
+        manager = ExecutionManager()
+        work_id = manager.execute(config)
+        
+    After::
+    
+        from src.application.services.work_service import get_work_service
+        manager = get_work_service()
+        work_id = manager.execute(config)
 
-Este arquivo será removido em versões futuras.
+This file will be removed in future versions.
 """
 
 import warnings
@@ -40,6 +42,13 @@ class ExecutionManager:
     """
     
     def __init__(self, work_service=None):
+        """
+        Initialize ExecutionManager (deprecated).
+        
+        Args:
+            work_service: Optional work service instance. If None, will use
+                the global work service.
+        """
         warnings.warn(
             "ExecutionManager is deprecated. Use get_work_service() instead.",
             DeprecationWarning,
@@ -51,9 +60,26 @@ class ExecutionManager:
             self._work_service = work_service
     
     def execute(self, config: CSPBenchConfig, extra: Optional[Dict[str, Any]] = None) -> str:
-        """Delegate to WorkManager.execute()"""
+        """
+        Delegate to WorkManager.execute().
+        
+        Args:
+            config (CSPBenchConfig): Configuration to execute.
+            extra (Optional[Dict[str, Any]]): Additional metadata.
+            
+        Returns:
+            str: Work ID for tracking execution.
+        """
         return self._work_service.execute(config, extra)
     
     def restart(self, work_id: str) -> bool:
-        """Delegate to WorkManager.restart_execution()"""
+        """
+        Delegate to WorkManager.restart_execution().
+        
+        Args:
+            work_id (str): Work ID to restart.
+            
+        Returns:
+            bool: True if restart successful, False otherwise.
+        """
         return self._work_service.restart_execution(work_id)

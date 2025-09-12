@@ -1,5 +1,5 @@
 """
-WorkService - Unified Work Management Service.
+Unified Work Management Service.
 
 Provides application-wide persistent work management state with global
 singleton pattern and FastAPI lifecycle integration.
@@ -9,11 +9,18 @@ of work items across the entire application, ensuring persistence and
 proper cleanup of resources.
 
 Features:
-- Global singleton work service
-- Persistent storage integration
-- Orphaned work cleanup on startup
-- FastAPI lifecycle management
-- Thread-safe operations
+    - Global singleton work service
+    - Persistent storage integration
+    - Orphaned work cleanup on startup
+    - FastAPI lifecycle management
+    - Thread-safe operations
+
+Example:
+    Basic usage of the work service:
+    
+    >>> work_service = get_work_service()
+    >>> work_id = work_service.execute(config)
+    >>> status = work_service.get_status(work_id)
 """
 
 from __future__ import annotations
@@ -37,10 +44,10 @@ def get_work_service() -> WorkManager:
     Get the global WorkService instance.
 
     Returns:
-        WorkManager: Global WorkService instance
+        WorkManager: Global WorkService instance.
 
     Raises:
-        RuntimeError: If WorkService not initialized
+        RuntimeError: If WorkService not initialized.
         
     Note:
         Auto-initializes if not already done for convenience.
@@ -60,10 +67,10 @@ def initialize_work_service() -> WorkManager:
     orphaned work items that cannot be controlled.
 
     Returns:
-        WorkManager: Initialized WorkService instance
+        WorkManager: Initialized WorkService instance.
         
     Raises:
-        RuntimeError: If WorkService initialization fails
+        RuntimeError: If WorkService initialization fails.
     """
     global _global_work_service
 
@@ -116,10 +123,10 @@ async def work_service_lifespan(app: FastAPI):
     Provides proper resource management for FastAPI applications.
     
     Args:
-        app: FastAPI application instance
+        app (FastAPI): FastAPI application instance.
         
     Yields:
-        None: Application runs between startup and shutdown
+        None: Application runs between startup and shutdown.
     """
     try:
         # Startup
@@ -141,10 +148,10 @@ def get_work_status(work_id: str):
     Get work status from the global WorkService.
     
     Args:
-        work_id: Unique work identifier
+        work_id (str): Unique work identifier.
         
     Returns:
-        str: Current work status, None if not found
+        Optional[str]: Current work status, None if not found.
     """
     return get_work_service().get_status(work_id)
 
@@ -154,10 +161,10 @@ def get_work_details(work_id: str):
     Get work details from the global WorkService.
     
     Args:
-        work_id: Unique work identifier
+        work_id (str): Unique work identifier.
         
     Returns:
-        WorkItem: Work item instance, None if not found
+        Optional[WorkItem]: Work item instance, None if not found.
     """
     return get_work_service().get(work_id)
 
@@ -167,7 +174,7 @@ def list_all_work():
     List all work items from the global WorkService.
     
     Returns:
-        list: List of all work items as WorkItem instances
+        List[WorkItem]: List of all work items as WorkItem instances.
     """
     return get_work_service().list()
 
@@ -177,11 +184,11 @@ def control_work(work_id: str, action: str) -> bool:
     Control work execution (pause, cancel, restart).
     
     Args:
-        work_id: Unique work identifier
-        action: Control action ('pause', 'cancel', 'restart')
+        work_id (str): Unique work identifier.
+        action (str): Control action ('pause', 'cancel', 'restart').
         
     Returns:
-        bool: True if action successful, False otherwise
+        bool: True if action successful, False otherwise.
     """
     work_service = get_work_service()
 

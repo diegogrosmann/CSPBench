@@ -1,7 +1,7 @@
-"""ExperimentExecutor: executa ExperimentTask.
+"""ExperimentExecutor: executes ExperimentTask.
 
-Paraleliza repetições via ProcessPool se ``max_workers > 1`` usando ``ProcessPoolExecutor``.
-Implementa controles de recursos, resume functionality e salvamento completo de dados.
+Parallelizes repetitions via ProcessPool if ``max_workers > 1`` using ``ProcessPoolExecutor``.
+Implements resource controls, resume functionality and complete data saving.
 """
 
 from __future__ import annotations
@@ -44,12 +44,29 @@ def _worker_exec(
     distance_method: str,
     use_cache: bool,
     params: dict[str, Any],
-    work_id: str,  # Alterado de db_path para work_id
+    work_id: str,  # Changed from db_path to work_id
     internal_jobs: int,
     algorithm_name: str,
     cpu_config: dict[str, Any] | None = None,
 ) -> tuple[dict[str, Any], str]:
-    """Função executada em subprocesso (precisa ser picklable)."""
+    """Function executed in subprocess (needs to be picklable).
+    
+    Args:
+        experiment_unit_id: Unique identifier for this experiment unit
+        seed: Random seed for this repetition
+        strings: Input strings for the algorithm
+        alphabet: Alphabet used
+        distance_method: Distance calculation method
+        use_cache: Whether to use distance cache
+        params: Algorithm parameters
+        work_id: Work identifier for persistence
+        internal_jobs: Number of internal jobs for algorithms
+        algorithm_name: Name of algorithm to execute
+        cpu_config: CPU configuration for worker process
+        
+    Returns:
+        Tuple of (execution_result_dict, experiment_unit_id)
+    """
     import psutil
 
     from src.domain.status import BaseStatus as _BaseStatus
@@ -61,7 +78,7 @@ def _worker_exec(
 
     logger = get_logger("CSPBench.WorkerProcess")
 
-    logger.debug(f"[WORKER][{experiment_unit_id}] Iniciando worker_exec.")
+    logger.debug(f"[WORKER][{experiment_unit_id}] Starting worker_exec.")
 
     # Apply CPU configuration to this worker process
     if cpu_config:
@@ -82,11 +99,11 @@ def _worker_exec(
             logger.warning(f"[WORKER][{experiment_unit_id}] Cannot apply CPU configuration: {e}")
 
     try:
-        # Usar factory method para criar work_scoped diretamente
+        # Use factory method to create work_scoped directly
         work_scoped = WorkScopedPersistence.submit(work_id)
         execution_store = work_scoped.for_execution(experiment_unit_id)
     except Exception as e:
-        logger.error(f"[WORKER][{experiment_unit_id}] Erro ao recriar store: {e}")
+        logger.error(f"[WORKER][{experiment_unit_id}] Error recreating store: {e}")
         raise
 
     # Controller with work_id for status checks
@@ -108,7 +125,7 @@ def _worker_exec(
                 dummy_controller.apply_memory_limits()
         except Exception as cpu_exc:
             logger.warning(
-                f"[WORKER][{experiment_unit_id}] CPU configuration parcialmente aplicada: {cpu_exc}"
+                f"[WORKER][{experiment_unit_id}] CPU configuration partially applied: {cpu_exc}"
             )
 
     # Create monitor with controller for cancellation checks
@@ -119,7 +136,7 @@ def _worker_exec(
     )
     try:
         execution_store.update_execution_status(_BaseStatus.RUNNING)
-        monitor.on_progress(0.0, f"Iniciando instância do algoritmo")
+        monitor.on_progress(0.0, f"Starting algorithm instance")
 
         result = run_algorithm(
             algorithm_name=algorithm_name,
@@ -132,7 +149,7 @@ def _worker_exec(
             params=params,
         )
 
-        monitor.on_progress(1.0, f"[{experiment_unit_id}] Instância do algoritmo finalizada")
+        monitor.on_progress(1.0, f"[{experiment_unit_id}] Algorithm instance finished")
         status_value = result.get("status")
         if hasattr(status_value, "value"):
             status_value = status_value.value
@@ -149,11 +166,11 @@ def _worker_exec(
             params=result.get("actual_params", None),
             objective=objective,
         )
-        logger.debug(f"[WORKER][{experiment_unit_id}] worker_exec finalizado com status: {status_value}")
+        logger.debug(f"[WORKER][{experiment_unit_id}] worker_exec finished with status: {status_value}")
         return result, experiment_unit_id
     except Exception as exc:  # pragma: no cover - defensive
         execution_store.update_execution_status("failed", result={"error": str(exc)})
-        logger.error(f"[WORKER][{experiment_unit_id}] worker_exec falhou: {exc}")
+        logger.error(f"[WORKER][{experiment_unit_id}] worker_exec failed: {exc}")
         return {
             "status": _BaseStatus.FAILED,
             "error": str(exc),
@@ -161,6 +178,8 @@ def _worker_exec(
 
 
 class ExperimentExecutor(AbstractExecutionEngine):
+    """Executor for experiment tasks with parallel repetition support."""
+    
     _combination_store: CombinationScopedPersistence = None
     _execution_controller: ExecutionController = None
     _batch_config: CSPBenchConfig = None
@@ -171,7 +190,16 @@ class ExperimentExecutor(AbstractExecutionEngine):
         dataset_obj: Dataset,
         alg: AlgParams,
     ) -> BaseStatus:
-        """Executa o experimento seguindo o novo processo passo a passo."""
+        """Execute the experiment following the new step-by-step process.
+        
+        Args:
+            task: Experiment task configuration
+            dataset_obj: Dataset to run experiments on
+            alg: Algorithm parameters configuration
+            
+        Returns:
+            Final execution status
+        """
 
         repetitions = max(1, int(getattr(task, "repetitions", 1)))
         strings = dataset_obj.sequences
@@ -182,36 +210,36 @@ class ExperimentExecutor(AbstractExecutionEngine):
         if global_seed is None:
             global_seed = alg.params.get("seed", None)
 
-        logger.info(f"Iniciando experimento para {alg.name} no dataset {dataset_id} com {repetitions} repetições")
+        logger.info(f"Starting experiment for {alg.name} on dataset {dataset_id} with {repetitions} repetitions")
 
-        # PASSO 1: Identificar todas as execuções necessárias
-        logger.info("PASSO 1: Identificando execuções necessárias")
+        # STEP 1: Identify all necessary executions
+        logger.info("STEP 1: Identifying necessary executions")
         all_needed_executions = self._identify_needed_executions(
             task, dataset_id, alg, repetitions
         )
         
-        # PASSO 2: Listar execuções já finalizadas 
-        logger.info("PASSO 2: Verificando execuções já finalizadas")
+        # STEP 2: List already completed executions 
+        logger.info("STEP 2: Checking already completed executions")
         completed_executions = self._get_completed_executions(all_needed_executions)
         
-        # PASSO 3: Determinar execuções pendentes
-        logger.info("PASSO 3: Determinando execuções pendentes")
+        # STEP 3: Determine pending executions
+        logger.info("STEP 3: Determining pending executions")
         pending_executions = self._get_pending_executions(
             all_needed_executions, completed_executions
         )
         
         if not pending_executions:
-            logger.info("Nenhuma execução pendente encontrada - todas já foram finalizadas")
+            logger.info("No pending executions found - all have been completed")
             return BaseStatus.COMPLETED
             
-        logger.info(f"Encontradas {len(pending_executions)} execuções pendentes de {len(all_needed_executions)} totais")
+        logger.info(f"Found {len(pending_executions)} pending executions out of {len(all_needed_executions)} total")
         
-        # PASSO 4: Persistir execuções pendentes em lote
-        logger.info("PASSO 4: Persistindo execuções pendentes em lote")
+        # STEP 4: Persist pending executions in batch
+        logger.info("STEP 4: Persisting pending executions in batch")
         self._persist_pending_executions(pending_executions)
         
-        # PASSO 5: Executar as execuções pendentes
-        logger.info("PASSO 5: Executando execuções pendentes")
+        # STEP 5: Execute pending executions
+        logger.info("STEP 5: Executing pending executions")
         results = self._execute_pending_executions(
             pending_executions, strings, alphabet, global_seed
         )
@@ -220,7 +248,7 @@ class ExperimentExecutor(AbstractExecutionEngine):
         if status != BaseStatus.RUNNING:
             return status
 
-        # Avaliar resultados (considera enum BaseStatus)
+        # Evaluate results (considers BaseStatus enum)
         if not results:
             return BaseStatus.COMPLETED
             
@@ -237,7 +265,17 @@ class ExperimentExecutor(AbstractExecutionEngine):
     def _identify_needed_executions(
         self, task: ExperimentTask, dataset_id: str, alg: AlgParams, repetitions: int
     ) -> list[dict[str, Any]]:
-        """PASSO 1: Identifica todas as execuções que precisam ser realizadas."""
+        """STEP 1: Identify all executions that need to be performed.
+        
+        Args:
+            task: Experiment task configuration
+            dataset_id: Dataset identifier
+            alg: Algorithm parameters
+            repetitions: Number of repetitions needed
+            
+        Returns:
+            List of execution data dictionaries
+        """
         needed_executions = []
         
         config_id = (
@@ -261,12 +299,19 @@ class ExperimentExecutor(AbstractExecutionEngine):
             }
             needed_executions.append(execution_data)
             
-        logger.debug(f"Identificadas {len(needed_executions)} execuções necessárias")
+        logger.debug(f"Identified {len(needed_executions)} necessary executions")
         return needed_executions
 
     def _get_completed_executions(self, all_executions: list[dict[str, Any]]) -> set[str]:
-        """PASSO 2: Lista todas as execuções que já estão com status finalizado."""
-        # Status finais que consideramos como "completos"
+        """STEP 2: List all executions that already have final status.
+        
+        Args:
+            all_executions: List of all execution data dictionaries
+            
+        Returns:
+            Set of unit_ids for completed executions
+        """
+        # Final statuses we consider as "completed"
         final_statuses = [
             BaseStatus.COMPLETED.value,
             "completed",
@@ -276,56 +321,68 @@ class ExperimentExecutor(AbstractExecutionEngine):
             "error",
         ]
         
-        # Buscar todas as execuções da combinação atual de uma só vez
+        # Fetch all executions from current combination at once
         all_existing_executions = self._combination_store.get_executions()
         
-        # Filtrar apenas execuções com status finais
+        # Filter only executions with final statuses
         completed_executions = [
             ex for ex in all_existing_executions 
             if ex.get("status") in final_statuses
         ]
         
-        # Criar um set com os unit_ids das execuções já finalizadas
+        # Create a set with unit_ids of already completed executions
         completed_unit_ids = {ex["unit_id"] for ex in completed_executions}
         
-        # Filtrar apenas as que estão na nossa lista de execuções necessárias
+        # Filter only those that are in our list of necessary executions
         needed_unit_ids = {ex["unit_id"] for ex in all_executions}
         relevant_completed = completed_unit_ids.intersection(needed_unit_ids)
         
-        logger.debug(f"Encontradas {len(relevant_completed)} execuções já finalizadas de {len(completed_executions)} com status final, de {len(all_existing_executions)} totais no banco")
+        logger.debug(f"Found {len(relevant_completed)} already completed executions out of {len(completed_executions)} with final status, from {len(all_existing_executions)} total in database")
         return relevant_completed
 
     def _get_pending_executions(
         self, all_executions: list[dict[str, Any]], completed: set[str]
     ) -> list[dict[str, Any]]:
-        """PASSO 3: Compara e retorna apenas as execuções que não foram realizadas."""
+        """STEP 3: Compare and return only executions that were not performed.
+        
+        Args:
+            all_executions: List of all execution data dictionaries
+            completed: Set of completed unit_ids
+            
+        Returns:
+            List of pending execution data dictionaries
+        """
         pending = []
         
         for execution in all_executions:
             if execution["unit_id"] not in completed:
                 pending.append(execution)
                 
-        logger.debug(f"Determinadas {len(pending)} execuções pendentes")
+        logger.debug(f"Determined {len(pending)} pending executions")
         return pending
 
     def _persist_pending_executions(self, pending_executions: list[dict[str, Any]]) -> None:
-        """PASSO 4: Persiste a lista de execuções pendentes em lote."""
+        """STEP 4: Persist the list of pending executions in batch.
+        
+        Args:
+            pending_executions: List of pending execution data dictionaries
+        """
         if not pending_executions:
             return
             
-        # Preparar dados para inserção em lote
+        # Prepare data for batch insertion
         executions_to_insert = []
         for execution in pending_executions:
             execution_data = {
                 "unit_id": execution["unit_id"],
                 "sequencia": execution["sequencia"],
-                # combination_id será adicionado automaticamente pelo submit_executions
+                # combination_id will be added automatically by submit_executions
             }
             executions_to_insert.append(execution_data)
             
-        # Usar inserção em lote para melhor performance
+        # Use batch insertion for better performance
         inserted_count = self._combination_store.submit_executions(executions_to_insert)
-        logger.info(f"Persistidas {inserted_count} execuções pendentes em lote")
+        logger.info(f"Persisted {inserted_count} pending executions in batch")
 
     def _execute_pending_executions(
         self, 
@@ -334,7 +391,17 @@ class ExperimentExecutor(AbstractExecutionEngine):
         alphabet: str,
         global_seed: int | None
     ) -> list[dict[str, Any]]:
-        """PASSO 5: Executa a lista de execuções pendentes (sequencial ou paralela)."""
+        """STEP 5: Execute the list of pending executions (sequential or parallel).
+        
+        Args:
+            pending_executions: List of pending execution data dictionaries
+            strings: Input strings for algorithms
+            alphabet: Alphabet used
+            global_seed: Global seed for random number generation
+            
+        Returns:
+            List of execution result dictionaries
+        """
         if not pending_executions:
             return []
             
@@ -348,12 +415,12 @@ class ExperimentExecutor(AbstractExecutionEngine):
             max_workers = 1
 
         if max_workers > 1:
-            # Execução paralela
-            logger.info(f"Executando {len(pending_executions)} execuções em paralelo com {max_workers} workers")
+            # Parallel execution
+            logger.info(f"Executing {len(pending_executions)} executions in parallel with {max_workers} workers")
             results = self._execute_parallel(pending_executions, strings, alphabet, global_seed)
         else:
-            # Execução sequencial
-            logger.info(f"Executando {len(pending_executions)} execuções sequencialmente")
+            # Sequential execution
+            logger.info(f"Executing {len(pending_executions)} executions sequentially")
             results = self._execute_sequential(pending_executions, strings, alphabet, global_seed)
             
         return results
@@ -365,7 +432,17 @@ class ExperimentExecutor(AbstractExecutionEngine):
         alphabet: str,
         global_seed: int | None
     ) -> list[dict[str, Any]]:
-        """Executa as execuções pendentes em paralelo."""
+        """Execute pending executions in parallel.
+        
+        Args:
+            pending_executions: List of pending execution data dictionaries
+            strings: Input strings for algorithms
+            alphabet: Alphabet used
+            global_seed: Global seed for random number generation
+            
+        Returns:
+            List of execution result dictionaries
+        """
         results = []
         
         # Get CPU configuration for worker processes
@@ -390,7 +467,7 @@ class ExperimentExecutor(AbstractExecutionEngine):
                 if self._execution_controller.check_status() != BaseStatus.RUNNING:
                     break
 
-                # Calcular seed para esta repetição
+                # Calculate seed for this repetition
                 seed = None
                 if global_seed is not None:
                     seed = global_seed
@@ -413,7 +490,7 @@ class ExperimentExecutor(AbstractExecutionEngine):
                 )
                 futures.append((execution["sequencia"], future))
 
-            # Coletar resultados
+            # Collect results
             for sequencia, future in futures:
                 result, unit_id = future.result()
                 results.append({unit_id: result})
@@ -427,7 +504,17 @@ class ExperimentExecutor(AbstractExecutionEngine):
         alphabet: str,
         global_seed: int | None
     ) -> list[dict[str, Any]]:
-        """Executa as execuções pendentes sequencialmente."""
+        """Execute pending executions sequentially.
+        
+        Args:
+            pending_executions: List of pending execution data dictionaries
+            strings: Input strings for algorithms
+            alphabet: Alphabet used
+            global_seed: Global seed for random number generation
+            
+        Returns:
+            List of execution result dictionaries
+        """
         results = []
         
         # Get CPU configuration for sequential execution
@@ -443,7 +530,7 @@ class ExperimentExecutor(AbstractExecutionEngine):
             if status != BaseStatus.RUNNING:
                 break
 
-            # Calcular seed para esta repetição
+            # Calculate seed for this repetition
             seed = None
             if global_seed is not None:
                 seed = global_seed

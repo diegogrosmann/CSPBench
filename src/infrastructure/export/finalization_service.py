@@ -1,6 +1,29 @@
-"""Finalization service for full export (raw DB dump, manifest, full_results, summary).
+"""
+Finalization Service for Comprehensive Export Operations.
 
-This implementation intentionally drops legacy/export-config driven outputs.
+Provides finalization services for complete work export including raw database
+dumps, manifest generation, full results compilation, and summary generation.
+This service handles the final phase of work execution by creating comprehensive
+export artifacts.
+
+Features:
+    - Raw database table exports to CSV format
+    - Full results JSON compilation with metadata
+    - Manifest generation with artifact inventory
+    - Summary report generation in Markdown format
+    - Optimization results export and visualization
+    - Sensitivity analysis results export and plotting
+
+Export Structure:
+    - raw_db/: CSV exports of database tables
+    - optuna/: Optimization trials and plots
+    - sensitivity/native/: Sensitivity analysis results and visualizations
+    - full_results.json: Complete results compilation
+    - manifest.json: Export inventory and metadata
+    - summary.md: Human-readable summary report
+
+This implementation intentionally drops legacy/export-config driven outputs
+in favor of a standardized export format.
 """
 
 from __future__ import annotations
@@ -19,9 +42,9 @@ import matplotlib
 matplotlib.use("Agg")  # headless
 import matplotlib.pyplot as plt
 
-try:  # Optuna é opcional
+try:  # Optuna is optional
     import optuna  # type: ignore
-except Exception:  # pragma: no cover - ausência não deve quebrar
+except Exception:  # pragma: no cover - absence should not break
     optuna = None
 
 from src.infrastructure.logging_config import get_logger
@@ -31,11 +54,52 @@ logger = get_logger("CSPBench.Finalization")
 
 @dataclass 
 class FinalizationConfig:
+    """
+    Configuration for finalization service operations.
+    
+    Attributes:
+        work_id (str): Unique work identifier for export.
+        output_dir (Path): Base directory for export artifacts.
+        tool_version (Optional[str]): Version of the tool generating exports.
+    """
     work_id: str
     output_dir: Path
     tool_version: str | None = None
+
+
 class FinalizationService:
+    """
+    Comprehensive finalization and export service.
+    
+    Handles the complete finalization process for work items including
+    database exports, result compilation, visualization generation, and
+    artifact manifest creation.
+    
+    Features:
+        - Database table exports in CSV format
+        - Optimization trial exports with plots
+        - Sensitivity analysis exports with visualizations
+        - Full results JSON compilation
+        - Export manifest with metadata
+        - Summary report generation
+    
+    Attributes:
+        config (FinalizationConfig): Service configuration.
+        work_store: Work-scoped persistence store.
+        output_dir (Path): Base output directory.
+        raw_dir (Path): Raw database exports directory.
+        optuna_dir (Path): Optimization artifacts directory.
+        sensitivity_dir (Path): Sensitivity analysis artifacts directory.
+    """
+
     def __init__(self, config: FinalizationConfig, work_store: Any = None):
+        """
+        Initialize finalization service with configuration and storage.
+        
+        Args:
+            config (FinalizationConfig): Service configuration.
+            work_store: WorkScopedPersistence instance for data access.
+        """
         self.config = config
         self.work_store = work_store  # WorkScopedPersistence instance
         self.output_dir = config.output_dir
@@ -46,7 +110,14 @@ class FinalizationService:
         self.raw_dir.mkdir(exist_ok=True)
         
     def _get_db_connection(self):
-        """DEPRECATED: Direct database access should not be used."""
+        """
+        Get database connection (DEPRECATED).
+        
+        Direct database access should not be used. Use work_store methods instead.
+        
+        Raises:
+            ValueError: If work_store is not available.
+        """
         logger.warning("Direct database access is deprecated. Use work_store methods instead.")
         if self.work_store is None:
             raise ValueError("work_store is required for database operations")
@@ -56,6 +127,13 @@ class FinalizationService:
 
     # -------------- PUBLIC --------------
     def run(self) -> None:
+        """
+        Execute the complete finalization process.
+        
+        Performs all finalization operations including database exports,
+        specialized exports (Optuna/Sensitivity), result compilation,
+        manifest generation, and summary creation.
+        """
         logger.info(
             "Starting finalization export (raw db + manifest + full_results + summary)"
         )
@@ -80,7 +158,16 @@ class FinalizationService:
 
     # -------------- INTERNAL --------------
     def _dump_sqlite_tables(self) -> Dict[str, Dict[str, Any]]:
-        """Export tables data using work_store methods instead of direct SQL."""
+        """
+        Export database tables using work_store methods instead of direct SQL.
+        
+        Exports all relevant database tables to CSV format using the work_store
+        interface rather than direct database access for better abstraction.
+        
+        Returns:
+            Dict[str, Dict[str, Any]]: Dictionary containing export metadata
+                for each table including row counts and file paths.
+        """
         info: Dict[str, Dict[str, Any]] = {}
         
         if self.work_store is None:
@@ -128,7 +215,17 @@ class FinalizationService:
         return info
 
     def _write_csv_data(self, table_name: str, data: List[Dict[str, Any]], info: Dict[str, Dict[str, Any]]) -> None:
-        """Write data to CSV file."""
+        """
+        Write data to CSV file with proper formatting.
+        
+        Handles CSV writing with proper escaping for special characters
+        and updates the export metadata information.
+        
+        Args:
+            table_name (str): Name of the table being exported.
+            data (List[Dict[str, Any]]): Data rows to export.
+            info (Dict[str, Dict[str, Any]]): Export metadata to update.
+        """
         if not data:
             return
             
@@ -165,6 +262,20 @@ class FinalizationService:
         optuna_exports: Dict[str, Any],
         sensitivity_exports: Dict[str, Any],
     ) -> Path:
+        """
+        Generate comprehensive full results JSON file.
+        
+        Compiles all execution results into a single JSON file with
+        metadata, table information, and specialized analysis results.
+        
+        Args:
+            tables_info (Dict[str, Dict[str, Any]]): Database table export metadata.
+            optuna_exports (Dict[str, Any]): Optimization export results.
+            sensitivity_exports (Dict[str, Any]): Sensitivity analysis export results.
+            
+        Returns:
+            Path: Path to the generated full results JSON file.
+        """
         # Build executions expansion (lightweight) using work_store
         executions: List[Dict[str, Any]] = []
         try:
@@ -209,6 +320,21 @@ class FinalizationService:
         optuna_exports: Dict[str, Any],
         sensitivity_exports: Dict[str, Any],
     ) -> Path:
+        """
+        Generate export manifest with artifact inventory.
+        
+        Creates a comprehensive manifest file listing all export artifacts
+        with metadata and version information.
+        
+        Args:
+            tables_info (Dict[str, Dict[str, Any]]): Database table export metadata.
+            full_results_path (Path): Path to full results file.
+            optuna_exports (Dict[str, Any]): Optimization export results.
+            sensitivity_exports (Dict[str, Any]): Sensitivity analysis export results.
+            
+        Returns:
+            Path: Path to the generated manifest JSON file.
+        """
         manifest = {
             "version": "1.0",
             "work_id": self.config.work_id,
@@ -234,6 +360,20 @@ class FinalizationService:
         full_results_path: Path,
         manifest_path: Path,
     ) -> Path:
+        """
+        Generate human-readable summary report in Markdown format.
+        
+        Creates a summary report with key statistics and artifact listings
+        for easy human consumption of export results.
+        
+        Args:
+            tables_info (Dict[str, Dict[str, Any]]): Database table export metadata.
+            full_results_path (Path): Path to full results file.
+            manifest_path (Path): Path to manifest file.
+            
+        Returns:
+            Path: Path to the generated summary Markdown file.
+        """
         executions_rows = tables_info.get("executions", {}).get("rows", 0)
         work_rows = tables_info.get("work", {}).get("rows", 0)
         summary_lines = [
@@ -261,13 +401,21 @@ class FinalizationService:
 
     # -------------- OPTUNA EXPORT --------------
     def _export_optuna_trials_and_plots(self) -> Dict[str, Any]:
-        """Exporta trials de otimização e plots derivados (sem depender necessariamente do storage Optuna).
-
-        Estratégia:
-          1. Ler executions cujo unit_id começa com 'optimization:'
-          2. Agrupar por (task_id, dataset_id, preset_id, algorithm_id)
-          3. Gerar trials.csv consolidado
-          4. Para cada estudo gerar dois plots simples (objective_vs_trial, best_objective_vs_trial)
+        """
+        Export optimization trials and generate plots.
+        
+        Exports optimization trial data and generates visualizations
+        without necessarily depending on Optuna storage format.
+        
+        Strategy:
+            1. Read executions whose unit_id starts with 'optimization:'
+            2. Group by (task_id, dataset_id, preset_id, algorithm_id)
+            3. Generate consolidated trials.csv file
+            4. Generate plots for each study (objective_vs_trial, best_objective_vs_trial)
+        
+        Returns:
+            Dict[str, Any]: Dictionary containing export metadata including
+                trials CSV path, study information, and plot paths.
         """
         try:
             # Use work_store method instead of direct DB access
@@ -384,7 +532,16 @@ class FinalizationService:
 
     # -------------- SENSITIVITY EXPORT --------------
     def _export_sensitivity_results_and_plots(self) -> Dict[str, Any]:
-        """Exporta resultados de sensibilidade baseados em eventos (futuro: integrar SALib nativo)."""
+        """
+        Export sensitivity analysis results and generate plots.
+        
+        Exports sensitivity analysis results based on events and generates
+        visualizations. Future enhancement will integrate native SALib support.
+        
+        Returns:
+            Dict[str, Any]: Dictionary containing export metadata including
+                analyses file path, analysis data, and plot paths.
+        """
         try:
             # Use work_store method instead of direct DB access
             events_data = self.work_store.store.get_sensitivity_events_for_export(self.config.work_id)
@@ -456,6 +613,15 @@ class FinalizationService:
 
     @staticmethod
     def _safe_parse_json(text: str | None) -> Any:
+        """
+        Safely parse JSON text with fallback.
+        
+        Args:
+            text (Optional[str]): JSON text to parse.
+            
+        Returns:
+            Any: Parsed JSON object, original text if parsing fails, or None.
+        """
         if not text:
             return None
         try:
@@ -465,13 +631,28 @@ class FinalizationService:
 
     @staticmethod
     def _now_iso() -> str:
+        """
+        Get current timestamp in ISO format.
+        
+        Returns:
+            str: Current timestamp in ISO 8601 format with timezone.
+        """
         return datetime.now(timezone.utc).isoformat()
 
     @staticmethod
     def detect_tool_version(pyproject_path: Path | None = None) -> str | None:
-        """Attempt to read version from pyproject.toml (PEP 621).
+        """
+        Attempt to read version from pyproject.toml (PEP 621).
+        
+        Tries to extract the tool version from the project configuration
+        file for inclusion in export metadata.
 
-        Returns None on any failure (caller may decide default).
+        Args:
+            pyproject_path (Optional[Path]): Path to pyproject.toml file.
+                If None, attempts to resolve relative to repository root.
+
+        Returns:
+            Optional[str]: Tool version string if found, None on any failure.
         """
         try:
             if pyproject_path is None:

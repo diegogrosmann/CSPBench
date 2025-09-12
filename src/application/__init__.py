@@ -10,11 +10,11 @@ layer (CLI/Web interfaces) and the domain/infrastructure layers,
 ensuring proper separation of concerns and clean architecture principles.
 
 Key Components:
-- Work management services
-- Execution orchestration
-- Configuration parsing and validation
-- Dataset generation and loading
-- Service coordination
+    - Work management services
+    - Execution orchestration
+    - Configuration parsing and validation
+    - Dataset generation and loading
+    - Service coordination
 
 Note:
     __all__ is intentionally empty to avoid premature imports of

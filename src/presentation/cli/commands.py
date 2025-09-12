@@ -1,6 +1,15 @@
 """CLI Commands Registration Module
 
-Centraliza registro de comandos usando WorkManager unificado.
+This module centralizes the registration of CLI commands using the unified WorkManager.
+It provides command implementations for batch execution, work management, algorithm
+listing, web interface startup, and dataset generation.
+
+The module handles:
+- Batch file execution with optional progress monitoring
+- Work item management (restart, list, status)
+- Algorithm registry display
+- Web interface startup with configurable parameters
+- Interactive dataset generation wizard
 """
 
 import os
@@ -18,8 +27,11 @@ command_logger = get_logger("CSPBench.CLI.Commands")
 def _run_work_monitor(
     work_id: str, show_final_status: bool = True, fallback_message: bool = True
 ) -> bool:
-    """
-    Run progress monitor for a work item.
+    """Run progress monitor for a work item.
+
+    This function starts the curses-based progress monitor for the specified work.
+    It handles initialization errors gracefully and provides fallback messaging
+    when the monitor cannot be started.
 
     Args:
         work_id: Work identifier to monitor
@@ -42,18 +54,20 @@ def _run_work_monitor(
 
     except Exception as e:
         if fallback_message:
-            typer.echo(f"⚠️  Não foi possível iniciar o monitor: {e}")
-            typer.echo("🔄 O trabalho continua executando em segundo plano...")
+            typer.echo(f"⚠️  Could not start monitor: {e}")
+            typer.echo("🔄 Work continues running in background...")
             typer.echo(
-                f"💡 Use 'cspbench monitor {work_id}' para tentar monitorar novamente mais tarde"
+                f"💡 Use 'cspbench monitor {work_id}' to try monitoring again later"
             )
 
         return False
 
 
 def _show_final_status_message(work_id: str) -> None:
-    """
-    Show appropriate exit message based on final work status.
+    """Show appropriate exit message based on final work status.
+
+    Retrieves the final status of the work and displays an appropriate message
+    with relevant information such as output paths or error details.
 
     Args:
         work_id: Work identifier to check status for
@@ -66,55 +80,60 @@ def _show_final_status_message(work_id: str) -> None:
         details = work_service.get(work_id)
 
         if not details:
-            typer.echo(f"⚠️  Não foi possível obter status final do trabalho {work_id}")
+            typer.echo(f"⚠️  Could not get final status for work {work_id}")
             return
 
         status = details.status.value
 
         # Show message based on final status
         if status == BaseStatus.COMPLETED.value:
-            typer.echo("\n🎉 Trabalho concluído com sucesso!")
-            typer.echo(f"✅ Status final: {status}")
+            typer.echo("\n🎉 Work completed successfully!")
+            typer.echo(f"✅ Final status: {status}")
             if details.output_path:
-                typer.echo(f"📁 Resultados salvos em: {details.output_path}")
+                typer.echo(f"📁 Results saved at: {details.output_path}")
 
         elif status == BaseStatus.FAILED.value:
-            typer.echo("\n❌ Trabalho falhou durante a execução")
-            typer.echo(f"💥 Status final: {status}")
+            typer.echo("\n❌ Work failed during execution")
+            typer.echo(f"💥 Final status: {status}")
             if details.error:
-                typer.echo(f"🔍 Erro: {details.error}")
+                typer.echo(f"🔍 Error: {details.error}")
 
         elif status == BaseStatus.ERROR.value:
-            typer.echo("\n⚠️  Trabalho finalizado com erros")
-            typer.echo(f"🟡 Status final: {status}")
-            typer.echo("🔍 Verifique os logs para mais detalhes")
+            typer.echo("\n⚠️  Work finished with errors")
+            typer.echo(f"🟡 Final status: {status}")
+            typer.echo("🔍 Check logs for more details")
             if details.error:
-                typer.echo(f"💬 Último erro: {details.error}")
+                typer.echo(f"💬 Last error: {details.error}")
 
         elif status == BaseStatus.CANCELED.value:
-            typer.echo("\n🛑 Trabalho foi cancelado")
-            typer.echo(f"⏹️  Status final: {status}")
-            typer.echo("📝 Execução interrompida pelo usuário")
+            typer.echo("\n🛑 Work was canceled")
+            typer.echo(f"⏹️  Final status: {status}")
+            typer.echo("📝 Execution interrupted by user")
 
         else:
             # Handle other statuses (paused, running, queued, etc.)
-            typer.echo(f"\n🔄 Trabalho terminou com status: {status}")
+            typer.echo(f"\n🔄 Work finished with status: {status}")
             if status in [
                 BaseStatus.PAUSED.value,
                 BaseStatus.RUNNING.value,
                 BaseStatus.QUEUED.value,
             ]:
-                typer.echo("💡 O trabalho pode ser retomado a qualquer momento.")
+                typer.echo("💡 Work can be resumed at any time.")
 
     except Exception as e:
-        typer.echo(f"⚠️  Erro ao verificar status final: {e}")
+        typer.echo(f"⚠️  Error checking final status: {e}")
 
 
 def register_commands(app: typer.Typer) -> None:
+    """Register all CLI commands in the Typer application.
+    
+    This function sets up all available CLI commands including batch execution,
+    work management, algorithm listing, web interface, and dataset generation.
+    
+    Args:
+        app: Typer application instance to register commands with
     """
-    Register all CLI commands in the Typer application.
-    """
-    command_logger.info("Registrando comandos CLI no Typer")
+    command_logger.info("Registering CLI commands in Typer")
 
     @app.command()
     def batch(
@@ -129,10 +148,14 @@ def register_commands(app: typer.Typer) -> None:
 
         Uses WorkManager for consistent execution workflow between CLI and Web.
         Automatically shows progress monitoring interface unless --no-monitor is used.
+        
+        Args:
+            batch: Path to batch configuration YAML file
+            no_monitor: Flag to disable real-time progress monitoring
         """
         try:
             typer.echo("")
-            typer.echo(f"🚀 Executando: batch={batch}")
+            typer.echo(f"🚀 Executing: batch={batch}")
             config = load_cspbench_config(batch)
 
             extra = {"origin": "cli", "batch_file": str(batch)}
@@ -143,7 +166,7 @@ def register_commands(app: typer.Typer) -> None:
 
             work_id = work_manager.execute(config=config, extra=extra)
 
-            typer.echo("✅ Trabalho submetido com sucesso. work_id={work_id}")
+            typer.echo(f"✅ Work submitted successfully. work_id={work_id}")
 
             if not no_monitor:
                 # Use the reusable monitor function
@@ -159,28 +182,33 @@ def register_commands(app: typer.Typer) -> None:
                 _show_final_status_message(work_id)
 
         except Exception as e:  # noqa: BLE001
-            typer.echo(f"❌ Erro: {e}")
+            typer.echo(f"❌ Error: {e}")
             raise typer.Exit(1)
 
     # --- Work management commands ---
-    work_app = typer.Typer(help="Gerencia WorkItems usando WorkService")
+    work_app = typer.Typer(help="Manage WorkItems using WorkService")
 
     @work_app.command("restart")
     def work_restart(
         work_id: str = typer.Argument(
-            ..., exists=True, readable=True, help="Work ID a ser Reiniciado"
+            ..., help="Work ID to be restarted"
         ),
         no_monitor: bool = typer.Option(
             False, "--no-monitor", help="Disable progress monitoring interface"
         ),
     ):
-        """Restart a work item using WorkService."""
+        """Restart a work item using WorkService.
+        
+        Args:
+            work_id: Identifier of the work item to restart
+            no_monitor: Flag to disable real-time progress monitoring
+        """
         try:
             from src.application.services.work_service import get_work_service
 
             work_service = get_work_service()
             if not work_service.get(work_id):
-                typer.echo("❌ Work não encontrado")
+                typer.echo("❌ Work not found")
                 return
 
             work_manager = get_work_service()
@@ -201,22 +229,25 @@ def register_commands(app: typer.Typer) -> None:
                 _show_final_status_message(work_id)
 
         except Exception as e:  # noqa: BLE001
-            typer.echo(f"❌ Erro: {e}")
+            typer.echo(f"❌ Error: {e}")
             raise typer.Exit(1)
 
     @work_app.command("list")
     def work_list():
-        """List all work items using WorkService."""
+        """List all work items using WorkService.
+        
+        Displays a summary of all work items including their IDs and current status.
+        """
         from src.application.services.work_service import get_work_service
 
         work_service = get_work_service()
         items = work_service.list()
 
         if not items:
-            typer.echo("📭 Nenhum trabalho encontrado")
+            typer.echo("📭 No work items found")
             return
 
-        typer.echo("📋 Lista de trabalhos:")
+        typer.echo("📋 Work items list:")
         for item in items:
             status = item.status.value
             wid = item.id
@@ -224,28 +255,39 @@ def register_commands(app: typer.Typer) -> None:
 
     @work_app.command("status")
     def work_status(work_id: str):
-        """Get work item status using WorkService."""
+        """Get work item status using WorkService.
+        
+        Displays detailed status information for a specific work item including
+        creation time, last update, and any error messages.
+        
+        Args:
+            work_id: Identifier of the work item to check
+        """
         from src.application.services.work_service import get_work_service
 
         work_service = get_work_service()
         work_item = work_service.get(work_id)
 
         if not work_item:
-            typer.echo(f"❌ Trabalho {work_id} não encontrado")
+            typer.echo(f"❌ Work {work_id} not found")
             raise typer.Exit(1)
 
-        typer.echo(f"📊 Status do trabalho {work_id}:")
+        typer.echo(f"📊 Status for work {work_id}:")
         typer.echo(f"  Status: {work_item.status.value}")
-        typer.echo(f"  Criado: {work_item.created_at}")
-        typer.echo(f"  Atualizado: {work_item.updated_at}")
+        typer.echo(f"  Created: {work_item.created_at}")
+        typer.echo(f"  Updated: {work_item.updated_at}")
         if work_item.error:
-            typer.echo(f"  Erro: {work_item.error}")
+            typer.echo(f"  Error: {work_item.error}")
 
     app.add_typer(work_app, name="work")
 
     @app.command()
     def algorithms():
-        """List available algorithms."""
+        """List available algorithms.
+        
+        Displays all registered algorithms in the global algorithm registry
+        along with their descriptions.
+        """
         try:
             from src.domain.algorithms import global_registry  # lazy import
 
@@ -265,7 +307,16 @@ def register_commands(app: typer.Typer) -> None:
         port: int = typer.Option(None, "--port", "-p", help="Port to bind to"),
         dev: bool = typer.Option(None, "--dev", help="Run in development mode"),
     ) -> None:
-        """Start the web interface."""
+        """Start the web interface.
+        
+        Launches the FastAPI web server with configurable host, port, and development
+        mode settings. Uses environment variables as defaults when options are not provided.
+        
+        Args:
+            host: Network interface to bind to (default: 0.0.0.0)
+            port: Port number to listen on (default: 8080)
+            dev: Enable development mode with auto-reload and debug logging
+        """
         try:
             host = host if host is not None else os.getenv("WEB_HOST", "0.0.0.0")
             # Use PORT environment variable as primary, fallback to WEB_PORT for compatibility
@@ -318,7 +369,12 @@ def register_commands(app: typer.Typer) -> None:
 
     @app.command(name="datasetsave")
     def dataset_save() -> None:
-        """Interactive synthetic dataset generation wizard."""
+        """Interactive synthetic dataset generation wizard.
+        
+        Launches an interactive command-line wizard that guides users through
+        the process of generating synthetic datasets or downloading real datasets
+        from NCBI databases.
+        """
         try:
             from src.infrastructure.orchestration.dataset_generation_orchestrator import (
                 DatasetGenerationOrchestrator,

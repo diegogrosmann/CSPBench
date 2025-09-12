@@ -1,13 +1,23 @@
 """
-NCBI Dataset Download Module - CSPBench
+NCBI Dataset Download Module - CSPBench.
 
 Provides functionality for automatic download of biological sequences
 from NCBI via Entrez API for Closest String Problem (CSP) applications.
+
+This module handles authentication, query execution, sequence retrieval,
+and post-processing for biological sequence datasets from NCBI databases.
 
 Configuration:
     Create a .env file in the project root with:
     NCBI_EMAIL=your_email@example.com
     NCBI_API_KEY=your_api_key  # Optional
+
+Features:
+    - Automatic NCBI Entrez API integration
+    - Configurable sequence filtering and uniformization
+    - Support for multiple databases (nucleotide, protein, etc.)
+    - Length-based filtering and quality control
+    - Deterministic sampling for reproducible results
 
 Author: CSPBench Development Team
 """
@@ -25,7 +35,7 @@ from src.domain.dataset import Dataset
 
 load_dotenv()
 
-# TODO: Reimplementar após migração completa
+# TODO: Re-implement after complete migration
 # from cspbench.ui.cli.entrez_wizard import collect_entrez_parameters
 
 try:
@@ -42,7 +52,7 @@ ENTREZ_DEFAULTS = {
     "email": os.getenv("NCBI_EMAIL", "change_me@example.com"),
     "api_key": os.getenv("NCBI_API_KEY"),
     "db": "nucleotide",
-    # Padrões unificados (sem duplicidade)
+    # Unified defaults (no duplicity)
     "query": "COIGene AND 600:650[SLEN]",
     "max_sequences": None,
     "rettype": "fasta",
@@ -59,7 +69,16 @@ class EntrezDatasetDownloader:
     NCBI Entrez dataset downloader for CSP applications.
 
     Provides static methods for downloading biological sequences from NCBI
-    and converting them to Dataset objects.
+    databases and converting them to Dataset objects with proper validation
+    and post-processing.
+
+    Features:
+        - Multi-database support (nucleotide, protein, etc.)
+        - Configurable sequence filtering and validation
+        - Length-based filtering with min/max constraints
+        - Sequence uniformization policies (strict, pad, trim)
+        - Deterministic sampling for reproducible downloads
+        - Comprehensive error handling and validation
     """
 
     @staticmethod
@@ -67,18 +86,24 @@ class EntrezDatasetDownloader:
         params: Union[Dict[str, Any], EntrezDatasetConfig],
     ) -> Tuple[Dataset, Dict[str, Any]]:
         """
-        Download a dataset from NCBI usando os parâmetros fornecidos.
+        Download a dataset from NCBI using the provided parameters.
+
+        Downloads biological sequences from NCBI databases based on the provided
+        configuration parameters. Handles authentication, query execution,
+        sequence retrieval, and post-processing.
 
         Args:
-            params: Parâmetros de configuração como dict ou EntrezDatasetConfig
+            params (Union[Dict[str, Any], EntrezDatasetConfig]): Configuration
+                parameters as dict or EntrezDatasetConfig object.
 
         Returns:
-            Tuple[Dataset, Dict[str, Any]]: Dataset com as sequências e
-            um dicionário com todos os parâmetros efetivamente utilizados.
+            Tuple[Dataset, Dict[str, Any]]: A tuple containing:
+                - Dataset: Dataset object with downloaded sequences
+                - Dict: Dictionary with all parameters effectively used
 
         Raises:
-            ValueError: If error in search, download or validation
-            HTTPError: If communication problem with NCBI
+            ValueError: If error in search, download or validation.
+            HTTPError: If communication problem with NCBI.
         """
         # Convert EntrezDatasetConfig to dict if needed
         if isinstance(params, EntrezDatasetConfig):
@@ -103,11 +128,14 @@ class EntrezDatasetDownloader:
         """
         Convert EntrezDatasetConfig to parameters dict.
 
+        Transforms an EntrezDatasetConfig object into a dictionary format
+        suitable for internal processing methods.
+
         Args:
-            config: EntrezDatasetConfig object
+            config (EntrezDatasetConfig): EntrezDatasetConfig object.
 
         Returns:
-            Dict with parameters for _fetch_sequences
+            Dict[str, Any]: Parameters dictionary for _fetch_sequences method.
         """
         return {
             "query": config.query,
@@ -128,15 +156,22 @@ class EntrezDatasetDownloader:
         """
         Internal method to fetch sequences from NCBI.
 
+        Performs the actual sequence download from NCBI databases including
+        authentication setup, query execution, sequence retrieval, and
+        post-processing operations.
+
         Args:
-            params: Configuration parameters
+            params (Dict[str, Any]): Configuration parameters containing
+                query, database, limits, and processing options.
 
         Returns:
-            Tuple with list of sequences and used parameters
+            Tuple[List[str], Dict[str, Any]]: A tuple containing:
+                - List[str]: List of downloaded and processed sequences
+                - Dict[str, Any]: Parameters used during download process
 
         Raises:
-            ValueError: If error in search, download or validation
-            HTTPError: If communication problem with NCBI
+            ValueError: If error in search, download or validation.
+            HTTPError: If communication problem with NCBI.
         """
         # Mesclar parâmetros com configurações padrão
         merged_params = {**ENTREZ_DEFAULTS}
@@ -303,13 +338,25 @@ class EntrezDatasetDownloader:
     def _apply_uniform_policy(
         sequences: List[str], policy: str, pad_char: str = "N"
     ) -> List[str]:
-        """Aplica política de uniformização às sequências.
+        """
+        Apply uniformization policy to sequences.
 
-        Políticas suportadas:
-          - strict: mantém apenas sequências do comprimento mais frequente
-          - majority: equivalente a strict (alias)
-          - pad: preenche à direita com pad_char até o maior comprimento
-          - trim: corta à direita até o menor comprimento
+        Applies different strategies to handle sequences of varying lengths,
+        ensuring consistent sequence length across the dataset when required.
+
+        Supported Policies:
+            - strict: Keep only sequences of the most frequent length
+            - majority: Equivalent to strict (alias)
+            - pad: Right-pad with pad_char to the longest sequence length
+            - trim: Right-trim to the shortest sequence length
+
+        Args:
+            sequences (List[str]): List of sequences to uniformize.
+            policy (str): Uniformization policy to apply.
+            pad_char (str): Character to use for padding. Defaults to "N".
+
+        Returns:
+            List[str]: List of sequences after applying uniformization policy.
         """
         lengths = [len(s) for s in sequences]
         uniq = sorted(set(lengths))

@@ -5,11 +5,25 @@ Defines standardized status enumeration and management for work execution
 across the entire CSPBench system, ensuring consistent status handling
 and proper state transitions.
 
-This module provides:
-- Standardized status enumeration
-- Status validation and normalization
-- Status transition rules
-- Helper functions for status management
+This module provides the core status management infrastructure including:
+- Standardized status enumeration with clear semantics
+- Status validation and normalization utilities
+- Status transition rules and validation
+- Helper functions for status categorization
+- Type-safe status operations
+
+The status system supports the complete work lifecycle from submission
+through completion, with proper categorization into incomplete and
+final states to support different operational needs.
+
+Status Flow:
+    QUEUED -> RUNNING -> {COMPLETED, FAILED, ERROR}
+           -> PAUSED -> RUNNING
+           -> CANCELED
+
+Categories:
+    - Incomplete: Work has not reached a terminal state
+    - Final: Work has completed (successfully or with errors)
 """
 
 from enum import Enum
@@ -20,11 +34,26 @@ class BaseStatus(str, Enum):
     Standardized work execution statuses across the entire system.
     
     This enumeration defines all possible states a work item can be in
-    during its lifecycle, from submission to completion.
+    during its lifecycle, from submission to completion. Each status
+    has clear semantics and defined transition rules.
     
     Status Categories:
-    - Incomplete: QUEUED, RUNNING, PAUSED, CANCELED
-    - Final: COMPLETED, FAILED, ERROR
+        Incomplete States: QUEUED, RUNNING, PAUSED, CANCELED
+            - Work has not reached a final conclusion
+            - May be resumed or restarted
+            
+        Final States: COMPLETED, FAILED, ERROR
+            - Work has reached a terminal state
+            - Represents different completion outcomes
+    
+    Status Descriptions:
+        QUEUED: Work submitted and waiting for execution
+        RUNNING: Work currently being executed
+        PAUSED: Work temporarily suspended, can be resumed
+        CANCELED: Work canceled before completion
+        COMPLETED: Work finished successfully
+        FAILED: Work failed and could not complete
+        ERROR: Work completed but with errors
     """
 
     QUEUED = "queued"      # Work in queue, waiting to start
@@ -38,20 +67,26 @@ class BaseStatus(str, Enum):
     @property
     def is_final(self) -> bool:
         """
-        Indicate if status represents a finalized (terminal) state.
+        Check if status represents a finalized (terminal) state.
+        
+        Terminal states indicate that work has reached a conclusion
+        and will not proceed further without explicit restart.
         
         Returns:
-            bool: True if status is terminal
+            bool: True if status is terminal (COMPLETED, FAILED, ERROR).
         """
         return self in FINAL_STATUSES
 
     @property
     def is_incomplete(self) -> bool:
         """
-        Indicate if status represents an incomplete (non-finalized) state.
+        Check if status represents an incomplete (non-finalized) state.
+        
+        Incomplete states indicate that work has not yet reached a
+        final conclusion and may continue or be resumed.
         
         Returns:
-            bool: True if status is incomplete
+            bool: True if status is incomplete (QUEUED, RUNNING, PAUSED, CANCELED).
         """
         return self in INCOMPLETE_STATUSES
 
@@ -88,61 +123,36 @@ ALLOWEDSTATUS: dict[BaseStatus, set[BaseStatus]] = {
 }
 
 
-def normalize_status(value) -> str:
-    """
-    Normalize a status value to lowercase string.
-
-    Accepts:
-    - BaseStatus instances (returns .value)
-    - Strings (converts to lowercase and strip)
-    - Other types (converts to string and applies lowercase)
-
-    Args:
-        value: Value to be normalized (BaseStatus, str, or other)
-
-    Returns:
-        str: Normalized string in lowercase
-
-    Raises:
-        ValueError: If normalized value doesn't correspond to a valid status
-    """
-    if isinstance(value, BaseStatus):
-        return value.value
-
-    if isinstance(value, str):
-        normalized = value.strip().lower()
-    else:
-        normalized = str(value).strip().lower()
-
-    # Validate if it's a known status
-    valid_values = {s.value for s in BaseStatus}
-    if normalized not in valid_values:
-        raise ValueError(f"Invalid status: {value}. Valid: {sorted(valid_values)}")
-
-    return normalized
-
-
 def normalize_status(value: str | BaseStatus) -> str:
     """
     Normalize a status to validated lowercase string.
 
+    Accepts BaseStatus instances or string values and normalizes them
+    to consistent lowercase string format with validation against
+    known status values.
+
     Args:
-        value: Status as BaseStatus or string (case-insensitive)
+        value (Union[str, BaseStatus]): Status as BaseStatus enum or
+            string (case-insensitive).
         
     Returns:
-        str: Normalized string (one of BaseStatus values)
+        str: Normalized string (one of BaseStatus values).
         
     Raises:
-        ValueError: If value doesn't represent a valid status
+        ValueError: If value doesn't represent a valid status.
+        
+    Examples:
+        >>> normalize_status(BaseStatus.RUNNING)
+        'running'
+        >>> normalize_status('COMPLETED')
+        'completed'
+        >>> normalize_status('  Queued  ')
+        'queued'
     """
     if isinstance(value, BaseStatus):
         return value.value
     if not isinstance(value, str):  # fallback
         value = str(value)
-    norm = value.strip().lower()
-    if norm not in {s.value for s in BaseStatus}:
-        raise ValueError(f"Invalid status: {value}")
-    return norm
     norm = value.strip().lower()
     if norm not in {s.value for s in BaseStatus}:
         raise ValueError(f"Invalid status: {value}")

@@ -1,4 +1,9 @@
-"""Combination CRUD mixin."""
+"""Combination CRUD operations mixin.
+
+This module provides CRUD operations for the Combination table, which represents
+unique combinations of task, dataset, preset, and algorithm configurations
+within a work execution context.
+"""
 
 import time
 from typing import Any, Dict, List, Optional, Tuple
@@ -6,7 +11,13 @@ from sqlalchemy import and_, or_
 
 
 class CombinationCRUDMixin:
-    """CRUD operations for Combination table."""
+    """Mixin providing CRUD operations for Combination table.
+    
+    This mixin handles combination entities which represent unique configurations
+    of task, dataset, preset, and algorithm combinations within a work context.
+    Each combination can contain multiple executions (sequences) and tracks
+    its own execution state and progress.
+    """
 
     def combination_create(
         self,
@@ -23,7 +34,21 @@ class CombinationCRUDMixin:
         started_at: Optional[float] = None,
         finished_at: Optional[float] = None,
     ) -> None:
-        """Create combination entry."""
+        """Create a new combination entry.
+        
+        Args:
+            work_id: ID of the work this combination belongs to
+            task_id: Task identifier for this combination
+            dataset_id: Dataset identifier for this combination
+            preset_id: Configuration preset identifier
+            algorithm_id: Algorithm identifier
+            mode: Execution mode (e.g., 'optimization', 'evaluation')
+            status: Initial status, defaults to "queued"
+            total_sequences: Total number of sequences/executions planned
+            created_at: Creation timestamp, defaults to current time
+            started_at: Start timestamp, if applicable
+            finished_at: Completion timestamp, if applicable
+        """
         from ..models import Combination
         
         # Set created_at timestamp if not provided
@@ -46,7 +71,14 @@ class CombinationCRUDMixin:
             session.add(combination)
 
     def combination_get(self, id: int) -> Optional[Dict[str, Any]]:
-        """Get combination by ID."""
+        """Retrieve a combination by its ID.
+        
+        Args:
+            id: Primary key of the combination
+            
+        Returns:
+            Dictionary containing combination data if found, None otherwise.
+        """
         from ..models import Combination
         
         with self.session_scope() as session:
@@ -54,7 +86,15 @@ class CombinationCRUDMixin:
             return combination.to_dict() if combination else None
 
     def combination_update(self, id: int, **fields: Any) -> None:
-        """Update combination entry."""
+        """Update a combination entry.
+        
+        Args:
+            id: Primary key of the combination to update
+            **fields: Key-value pairs of fields to update
+            
+        Note:
+            This operation is idempotent - no error if combination doesn't exist.
+        """
         from ..models import Combination
         
         if not fields:
@@ -67,7 +107,15 @@ class CombinationCRUDMixin:
                     setattr(combination, key, value)
 
     def combination_delete(self, id: int) -> None:
-        """Delete combination entry."""
+        """Delete a combination entry.
+        
+        Args:
+            id: Primary key of the combination to delete
+            
+        Warning:
+            This will also delete all associated executions due to foreign
+            key constraints. This operation is idempotent.
+        """
         from ..models import Combination
         
         with self.session_scope() as session:
@@ -84,18 +132,26 @@ class CombinationCRUDMixin:
         order_by: Optional[str] = None,
         order_desc: bool = False
     ) -> Tuple[List[Dict[str, Any]], int]:
-        """
-        List combinations with generic filtering and pagination.
+        """List combinations with filtering and pagination.
         
         Args:
-            filters: Dictionary of field:value pairs for filtering
-            offset: Number of records to skip
+            filters: Dictionary of field:value pairs for filtering. Supports:
+                - Simple values: {'work_id': 'abc', 'status': 'running'}
+                - List values: {'status': ['running', 'queued']}
+                - Advanced operators: {'created_at': {'operator': 'gte', 'value': 123456}}
+            offset: Number of records to skip (for pagination)
             limit: Maximum number of records to return
-            order_by: Field to order by
+            order_by: Field name to order results by
             order_desc: Whether to order in descending order
             
         Returns:
-            Tuple of (records, total_count)
+            Tuple containing:
+                - List of combination dictionaries matching the criteria
+                - Total count of matching records (before pagination)
+                
+        Note:
+            Advanced operators supported: 'like', 'ilike', 'gt', 'gte', 
+            'lt', 'lte', 'ne' for flexible querying.
         """
         from ..models import Combination
         
@@ -154,14 +210,24 @@ class CombinationCRUDMixin:
             return results, total_count
 
     def combination_bulk_create(self, combinations: List[Dict[str, Any]]) -> int:
-        """
-        Create multiple combinations in a single transaction for better performance.
+        """Create multiple combinations efficiently in a single transaction.
+        
+        Uses bulk insert operations for better performance when creating
+        large numbers of combinations. Falls back to individual inserts
+        if bulk operation fails due to constraint violations.
         
         Args:
-            combinations: List of combination dictionaries with required fields
+            combinations: List of combination dictionaries with required fields.
+                         Each should contain at least work_id and identifiers.
             
         Returns:
-            Number of combinations successfully inserted
+            Number of combinations successfully inserted. May be less than
+            the input list length if some insertions fail due to constraints.
+            
+        Note:
+            - Automatically sets created_at timestamp if not provided
+            - Automatically sets default status to 'queued' if not provided
+            - Ignores duplicate key constraint violations gracefully
         """
         from ..models import Combination
         
@@ -207,15 +273,29 @@ class CombinationCRUDMixin:
         filters: Dict[str, Any], 
         update_fields: Dict[str, Any]
     ) -> int:
-        """
-        Bulk update combinations matching the filters.
+        """Bulk update combinations matching the specified filters.
+        
+        Efficiently updates multiple combinations in a single database operation
+        based on filter criteria. Useful for status transitions, batch operations,
+        and cleanup tasks.
         
         Args:
-            filters: Dictionary with filter conditions (e.g., {'work_id': 'abc', 'status': ['running', 'paused']})
-            update_fields: Dictionary with fields to update (e.g., {'status': 'queued', 'started_at': None})
+            filters: Dictionary with filter conditions. Supports:
+                - Simple values: {'work_id': 'abc', 'status': 'running'}
+                - List values: {'work_id': ['abc', 'def'], 'status': ['running', 'paused']}
+            update_fields: Dictionary with fields to update:
+                - Any combination field can be updated
+                - Common use cases: status transitions, timestamp updates
             
         Returns:
-            int: Number of combinations updated
+            Number of combinations that were actually updated.
+            
+        Example:
+            # Reset all running combinations in work 'abc' to queued
+            count = combination_bulk_update(
+                filters={'work_id': 'abc', 'status': 'running'},
+                update_fields={'status': 'queued', 'started_at': None}
+            )
         """
         from ..models import Combination
         from sqlalchemy import and_

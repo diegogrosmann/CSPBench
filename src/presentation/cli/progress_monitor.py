@@ -1,5 +1,8 @@
 """
 CLI Progress Monitor using curses for real-time algorithm execution monitoring.
+
+This module provides a terminal-based progress monitor that displays real-time
+execution status of CSPBench work items in an htop-style interface.
 """
 
 import argparse
@@ -23,11 +26,39 @@ pm_logger = get_logger("CSPBench.CLI.ProgressMonitor")
 
 
 class ProgressMonitor:
-    """Real-time progress monitor using curses, htop-style."""
+    """Real-time progress monitor using curses, htop-style interface.
+    
+    This class provides a terminal-based interface for monitoring the progress
+    of CSPBench work executions. It displays real-time information about:
+    - Overall work progress
+    - Individual algorithm executions
+    - System status and logs
+    - Resource usage
+    
+    The interface supports keyboard navigation and can pause/resume work execution.
+    
+    Attributes:
+        work_id: The identifier of the work item being monitored
+        running: Flag indicating if the monitor is active
+        refresh_interval: Screen refresh interval in seconds
+        start_time: Monitor start timestamp
+        scroll_pos: Current scroll position in execution list
+        executions: List of execution details
+        logs: List of recent log entries
+        previous_status: Previous work status for change detection
+        persistence: Work persistence interface
+    """
 
     def __init__(self, work_id: str):
-        """Initialize monitor."""
-        print(f"🚀 Inicializando monitor para work: {work_id}")
+        """Initialize the progress monitor.
+        
+        Args:
+            work_id: The identifier of the work item to monitor
+            
+        Raises:
+            ValueError: If the work item is not found or fails to initialize
+        """
+        print(f"🚀 Initializing monitor for work: {work_id}")
 
         self.work_id = work_id
         self.running = True
@@ -38,28 +69,27 @@ class ProgressMonitor:
         self.logs: List[dict] = []
         self.previous_status = None
 
-        # Criar WorkPersistence com configuração padrão
-        print(f"⚙️ Conectando ao sistema de persistência...", end="\r")
+        # Create WorkPersistence with default configuration
+        print(f"⚙️ Connecting to persistence system...", end="\r")
         self.persistence = WorkPersistence()
 
-        # Aguardar que o work exista e esteja em execução
-        print(f"⏳ Aguardando work estar disponível e em execução...", end="\r")
+        # Wait for work to exist and be in execution
+        print(f"⏳ Waiting for work to be available and running...", end="\r")
         if not self._wait_for_work_ready(timeout=60):
-            raise ValueError(f"Timeout: Work '{work_id}' não foi encontrado ou não iniciou execução")
+            raise ValueError(f"Timeout: Work '{work_id}' not found or failed to start execution")
 
         print(" " * 60, end="\r")
-        print("✅ Monitor inicializado com sucesso!")
-        print("🎯 Iniciando interface...")
+        print("✅ Monitor initialized successfully!")
+        print("🎯 Starting interface...")
 
     def _wait_for_work_ready(self, timeout: int = 60) -> bool:
-        """
-        Aguarda que o work exista e esteja disponível para monitoramento.
+        """Wait for work to exist and be available for monitoring.
 
         Args:
-            timeout: Tempo limite em segundos para aguardar
+            timeout: Timeout in seconds to wait for work readiness
 
         Returns:
-            True se o work estiver pronto, False se timeout
+            True if work is ready for monitoring, False if timeout occurred
         """
         start_time = time.time()
         last_log = 0.0
@@ -67,75 +97,89 @@ class ProgressMonitor:
         while time.time() - start_time < timeout:
             current_time = time.time()
             
-            # Log periódico
+            # Periodic logging
             if current_time - last_log >= 5:
                 elapsed = int(current_time - start_time)
-                print(f"   Aguardando work ({elapsed}s)...", end="\r")
+                print(f"   Waiting for work ({elapsed}s)...", end="\r")
                 last_log = current_time
             
             try:
-                # Verifica se o work existe
+                # Check if work exists
                 work = self.persistence.work_get(self.work_id)
                 if not work:
                     time.sleep(1)
                     continue
                 
                 status = work.get('status')
-                print(f"   Work encontrado com status: {status}", end="\r")
+                print(f"   Work found with status: {status}", end="\r")
                 
-                # Para status finais, permite monitoramento
+                # For final statuses, allow monitoring
                 if status in ["completed", "failed", "canceled", "error"]:
                     print(" " * 60, end="\r")
-                    print(f"   Work em estado final: {status}")
+                    print(f"   Work in final state: {status}")
                     self.previous_status = status
                     return True
                 
-                # Para status de execução, verifica se há dados de progresso
+                # For execution statuses, check if there's progress data
                 if status in ["running", "queued"]:
                     try:
                         progress_data = self.persistence.get_work_progress_summary(self.work_id)
                         if progress_data and progress_data.global_execution.get("Total", 0) > 0:
-                            print(f"   Work pronto: status={status}, total_sequences={progress_data.global_execution.get('Total', 0)}", end="\r")
+                            print(f"   Work ready: status={status}, total_sequences={progress_data.global_execution.get('Total', 0)}", end="\r")
                             self.previous_status = status
                             return True
                     except Exception as e:
-                        pm_logger.error("[PM] Erro ao obter progresso do work: %s", e)
-                        pass  # Ainda sem dados de progresso
+                        pm_logger.error("[PM] Error getting work progress: %s", e)
+                        pass  # Still no progress data
                         
             except Exception as e:
-                pm_logger.debug("[PM] Erro ao verificar work: %s", e)
+                pm_logger.debug("[PM] Error checking work: %s", e)
             
             time.sleep(1)
         
         return False
 
     def signal_handler(self, signum, frame):
-        """Handle Ctrl+C gracefully by pausing the work."""
+        """Handle Ctrl+C gracefully by pausing the work.
+        
+        Args:
+            signum: Signal number
+            frame: Current stack frame
+        """
         try:
-            # Importar e usar o WorkService para pausar o trabalho
+            # Import and use WorkService to pause the work
             from src.application.services.work_service import get_work_service
             
             work_service = get_work_service()
             success = work_service.pause(self.work_id)
             
             if success:
-                pm_logger.info(f"Trabalho {self.work_id} pausado via Ctrl+C")
-                print(f"\n✅ Trabalho {self.work_id} pausado com sucesso!")
-                print("🔄 Use 'cspbench monitor {work_id}' para continuar monitorando")
+                pm_logger.info(f"Work {self.work_id} paused via Ctrl+C")
+                print(f"\n✅ Work {self.work_id} paused successfully!")
+                print("🔄 Use 'cspbench monitor {work_id}' to continue monitoring")
             else:
-                pm_logger.warning(f"Falha ao pausar trabalho {self.work_id} via Ctrl+C")
-                print(f"\n⚠️  Não foi possível pausar o trabalho {self.work_id}")
+                pm_logger.warning(f"Failed to pause work {self.work_id} via Ctrl+C")
+                print(f"\n⚠️  Could not pause work {self.work_id}")
                 
         except Exception as e:
-            pm_logger.error(f"Erro ao pausar trabalho {self.work_id} via Ctrl+C: {e}")
-            print(f"\n❌ Erro ao pausar trabalho: {e}")
+            pm_logger.error(f"Error pausing work {self.work_id} via Ctrl+C: {e}")
+            print(f"\n❌ Error pausing work: {e}")
         
         self.running = False
 
     def format_progress_bar(
         self, progress: float, width: int, show_percent: bool = True
     ) -> str:
-        """Creates a text-based progress bar."""
+        """Create a text-based progress bar.
+        
+        Args:
+            progress: Progress value between 0.0 and 1.0
+            width: Width of the progress bar in characters
+            show_percent: Whether to show percentage alongside the bar
+            
+        Returns:
+            Formatted progress bar string
+        """
         filled_len = int(width * progress)
         bar = "█" * filled_len + "─" * (width - filled_len)
         if show_percent:
@@ -144,7 +188,14 @@ class ProgressMonitor:
             return bar
 
     def format_execution_time(self, elapsed_seconds: float) -> str:
-        """Format execution time as mm:ss.mmm"""
+        """Format execution time as mm:ss.mmm.
+        
+        Args:
+            elapsed_seconds: Elapsed time in seconds
+            
+        Returns:
+            Formatted time string
+        """
         total_ms = int(elapsed_seconds * 1000)
         minutes = total_ms // 60000
         seconds = (total_ms % 60000) // 1000
@@ -156,7 +207,16 @@ class ProgressMonitor:
             return f"{seconds:02d}.{milliseconds:03d}s"
 
     def draw_header(self, stdscr, progress: ProgressSummary, work_status: str):
-        """Draws the header with summary information."""
+        """Draw the header with summary information.
+        
+        Args:
+            stdscr: Curses screen object
+            progress: Progress summary data
+            work_status: Current work status
+            
+        Returns:
+            Number of lines used by the header
+        """
         h, w = stdscr.getmaxyx()
         if h < 5:
             return 0
@@ -238,7 +298,12 @@ class ProgressMonitor:
         return 6
 
     def draw_executions_list(self, stdscr, y_pos: int):
-        """Draws the list of executions with visual status indicators."""
+        """Draw the list of executions with visual status indicators.
+        
+        Args:
+            stdscr: Curses screen object
+            y_pos: Starting Y position for the execution list
+        """
         h, w = stdscr.getmaxyx()
         max_rows = h - y_pos - 1
 
@@ -300,7 +365,11 @@ class ProgressMonitor:
             stdscr.addstr(y_pos + i, 0, line.ljust(w)[:w], color)
 
     def draw_footer(self, stdscr):
-        """Draws the footer with controls, legend and status."""
+        """Draw the footer with controls, legend and status.
+        
+        Args:
+            stdscr: Curses screen object
+        """
         h, w = stdscr.getmaxyx()
         if h <= 1:
             return
@@ -321,7 +390,13 @@ class ProgressMonitor:
         stdscr.addstr(h - 1, 0, footer_text, curses.color_pair(5) | curses.A_REVERSE)
 
     def draw_log_panel(self, stdscr, y_pos: int, max_height: int):
-        """Draws a small panel with recent error and warning logs."""
+        """Draw a small panel with recent error and warning logs.
+        
+        Args:
+            stdscr: Curses screen object
+            y_pos: Starting Y position for the log panel
+            max_height: Maximum height available for the log panel
+        """
         h, w = stdscr.getmaxyx()
         if max_height <= 1 or not self.logs:
             return
@@ -367,7 +442,11 @@ class ProgressMonitor:
             stdscr.addstr(y_pos + i, 0, line.ljust(w)[:w], color)
 
     def run(self, stdscr):
-        """Main monitoring loop."""
+        """Main monitoring loop.
+        
+        Args:
+            stdscr: Curses screen object
+        """
         curses.curs_set(0)
         stdscr.nodelay(1)
         stdscr.timeout(50)  # 50ms timeout for getch()
@@ -401,7 +480,7 @@ class ProgressMonitor:
                 )
                 self.scroll_pos = min(max_scroll, self.scroll_pos + 1)
 
-            # Verifica se foi pausado ou cancelado e deve sair
+            # Check if was paused or canceled and should exit
             if not self.running:
                 break
 
@@ -424,7 +503,7 @@ class ProgressMonitor:
                     work = self.persistence.work_get(self.work_id)
                     work_status = work.get('status') if work else "unknown"
 
-                    # Detecta mudança de status de 'queued' para algo que não seja 'running'
+                    # Detect status change from 'queued' to something other than 'running'
                     if (
                         self.previous_status == "queued"
                         and work_status not in ["queued", "running"]
@@ -435,7 +514,7 @@ class ProgressMonitor:
                         )
                         break
 
-                    # Atualiza o status anterior
+                    # Update previous status
                     if work_status != "unknown":
                         self.previous_status = work_status
 
@@ -576,32 +655,36 @@ class ProgressMonitor:
             time.sleep(0.02)
 
     def handle_pause(self, stdscr):
-        """Shows a confirmation dialog for pausing the work."""
+        """Show a confirmation dialog for pausing the work.
+        
+        Args:
+            stdscr: Curses screen object
+        """
         h, w = stdscr.getmaxyx()
 
-        # Criar caixa de diálogo com fundo
+        # Create dialog box with background
         dialog_width = 50
         dialog_height = 7
         start_y = (h - dialog_height) // 2
         start_x = (w - dialog_width) // 2
 
-        # Criar janela de diálogo
+        # Create dialog window
         dialog_win = curses.newwin(dialog_height, dialog_width, start_y, start_x)
-        dialog_win.bkgd(" ", curses.color_pair(5))  # Fundo azul
+        dialog_win.bkgd(" ", curses.color_pair(5))  # Blue background
         dialog_win.box()
 
-        # Título
-        title = "⏸️ PAUSAR TRABALHO"
+        # Title
+        title = "⏸️ PAUSE WORK"
         dialog_win.addstr(1, (dialog_width - len(title)) // 2, title, curses.A_BOLD)
 
-        # Mensagem
-        msg1 = f"Pausar work '{self.work_id[:20]}...'?"
-        msg2 = "Pressione Y para confirmar ou N para cancelar"
+        # Message
+        msg1 = f"Pause work '{self.work_id[:20]}...'?"
+        msg2 = "Press Y to confirm or N to cancel"
         dialog_win.addstr(3, (dialog_width - len(msg1)) // 2, msg1)
         dialog_win.addstr(4, (dialog_width - len(msg2)) // 2, msg2)
 
-        # Opções
-        options = "[Y] Sim    [N] Não"
+        # Options
+        options = "[Y] Yes    [N] No"
         dialog_win.addstr(5, (dialog_width - len(options)) // 2, options, curses.A_BOLD)
 
         dialog_win.refresh()
@@ -619,7 +702,7 @@ class ProgressMonitor:
 
         if confirm_key in [ord("y"), ord("Y")]:
             try:
-                # Importar e usar o WorkService para realmente pausar o trabalho
+                # Import and use WorkService to actually pause the work
                 from src.application.services.work_service import get_work_service
                 
                 work_service = get_work_service()
@@ -629,22 +712,26 @@ class ProgressMonitor:
                     self.show_paused_confirmation_screen(stdscr)
                     self.running = False
                 else:
-                    # Mostrar erro se não conseguiu pausar
-                    self.show_action_error_screen(stdscr, "pausar")
+                    # Show error if couldn't pause
+                    self.show_action_error_screen(stdscr, "pause")
                     
             except Exception as e:
-                pm_logger.error(f"Erro ao pausar trabalho {self.work_id}: {e}")
-                self.show_action_error_screen(stdscr, "pausar")
+                pm_logger.error(f"Error pausing work {self.work_id}: {e}")
+                self.show_action_error_screen(stdscr, "pause")
                 pass  # Continue monitoring in case of error
 
     def show_paused_confirmation_screen(self, stdscr):
-        """Displays a screen when the work is successfully paused."""
+        """Display a screen when the work is successfully paused.
+        
+        Args:
+            stdscr: Curses screen object
+        """
         stdscr.clear()
         h, w = stdscr.getmaxyx()
 
-        title = "⏸️ TRABALHO PAUSADO"
-        msg1 = f"O work '{self.work_id}' foi pausado com sucesso."
-        msg2 = "Monitor será finalizado em 3 segundos..."
+        title = "⏸️ WORK PAUSED"
+        msg1 = f"Work '{self.work_id}' was paused successfully."
+        msg2 = "Monitor will exit in 3 seconds..."
 
         stdscr.addstr(
             h // 2 - 1,
@@ -662,15 +749,21 @@ class ProgressMonitor:
             time.sleep(0.1)
 
     def show_paused_screen(self, stdscr, status: str, progress):
-        """Displays a paused screen when the work is paused."""
+        """Display a paused screen when the work is paused.
+        
+        Args:
+            stdscr: Curses screen object
+            status: Current work status
+            progress: Progress summary data
+        """
         stdscr.clear()
         h, w = stdscr.getmaxyx()
 
-        title = f"⏸️ Work Pausado: {status.upper()}"
+        title = f"⏸️ Work Paused: {status.upper()}"
         finished = progress.global_execution["Finished"]
         total = progress.global_execution["Total"]
         pause_progress = (
-            f"Progresso no momento da pausa: {finished}/{total} execuções completadas."
+            f"Progress at pause: {finished}/{total} executions completed."
         )
 
         stdscr.addstr(
@@ -680,9 +773,9 @@ class ProgressMonitor:
             curses.color_pair(2) | curses.A_BOLD,
         )
         stdscr.addstr(h // 2, (w - len(pause_progress)) // 2, pause_progress)
-        stdscr.addstr(h // 2 + 1, (w - 60) // 2, "O trabalho foi pausado com sucesso.")
+        stdscr.addstr(h // 2 + 1, (w - 60) // 2, "Work was paused successfully.")
         stdscr.addstr(
-            h // 2 + 2, (w - 40) // 2, "Monitor será finalizado em 3 segundos..."
+            h // 2 + 2, (w - 40) // 2, "Monitor will exit in 3 seconds..."
         )
         stdscr.refresh()
 
@@ -694,35 +787,42 @@ class ProgressMonitor:
     def show_status_change_screen(
         self, stdscr, old_status: str, new_status: str, progress: ProgressSummary
     ):
-        """Displays a screen when work status changes from queued to non-running status."""
+        """Display a screen when work status changes from queued to non-running status.
+        
+        Args:
+            stdscr: Curses screen object
+            old_status: Previous work status
+            new_status: New work status
+            progress: Progress summary data
+        """
         stdscr.clear()
         h, w = stdscr.getmaxyx()
 
-        # Determina a cor e mensagem baseada no novo status
+        # Determine color and message based on new status
         if new_status in ["failed", "error"]:
-            color = curses.color_pair(1)  # Vermelho
+            color = curses.color_pair(1)  # Red
             title = f"Work Failed: {new_status.upper()}"
-            message = "O trabalho falhou antes de começar a executar."
+            message = "Work failed before starting execution."
         elif new_status == "canceled":
-            color = curses.color_pair(2)  # Amarelo
+            color = curses.color_pair(2)  # Yellow
             title = f"Work Canceled: {new_status.upper()}"
-            message = "O trabalho foi cancelado antes de começar a executar."
+            message = "Work was canceled before starting execution."
         elif new_status == "completed":
-            color = curses.color_pair(3)  # Verde
+            color = curses.color_pair(3)  # Green
             title = f"Work Completed: {new_status.upper()}"
-            message = "O trabalho foi concluído rapidamente."
+            message = "Work completed quickly."
         else:
-            color = curses.color_pair(2)  # Amarelo
+            color = curses.color_pair(2)  # Yellow
             title = f"Status Changed: {old_status.upper()} → {new_status.upper()}"
             message = (
-                f"O trabalho mudou de '{old_status}' para '{new_status}' sem executar."
+                f"Work changed from '{old_status}' to '{new_status}' without executing."
             )
 
         finished = progress.global_execution["Finished"]
         total = progress.global_execution["Total"]
-        progress_info = f"Progresso: {finished}/{total} execuções completadas."
+        progress_info = f"Progress: {finished}/{total} executions completed."
 
-        # Calcula posições centralizadas
+        # Calculate centered positions
         title_y = h // 2 - 2
         message_y = h // 2 - 1
         progress_y = h // 2
@@ -734,18 +834,24 @@ class ProgressMonitor:
         stdscr.addstr(exit_y, (w - 40) // 2, "Monitor will exit in 5 seconds...")
         stdscr.refresh()
 
-        # Aguarda 5 segundos ou tecla pressionada
+        # Wait 5 seconds or key press
         for _ in range(50):
             if stdscr.getch() != -1:
                 break
             time.sleep(0.1)
 
     def show_final_screen(self, stdscr, status: str, progress: ProgressSummary):
-        """Displays a final summary screen when the work is done."""
+        """Display a final summary screen when the work is done.
+        
+        Args:
+            stdscr: Curses screen object
+            status: Final work status
+            progress: Progress summary data
+        """
         stdscr.clear()
         h, w = stdscr.getmaxyx()
 
-        # Escolhe emoji baseado no status
+        # Choose emoji based on status
         if status == "completed":
             emoji = "🎉"
         elif status in ["failed", "error"]:
@@ -776,14 +882,19 @@ class ProgressMonitor:
             time.sleep(0.1)
 
     def show_action_error_screen(self, stdscr, action: str):
-        """Displays an error screen when an action fails."""
+        """Display an error screen when an action fails.
+        
+        Args:
+            stdscr: Curses screen object
+            action: The action that failed (e.g., "pause")
+        """
         stdscr.clear()
         h, w = stdscr.getmaxyx()
 
-        title = f"❌ ERRO AO {action.upper()}"
-        msg1 = f"Não foi possível {action} o trabalho '{self.work_id}'"
-        msg2 = "Verifique os logs ou tente novamente"
-        msg3 = "Pressione qualquer tecla para continuar..."
+        title = f"❌ ERROR {action.upper()}"
+        msg1 = f"Could not {action} work '{self.work_id}'"
+        msg2 = "Check logs or try again"
+        msg3 = "Press any key to continue..."
 
         stdscr.addstr(
             h // 2 - 2,
@@ -796,11 +907,15 @@ class ProgressMonitor:
         stdscr.addstr(h // 2 + 2, (w - len(msg3)) // 2, msg3, curses.A_BOLD)
         stdscr.refresh()
 
-        # Aguardar tecla
+        # Wait for key press
         stdscr.getch()
 
     def start(self):
-        """Start the monitor."""
+        """Start the progress monitor.
+        
+        Returns:
+            Exit code (0 for success, 1 for error)
+        """
         signal.signal(signal.SIGINT, self.signal_handler)
         try:
             if not self.persistence.work_get(self.work_id):
@@ -819,7 +934,7 @@ class ProgressMonitor:
 
 
 def main():
-    """CLI entry point."""
+    """CLI entry point for the progress monitor."""
 
     parser = argparse.ArgumentParser(
         description="CSPBench Progress Monitor (htop-style)"
@@ -835,27 +950,27 @@ def main():
         if "Timeout" in str(e):
             if "WorkService" in str(e):
                 print(
-                    "\n❌ Erro: Sistema WorkService não foi inicializado a tempo.",
+                    "\n❌ Error: WorkService system was not initialized in time.",
                     file=sys.stderr,
                 )
             else:
-                print(f"\n❌ Erro de execução: {e}", file=sys.stderr)
+                print(f"\n❌ Runtime error: {e}", file=sys.stderr)
         else:
-            print(f"\n❌ Erro de execução: {e}", file=sys.stderr)
+            print(f"\n❌ Runtime error: {e}", file=sys.stderr)
         return 1
     except ValueError as e:
         if "not found" in str(e):
-            print(f"\n🔍 Erro: Work '{args.work_id}' não encontrado.", file=sys.stderr)
+            print(f"\n🔍 Error: Work '{args.work_id}' not found.", file=sys.stderr)
         elif "Timeout" in str(e):
             print(
-                f"\n⏰ Erro: Timeout aguardando inicialização do work '{args.work_id}'.",
+                f"\n⏰ Error: Timeout waiting for work '{args.work_id}' initialization.",
                 file=sys.stderr,
             )
         else:
-            print(f"\n⚠️ Erro de configuração: {e}", file=sys.stderr)
+            print(f"\n⚠️ Configuration error: {e}", file=sys.stderr)
         return 1
     except Exception as e:
-        print(f"\n💥 Erro inesperado: {e}", file=sys.stderr)
+        print(f"\n💥 Unexpected error: {e}", file=sys.stderr)
         return 1
 
 

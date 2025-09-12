@@ -1,4 +1,4 @@
-"""Unit-scoped persistence wrapper."""
+"""Execution-scoped persistence wrapper."""
 
 from typing import Any, Optional
 
@@ -7,14 +7,31 @@ from src.infrastructure.persistence.work_state.wrappers.combination_scoped impor
 
 
 class ExecutionScopedPersistence(CombinationScopedPersistence):
-    """
-    Wrapper para WorkPersistence com unit_id preconfigurado.
+    """Wrapper for WorkPersistence with pre-configured unit_id.
 
     Inherits from CombinationScopedPersistence to provide work and combination-level operations
     while adding execution-specific functionality.
+    
+    Args:
+        unit_id: Execution unit identifier
+        work_id: Work identifier
+        store: Optional WorkPersistence instance
+        
+    Raises:
+        ValueError: If execution unit is not found or doesn't belong to the specified work
     """
 
     def __init__(self, unit_id: str, work_id: str, store: Optional[WorkPersistence] = None):
+        """Initialize ExecutionScopedPersistence.
+        
+        Args:
+            unit_id: Execution unit identifier
+            work_id: Work identifier
+            store: Optional WorkPersistence instance
+            
+        Raises:
+            ValueError: If execution unit is not found or work ID mismatch
+        """
         self._unit_id = unit_id
         self._expected_work_id = work_id
         
@@ -35,7 +52,19 @@ class ExecutionScopedPersistence(CombinationScopedPersistence):
         self._execution_id = execution_id
 
     def _load_execution_data(self, store: WorkPersistence, unit_id: str, expected_work_id: str) -> tuple[int, int]:
-        """Load execution data from database."""
+        """Load execution data from database.
+        
+        Args:
+            store: WorkPersistence instance
+            unit_id: Execution unit identifier
+            expected_work_id: Expected work identifier
+            
+        Returns:
+            Tuple of (combination_id, execution_id)
+            
+        Raises:
+            ValueError: If execution not found or work ID mismatch
+        """
         from src.infrastructure.persistence.work_state.models import Execution, Combination
         
         # Search for execution with unit_id and filter by work_id through combination
@@ -51,7 +80,7 @@ class ExecutionScopedPersistence(CombinationScopedPersistence):
             
             if not execution_model:
                 raise ValueError(
-                    f"Unidade de execução unit_id={unit_id} e work_id={expected_work_id} não encontrada"
+                    f"Execution unit unit_id={unit_id} and work_id={expected_work_id} not found"
                 )
             
             execution = execution_model.to_dict()
@@ -70,20 +99,23 @@ class ExecutionScopedPersistence(CombinationScopedPersistence):
 
     @property
     def unit_id(self) -> str:
+        """Get the execution unit ID."""
         return self._unit_id
 
     @property
     def execution_id(self) -> int:
+        """Get the execution ID."""
         return self._execution_id
 
     def __repr__(self) -> str:
+        """Return string representation."""
         return (
             f"ExecutionScopedPersistence(unit_id={self._unit_id}, "
             f"work_id={self.work_id}, combination_id={self.combination_id}, "
             f"execution_id={self._execution_id})"
         )
 
-    # === Execução ===
+    # === Execution ===
     def update_execution_status(
         self,
         status: str,
@@ -91,7 +123,14 @@ class ExecutionScopedPersistence(CombinationScopedPersistence):
         objective: float | None = None,
         params: dict[str, Any] | None = None,
     ) -> None:
-        """Atualiza status da execução atual."""
+        """Update the status of the current execution.
+        
+        Args:
+            status: New status value
+            result: Execution result data
+            objective: Objective value
+            params: Execution parameters
+        """
         import time
         
         fields = {'status': status}
@@ -112,21 +151,40 @@ class ExecutionScopedPersistence(CombinationScopedPersistence):
         self.store.execution_update(self._execution_id, **fields)
 
     def get_execution_info(self) -> dict[str, Any] | None:
-        """Retorna informações da execução atual."""
+        """Get information about the current execution.
+        
+        Returns:
+            Execution data dictionary or None if not found
+        """
         return self.store.execution_get(self._execution_id)
 
-    # === Eventos ===
+    # === Events ===
     # Override parent methods to use unit-specific context
     def log_warning(self, message: str, context: dict[str, Any] | None = None) -> None:
-        """Log warning for the current execution unit."""
+        """Log warning for the current execution unit.
+        
+        Args:
+            message: Warning message
+            context: Additional context data
+        """
         self.unit_warning(self._unit_id, message, context)
 
     def log_error(self, error: Exception) -> None:
-        """Log error for the current execution unit."""
+        """Log error for the current execution unit.
+        
+        Args:
+            error: Exception that occurred
+        """
         self.unit_error(self._unit_id, error)
 
     def unit_warning(self, unit_id: str, message: str, context: dict[str, Any] | None = None) -> None:
-        """Registra warning para a unidade especificada (ou atual se não especificada)."""
+        """Log warning for the specified unit (or current if matches).
+        
+        Args:
+            unit_id: Unit identifier
+            message: Warning message
+            context: Additional context data
+        """
         actual_unit_id = unit_id if unit_id != self._unit_id else self._unit_id
         # Use event_create directly since it's the actual method that exists
         self.store.event_create(
@@ -137,7 +195,12 @@ class ExecutionScopedPersistence(CombinationScopedPersistence):
         )
 
     def unit_error(self, unit_id: str, error: Exception) -> None:
-        """Registra erro para a unidade especificada (ou atual se não especificada)."""
+        """Log error for the specified unit (or current if matches).
+        
+        Args:
+            unit_id: Unit identifier
+            error: Exception that occurred
+        """
         actual_unit_id = unit_id if unit_id != self._unit_id else self._unit_id
         # Use event_create directly since it's the actual method that exists
         self.store.event_create(
@@ -154,7 +217,13 @@ class ExecutionScopedPersistence(CombinationScopedPersistence):
     def generic_event(
         self, event_type: str, message: str, context: dict[str, Any] | None = None
     ) -> None:
-        """Registra evento genérico para a unidade atual."""
+        """Log generic event for the current unit.
+        
+        Args:
+            event_type: Type of event
+            message: Event message
+            context: Additional context data
+        """
         # Use event_create directly since it's the actual method that exists
         self.store.event_create(
             work_id=self.work_id,
@@ -163,13 +232,21 @@ class ExecutionScopedPersistence(CombinationScopedPersistence):
             entity_data={"unit_id": self._unit_id, "message": message, **(context or {})}
         )
 
-    # === Consultas relacionadas ===
+    # === Related queries ===
     def get_combination_info(self) -> dict[str, Any] | None:
-        """Retorna informações da combinação associada."""
+        """Get information about the associated combination.
+        
+        Returns:
+            Combination data dictionary or None if not found
+        """
         return self.get_combination_data()
 
     def get_related_executions(self) -> list[dict[str, Any]]:
-        """Retorna todas as execuções da mesma combinação."""
+        """Get all executions from the same combination.
+        
+        Returns:
+            List of execution dictionaries
+        """
         executions, _ = self.store.execution_list(
             filters={'combination_id': self.combination_id}
         )
@@ -180,7 +257,15 @@ class ExecutionScopedPersistence(CombinationScopedPersistence):
         event_type: str | None = None,
         limit: int = 100,
     ) -> list[dict[str, Any]]:
-        """Retorna eventos relacionados à unidade atual."""
+        """Get events related to the current unit.
+        
+        Args:
+            event_type: Optional event type filter
+            limit: Maximum number of events to return
+            
+        Returns:
+            List of event dictionaries for this unit
+        """
         # Build filters for the event_list method
         filters = {
             'work_id': self.work_id,
@@ -207,17 +292,29 @@ class ExecutionScopedPersistence(CombinationScopedPersistence):
                 
         return unit_events
 
-    # === Progresso da Execução ===
+    # === Execution Progress ===
     def add_progress(
         self,
         progress: float,
         message: str | None = None,
     ) -> None:
-        """Adiciona entrada de progresso para a execução atual."""
+        """Add progress entry for the current execution.
+        
+        Args:
+            progress: Progress value (typically 0.0 to 1.0)
+            message: Optional progress message
+        """
         self.store.execution_progress_create(execution_id=self._execution_id, progress=progress, message=message)
 
     def get_progress(self, limit: int | None = None) -> list[dict[str, Any]]:
-        """Retorna entradas de progresso da execução atual."""
+        """Get progress entries for the current execution.
+        
+        Args:
+            limit: Maximum number of progress entries to return
+            
+        Returns:
+            List of progress entry dictionaries
+        """
         filters = {'execution_id': self._execution_id}
         results, _ = self.store.execution_progress_list(
             filters=filters,
@@ -228,10 +325,10 @@ class ExecutionScopedPersistence(CombinationScopedPersistence):
         return results
 
     def clear_progress_if_not_finalized(self) -> int:
-        """
-        Limpa entradas de progresso da execução atual se ela não estiver finalizada.
+        """Clear progress entries for the current execution if it's not finalized.
         
-        Retorna o número de entradas removidas (0 se a execução estiver finalizada).
+        Returns:
+            Number of entries removed (0 if execution is finalized)
         """
         return self.store.execution_progress_clear_for_non_finalized(
             execution_id=self._execution_id

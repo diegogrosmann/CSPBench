@@ -1,4 +1,9 @@
-"""Advanced queries mixin for complex database operations."""
+"""Advanced database queries mixin for complex operations.
+
+This module provides sophisticated query operations for monitoring, reporting,
+and analytics on work execution data. It includes dataclasses for structured
+results and methods for complex multi-table queries.
+"""
 
 import time
 from typing import Any, Dict, List, Optional, Tuple, Union
@@ -8,7 +13,29 @@ from dataclasses import dataclass
 
 @dataclass
 class ExecutionDetail:
-    """Detailed execution information for monitoring."""
+    """Detailed execution information for monitoring and reporting.
+    
+    This dataclass contains comprehensive information about a single execution,
+    including progress tracking, timing information, and hierarchical context
+    (task, dataset, preset, algorithm).
+    
+    Attributes:
+        unit_id: Unique identifier for the execution unit
+        combination_id: ID of the combination this execution belongs to
+        sequencia: Sequence number within the combination
+        status: Current execution status
+        progress: Progress percentage (0.0 to 1.0)
+        progress_message: Human-readable progress description
+        started_at: Timestamp when execution started
+        finished_at: Timestamp when execution finished
+        objective: Objective function value (if completed)
+        task_id: Task identifier
+        dataset_id: Dataset identifier
+        preset_id: Configuration preset identifier
+        algorithm_id: Algorithm identifier
+        mode: Execution mode
+        total_sequences: Total number of sequences in the combination
+    """
     unit_id: str
     combination_id: int
     sequencia: int
@@ -28,7 +55,22 @@ class ExecutionDetail:
 
 @dataclass
 class ProgressSummary:
-    """Summary of progress for a work item."""
+    """Comprehensive progress summary for a work item.
+    
+    Provides hierarchical progress information across tasks, datasets,
+    configurations, algorithms, and executions for monitoring purposes.
+    
+    Attributes:
+        work_id: Work identifier this summary belongs to
+        tasks: Task-level progress information
+        datasets: Dataset-level progress information
+        configs: Configuration-level progress information
+        algorithms: Algorithm-level progress information
+        execution: Current combination execution progress
+        global_execution: Overall execution statistics
+        global_progress: Global progress percentage (0.0 to 1.0)
+        current_combination_details: Details of currently active combination
+    """
     work_id: str
     tasks: Dict[str, Union[int, str]]
     datasets: Dict[str, Union[int, str]]
@@ -42,7 +84,14 @@ class ProgressSummary:
 
 @dataclass
 class ErrorSummary:
-    """Summary of errors for a work item."""
+    """Summary of execution errors for troubleshooting.
+    
+    Attributes:
+        unit_id: Execution unit where the error occurred
+        error_type: Type/category of the error
+        error_message: Detailed error message
+        timestamp: When the error occurred
+    """
     unit_id: str
     error_type: str
     error_message: str
@@ -50,10 +99,25 @@ class ErrorSummary:
 
 
 class QueriesMixin:
-    """Advanced queries for complex database operations."""
+    """Advanced database queries for complex operations and analytics.
+    
+    This mixin provides sophisticated query methods for monitoring work progress,
+    analyzing execution statistics, retrieving detailed execution information,
+    and supporting data export operations. It complements the basic CRUD mixins
+    with complex multi-table queries and aggregations.
+    """
 
     def get_running_combination(self, work_id: str) -> Optional[Dict[str, Any]]:
-        """Get running combination."""
+        """Get the currently running combination for a work.
+        
+        Args:
+            work_id: Work identifier to search for running combinations
+            
+        Returns:
+            Dictionary with combination details if a running combination exists,
+            None otherwise. Contains combination_id, task_id, dataset_id,
+            preset_id, algorithm_id, and total_sequences.
+        """
         from ..models import Combination
         
         with self.session_scope() as session:
@@ -80,7 +144,19 @@ class QueriesMixin:
             return None
 
     def get_last_paused_or_incomplete_combination(self, work_id: str) -> Optional[Dict[str, Any]]:
-        """Get the last paused or incomplete combination for context when no running combination exists."""
+        """Get the most recent paused or incomplete combination for context.
+        
+        When no running combination exists, this method helps provide context
+        by finding the last combination that was paused, queued, failed, or canceled.
+        Prioritizes paused combinations, then queued, then failed/error, then canceled.
+        
+        Args:
+            work_id: Work identifier to search combinations for
+            
+        Returns:
+            Dictionary with combination details if found, None otherwise.
+            Same structure as get_running_combination.
+        """
         from ..models import Combination
         
         with self.session_scope() as session:
@@ -123,7 +199,17 @@ class QueriesMixin:
             return None
 
     def _combination_to_dict(self, combination) -> Dict[str, Any]:
-        """Convert combination to dict format expected by queries."""
+        """Convert combination model to dictionary format.
+        
+        Internal helper method to standardize combination data format
+        across different query methods.
+        
+        Args:
+            combination: SQLAlchemy combination model instance
+            
+        Returns:
+            Dictionary with standardized combination fields
+        """
         return {
             'id': combination.id,
             'combination_id': combination.id,
@@ -135,7 +221,20 @@ class QueriesMixin:
         }
 
     def get_task_status_lists(self, work_id: str) -> Tuple[List[str], List[str], List[str]]:
-        """Get task status lists (finished, running, queued)."""
+        """Get task status categorization for a work.
+        
+        Analyzes all combinations within a work to categorize tasks by their
+        completion status based on their constituent combinations.
+        
+        Args:
+            work_id: Work identifier to analyze
+            
+        Returns:
+            Tuple containing three lists:
+                - finished_tasks: Task IDs where all combinations are completed
+                - running_tasks: Task IDs with mixed completion status
+                - queued_tasks: Task IDs where all combinations are queued
+        """
         from ..models import Combination
         
         with self.session_scope() as session:
@@ -161,7 +260,18 @@ class QueriesMixin:
             return finished, running, queued
 
     def get_dataset_status_lists(self, work_id: str, task_id: str) -> Tuple[List[str], List[str], List[str]]:
-        """Get dataset status lists within a task."""
+        """Get dataset status categorization within a specific task.
+        
+        Args:
+            work_id: Work identifier
+            task_id: Task identifier to analyze datasets for
+            
+        Returns:
+            Tuple containing three lists:
+                - finished_datasets: Dataset IDs with all combinations completed
+                - running_datasets: Dataset IDs with mixed completion status  
+                - queued_datasets: Dataset IDs with all combinations queued
+        """
         from ..models import Combination
         
         with self.session_scope() as session:
@@ -187,7 +297,19 @@ class QueriesMixin:
             return finished, running, queued
 
     def get_config_status_lists(self, work_id: str, task_id: str, dataset_id: str) -> Tuple[List[str], List[str], List[str]]:
-        """Get config (preset) status lists within a dataset."""
+        """Get configuration preset status categorization within a dataset.
+        
+        Args:
+            work_id: Work identifier
+            task_id: Task identifier
+            dataset_id: Dataset identifier to analyze configurations for
+            
+        Returns:
+            Tuple containing three lists:
+                - finished_configs: Preset IDs with all combinations completed
+                - running_configs: Preset IDs with mixed completion status
+                - queued_configs: Preset IDs with all combinations queued
+        """
         from ..models import Combination
         
         with self.session_scope() as session:
@@ -214,7 +336,20 @@ class QueriesMixin:
             return finished, running, queued
 
     def get_algorithm_status_lists(self, work_id: str, task_id: str, dataset_id: str, preset_id: str) -> Tuple[List[str], List[str], List[str]]:
-        """Get algorithm status lists within a config."""
+        """Get algorithm status categorization within a configuration.
+        
+        Args:
+            work_id: Work identifier
+            task_id: Task identifier  
+            dataset_id: Dataset identifier
+            preset_id: Configuration preset identifier
+            
+        Returns:
+            Tuple containing three lists:
+                - finished_algorithms: Algorithm IDs with all combinations completed
+                - running_algorithms: Algorithm IDs with mixed completion status
+                - queued_algorithms: Algorithm IDs with all combinations queued
+        """
         from ..models import Combination
         
         with self.session_scope() as session:
@@ -242,7 +377,17 @@ class QueriesMixin:
             return finished, running, queued
 
     def get_execution_status_lists(self, combination_id: int) -> Tuple[List[int], List[int], List[int]]:
-        """Get execution status lists for a combination."""
+        """Get execution status categorization for a specific combination.
+        
+        Args:
+            combination_id: Combination identifier to analyze executions for
+            
+        Returns:
+            Tuple containing three lists:
+                - finished_executions: Execution IDs that are completed/failed/error
+                - running_executions: Execution IDs that are currently running
+                - queued_executions: Execution IDs that are queued
+        """
         from ..models import Execution
         
         with self.session_scope() as session:
@@ -262,7 +407,17 @@ class QueriesMixin:
             return finished, running, queued
 
     def get_global_execution_stats(self, work_id: str) -> Dict[str, Union[int, float]]:
-        """Get global execution statistics."""
+        """Get global execution statistics across all combinations in a work.
+        
+        Args:
+            work_id: Work identifier to calculate statistics for
+            
+        Returns:
+            Dictionary containing:
+                - Finished: Number of completed executions
+                - Total: Total number of sequences across all combinations
+                - Progress: Overall progress ratio (0.0 to 1.0)
+        """
         from ..models import Combination, Execution
         
         with self.session_scope() as session:
@@ -288,7 +443,19 @@ class QueriesMixin:
             }
 
     def get_work_progress_summary(self, work_id: str) -> Optional[ProgressSummary]:
-        """Get comprehensive progress summary for a work item."""
+        """Get comprehensive progress summary for a work item.
+        
+        Builds a complete hierarchical progress summary including status
+        information at task, dataset, configuration, algorithm, and execution
+        levels, plus global statistics and current combination context.
+        
+        Args:
+            work_id: Work identifier to generate summary for
+            
+        Returns:
+            ProgressSummary dataclass instance with complete progress information,
+            or None if the work doesn't exist.
+        """
         work = self.work_get(work_id)
         if not work:
             return None
@@ -388,7 +555,17 @@ class QueriesMixin:
         )
 
     def get_combination_executions_detail(self, combination_id: int) -> List[ExecutionDetail]:
-        """Get detailed information about all executions for a specific combination."""
+        """Get detailed information about all executions in a combination.
+        
+        Retrieves comprehensive execution details including progress tracking,
+        timing information, and results for monitoring and analysis purposes.
+        
+        Args:
+            combination_id: Combination identifier to get execution details for
+            
+        Returns:
+            List of ExecutionDetail dataclass instances, ordered by sequence number.
+        """
         from ..models import Execution, Combination, ExecutionProgress
         
         with self.session_scope() as session:
@@ -436,7 +613,16 @@ class QueriesMixin:
         return results
 
     def get_running_executions_detail(self, work_id: str, limit: int = 20) -> List[ExecutionDetail]:
-        """Get detailed information about running executions."""
+        """Get detailed information about currently running executions.
+        
+        Args:
+            work_id: Work identifier to find running executions for
+            limit: Maximum number of executions to return
+            
+        Returns:
+            List of ExecutionDetail instances for running executions,
+            ordered by start time (most recent first).
+        """
         from ..models import Execution, Combination, ExecutionProgress
         
         with self.session_scope() as session:
@@ -478,7 +664,16 @@ class QueriesMixin:
         return results
 
     def get_error_summary(self, work_id: str, limit: int = 10) -> List[ErrorSummary]:
-        """Get recent errors for a work item."""
+        """Get summary of recent errors for troubleshooting.
+        
+        Args:
+            work_id: Work identifier to get error summary for
+            limit: Maximum number of error entries to return
+            
+        Returns:
+            List of ErrorSummary instances for failed/error executions,
+            ordered by occurrence time (most recent first).
+        """
         from ..models import Execution, Combination
         
         with self.session_scope() as session:
@@ -505,7 +700,16 @@ class QueriesMixin:
         return results
 
     def get_execution_warnings(self, work_id: str, limit: int = 10) -> List[Dict[str, Any]]:
-        """Get recent warnings from events table."""
+        """Get recent warning events from the events table.
+        
+        Args:
+            work_id: Work identifier to get warnings for
+            limit: Maximum number of warning entries to return
+            
+        Returns:
+            List of dictionaries containing warning event details,
+            ordered by timestamp (most recent first).
+        """
         from ..models import Event
         
         with self.session_scope() as session:
@@ -529,7 +733,17 @@ class QueriesMixin:
         return results
 
     def get_events(self, work_id: str, limit: int = 100, event_types: Optional[List[str]] = None) -> List[Dict[str, Any]]:
-        """Get events for a work item."""
+        """Get events for a work item with optional filtering by type.
+        
+        Args:
+            work_id: Work identifier to get events for
+            limit: Maximum number of events to return
+            event_types: Optional list of event types to filter by
+            
+        Returns:
+            List of dictionaries containing event details,
+            ordered by timestamp (most recent first).
+        """
         from ..models import Event
         
         results = []
@@ -558,7 +772,14 @@ class QueriesMixin:
         return results
 
     def get_combination_status_counts(self, work_id: str) -> Dict[str, int]:
-        """Get counts of combinations by status."""
+        """Get count statistics of combinations grouped by status.
+        
+        Args:
+            work_id: Work identifier to get statistics for
+            
+        Returns:
+            Dictionary mapping status names to their counts.
+        """
         from ..models import Combination
         
         with self.session_scope() as session:
@@ -572,7 +793,14 @@ class QueriesMixin:
             return {row.status: row.count for row in result}
 
     def get_execution_status_counts(self, work_id: str) -> Dict[str, int]:
-        """Get counts of executions by status."""
+        """Get count statistics of executions grouped by status.
+        
+        Args:
+            work_id: Work identifier to get statistics for
+            
+        Returns:
+            Dictionary mapping status names to their counts.
+        """
         from ..models import Execution, Combination
         
         with self.session_scope() as session:
@@ -588,7 +816,20 @@ class QueriesMixin:
             return {row.status: row.count for row in result}
 
     def get_execution_stats(self, work_id: str) -> Dict[str, Any]:
-        """Return aggregated execution stats across all combinations."""
+        """Get aggregated execution statistics across all combinations.
+        
+        Args:
+            work_id: Work identifier to get statistics for
+            
+        Returns:
+            Dictionary containing execution counts by status and totals:
+                - completed: Number of completed executions
+                - running: Number of running executions  
+                - queued: Number of queued executions
+                - failed: Number of failed/error executions
+                - total_sequences: Total sequences across all combinations
+                - raw_status_counts: Raw status counts dictionary
+        """
         from ..models import Execution, Combination
         
         with self.session_scope() as session:
@@ -624,8 +865,16 @@ class QueriesMixin:
             }
 
     # -------------- EXPORT SPECIFIC QUERIES --------------
+    
     def get_work_export_data(self, work_id: str) -> Dict[str, Any]:
-        """Get work data for export."""
+        """Get work data for export operations.
+        
+        Args:
+            work_id: Work identifier to export
+            
+        Returns:
+            Dictionary containing complete work data for export.
+        """
         from ..models import Work
         
         with self.session_scope() as session:
@@ -633,7 +882,15 @@ class QueriesMixin:
             return work.to_dict() if work else {}
 
     def list_combinations(self, work_id: str) -> List[Dict[str, Any]]:
-        """List all combinations for a work with combination_id field."""
+        """List all combinations for a work with combination_id field.
+        
+        Args:
+            work_id: Work identifier to list combinations for
+            
+        Returns:
+            List of combination dictionaries, each including a combination_id
+            field for compatibility with legacy code.
+        """
         from ..models import Combination
         
         with self.session_scope() as session:
@@ -651,7 +908,14 @@ class QueriesMixin:
             return result
 
     def get_combinations_for_export(self, work_id: str) -> List[Dict[str, Any]]:
-        """Get all combinations for a work for export."""
+        """Get all combinations for a work for export operations.
+        
+        Args:
+            work_id: Work identifier to export combinations for
+            
+        Returns:
+            List of combination dictionaries with all fields.
+        """
         from ..models import Combination
         
         with self.session_scope() as session:
@@ -661,7 +925,14 @@ class QueriesMixin:
             return [combo.to_dict() for combo in combinations]
 
     def get_executions_for_export(self, work_id: str) -> List[Dict[str, Any]]:
-        """Get all executions for a work for export."""
+        """Get all executions for a work for export operations.
+        
+        Args:
+            work_id: Work identifier to export executions for
+            
+        Returns:
+            List of execution dictionaries with all fields.
+        """
         from ..models import Execution, Combination
         
         with self.session_scope() as session:
@@ -671,7 +942,14 @@ class QueriesMixin:
             return [exec.to_dict() for exec in executions]
 
     def get_execution_progress_for_export(self, work_id: str) -> List[Dict[str, Any]]:
-        """Get all execution progress for a work for export."""
+        """Get all execution progress records for export operations.
+        
+        Args:
+            work_id: Work identifier to export progress data for
+            
+        Returns:
+            List of execution progress dictionaries with all fields.
+        """
         from ..models import ExecutionProgress, Execution, Combination
         
         with self.session_scope() as session:
@@ -683,7 +961,15 @@ class QueriesMixin:
             return [progress.to_dict() for progress in progress_records]
 
     def get_events_for_export(self, work_id: str) -> List[Dict[str, Any]]:
-        """Get all events for a work for export."""
+        """Get all events for a work for export operations.
+        
+        Args:
+            work_id: Work identifier to export events for
+            
+        Returns:
+            List of event dictionaries. Falls back to all events if
+            work_id column doesn't exist in the events table.
+        """
         from ..models import Event
         
         with self.session_scope() as session:
@@ -697,7 +983,14 @@ class QueriesMixin:
                 return [event.to_dict() for event in events]
 
     def get_datasets_for_export(self, work_id: str) -> List[Dict[str, Any]]:
-        """Get datasets used by a work for export."""
+        """Get datasets used by a work for export operations.
+        
+        Args:
+            work_id: Work identifier to export datasets for
+            
+        Returns:
+            List of dataset dictionaries with all fields.
+        """
         from ..models import Dataset
         
         with self.session_scope() as session:
@@ -707,7 +1000,14 @@ class QueriesMixin:
             return [dataset.to_dict() for dataset in datasets]
 
     def get_dataset_sequences_for_export(self, work_id: str) -> List[Dict[str, Any]]:
-        """Get dataset sequences used by a work for export."""
+        """Get dataset sequences used by a work for export operations.
+        
+        Args:
+            work_id: Work identifier to export dataset sequences for
+            
+        Returns:
+            List of dataset sequence dictionaries with all fields.
+        """
         from ..models import DatasetSequence, Dataset
         
         with self.session_scope() as session:
@@ -717,7 +1017,16 @@ class QueriesMixin:
             return [seq.to_dict() for seq in sequences]
 
     def get_optimization_executions_for_export(self, work_id: str) -> List[Dict[str, Any]]:
-        """Get optimization executions for a work for export."""
+        """Get optimization-specific executions for export operations.
+        
+        Filters executions that have unit_id starting with 'optimization:'.
+        
+        Args:
+            work_id: Work identifier to export optimization executions for
+            
+        Returns:
+            List of optimization execution dictionaries ordered by unit_id and sequence.
+        """
         from ..models import Execution, Combination
         
         with self.session_scope() as session:
@@ -730,7 +1039,18 @@ class QueriesMixin:
             return [exec.to_dict() for exec in executions]
 
     def get_sensitivity_events_for_export(self, work_id: str) -> List[Dict[str, Any]]:
-        """Get sensitivity analysis events for a work for export."""
+        """Get sensitivity analysis events for export operations.
+        
+        Filters progress events related to sensitivity analysis by looking
+        for unit_id containing 'sensitivity_analysis'.
+        
+        Args:
+            work_id: Work identifier to export sensitivity events for
+            
+        Returns:
+            List of sensitivity analysis event dictionaries ordered by timestamp.
+            Falls back to all sensitivity events if work_id column doesn't exist.
+        """
         from ..models import Event
         
         with self.session_scope() as session:

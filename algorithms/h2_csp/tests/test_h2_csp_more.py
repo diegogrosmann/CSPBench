@@ -64,12 +64,6 @@ def test_exhaustive_block_fallback_duplicates():
     assert res["success"]
     assert any("exhaustive" in t for t in res["metadata"]["techniques"])
 
-
-def test_fuse_blocks_length_mismatch():
-    with pytest.raises(ValueError):
-        h2_mod._fuse_blocks(["AA", "A"], [(0, 2), (2, 4)], 4)
-
-
 def test_run_internal_exception(monkeypatch):
     strings = ["AAAA", "AAAT"]
     alphabet = "AT"

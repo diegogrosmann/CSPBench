@@ -1,4 +1,9 @@
-"""Execution Progress CRUD mixin."""
+"""Execution Progress CRUD operations mixin.
+
+This module provides CRUD operations for tracking execution progress,
+including creation, retrieval, updates, deletion, and bulk operations
+for managing progress data efficiently.
+"""
 
 import time
 from typing import Any, Dict, List, Optional, Tuple
@@ -6,7 +11,12 @@ from sqlalchemy import and_, or_
 
 
 class ExecutionProgressCRUDMixin:
-    """CRUD operations for ExecutionProgress table."""
+    """Mixin providing CRUD operations for ExecutionProgress table.
+    
+    This mixin handles progress tracking data for executions, allowing
+    detailed monitoring of execution progress over time. It supports
+    both individual operations and bulk operations for performance.
+    """
 
     def execution_progress_create(
         self,
@@ -16,7 +26,14 @@ class ExecutionProgressCRUDMixin:
         message: Optional[str] = None,
         timestamp: Optional[float] = None,
     ) -> None:
-        """Create execution progress entry."""
+        """Create a new execution progress entry.
+        
+        Args:
+            execution_id: ID of the execution this progress belongs to
+            progress: Progress value (typically 0.0 to 1.0)
+            message: Optional progress message or description
+            timestamp: Progress timestamp, defaults to current time
+        """
         from ..models import ExecutionProgress
         
         with self.session_scope() as session:
@@ -29,7 +46,14 @@ class ExecutionProgressCRUDMixin:
             session.add(progress_entry)
 
     def execution_progress_get(self, id: int) -> Optional[Dict[str, Any]]:
-        """Get execution progress by ID."""
+        """Retrieve an execution progress entry by ID.
+        
+        Args:
+            id: Primary key of the progress entry
+            
+        Returns:
+            Dictionary containing progress data if found, None otherwise.
+        """
         from ..models import ExecutionProgress
         
         with self.session_scope() as session:
@@ -37,7 +61,15 @@ class ExecutionProgressCRUDMixin:
             return progress.to_dict() if progress else None
 
     def execution_progress_update(self, id: int, **fields: Any) -> None:
-        """Update execution progress entry."""
+        """Update an execution progress entry.
+        
+        Args:
+            id: Primary key of the progress entry to update
+            **fields: Key-value pairs of fields to update
+            
+        Note:
+            This operation is idempotent - no error if entry doesn't exist.
+        """
         from ..models import ExecutionProgress
         
         if not fields:
@@ -50,7 +82,14 @@ class ExecutionProgressCRUDMixin:
                     setattr(progress, key, value)
 
     def execution_progress_delete(self, id: int) -> None:
-        """Delete execution progress entry."""
+        """Delete an execution progress entry.
+        
+        Args:
+            id: Primary key of the progress entry to delete
+            
+        Note:
+            This operation is idempotent - no error if entry doesn't exist.
+        """
         from ..models import ExecutionProgress
         
         with self.session_scope() as session:
@@ -67,18 +106,26 @@ class ExecutionProgressCRUDMixin:
         order_by: Optional[str] = None,
         order_desc: bool = False
     ) -> Tuple[List[Dict[str, Any]], int]:
-        """
-        List execution progress entries with generic filtering and pagination.
+        """List execution progress entries with filtering and pagination.
         
         Args:
-            filters: Dictionary of field:value pairs for filtering
-            offset: Number of records to skip
+            filters: Dictionary of field:value pairs for filtering. Supports:
+                - Simple values: {'execution_id': 123}
+                - List values: {'execution_id': [123, 456]}
+                - Advanced operators: {'progress': {'operator': 'gte', 'value': 0.5}}
+            offset: Number of records to skip (for pagination)
             limit: Maximum number of records to return
-            order_by: Field to order by
+            order_by: Field name to order results by
             order_desc: Whether to order in descending order
             
         Returns:
-            Tuple of (records, total_count)
+            Tuple containing:
+                - List of progress entry dictionaries
+                - Total count of matching records (before pagination)
+                
+        Note:
+            Advanced operators supported: 'like', 'ilike', 'gt', 'gte', 
+            'lt', 'lte', 'ne' for flexible querying.
         """
         from ..models import ExecutionProgress
         
@@ -143,19 +190,23 @@ class ExecutionProgressCRUDMixin:
         combination_id: Optional[int] = None,
         execution_id: Optional[int] = None,
     ) -> int:
-        """
-        Clear all progress entries for executions that are not finalized.
+        """Clear progress entries for executions that are not finalized.
         
-        Non-finalized statuses: 'queued', 'running', 'paused'
-        Finalized statuses: 'completed', 'failed', 'error', 'canceled'
+        Removes progress tracking data for executions in non-finalized states
+        (queued, running, paused). This is useful for cleanup operations when
+        restarting or resetting work execution.
         
         Args:
             work_id: If provided, only clear progress for executions in this work
             combination_id: If provided, only clear progress for executions in this combination
-            execution_id: If provided, only clear progress for this specific execution (if not finalized)
+            execution_id: If provided, only clear progress for this specific execution
             
         Returns:
-            Number of progress entries deleted
+            Number of progress entries that were deleted.
+            
+        Note:
+            Non-finalized statuses are: 'queued', 'running', 'paused'
+            Finalized statuses are: 'completed', 'failed', 'error', 'canceled'
         """
         from ..models import ExecutionProgress, Execution, Combination
         

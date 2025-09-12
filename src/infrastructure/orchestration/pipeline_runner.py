@@ -1,4 +1,4 @@
-"""PipelineRunner com suporte a controle (pause/cancel/resume) via WorkManager."""
+"""PipelineRunner with control support (pause/cancel/resume) via WorkManager."""
 
 from __future__ import annotations
 
@@ -39,20 +39,31 @@ logger = get_logger("CSPBench.PipelineRunner")
 
 
 class PipelineRunner:
+    """Main pipeline runner with support for pause/cancel/resume operations."""
+    
     def __init__(self, work_store: WorkScopedPersistence):
+        """Initialize pipeline runner.
+        
+        Args:
+            work_store: Work-scoped persistence wrapper
+        """
         self.work_store: WorkScopedPersistence = work_store
         self.work_id = work_store.work_id
         # ExecutionController will be initialized in run() with proper resources config
         self.execution_controller: ExecutionController = None
         self.datasets_cache: dict[str, Dataset] = {}
 
-        logger.info(f"PipelineRunner inicializado para work_id: {self.work_id}")
+        logger.info(f"PipelineRunner initialized for work_id: {self.work_id}")
 
     def run(self, config: CSPBenchConfig) -> None:
-        """Executa o pipeline seguindo o novo fluxo reorganizado."""
-        logger.info("Iniciando execução do pipeline reorganizado")
+        """Execute the pipeline following the new reorganized flow.
+        
+        Args:
+            config: Complete CSPBench configuration
+        """
+        logger.info("Starting reorganized pipeline execution")
         logger.info(
-            f"Configuração: {len(config.tasks.items)} tarefas do tipo {config.tasks.type}"
+            f"Configuration: {len(config.tasks.items)} tasks of type {config.tasks.type}"
         )
 
         # Initialize ExecutionController with resources configuration
@@ -70,47 +81,48 @@ class PipelineRunner:
         try:
             self.work_store.update_work_status(BaseStatus.RUNNING)
 
-            # Fase 1: Gerar todos os datasets primeiro
-            logger.info("=== FASE 1: Gerando datasets ===")
+            # Phase 1: Generate all datasets first
+            logger.info("=== PHASE 1: Generating datasets ===")
             self.execution_controller.check_batch_timeout()  # Check timeout before each phase
             self._generate_all_datasets(config)
 
-            # Fase 2: Gerar todas as combinações
-            logger.info("=== FASE 2: Gerando combinações ===")
+            # Phase 2: Generate all combinations
+            logger.info("=== PHASE 2: Generating combinations ===")
             self.execution_controller.check_batch_timeout()  # Check timeout before each phase
             self._generate_pipeline_combinations(config)
 
-            # Fase 3: Executar combinações
-            logger.info("=== FASE 3: Executando combinações ===")
+            # Phase 3: Execute combinations
+            logger.info("=== PHASE 3: Executing combinations ===")
             self.execution_controller.check_batch_timeout()  # Check timeout before each phase
             status = self._execute_combinations(config)
 
-            # Aguardar finalização de todas as execuções antes de atualizar o status do work
-            logger.info("Aguardando finalização de todas as execuções em progresso...")
+            # Wait for all executions to finish before updating work status
+            logger.info("Waiting for all executions in progress to complete...")
             self._wait_for_all_executions_to_complete()
 
-            # Verificar se o work foi pausado ou cancelado durante a execução
+            # Check if work was paused or canceled during execution
             current_work_status = self.work_store.get_work_status()
             
             if current_work_status in [BaseStatus.PAUSED, BaseStatus.CANCELED]:
-                logger.info(f"Pipeline foi {current_work_status.lower()} durante a execução")
-                # Não atualizar o status - manter como está (pausado/cancelado)
+                logger.info(f"Pipeline was {current_work_status.lower()} during execution")
+                # Don't update status - keep as is (paused/canceled)
+                self.final_status_to_set = None
             elif status == BaseStatus.RUNNING:
-                logger.error("Pipeline ainda em execução após finalização")
-                self.work_store.update_work_status(BaseStatus.FAILED)
+                logger.error("Pipeline still running after completion")
+                self.final_status_to_set = BaseStatus.FAILED
             else:
-                logger.info("Pipeline executado com sucesso")
-                self.work_store.update_work_status(status)
+                logger.info("Pipeline executed successfully")
+                self.final_status_to_set = status
 
         except ExecutionLimitError as timeout_exc:
-            logger.error(f"Pipeline interrompido por timeout: {timeout_exc}")
+            logger.error(f"Pipeline interrupted by timeout: {timeout_exc}")
             if self.work_store:
                 self.work_store.work_error(timeout_exc)
                 self.work_store.update_work_status(
                     BaseStatus.CANCELED, error=str(timeout_exc)
                 )
         except Exception as e:
-            logger.error(f"Erro durante execução do pipeline: {e}", exc_info=True)
+            logger.error(f"Error during pipeline execution: {e}", exc_info=True)
             if self.work_store:
                 self.work_store.work_error(e)
                 self.work_store.update_work_status(BaseStatus.FAILED, error=str(e))
@@ -118,16 +130,18 @@ class PipelineRunner:
         finally:
             # Cleanup execution controller
             if self.execution_controller:
-                logger.debug("Limpando ExecutionController")
                 self.execution_controller.cleanup()
-                logger.info("Pipeline finalizado e recursos liberados")
             
-            # Verificar se deve fazer exportação final
+            # Check if final export should be done (before updating final status)
             final_work_status = self.work_store.get_work_status()
             should_export = final_work_status in [BaseStatus.COMPLETED, BaseStatus.ERROR, BaseStatus.FAILED]
             
+            # If we have a pending status to set, also check if it requires export
+            if hasattr(self, 'final_status_to_set') and self.final_status_to_set:
+                should_export = should_export or self.final_status_to_set in [BaseStatus.COMPLETED, BaseStatus.ERROR, BaseStatus.FAILED]
+            
             if should_export:
-                logger.info(f"Iniciando exportação final (status: {final_work_status.value})")
+                logger.info(f"Starting final export (status: {final_work_status})")
                 # Finalization export (raw db + manifest + full_results + summary)
                 try:
                     from src.infrastructure.export.finalization_service import (
@@ -158,59 +172,72 @@ class PipelineRunner:
                         tool_version=FinalizationService.detect_tool_version(),
                     )
                     FinalizationService(cfg, work_store=self.work_store).run()
-                    logger.info("Exportação final concluída com sucesso")
+                    logger.info("Final export completed successfully")
                 except Exception as fe:  # pragma: no cover - defensive
-                    logger.error(f"Erro durante finalização de exportação: {fe}")
+                    logger.error(f"Error during export finalization: {fe}")
             else:
-                logger.info(f"Exportação final ignorada devido ao status: {final_work_status}")
+                logger.info(f"Final export skipped due to status: {final_work_status}")
+                
+            # Now update the final status after export is complete
+            if hasattr(self, 'final_status_to_set') and self.final_status_to_set:
+                logger.info(f"Setting final work status to: {self.final_status_to_set}")
+                self.work_store.update_work_status(self.final_status_to_set)
 
     def _generate_all_datasets(self, config: CSPBenchConfig) -> None:
-        """Fase 1: Gera todos os datasets necessários."""
-        # Coletar todos os dataset IDs únicos utilizados nas tasks
+        """Phase 1: Generate all necessary datasets.
+        
+        Args:
+            config: CSPBench configuration containing dataset definitions
+        """
+        # Collect all unique dataset IDs used in tasks
         used_dataset_ids = set()
 
         for task in config.tasks.items:
-            # task.datasets agora é List[str] contendo IDs de datasets
+            # task.datasets is now List[str] containing dataset IDs
             used_dataset_ids.update(task.datasets)
 
         logger.info(
-            f"Encontrados {len(used_dataset_ids)} dataset IDs únicos utilizados: {sorted(used_dataset_ids)}"
+            f"Found {len(used_dataset_ids)} unique dataset IDs used: {sorted(used_dataset_ids)}"
         )
 
-        # Verificar se todos os IDs referenciados existem na configuração
+        # Check if all referenced IDs exist in configuration
         missing_datasets = used_dataset_ids - set(config.datasets.keys())
         if missing_datasets:
             raise ValueError(
-                f"Dataset IDs referenciados mas não definidos: {sorted(missing_datasets)}"
+                f"Dataset IDs referenced but not defined: {sorted(missing_datasets)}"
             )
 
-        # Processar cada dataset utilizado
+        # Process each used dataset
         for dataset_id in sorted(used_dataset_ids):
 
-            logger.info(f"Processando dataset: {dataset_id}")
+            logger.info(f"Processing dataset: {dataset_id}")
 
             try:
-                # Obter a configuração do dataset do dicionário config.datasets
+                # Get dataset configuration from config.datasets dictionary
                 dataset_config = config.datasets[dataset_id]
                 self._process_dataset(dataset_config)
 
-                logger.info(f"Dataset {dataset_id} processado.")
+                logger.info(f"Dataset {dataset_id} processed.")
 
             except Exception as e:
-                logger.error(f"Erro ao processar dataset {dataset_id}: {e}")
+                logger.error(f"Error processing dataset {dataset_id}: {e}")
                 raise
 
     def _generate_pipeline_combinations(self, config: CSPBenchConfig) -> None:
-        """Fase 2: Gera todas as combinações possíveis do pipeline."""
+        """Phase 2: Generate all possible pipeline combinations.
+        
+        Args:
+            config: CSPBench configuration containing tasks and algorithms
+        """
         try:
             requeued = self.work_store.init_combination()
             if requeued:
                 logger.info(
-                    "Combinações em andamento/pausadas/canceladas reiniciadas para 'queued'. Verificando novas combinações..."
+                    "Running/paused/canceled combinations restarted to 'queued'. Checking for new combinations..."
                 )
-                return  # Não gerar novas combinações se houver em andamento
+                return  # Don't generate new combinations if there are ongoing ones
 
-            # Sempre gerar combinações: tanto para casos novos quanto para adicionar novas após reset
+            # Always generate combinations: both for new cases and to add new ones after reset
             combinations = []
 
             for task in config.tasks.items:
@@ -227,19 +254,19 @@ class PipelineRunner:
                         task.config.get("samples", 100) if task.config else 100
                     )
 
-                # task.datasets agora é List[str] contendo IDs de datasets
+                # task.datasets is now List[str] containing dataset IDs
                 for dataset_id in task.datasets:
 
-                    # task.algorithms agora é List[str] contendo IDs de algorithm presets
+                    # task.algorithms is now List[str] containing algorithm preset IDs
                     for preset_id in task.algorithms:
-                        # Obter o preset do dicionário config.algorithms
+                        # Get preset from config.algorithms dictionary
                         preset = config.algorithms.get(preset_id)
                         if not preset:
                             self.work_store.preset_error(
-                                preset_id, "Algorithm não encontrado na configuração"
+                                preset_id, "Algorithm not found in configuration"
                             )
                             logger.warning(
-                                f"Algorithm preset '{preset_id}' não encontrado na configuração"
+                                f"Algorithm preset '{preset_id}' not found in configuration"
                             )
                             continue
 
@@ -254,67 +281,74 @@ class PipelineRunner:
                             }
                             combinations.append(combination)
 
-            logger.info(f"Geradas {len(combinations)} combinações para processamento")
+            logger.info(f"Generated {len(combinations)} combinations for processing")
 
-            # Submeter todas as combinações (INSERT OR IGNORE garante que duplicatas sejam ignoradas)
+            # Submit all combinations (INSERT OR IGNORE ensures duplicates are ignored)
             if combinations:
                 inserted_count = self.work_store.submit_combinations(combinations)
-                logger.info(f"{inserted_count} novas combinações inseridas no banco")
+                logger.info(f"{inserted_count} new combinations inserted into database")
             else:
-                logger.warning("Nenhuma combinação válida foi gerada")
+                logger.warning("No valid combinations were generated")
         except Exception as e:
             self.work_store.combination_error("N/A", e)
             raise e
 
     def _execute_combinations(self, config: CSPBenchConfig) -> BaseStatus:
-        """Fase 3: Executa todas as combinações pendentes."""
+        """Phase 3: Execute all pending combinations.
+        
+        Args:
+            config: CSPBench configuration
+            
+        Returns:
+            Final execution status
+        """
         if not self.work_store:
-            logger.error("Work store não disponível para execução")
+            logger.error("Work store not available for execution")
             return BaseStatus.FAILED
 
-        execution_statuses = []  # Lista para armazenar os status das execuções
+        execution_statuses = []  # List to store execution statuses
 
         while True:
-            # Se controle indicar que não está mais em RUNNING, parar
+            # If control indicates no longer RUNNING, stop
             if self.execution_controller.check_status() != BaseStatus.RUNNING:
                 return self.execution_controller.check_status()
 
-            # Obter próxima combinação pendente
+            # Get next pending combination
             combination = self.work_store.get_next_pending_combination()
             logger.debug(
-                "[PipelineRunner] Próxima combinação retornada=%s",
+                "[PipelineRunner] Next combination returned=%s",
                 combination,
             )
             if not combination:
-                logger.info("Todas as combinações foram processadas")
+                logger.info("All combinations have been processed")
                 break
 
             work_combination = self.work_store.for_combination(combination["id"])
 
-            # Executar combinação e armazenar o status
+            # Execute combination and store status
             status = self._execute_single_combination(
                 combination, config, work_combination
             )
             execution_statuses.append(status)
 
-        # Verificar a lista de status e determinar o resultado final
+        # Check status list and determine final result
         if not execution_statuses:
-            # Nenhuma combinação foi executada
+            # No combination was executed
             return BaseStatus.COMPLETED
 
-        # Se existe falha, retorna falha
+        # If failure exists, return failure
         if BaseStatus.FAILED in execution_statuses:
             return BaseStatus.FAILED
 
-        # Se existe erro, retorna erro
+        # If error exists, return error
         if BaseStatus.ERROR in execution_statuses:
             return BaseStatus.ERROR
 
-        # Se todos completos, retorna completo
+        # If all completed, return completed
         if all(status == BaseStatus.COMPLETED for status in execution_statuses):
             return BaseStatus.COMPLETED
 
-        # Se outra coisa, retorna erro
+        # If something else, return error
         return BaseStatus.ERROR
 
     def _execute_single_combination(
@@ -323,34 +357,43 @@ class PipelineRunner:
         config: CSPBenchConfig,
         work_combination: CombinationScopedPersistence,
     ) -> BaseStatus:
-        """Executa uma única combinação."""
+        """Execute a single combination.
+        
+        Args:
+            combination: Combination data dictionary
+            config: CSPBench configuration
+            work_combination: Combination-scoped persistence wrapper
+            
+        Returns:
+            Execution status for this combination
+        """
         task_id = combination["task_id"]
         dataset_id = combination["dataset_id"]
         preset_id = combination["preset_id"]
         algorithm_id = combination["algorithm_id"]
 
         logger.info(
-            f"Executando combinação: {task_id}/{dataset_id}/{preset_id}/{algorithm_id}"
+            f"Executing combination: {task_id}/{dataset_id}/{preset_id}/{algorithm_id}"
         )
 
         try:
-            # Marcar como running
+            # Mark as running
             work_combination.update_combination_status(BaseStatus.RUNNING)
 
-            # Encontrar objetos de configuração
+            # Find configuration objects
             task = self._find_task(config, task_id)
             if not task:
-                raise ValueError(f"Task não encontrada: {task_id}")
+                raise ValueError(f"Task not found: {task_id}")
 
             alg = self._find_algorithm(config, preset_id, algorithm_id)
             if not alg:
-                raise ValueError(f"Algoritmo não encontrado: {algorithm_id}")
+                raise ValueError(f"Algorithm not found: {algorithm_id}")
 
             dataset_obj = self.datasets_cache.get(dataset_id)
             if not dataset_obj:
-                raise ValueError(f"Dataset não encontrado no cache: {dataset_id}")
+                raise ValueError(f"Dataset not found in cache: {dataset_id}")
 
-            # Executar algoritmo
+            # Execute algorithm
             status = self._execute_algorithm(
                 work_combination, task, alg, dataset_obj, config
             )
@@ -358,13 +401,13 @@ class PipelineRunner:
             work_combination.update_combination_status(status)
 
             logger.info(
-                f"Combinação {task_id}/{dataset_id}/{preset_id}/{algorithm_id} concluída: {status}"
+                f"Combination {task_id}/{dataset_id}/{preset_id}/{algorithm_id} completed: {status}"
             )
 
             return status
 
         except Exception as e:
-            logger.error(f"Erro na execução da combinação: {e}")
+            logger.error(f"Error executing combination: {e}")
             work_combination.update_combination_status(BaseStatus.FAILED)
             work_combination.record_error(e)
             if self.work_store:
@@ -374,7 +417,18 @@ class PipelineRunner:
     def _execute_algorithm(
         self, work_combination, task, alg, dataset_obj, config
     ) -> BaseStatus:
-        """Execute a single algorithm with proper result capture."""
+        """Execute a single algorithm with proper result capture.
+        
+        Args:
+            work_combination: Combination-scoped persistence wrapper
+            task: Task configuration object
+            alg: Algorithm parameters object
+            dataset_obj: Dataset object to process
+            config: Complete CSPBench configuration
+            
+        Returns:
+            Algorithm execution status
+        """
         try:
 
             engine: ExecutionEngine = self._get_executor(work_combination, config, task)
@@ -393,10 +447,14 @@ class PipelineRunner:
             raise e
 
     def _process_dataset(self, dataset_config) -> None:
-        """Processa um dataset (cache ou gera novo)."""
+        """Process a dataset (cache or generate new).
+        
+        Args:
+            dataset_config: Dataset configuration object
+        """
         dataset_id = getattr(dataset_config, "id", None)
 
-        # Verificar cache primeiro
+        # Check cache first
         if (
             self.work_store
             and dataset_id
@@ -405,18 +463,18 @@ class PipelineRunner:
                 dataset_obj = self.work_store.get_dataset(dataset_id)
                 if dataset_obj is None or not dataset_obj.sequences:
                     logger.warning(
-                        f"Dataset {dataset_id} encontrado no cache, mas está vazio"
+                        f"Dataset {dataset_id} found in cache but is empty"
                     )
                 else:
                     self.datasets_cache[dataset_id] = dataset_obj
                     return
             except Exception as e:
-                logger.warning(f"Erro ao carregar dataset do cache {dataset_id}: {e}")
+                logger.warning(f"Error loading dataset from cache {dataset_id}: {e}")
 
-        # Sem cache ou dataset vazio, gerar novo
+        # No cache or empty dataset, generate new
         try:
-            # Gerar/carregar dataset normalmente
-            logger.info(f"Gerando dataset: {dataset_id}")
+            # Generate/load dataset normally
+            logger.info(f"Generating dataset: {dataset_id}")
             resolver, params = load_dataset(dataset_config)
 
             meta = {
@@ -431,13 +489,21 @@ class PipelineRunner:
             self.datasets_cache[dataset_id] = resolver
 
         except Exception as e:
-            logger.error(f"Erro ao gerar/salvar dataset {dataset_id}: {e}")
+            logger.error(f"Error generating/saving dataset {dataset_id}: {e}")
             if self.work_store:
                 self.work_store.dataset_error(dataset_id, e)
-            raise ValueError(f"Erro ao gerar/salvar dataset {dataset_id}: {e}")
+            raise ValueError(f"Error generating/saving dataset {dataset_id}: {e}")
 
     def _find_task(self, config: CSPBenchConfig, task_id: str):
-        """Encontra uma task pelo ID."""
+        """Find a task by ID.
+        
+        Args:
+            config: CSPBench configuration
+            task_id: Task identifier to find
+            
+        Returns:
+            Task object or None if not found
+        """
         for task in config.tasks.items:
             if task.id == task_id:
                 return task
@@ -446,7 +512,16 @@ class PipelineRunner:
     def _find_algorithm(
         self, config: CSPBenchConfig, preset_id: str, algorithm_id: str
     ):
-        """Encontra um algoritmo dentro de um preset usando a nova estrutura."""
+        """Find an algorithm within a preset using the new structure.
+        
+        Args:
+            config: CSPBench configuration
+            preset_id: Algorithm preset identifier
+            algorithm_id: Algorithm identifier within the preset
+            
+        Returns:
+            Algorithm object or None if not found
+        """
         preset = config.algorithms.get(preset_id)
         if not preset:
             return None
@@ -457,7 +532,16 @@ class PipelineRunner:
         return None
 
     def _get_executor(self, work_combination, batch_config, task) -> ExecutionEngine:
-        """Factory method para obter engine de execução apropriada baseada no tipo da task."""
+        """Factory method to get appropriate execution engine based on task type.
+        
+        Args:
+            work_combination: Combination-scoped persistence wrapper
+            batch_config: Batch configuration object
+            task: Task configuration object
+            
+        Returns:
+            Appropriate execution engine instance
+        """
         if isinstance(task, ExperimentTask):
             return ExperimentExecutor(
                 combination_store=work_combination,
@@ -477,58 +561,57 @@ class PipelineRunner:
                 batch_config=batch_config,
             )
         else:
-            raise ValueError(f"Tipo de task não suportado: {type(task)}")
+            raise ValueError(f"Unsupported task type: {type(task)}")
 
     def _wait_for_all_executions_to_complete(self, max_wait_time: int = 60) -> None:
-        """
-        Aguarda a finalização de todas as execuções em progresso antes de finalizar o pipeline.
+        """Wait for all executions in progress to finish before finalizing pipeline.
         
         Args:
-            max_wait_time: Tempo máximo de espera em segundos
+            max_wait_time: Maximum wait time in seconds
         """
-        logger.info("Verificando execuções em progresso...")
+        logger.info("Checking executions in progress...")
         
         start_time = time.time()
-        check_interval = 2.0  # Verificar a cada 2 segundos
+        check_interval = 2.0  # Check every 2 seconds
         
         while time.time() - start_time < max_wait_time:
-            # Buscar execuções ainda em progresso
+            # Search for executions still in progress
             running_executions = self.work_store.get_running_executions()
             
             if not running_executions:
-                logger.info("Todas as execuções foram finalizadas")
+                logger.info("All executions have been completed")
                 return
                 
-            logger.info(f"Aguardando finalização de {len(running_executions)} execuções em progresso...")
+            logger.info(f"Waiting for {len(running_executions)} executions in progress to complete...")
             
-            # Log das execuções que ainda estão rodando para debug
-            for execution in running_executions[:5]:  # Mostrar apenas as primeiras 5
-                logger.debug(f"Execução em progresso: {execution.get('unit_id', 'unknown')}")
+            # Log running executions for debug
+            for execution in running_executions[:5]:  # Show only first 5
+                logger.debug(f"Execution in progress: {execution.get('unit_id', 'unknown')}")
             
             time.sleep(check_interval)
         
-        # Se chegou aqui, timeout foi atingido
+        # If we got here, timeout was reached
         remaining_executions = self.work_store.get_running_executions()
         if remaining_executions:
             logger.warning(
-                f"Timeout atingido aguardando finalização de {len(remaining_executions)} execuções. "
-                f"Algumas execuções podem ficar em estado inconsistente."
+                f"Timeout reached waiting for {len(remaining_executions)} executions to complete. "
+                f"Some executions may be left in inconsistent state."
             )
             
-            # Forçar finalização das execuções pendentes como timeout
+            # Force timeout on pending executions
             for execution in remaining_executions:
                 try:
                     execution_id = execution.get('id')
                     unit_id = execution.get('unit_id', 'unknown')
-                    logger.warning(f"Forçando timeout para execução: {unit_id}")
+                    logger.warning(f"Forcing timeout for execution: {unit_id}")
                     
-                    # Usar execution_scoped para atualizar o status
+                    # Use execution_scoped to update status
                     execution_store = self.work_store.for_execution(unit_id)
                     execution_store.update_execution_status(
                         status=BaseStatus.FAILED.value,
                         result={"error": "Execution timeout during pipeline finalization"},
                     )
                 except Exception as e:
-                    logger.error(f"Erro ao forçar timeout da execução {unit_id}: {e}")
+                    logger.error(f"Error forcing timeout on execution {unit_id}: {e}")
         else:
-            logger.info("Todas as execuções foram finalizadas durante o período de espera")
+            logger.info("All executions were completed during wait period")

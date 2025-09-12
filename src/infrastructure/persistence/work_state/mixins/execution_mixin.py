@@ -1,4 +1,8 @@
-"""Execution CRUD mixin."""
+"""Execution CRUD operations mixin.
+
+This module provides CRUD operations for the Execution table, including
+individual operations and bulk operations for efficient execution management.
+"""
 
 import time
 from typing import Any, Dict, List, Optional, Tuple
@@ -6,7 +10,12 @@ from sqlalchemy import and_, or_
 
 
 class ExecutionCRUDMixin:
-    """CRUD operations for Execution table."""
+    """Mixin providing CRUD operations for Execution table.
+    
+    This mixin handles individual execution records within combinations,
+    supporting both single operations and bulk operations for performance
+    when dealing with large numbers of executions.
+    """
 
     def execution_create(
         self,
@@ -21,7 +30,19 @@ class ExecutionCRUDMixin:
         result: Dict[str, Any] | None = None,
         objective: Optional[float] = None,
     ) -> None:
-        """Create execution entry."""
+        """Create a new execution entry.
+        
+        Args:
+            unit_id: Unique identifier for the execution unit
+            combination_id: ID of the combination this execution belongs to
+            sequencia: Sequence number within the combination
+            status: Initial execution status, defaults to "queued"
+            started_at: Timestamp when execution started
+            finished_at: Timestamp when execution finished
+            params: Execution parameters (stored as JSON)
+            result: Execution results (stored as JSON)
+            objective: Objective function value, if applicable
+        """
         from ..models import Execution
         
         with self.session_scope() as session:
@@ -39,7 +60,14 @@ class ExecutionCRUDMixin:
             session.add(execution)
 
     def execution_get(self, id: int) -> Optional[Dict[str, Any]]:
-        """Get execution by ID."""
+        """Retrieve an execution by its ID.
+        
+        Args:
+            id: Primary key of the execution
+            
+        Returns:
+            Dictionary containing execution data if found, None otherwise.
+        """
         from ..models import Execution
         
         with self.session_scope() as session:
@@ -47,7 +75,18 @@ class ExecutionCRUDMixin:
             return execution.to_dict() if execution else None
 
     def execution_update(self, id: int, **fields: Any) -> None:
-        """Update execution entry."""
+        """Update an execution entry.
+        
+        Args:
+            id: Primary key of the execution to update
+            **fields: Key-value pairs of fields to update. Special handling
+                     for 'params' and 'result' keys which map to JSON fields.
+                     
+        Note:
+            - 'params' maps to params_json field
+            - 'result' maps to result_json field
+            - Other fields are set directly on the model
+        """
         from ..models import Execution
         
         if not fields:
@@ -66,7 +105,14 @@ class ExecutionCRUDMixin:
                         setattr(execution, key, value)
 
     def execution_delete(self, id: int) -> None:
-        """Delete execution entry."""
+        """Delete an execution entry.
+        
+        Args:
+            id: Primary key of the execution to delete
+            
+        Note:
+            This operation is idempotent - no error if execution doesn't exist.
+        """
         from ..models import Execution
         
         with self.session_scope() as session:
@@ -83,18 +129,26 @@ class ExecutionCRUDMixin:
         order_by: Optional[str] = None,
         order_desc: bool = False
     ) -> Tuple[List[Dict[str, Any]], int]:
-        """
-        List executions with generic filtering and pagination.
+        """List executions with advanced filtering and pagination.
         
         Args:
-            filters: Dictionary of field:value pairs for filtering
-            offset: Number of records to skip
+            filters: Dictionary of field:value pairs for filtering. Supports:
+                - Simple values: {'status': 'running'}
+                - List values: {'status': ['running', 'queued']}
+                - Advanced operators: {'started_at': {'operator': 'gte', 'value': 123456}}
+            offset: Number of records to skip (for pagination)
             limit: Maximum number of records to return
-            order_by: Field to order by
+            order_by: Field name to order results by
             order_desc: Whether to order in descending order
             
         Returns:
-            Tuple of (records, total_count)
+            Tuple containing:
+                - List of execution dictionaries matching the criteria
+                - Total count of matching records (before pagination)
+                
+        Note:
+            Advanced operators supported: 'like', 'ilike', 'gt', 'gte', 
+            'lt', 'lte', 'ne' for flexible querying.
         """
         from ..models import Execution
         
@@ -153,14 +207,25 @@ class ExecutionCRUDMixin:
             return results, total_count
 
     def execution_bulk_create(self, executions: List[Dict[str, Any]]) -> int:
-        """
-        Create multiple executions in a single transaction for better performance.
+        """Create multiple executions efficiently in a single transaction.
+        
+        Uses bulk insert operations for better performance when creating
+        large numbers of executions. Falls back to individual inserts
+        if bulk operation fails due to constraint violations.
         
         Args:
-            executions: List of execution dictionaries with required fields
+            executions: List of execution dictionaries with required fields.
+                       Each dictionary should contain at least unit_id,
+                       combination_id, and sequencia.
             
         Returns:
-            Number of executions successfully inserted
+            Number of executions successfully inserted. May be less than
+            the input list length if some insertions fail due to constraints.
+            
+        Note:
+            - Automatically sets default status to 'queued' if not provided
+            - Automatically initializes empty JSON fields if not provided
+            - Ignores duplicate key constraint violations gracefully
         """
         from ..models import Execution
         
@@ -206,15 +271,29 @@ class ExecutionCRUDMixin:
         filters: Dict[str, Any], 
         update_fields: Dict[str, Any]
     ) -> int:
-        """
-        Bulk update executions matching the filters.
+        """Bulk update executions matching the specified filters.
+        
+        Efficiently updates multiple executions in a single database operation
+        based on filter criteria.
         
         Args:
-            filters: Dictionary with filter conditions (e.g., {'combination_id': [1,2,3], 'status': ['running', 'paused']})
-            update_fields: Dictionary with fields to update (e.g., {'status': 'queued', 'started_at': None})
+            filters: Dictionary with filter conditions. Supports:
+                - Simple values: {'combination_id': 123, 'status': 'running'}
+                - List values: {'combination_id': [1,2,3], 'status': ['running', 'paused']}
+            update_fields: Dictionary with fields to update:
+                - 'result' maps to result_json field
+                - 'params' maps to params_json field  
+                - Other fields are updated directly
             
         Returns:
-            int: Number of executions updated
+            Number of executions that were actually updated.
+            
+        Example:
+            # Reset all running executions in combinations 1,2,3 to queued
+            count = execution_bulk_update(
+                filters={'combination_id': [1,2,3], 'status': 'running'},
+                update_fields={'status': 'queued', 'started_at': None}
+            )
         """
         from ..models import Execution
         from sqlalchemy import and_

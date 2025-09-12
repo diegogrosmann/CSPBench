@@ -42,6 +42,12 @@ class WorkManager:
     Attributes:
         _repo: Repository for work item persistence
         _lock: Thread lock for concurrent access protection
+
+    Example:
+        >>> with WorkManager() as manager:
+        ...     work_id = manager.submit(config=my_config)
+        ...     final_status = manager.wait_until_terminal(work_id)
+        ...     work = manager.get(work_id)
     """
 
     # ==============================================
@@ -49,11 +55,16 @@ class WorkManager:
     # ==============================================
 
     def __init__(self, repository: Optional[WorkPersistence] = None):
-        """Initialize WorkManager with persistence repository.
+        """
+        Initialize WorkManager with persistence repository.
 
         Args:
             repository: WorkPersistence instance for data persistence (optional)
                        If None, a new instance will be created.
+                       
+        Note:
+            The repository handles all database operations and should be
+            thread-safe for concurrent access.
         """
         if repository is None:
             repository = WorkPersistence()
@@ -76,6 +87,7 @@ class WorkManager:
         
         Returns:
             Dict[str, Any]: Summary of initialization operations performed
+                           containing 'works_paused' count and any 'errors'
         """
         with self._lock:
             logger.info("Starting WorkManager initialization...")
@@ -99,16 +111,31 @@ class WorkManager:
             return summary
 
     def __enter__(self):
-        """Context manager entry."""
+        """
+        Context manager entry.
+        
+        Returns:
+            WorkManager: Self instance for context manager protocol
+        """
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        """Context manager exit - cleanup resources."""
+        """
+        Context manager exit - cleanup resources.
+        
+        Args:
+            exc_type: Exception type if exception occurred
+            exc_val: Exception value if exception occurred
+            exc_tb: Exception traceback if exception occurred
+        """
         self.shutdown()
 
     def shutdown(self, wait: bool = True, timeout: Optional[float] = 30.0) -> None:
         """
         Shutdown WorkManager and cleanup resources.
+        
+        Gracefully shuts down the WorkManager, optionally waiting for
+        pending operations to complete before closing resources.
         
         Args:
             wait: Whether to wait for pending operations
@@ -142,6 +169,10 @@ class WorkManager:
 
         Thread Safety:
             This method is thread-safe.
+            
+        Raises:
+            ValueError: If configuration is invalid
+            RuntimeError: If work item creation fails
         """
         with self._lock:
             wid = self._new_id()
@@ -206,10 +237,14 @@ class WorkManager:
             order_desc: Whether to order in descending order
 
         Returns:
-            list: List of WorkItem instances
+            list[WorkItem]: List of WorkItem instances
 
         Thread Safety:
             This method is thread-safe.
+            
+        Note:
+            Processes results in batches of 1000 to avoid memory issues
+            with large result sets.
         """
         with self._lock:
             all_work_items = []
@@ -267,6 +302,9 @@ class WorkManager:
         """
         Mark work item as running.
 
+        Transitions work item from QUEUED or PAUSED status to RUNNING.
+        Updates the timestamp to track when execution started.
+
         Args:
             work_id: Unique work identifier
 
@@ -295,6 +333,9 @@ class WorkManager:
     def mark_finished(self, work_id: str) -> bool:
         """
         Mark work item as finished/completed.
+
+        Transitions work item to COMPLETED status indicating successful
+        completion of all processing.
 
         Args:
             work_id: Unique work identifier
@@ -339,6 +380,9 @@ class WorkManager:
     def mark_error(self, work_id: str, error: str) -> bool:
         """
         Mark work item as failed with error message.
+
+        Transitions work item to FAILED status and stores the error
+        message for debugging and monitoring purposes.
 
         Args:
             work_id: Unique work identifier
@@ -421,6 +465,9 @@ class WorkManager:
         """
         Pause work item execution.
 
+        Transitions work item from RUNNING or QUEUED status to PAUSED.
+        The execution can be resumed later.
+
         Args:
             work_id: Unique work identifier
 
@@ -429,6 +476,9 @@ class WorkManager:
 
         Thread Safety:
             This method is thread-safe.
+            
+        Note:
+            Only works in RUNNING or QUEUED status can be paused.
         """
         with self._lock:
             item_data = self._repo.work_get(work_id)
@@ -454,6 +504,9 @@ class WorkManager:
         """
         Cancel work item execution.
 
+        Transitions work item to CANCELED status. This is typically
+        irreversible and stops all processing.
+
         Args:
             work_id: Unique work identifier
 
@@ -462,6 +515,9 @@ class WorkManager:
 
         Thread Safety:
             This method is thread-safe.
+            
+        Note:
+            Already completed, failed, or canceled works cannot be canceled.
         """
         with self._lock:
             item_data = self._repo.work_get(work_id)
@@ -489,12 +545,17 @@ class WorkManager:
 
         Retrieves the work item configuration and starts a new execution
         thread after validating the configuration and resetting the status.
+        Performs cleanup of non-finalized combinations and executions.
 
         Args:
             work_id: ID of the work item to restart
 
         Returns:
             bool: True if restart was successful, False otherwise
+            
+        Note:
+            This operation resets all non-finalized combinations and executions
+            to QUEUED status and clears associated progress data.
         """
         with self._lock:
             item_data = self._repo.work_get(work_id)
@@ -573,6 +634,11 @@ class WorkManager:
 
         Thread Safety:
             This method is thread-safe.
+            
+        Example:
+            >>> final_status = manager.wait_until_terminal("work_123", timeout=3600)
+            >>> if final_status == "completed":
+            ...     print("Work completed successfully")
         """
         start = self._now()
         last_status: Optional[str] = None
@@ -603,11 +669,14 @@ class WorkManager:
         """
         Validate configuration before execution.
 
+        Ensures the configuration has all required sections and parameters
+        for successful pipeline execution.
+
         Args:
             config: Configuration to validate
 
         Raises:
-            ValueError: If configuration is invalid
+            ValueError: If configuration is invalid or missing required sections
         """
         if not config:
             raise ValueError("Configuration is required")
@@ -626,11 +695,15 @@ class WorkManager:
         """
         Generate a summary of the configuration for monitoring and logging.
 
+        Creates a compact summary of the configuration showing algorithms,
+        datasets, and total combination count for monitoring purposes.
+
         Args:
             config: Configuration to summarize
 
         Returns:
-            dict: Configuration summary
+            dict: Configuration summary containing algorithms, datasets,
+                 and total_combinations count
         """
         try:
             summary = {
@@ -676,12 +749,15 @@ class WorkManager:
         """
         Execute a work item with proper error handling and status management.
 
+        Internal method that runs in a separate thread to execute pipeline
+        configuration. Handles status transitions and error reporting.
+
         Args:
             work_id: Work item identifier
             config: Pipeline configuration
 
         Returns:
-            dict: Execution result summary
+            dict: Execution result summary containing work_id and status
         """
         try:
             logger.info(f"=== Starting work execution thread: {work_id} ===")
@@ -722,9 +798,15 @@ class WorkManager:
         """
         Run the pipeline for a work item.
 
+        Creates work-scoped persistence and pipeline runner to execute
+        the configured pipeline with proper resource management.
+
         Args:
             work: Work item to execute
             config: Pipeline configuration
+            
+        Raises:
+            Exception: Any pipeline execution errors are re-raised
         """
         try:
             logger.info(f"Running pipeline for work {work.id}")
@@ -805,6 +887,9 @@ class WorkManager:
         """
         Clear all progress entries for non-finalized executions.
         
+        Removes progress data for executions that are not in final states,
+        useful for cleanup during restart operations.
+        
         Returns:
             int: Number of progress entries cleared
         """
@@ -821,6 +906,9 @@ class WorkManager:
     def _reset_work_combinations(self, work_id: str) -> int:
         """
         Reset all non-finalized combinations for a specific work to queued status.
+        
+        Resets combinations in RUNNING or PAUSED status back to QUEUED
+        and clears timing information for clean restart.
         
         Args:
             work_id: Work identifier to reset combinations for
@@ -864,6 +952,9 @@ class WorkManager:
         """
         Reset all non-finalized executions for a specific work to queued status 
         and clear runtime data.
+        
+        Resets executions in RUNNING or PAUSED status back to QUEUED,
+        clears timing information and results for clean restart.
         
         Args:
             work_id: Work identifier to reset executions for
@@ -920,9 +1011,22 @@ class WorkManager:
     # ==============================================
 
     def _now(self) -> float:
-        """Get current timestamp."""
+        """
+        Get current timestamp.
+        
+        Returns:
+            float: Current time as Unix timestamp
+        """
         return time.time()
 
     def _new_id(self) -> str:
-        """Generate new unique work ID."""
+        """
+        Generate new unique work ID.
+        
+        Creates a random 12-character hexadecimal identifier
+        suitable for use as a work ID.
+        
+        Returns:
+            str: Unique work identifier
+        """
         return uuid.uuid4().hex[:12]

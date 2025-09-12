@@ -118,7 +118,7 @@ experiment:
       algorithms:
 #        - "full_config"
         - "small_config"
-      repetitions: 30                 # int: Number of repetitions per combination (1-10 recommended)
+      repetitions: 10                 # int: Number of repetitions per combination (1-10 recommended)
                                       # Each dataset+algorithm combination will be executed N times
  
 # =====================================================================

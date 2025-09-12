@@ -1,11 +1,20 @@
-"""Dataset CRUD mixin."""
+"""Dataset CRUD operations mixin.
+
+This module provides CRUD operations for the Dataset table, which stores
+dataset metadata and information for CSP benchmark problems.
+"""
 
 from typing import Any, Dict, List, Optional, Tuple
 from sqlalchemy import and_, or_
 
 
 class DatasetCRUDMixin:
-    """CRUD operations for Dataset table."""
+    """Mixin providing CRUD operations for Dataset table.
+    
+    This mixin handles dataset metadata and information, including dataset
+    identifiers, names, and associated metadata. Datasets contain collections
+    of sequences used for CSP benchmarking and algorithm evaluation.
+    """
 
     def dataset_create(
         self,
@@ -15,7 +24,20 @@ class DatasetCRUDMixin:
         name: Optional[str] = None,
         meta: Dict[str, Any] | None = None,
     ) -> int:
-        """Create a new dataset entry. Returns the auto-generated ID."""
+        """Create a new dataset entry and return its auto-generated ID.
+        
+        Args:
+            dataset_id: Logical identifier for the dataset (not the primary key)
+            work_id: ID of the work this dataset belongs to (can be None)
+            name: Human-readable name for the dataset
+            meta: Additional metadata about the dataset (stored as JSON)
+            
+        Returns:
+            Auto-generated primary key ID of the created dataset.
+            
+        Note:
+            The returned ID should be used for creating associated dataset sequences.
+        """
         from ..models import Dataset
         
         with self.session_scope() as session:
@@ -30,7 +52,15 @@ class DatasetCRUDMixin:
             return dataset.id
 
     def dataset_get(self, id: int) -> Optional[Dict[str, Any]]:
-        """Get dataset by auto-generated ID."""
+        """Retrieve a dataset by its auto-generated primary key ID.
+        
+        Args:
+            id: Auto-generated primary key of the dataset
+            
+        Returns:
+            Dictionary containing dataset data if found, None otherwise.
+            Includes dataset_id, work_id, name, and meta fields.
+        """
         from ..models import Dataset
         
         with self.session_scope() as session:
@@ -38,7 +68,16 @@ class DatasetCRUDMixin:
             return dataset.to_dict() if dataset else None
 
     def dataset_update(self, id: int, **fields: Any) -> None:
-        """Update dataset entry by auto-generated ID."""
+        """Update a dataset entry by its auto-generated primary key ID.
+        
+        Args:
+            id: Auto-generated primary key of the dataset to update
+            **fields: Key-value pairs of fields to update. The 'meta'
+                     field maps to meta_json in the database.
+                     
+        Note:
+            This operation is idempotent - no error if dataset doesn't exist.
+        """
         from ..models import Dataset
         
         if not fields:
@@ -54,7 +93,15 @@ class DatasetCRUDMixin:
                         setattr(dataset, field, value)
 
     def dataset_delete(self, id: int) -> None:
-        """Delete dataset entry by auto-generated ID."""
+        """Delete a dataset entry by its auto-generated primary key ID.
+        
+        Args:
+            id: Auto-generated primary key of the dataset to delete
+            
+        Warning:
+            This will also delete all associated dataset sequences due to
+            foreign key constraints. This operation is idempotent.
+        """
         from ..models import Dataset
         
         with self.session_scope() as session:
@@ -71,18 +118,27 @@ class DatasetCRUDMixin:
         order_by: Optional[str] = None,
         order_desc: bool = False
     ) -> Tuple[List[Dict[str, Any]], int]:
-        """
-        List datasets with generic filtering and pagination.
+        """List datasets with filtering and pagination.
         
         Args:
-            filters: Dictionary of field:value pairs for filtering
-            offset: Number of records to skip
+            filters: Dictionary of field:value pairs for filtering. Supports:
+                - Simple values: {'work_id': 'abc', 'dataset_id': 'dataset1'}
+                - List values: {'work_id': ['abc', 'def']}
+                - Advanced operators: {'name': {'operator': 'like', 'value': 'test'}}
+            offset: Number of records to skip (for pagination)
             limit: Maximum number of records to return
-            order_by: Field to order by
+            order_by: Field name to order results by
             order_desc: Whether to order in descending order
             
         Returns:
-            Tuple of (records, total_count)
+            Tuple containing:
+                - List of dataset dictionaries matching the criteria
+                - Total count of matching records (before pagination)
+                
+        Note:
+            Advanced operators supported: 'like', 'ilike', 'gt', 'gte', 
+            'lt', 'lte', 'ne' for flexible querying. Useful for searching
+            datasets by name patterns or filtering by work association.
         """
         from ..models import Dataset
         

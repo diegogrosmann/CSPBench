@@ -1,4 +1,9 @@
-"""Event CRUD mixin."""
+"""Event CRUD operations mixin.
+
+This module provides CRUD operations for the Event table, enabling
+event logging, retrieval, and management for work execution monitoring
+and auditing purposes.
+"""
 
 import time
 from typing import Any, Dict, List, Optional, Tuple
@@ -6,7 +11,12 @@ from sqlalchemy import desc
 
 
 class EventCRUDMixin:
-    """CRUD operations for Event table."""
+    """Mixin providing CRUD operations for Event table.
+    
+    This mixin handles event logging and retrieval for work execution
+    monitoring, auditing, and debugging. Events capture important
+    occurrences during work execution with structured data.
+    """
 
     def event_create(
         self,
@@ -17,7 +27,15 @@ class EventCRUDMixin:
         entity_data: Dict[str, Any] | None = None,
         timestamp: Optional[float] = None,
     ) -> None:
-        """Create event entry."""
+        """Create a new event entry for logging purposes.
+        
+        Args:
+            work_id: ID of the work this event belongs to
+            event_type: Type classification of the event (e.g., 'info', 'warning', 'error')
+            event_category: Category classification (e.g., 'execution', 'progress', 'system')
+            entity_data: Additional structured data about the event (stored as JSON)
+            timestamp: Event timestamp, defaults to current time
+        """
         from ..models import Event
         
         with self.session_scope() as session:
@@ -31,7 +49,14 @@ class EventCRUDMixin:
             session.add(event)
 
     def event_get(self, id: int) -> Optional[Dict[str, Any]]:
-        """Get event by ID."""
+        """Retrieve an event by its ID.
+        
+        Args:
+            id: Primary key of the event
+            
+        Returns:
+            Dictionary containing event data if found, None otherwise.
+        """
         from ..models import Event
         
         with self.session_scope() as session:
@@ -39,7 +64,17 @@ class EventCRUDMixin:
             return event.to_dict() if event else None
 
     def event_update(self, id: int, **fields: Any) -> None:
-        """Update event entry."""
+        """Update an event entry.
+        
+        Args:
+            id: Primary key of the event to update
+            **fields: Key-value pairs of fields to update. The 'entity_data'
+                     field maps to entity_data_json in the database.
+                     
+        Note:
+            Events are typically immutable for audit purposes, so updates
+            should be rare and done with caution.
+        """
         from ..models import Event
         
         if not fields:
@@ -55,7 +90,15 @@ class EventCRUDMixin:
                         setattr(event, key, value)
 
     def event_delete(self, id: int) -> None:
-        """Delete event entry."""
+        """Delete an event entry.
+        
+        Args:
+            id: Primary key of the event to delete
+            
+        Note:
+            Deleting events should be done carefully as it removes audit trail.
+            This operation is idempotent - no error if event doesn't exist.
+        """
         from ..models import Event
         
         with self.session_scope() as session:
@@ -72,18 +115,27 @@ class EventCRUDMixin:
         order_by: Optional[str] = None,
         order_desc: bool = False
     ) -> Tuple[List[Dict[str, Any]], int]:
-        """
-        List events with generic filtering and pagination.
+        """List events with filtering and pagination for monitoring and analysis.
         
         Args:
-            filters: Dictionary of field:value pairs for filtering
-            offset: Number of records to skip
+            filters: Dictionary of field:value pairs for filtering. Supports:
+                - Simple values: {'work_id': 'abc', 'event_type': 'error'}
+                - List values: {'event_type': ['warning', 'error']}
+                - Advanced operators: {'timestamp': {'operator': 'gte', 'value': 123456}}
+            offset: Number of records to skip (for pagination)
             limit: Maximum number of records to return
-            order_by: Field to order by
+            order_by: Field name to order results by
             order_desc: Whether to order in descending order
             
         Returns:
-            Tuple of (records, total_count)
+            Tuple containing:
+                - List of event dictionaries matching the criteria
+                - Total count of matching records (before pagination)
+                
+        Note:
+            Advanced operators supported: 'like', 'ilike', 'gt', 'gte', 
+            'lt', 'lte', 'ne' for flexible querying. Commonly used for
+            timestamp-based filtering and text search in messages.
         """
         from ..models import Event
         

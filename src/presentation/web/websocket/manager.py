@@ -108,13 +108,14 @@ class WorkMonitorSession:
 
         self.running = True
         self._monitor_task = asyncio.create_task(self._monitor_loop())
-        logger.info(f"Started monitoring for work {self.work_id}")
+        logger.info(f"[WEBSOCKET] Iniciado monitoramento para work {self.work_id}")
 
     async def stop(self) -> None:
         """Stop monitoring loop."""
         if not self.running:
             return
 
+        logger.info(f"[WEBSOCKET] Parando monitoramento para work {self.work_id}")
         self.running = False
         if self._monitor_task:
             self._monitor_task.cancel()
@@ -122,10 +123,10 @@ class WorkMonitorSession:
                 await self._monitor_task
             except asyncio.CancelledError:
                 pass
-        logger.info(f"Stopped monitoring for work {self.work_id}")
 
     async def _monitor_loop(self) -> None:
         """Main monitoring loop."""
+        loop_count = 0
         try:
             # Send initial snapshot
             await self._send_initial_snapshot()
@@ -134,15 +135,14 @@ class WorkMonitorSession:
                 try:
                     await self._check_for_updates()
                     await asyncio.sleep(self.update_interval)
-
                 except Exception as e:
-                    logger.error(f"Error in monitor loop for work {self.work_id}: {e}")
+                    logger.error(f"[WEBSOCKET] Erro no loop de monitoramento para work {self.work_id}: {e}")
                     await asyncio.sleep(self.update_interval)
 
         except asyncio.CancelledError:
-            logger.debug(f"Monitor loop cancelled for work {self.work_id}")
+            pass
         except Exception as e:
-            logger.error(f"Monitor loop failed for work {self.work_id}: {e}")
+            logger.error(f"[WEBSOCKET] Loop de monitoramento falhou para work {self.work_id}: {e}")
 
     async def _send_initial_snapshot(self) -> None:
         """Send initial complete snapshot."""
@@ -272,13 +272,19 @@ class WorkMonitorSession:
     async def _check_for_updates(self) -> None:
         """Check for updates and send incremental changes."""
         try:
-            # Get current state
-            progress_summary = self._persistence.get_work_progress_summary(self.work_id)
-            if not progress_summary:
-                return
-
+            # Verificar status do work INDEPENDENTE do progress_summary
             work_data = self._persistence.work_get(self.work_id)
             current_work_status = work_data.get("status") if work_data else None
+            
+            final_statuses = ["completed", "failed", "cancelled", "error"]
+            is_final_status = current_work_status in final_statuses
+            
+            if is_final_status:
+                logger.info(f"[WEBSOCKET] Work {self.work_id} finalizou com status {current_work_status}")
+                asyncio.create_task(self._handle_work_completion())
+
+            # Obter progress_summary para atualizações de progresso
+            progress_summary = self._persistence.get_work_progress_summary(self.work_id)
 
             # Check for work status change
             if self.last_work_status != current_work_status:
@@ -286,6 +292,10 @@ class WorkMonitorSession:
                     self.last_work_status, current_work_status
                 )
                 self.last_work_status = current_work_status
+
+            # Se não há progress_summary, interromper processamento de atualizações
+            if not progress_summary:
+                return
 
             # Check for progress changes
             progress_hash = self._hash_progress(progress_summary)
@@ -442,18 +452,15 @@ class WorkMonitorSession:
                     if executions_changed:
                         self._update_executions_state(executions)
 
-                # Check if work is finished and should stop monitoring
-                if current_work_status in ["completed", "failed", "cancelled", "error"]:
-                    # Send final snapshot and stop after delay
-                    asyncio.create_task(self._handle_work_completion())
-
         except Exception as e:
-            logger.error(f"Error checking updates for work {self.work_id}: {e}")
+            logger.error(f"[WEBSOCKET] Exception em _check_for_updates para work {self.work_id}: {e}")
 
     async def _send_work_status_event(
         self, old_status: Optional[str], new_status: str
     ) -> None:
         """Send work status change event."""
+        logger.info(f"[WEBSOCKET] 🔄 Enviando evento de mudança de status para work {self.work_id}: {old_status} -> {new_status}")
+        
         event = ProgressMessage(
             type=MessageType.EVENT,
             work_id=self.work_id,
@@ -715,15 +722,38 @@ class WorkMonitorSession:
 
     async def _handle_work_completion(self) -> None:
         """Handle work completion - send final snapshot and cleanup."""
-        await asyncio.sleep(30)  # Grace period
-        if self.running:
-            logger.info(f"Work {self.work_id} completed, stopping monitor")
-            await self.stop()
+        try:
+            logger.info(f"[WEBSOCKET] Finalizando work {self.work_id} - enviando snapshot final")
+            
+            # Enviar snapshot final
+            try:
+                final_message = await self._build_snapshot_message(update_tracking=False)
+                if final_message:
+                    await self._broadcast_message(final_message)
+            except Exception as snapshot_error:
+                logger.error(f"[WEBSOCKET] Erro ao enviar snapshot final para work {self.work_id}: {snapshot_error}")
+            
+            # Período de graça antes de parar o monitoramento
+            await asyncio.sleep(30)
+            
+            if self.running:
+                logger.info(f"[WEBSOCKET] Parando monitoramento para work {self.work_id}")
+                await self.stop()
+            
+        except asyncio.CancelledError:
+            logger.debug(f"[WEBSOCKET] _handle_work_completion cancelado para work {self.work_id}")
+            raise
+        except Exception as e:
+            logger.error(f"[WEBSOCKET] Erro em _handle_work_completion para work {self.work_id}: {e}")
 
     async def _broadcast_message(self, message: ProgressMessage) -> None:
         """Broadcast message to all subscribers."""
         if not self.subscribers:
             return
+
+        # Log important events only
+        if message.type in [MessageType.ERROR]:
+            logger.info(f"[WEBSOCKET] Broadcasting {message.type.value} para {len(self.subscribers)} subscribers do work {self.work_id}")
 
         # Convert to WebSocket message
         ws_message = message.to_websocket_message()

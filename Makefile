@@ -109,6 +109,15 @@ test-cov: setup ## Executa testes com cobertura
 	@echo "$(BLUE)=== Executando testes com cobertura ===$(NC)"
 	@.venv/bin/python -m pytest tests/ -v --cov=src --cov-report=html
 
+docs: setup ## Gera documentação (pdoc) em docs/api
+	@echo "$(BLUE)=== Gerando documentação (pdoc) ===$(NC)"
+	@.venv/bin/python scripts/generate_docs.py
+	@echo "$(GREEN)✓ Documentação gerada em docs/api$(NC)"
+
+docs-serve: setup ## Serve documentação (pdoc) em http://localhost:8081
+	@echo "$(BLUE)=== Servindo documentação (pdoc) ===$(NC)"
+	@.venv/bin/python scripts/generate_docs.py --serve --port 8081
+
 format: setup ## Formata código
 	@echo "$(BLUE)=== Formatando código ===$(NC)"
 	@.venv/bin/python -m black .
@@ -313,6 +322,6 @@ dive: ## Analisa camadas da imagem (requer dive)
 .PHONY: help info setup clean-setup dev dev-web test test-cov format lint lint-fix clean-dev \
 	build build-no-cache build-multi run run-detached run-shell stop logs \
 	push pull health ps images stats \
-	clean clean-all clean-docker clean-cache clean-full size inspect dive .env
+	clean clean-all clean-docker clean-cache clean-full size inspect dive .env docs docs-serve
 
 

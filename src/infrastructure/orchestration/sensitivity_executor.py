@@ -1,26 +1,11 @@
-"""SensitivityExecutor: executa SensitivityTask com amostragem de parâmetros.
+"""SensitivityExecutor: executes SensitivityTask with parameter sampling.
 
-Reimplementado para seguir o padrão do ExperimentExecutor e OptimizationExecutor:
-- Cada sample é armazenado como uma execução na tabela executions
-- Implementa controle de recursos e status checking
--                # Parallel execution using ProcessPoolExecutor
-                completed_samples, failed_samples, results = (
-                    self._run_parallel_sensitivity(
-                        task,
-                        dataset_obj,
-                        alg,
-                        samples,
-                        base_params,
-                        sensitivity_params,
-                        strings,
-                        alphabet,
-                        dataset_id,
-                        max_workers,
-                        rng,
-                    )
-                )zação de samples
-- Integração completa com sistema de persistência
-- Análise de sensibilidade baseada em variância dos resultados
+Reimplemented to follow ExperimentExecutor and OptimizationExecutor pattern:
+- Each sample is stored as an execution in the executions table
+- Implements resource control and status checking
+- Sample parallelization
+- Full integration with persistence system
+- Sensitivity analysis based on result variance
 """
 
 from __future__ import annotations
@@ -63,7 +48,24 @@ def _sample_worker(
     cpu_config: dict[str, Any] | None = None,
     work_id: str | None = None,
 ) -> tuple[dict[str, Any], str]:
-    """Função executada em subprocesso para um sample de análise de sensibilidade (precisa ser picklable)."""
+    """Function executed in subprocess for a sensitivity analysis sample (needs to be picklable).
+    
+    Args:
+        sensitivity_unit_id: Unique identifier for this sensitivity unit
+        sample_number: Sample sequence number
+        sample_params: Parameters for this sample
+        strings: Input strings for the algorithm
+        alphabet: Alphabet used
+        distance_method: Distance calculation method
+        use_cache: Whether to use distance cache
+        internal_jobs: Number of internal jobs for algorithms
+        algorithm_name: Name of algorithm to execute
+        cpu_config: CPU configuration for worker process
+        work_id: Work identifier for status checking
+        
+    Returns:
+        Tuple of (sample_result_dict, sensitivity_unit_id)
+    """
     import psutil
 
     from src.domain.distance import create_distance_calculator
@@ -119,7 +121,7 @@ def _sample_worker(
         except Exception as e:
             logger.warning(f"[SAMPLE-WORKER] Cannot apply memory limit: {e}")
 
-    # Recriar store e wrappers using factory methods
+    # Recreate store and wrappers using factory methods
     store = WorkPersistence()
     work_scoped = WorkScopedPersistence(work_id, store)
     execution_store = work_scoped.for_execution(sensitivity_unit_id)
@@ -145,7 +147,7 @@ def _sample_worker(
     try:
         execution_store.update_execution_status(_BaseStatus.RUNNING)
         monitor.on_progress(
-            0.0, f"Iniciando sample {sample_number} da análise de sensibilidade"
+            0.0, f"Starting sample {sample_number} of sensitivity analysis"
         )
 
         result = run_algorithm(
@@ -159,7 +161,7 @@ def _sample_worker(
             params=sample_params,
         )
 
-        monitor.on_progress(1.0, f"Sample {sample_number} finalizado")
+        monitor.on_progress(1.0, f"Sample {sample_number} finished")
         status_value = result.get("status")
         if hasattr(status_value, "value"):
             status_value = status_value.value
@@ -197,7 +199,7 @@ def _sample_worker(
 
 
 class SensitivityExecutor(AbstractExecutionEngine):
-    """Executor para tarefas de análise de sensibilidade."""
+    """Executor for sensitivity analysis tasks."""
 
     def __init__(
         self,
@@ -205,6 +207,13 @@ class SensitivityExecutor(AbstractExecutionEngine):
         execution_controller: ExecutionController,
         batch_config: CSPBenchConfig,
     ):
+        """Initialize sensitivity executor.
+        
+        Args:
+            combination_store: Scoped persistence for combination data
+            execution_controller: Controller for execution limits and status
+            batch_config: Batch configuration object
+        """
         super().__init__(combination_store, execution_controller, batch_config)
 
     def run(
@@ -213,7 +222,16 @@ class SensitivityExecutor(AbstractExecutionEngine):
         dataset_obj: Dataset,
         alg: AlgParams,
     ) -> BaseStatus:
-        """Executa a análise de sensibilidade por amostragem de parâmetros."""
+        """Execute sensitivity analysis by parameter sampling.
+        
+        Args:
+            task: Sensitivity analysis task configuration
+            dataset_obj: Dataset to analyze
+            alg: Algorithm parameters configuration
+            
+        Returns:
+            Final execution status
+        """
 
         try:
             # Extract configuration
@@ -221,7 +239,7 @@ class SensitivityExecutor(AbstractExecutionEngine):
             samples = config.get("samples", 32)  # Default increased for better analysis
             method = task.method or "morris"  # Default sensitivity method
 
-            logger.info("Iniciando análise de sensibilidade para combinação")
+            logger.info("Starting sensitivity analysis for combination")
             logger.info(f"Config: samples={samples}, method={method}")
 
             strings = dataset_obj.sequences
@@ -275,7 +293,7 @@ class SensitivityExecutor(AbstractExecutionEngine):
             rng = random.Random(global_seed)
 
             logger.info(
-                f"Iniciando análise de sensibilidade: {samples} samples, método: {method}"
+                f"Starting sensitivity analysis: {samples} samples, method: {method}"
             )
 
             try:
@@ -289,7 +307,7 @@ class SensitivityExecutor(AbstractExecutionEngine):
             failed_samples = 0
             results: list[dict[str, Any]] = []
 
-            logger.info(f"Configuração: max_workers={max_workers}")
+            logger.info(f"Configuration: max_workers={max_workers}")
 
             if max_workers > 1:
                 # Parallel execution
@@ -335,22 +353,22 @@ class SensitivityExecutor(AbstractExecutionEngine):
             ):  # Need at least 2 samples for variance calculation
                 self._perform_sensitivity_analysis(results, sensitivity_params, method)
                 logger.info(
-                    f"Análise de sensibilidade concluída: {completed_samples} samples completados, {failed_samples} falharam"
+                    f"Sensitivity analysis completed: {completed_samples} samples completed, {failed_samples} failed"
                 )
                 return BaseStatus.COMPLETED
             elif completed_samples == 0:
-                logger.error("Nenhum sample foi completado com sucesso")
+                logger.error("No sample was completed successfully")
                 return BaseStatus.FAILED
             else:
                 logger.warning(
-                    f"Poucos samples para análise válida: {completed_samples} completados, {failed_samples} falharam"
+                    f"Too few samples for valid analysis: {completed_samples} completed, {failed_samples} failed"
                 )
                 return BaseStatus.ERROR
 
         except Exception as e:
-            logger.error(f"Erro durante análise de sensibilidade: {e}")
-            logger.error(f"Tipo do erro: {type(e)}")
-            logger.error("Stack trace completa:", exc_info=True)
+            logger.error(f"Error during sensitivity analysis: {e}")
+            logger.error(f"Error type: {type(e)}")
+            logger.error("Full stack trace:", exc_info=True)
             return BaseStatus.FAILED
 
     def _generate_sample_params(
@@ -359,7 +377,16 @@ class SensitivityExecutor(AbstractExecutionEngine):
         sensitivity_params: dict[str, Any],
         rng: random.Random,
     ) -> dict[str, Any]:
-        """Gera parâmetros do sample baseado na configuração de sensibilidade."""
+        """Generate sample parameters based on sensitivity configuration.
+        
+        Args:
+            base_params: Base algorithm parameters
+            sensitivity_params: Sensitivity parameter configuration
+            rng: Random number generator
+            
+        Returns:
+            Generated parameters for this sample
+        """
         sample_params = dict(base_params)
 
         for param_name, param_config in sensitivity_params.items():
@@ -407,7 +434,7 @@ class SensitivityExecutor(AbstractExecutionEngine):
                     log_high = math.log(param_config["high"])
                     sample_params[param_name] = math.exp(rng.uniform(log_low, log_high))
             else:
-                logger.warning(f"Tipo de parâmetro desconhecido: {param_type}")
+                logger.warning(f"Unknown parameter type: {param_type}")
 
         return sample_params
 
@@ -425,7 +452,24 @@ class SensitivityExecutor(AbstractExecutionEngine):
         max_workers,
         rng,
     ) -> tuple[int, int, list[dict[str, Any]]]:
-        """Executa análise de sensibilidade em paralelo."""
+        """Execute sensitivity analysis in parallel.
+        
+        Args:
+            task: Sensitivity task configuration
+            dataset_obj: Dataset object
+            alg: Algorithm parameters
+            samples: Number of samples to run
+            base_params: Base algorithm parameters
+            sensitivity_params: Sensitivity parameter configuration
+            strings: Input strings
+            alphabet: Alphabet used
+            dataset_id: Dataset identifier
+            max_workers: Maximum number of worker processes
+            rng: Random number generator
+            
+        Returns:
+            Tuple of (completed_samples, failed_samples, results)
+        """
 
         # Get CPU configuration for worker processes
         cpu_config = self._execution_controller.create_worker_config()
@@ -453,7 +497,7 @@ class SensitivityExecutor(AbstractExecutionEngine):
                     base_params, sensitivity_params, rng
                 )
 
-                # Construir unit_id padronizado: type:task:dataset:config:name:sample_X
+                # Build standardized unit_id: type:task:dataset:config:name:sample_X
                 config_id = (
                     getattr(self._combination_store, "_preset_id", None) or "default"
                 )
@@ -520,7 +564,23 @@ class SensitivityExecutor(AbstractExecutionEngine):
         dataset_id,
         rng,
     ) -> tuple[int, int, list[dict[str, Any]]]:
-        """Executa análise de sensibilidade sequencial."""
+        """Execute sensitivity analysis sequentially.
+        
+        Args:
+            task: Sensitivity task configuration
+            dataset_obj: Dataset object
+            alg: Algorithm parameters
+            samples: Number of samples to run
+            base_params: Base algorithm parameters
+            sensitivity_params: Sensitivity parameter configuration
+            strings: Input strings
+            alphabet: Alphabet used
+            dataset_id: Dataset identifier
+            rng: Random number generator
+            
+        Returns:
+            Tuple of (completed_samples, failed_samples, results)
+        """
 
         # Get CPU configuration for sequential execution
         cpu_config = self._execution_controller.create_worker_config()
@@ -546,7 +606,7 @@ class SensitivityExecutor(AbstractExecutionEngine):
                 base_params, sensitivity_params, rng
             )
 
-            # Construir unit_id padronizado: type:task:dataset:config:name:sample_X
+            # Build standardized unit_id: type:task:dataset:config:name:sample_X
             config_id = (
                 getattr(self._combination_store, "_preset_id", None) or "default"
             )
@@ -600,10 +660,19 @@ class SensitivityExecutor(AbstractExecutionEngine):
         sensitivity_params: dict[str, Any],
         method: str,
     ) -> dict[str, float]:
-        """Realiza análise de sensibilidade baseada nos resultados dos samples."""
+        """Perform sensitivity analysis based on sample results.
+        
+        Args:
+            results: List of sample execution results
+            sensitivity_params: Sensitivity parameter configuration
+            method: Analysis method to use
+            
+        Returns:
+            Dictionary of parameter sensitivity scores
+        """
 
         if len(results) < 2:
-            logger.warning("Poucos resultados para análise de sensibilidade")
+            logger.warning("Too few results for sensitivity analysis")
             return {}
 
         # Extract objectives from results
@@ -614,14 +683,14 @@ class SensitivityExecutor(AbstractExecutionEngine):
         ]
 
         if len(objectives) < 2:
-            logger.warning("Poucos objetivos válidos para análise de sensibilidade")
+            logger.warning("Too few valid objectives for sensitivity analysis")
             return {}
 
         # Simple variance-based sensitivity analysis
         param_scores: dict[str, float] = {}
         overall_variance = variance(objectives) if len(objectives) > 1 else 0.0
 
-        logger.info(f"Variância geral dos objetivos: {overall_variance}")
+        logger.info(f"Overall objective variance: {overall_variance}")
 
         # For each parameter, calculate sensitivity based on parameter variation impact
         for param_name in sensitivity_params.keys():
@@ -654,12 +723,12 @@ class SensitivityExecutor(AbstractExecutionEngine):
                     # Fallback to simple variance calculation if numpy not available
                     param_scores[param_name] = overall_variance
                 except (ValueError, TypeError) as e:
-                    logger.warning(f"Erro no cálculo de correlação para {param_name}: {e}")
+                    logger.warning(f"Error calculating correlation for {param_name}: {e}")
                     param_scores[param_name] = overall_variance
             else:
                 param_scores[param_name] = 0.0
 
-        logger.info(f"Scores de sensibilidade calculados: {param_scores}")
+        logger.info(f"Calculated sensitivity scores: {param_scores}")
 
         # Store sensitivity analysis results
         self._store_sensitivity_results(param_scores, method, len(results))
@@ -669,7 +738,13 @@ class SensitivityExecutor(AbstractExecutionEngine):
     def _store_sensitivity_results(
         self, param_scores: dict[str, float], method: str, num_samples: int
     ) -> None:
-        """Armazena os resultados da análise de sensibilidade."""
+        """Store sensitivity analysis results.
+        
+        Args:
+            param_scores: Parameter sensitivity scores
+            method: Analysis method used
+            num_samples: Number of samples analyzed
+        """
 
         sensitivity_results = {
             "method": method,
@@ -684,11 +759,11 @@ class SensitivityExecutor(AbstractExecutionEngine):
             self._combination_store.generic_event(
                 unit_id="sensitivity_analysis",  # Use a descriptive unit_id for this event type
                 event_type="progress",
-                message=f"Análise de sensibilidade concluída usando método {method}",
+                message=f"Sensitivity analysis completed using {method} method",
                 context=sensitivity_results,
             )
-            logger.info("Resultados da análise de sensibilidade armazenados")
+            logger.info("Sensitivity analysis results stored")
         except Exception as e:
             logger.warning(
-                f"Erro ao armazenar resultados da análise de sensibilidade: {e}"
+                f"Error storing sensitivity analysis results: {e}"
             )

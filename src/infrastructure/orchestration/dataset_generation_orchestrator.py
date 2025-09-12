@@ -1,13 +1,13 @@
 """
 Dataset Generation Orchestrator - High-Level Orchestration
 
-Refatorado para usar as novas estruturas:
+Refactored to use new structures:
  - Domain: Dataset
- - Services: SyntheticDatasetGenerator (geração sintética)
- - External: EntrezDatasetDownloader (download NCBI)
- - Persistence: FileDatasetRepository (salvar/carregar .fasta)
+ - Services: SyntheticDatasetGenerator (synthetic generation)
+ - External: EntrezDatasetDownloader (NCBI download)
+ - Persistence: FileDatasetRepository (save/load .fasta)
 
-Orquestra o fluxo interativo via DatasetWizard.
+Orchestrates interactive flow via DatasetWizard.
 """
 
 from pathlib import Path
@@ -31,8 +31,7 @@ class DatasetGenerationOrchestrator:
     """Orchestrator for interactive dataset generation."""
 
     def __init__(self, base_path: str = "datasets"):
-        """
-        Initialize orchestrator.
+        """Initialize orchestrator.
 
         Args:
             base_path: Base directory to save datasets
@@ -44,8 +43,7 @@ class DatasetGenerationOrchestrator:
         self.repository = FileDatasetRepository
 
     def run_interactive_generation(self) -> Optional[str]:
-        """
-        Execute complete interactive dataset generation process.
+        """Execute complete interactive dataset generation process.
 
         Returns:
             Generated file path or None if cancelled
@@ -71,7 +69,11 @@ class DatasetGenerationOrchestrator:
             return None
 
     def _handle_synthetic_generation(self) -> Optional[str]:
-        """Handle synthetic dataset generation."""
+        """Handle synthetic dataset generation.
+        
+        Returns:
+            Generated file path or None if cancelled
+        """
         # Collect parameters
         params = self.wizard.collect_synthetic_params()
 
@@ -93,7 +95,7 @@ class DatasetGenerationOrchestrator:
                 print("📄 Operation cancelled.")
                 return None
 
-        # Generate dataset (dispatch por método)
+        # Generate dataset (dispatch by method)
         print("\n🧪 Generating synthetic dataset...")
         method = params.get("method", "random")
         ds, used = self._generate_synthetic_dispatch(params)
@@ -108,7 +110,11 @@ class DatasetGenerationOrchestrator:
         return saved_path
 
     def _handle_real_generation(self) -> Optional[str]:
-        """Handle real dataset generation."""
+        """Handle real dataset generation.
+        
+        Returns:
+            Generated file path or None if cancelled
+        """
         # Collect parameters
         params = self.wizard.collect_real_params()
 
@@ -132,7 +138,7 @@ class DatasetGenerationOrchestrator:
 
         # Download/import dataset
         print("\n🌐 Processing real dataset...")
-        # Apenas NCBI suportado
+        # Only NCBI supported
         entrez_params: Dict[str, Any] = {
             "query": params.get("query", "*"),
             "db": params.get("db"),
@@ -154,7 +160,13 @@ class DatasetGenerationOrchestrator:
     def _show_generation_summary(
         self, dataset_type: str, saved_path: str, summary: Dict[str, Any]
     ) -> None:
-        """Show generation summary."""
+        """Show generation summary.
+        
+        Args:
+            dataset_type: Type of dataset generated
+            saved_path: Path where dataset was saved
+            summary: Summary statistics dictionary
+        """
         print(f"\n✅ {dataset_type} dataset generated successfully!")
         print("=" * 50)
         print(f"📁 File saved: {saved_path}")
@@ -166,13 +178,30 @@ class DatasetGenerationOrchestrator:
 
     # -------- Helpers --------
     def _save_dataset(self, dataset: Dataset, filename: str) -> str:
-        """Persist dataset using FileDatasetRepository and return saved path."""
+        """Persist dataset using FileDatasetRepository and return saved path.
+        
+        Args:
+            dataset: Dataset object to save
+            filename: Desired filename
+            
+        Returns:
+            Actual saved file path
+        """
         name_no_ext = Path(filename).stem
         return self.repository.save(dataset, name_no_ext, base_path=self.base_path)
 
     def _build_summary(
         self, ds: Dataset, used_params: Dict[str, Any] | None = None
     ) -> Dict[str, Any]:
+        """Build summary statistics for dataset.
+        
+        Args:
+            ds: Dataset object
+            used_params: Parameters used for generation
+            
+        Returns:
+            Summary statistics dictionary
+        """
         stats = ds.get_statistics()
         est_kb = stats["total_characters"] / 1024.0
         return {
@@ -186,7 +215,14 @@ class DatasetGenerationOrchestrator:
     def _generate_synthetic_dispatch(
         self, params: Dict[str, Any]
     ) -> Tuple[Dataset, Dict[str, Any]]:
-        """Dispatch synthetic generation to appropriate method using new defaults."""
+        """Dispatch synthetic generation to appropriate method using new defaults.
+        
+        Args:
+            params: Generation parameters dictionary
+            
+        Returns:
+            Tuple of (generated_dataset, used_parameters)
+        """
         method = params.get("method", "random")
 
         # Extract common parameters - let generator methods handle defaults

@@ -7,13 +7,13 @@ random sequences, noise-based variations, mutation-based sequences,
 and clustered data.
 
 Features:
-- Random sequence generation
-- Noise-based sequence variation
-- Mutation-based sequence evolution (substitution, insertion, deletion)
-- Clustered sequence generation
-- Configurable parameters for all generation modes
-- Deterministic generation with seed support
-- Compatibility with existing test infrastructure
+    - Random sequence generation
+    - Noise-based sequence variation
+    - Mutation-based sequence evolution (substitution, insertion, deletion)
+    - Clustered sequence generation
+    - Configurable parameters for all generation modes
+    - Deterministic generation with seed support
+    - Compatibility with existing test infrastructure
 
 Default Values:
     - n: 20 sequences
@@ -50,7 +50,7 @@ SYNTHETIC_DEFAULTS = {
 
 class SyntheticDatasetGenerator:
     """
-    Synthetic dataset generator (compatibility with existing tests).
+    Synthetic dataset generator with compatibility for existing tests.
     
     Provides static methods for generating various types of synthetic
     datasets with configurable parameters. All methods return a tuple
@@ -74,11 +74,11 @@ class SyntheticDatasetGenerator:
         Prioritizes the injected rng. If none provided, creates a new one using the seed.
         
         Args:
-            seed: Random seed for reproducibility
-            rng: Existing random number generator
+            seed (Optional[int]): Random seed for reproducibility.
+            rng (Optional[random.Random]): Existing random number generator.
             
         Returns:
-            random.Random: Random number generator instance
+            random.Random: Random number generator instance.
         """
         return rng if rng is not None else random.Random(seed)
 
@@ -97,17 +97,19 @@ class SyntheticDatasetGenerator:
         the given alphabet. Each position is independently random.
         
         Args:
-            n: Number of sequences to generate
-            length: Length of each sequence
-            alphabet: Character alphabet to use
-            seed: Random seed for reproducibility
-            rng: Existing random number generator
+            n (Optional[int]): Number of sequences to generate. Defaults to 20.
+            length (Optional[int]): Length of each sequence. Defaults to 50.
+            alphabet (Optional[str]): Character alphabet to use. Defaults to "ACGT".
+            seed (Optional[int]): Random seed for reproducibility.
+            rng (Optional[random.Random]): Existing random number generator.
             
         Returns:
-            tuple: (Dataset with random sequences, generation parameters)
+            Tuple[Dataset, dict]: A tuple containing:
+                - Dataset: Dataset with random sequences
+                - dict: Generation parameters
             
         Raises:
-            ValueError: If n or length <= 0, or alphabet is empty
+            ValueError: If n or length <= 0, or alphabet is empty.
         """
         # Apply default values
         n = n if n is not None else SYNTHETIC_DEFAULTS["n"]
@@ -153,18 +155,22 @@ class SyntheticDatasetGenerator:
         with a random character from the alphabet.
         
         Args:
-            base_sequence: Template sequence for variation (auto-generated if None)
-            n: Number of sequences to generate
-            noise_rate: Probability of noise per position (0.0-1.0)
-            alphabet: Character alphabet to use
-            seed: Random seed for reproducibility
-            rng: Existing random number generator
+            base_sequence (Optional[str]): Template sequence for variation. 
+                Auto-generated if None.
+            n (Optional[int]): Number of sequences to generate. Defaults to 20.
+            noise_rate (Optional[float]): Probability of noise per position (0.0-1.0).
+                Defaults to 0.1.
+            alphabet (Optional[str]): Character alphabet to use. Defaults to "ACGT".
+            seed (Optional[int]): Random seed for reproducibility.
+            rng (Optional[random.Random]): Existing random number generator.
             
         Returns:
-            tuple: (Dataset with noisy sequences, generation parameters)
+            Tuple[Dataset, dict]: A tuple containing:
+                - Dataset: Dataset with noisy sequences
+                - dict: Generation parameters
             
         Raises:
-            ValueError: If n <= 0, noise_rate not in [0,1], or base_sequence empty
+            ValueError: If n <= 0, noise_rate not in [0,1], or base_sequence empty.
         """
         # Apply default values
         n = n if n is not None else SYNTHETIC_DEFAULTS["n"]
@@ -231,20 +237,26 @@ class SyntheticDatasetGenerator:
         mutation types and rates.
         
         Args:
-            base_sequence: Template sequence for mutation (auto-generated if None)
-            n: Number of sequences to generate
-            mutation_types: Types of mutations to apply ["substitution", "insertion", "deletion"]
-            mutation_rate: Probability of mutation per position (0.0-1.0)
-            alphabet: Character alphabet to use
-            seed: Random seed for reproducibility
-            rng: Existing random number generator
-            pad_char: Character for padding sequences to uniform length
+            base_sequence (Optional[str]): Template sequence for mutation. 
+                Auto-generated if None.
+            n (Optional[int]): Number of sequences to generate. Defaults to 20.
+            mutation_types (Optional[List[str]]): Types of mutations to apply.
+                Defaults to ["substitution"]. Options: ["substitution", "insertion", "deletion"].
+            mutation_rate (Optional[float]): Probability of mutation per position (0.0-1.0).
+                Defaults to 0.1.
+            alphabet (Optional[str]): Character alphabet to use. Defaults to "ACGT".
+            seed (Optional[int]): Random seed for reproducibility.
+            rng (Optional[random.Random]): Existing random number generator.
+            pad_char (Optional[str]): Character for padding sequences to uniform length.
+                Defaults to "N".
             
         Returns:
-            tuple: (Dataset with mutated sequences, generation parameters)
+            Tuple[Dataset, dict]: A tuple containing:
+                - Dataset: Dataset with mutated sequences
+                - dict: Generation parameters
             
         Raises:
-            ValueError: If n <= 0, mutation_rate not in [0,1], or base_sequence empty
+            ValueError: If n <= 0, mutation_rate not in [0,1], or base_sequence empty.
         """
         # Apply default values
         n = n if n is not None else SYNTHETIC_DEFAULTS["n"]
@@ -354,19 +366,22 @@ class SyntheticDatasetGenerator:
         with a specified cluster_distance probability.
         
         Args:
-            n: Number of sequences to generate
-            length: Length of each sequence
-            num_clusters: Number of cluster centers
-            alphabet: Character alphabet to use
-            cluster_distance: Probability of variation from cluster center (0.0-1.0)
-            seed: Random seed for reproducibility
-            rng: Existing random number generator
+            n (Optional[int]): Number of sequences to generate. Defaults to 20.
+            length (Optional[int]): Length of each sequence. Defaults to 50.
+            num_clusters (Optional[int]): Number of cluster centers. Defaults to 2.
+            alphabet (Optional[str]): Character alphabet to use. Defaults to "ACGT".
+            cluster_distance (Optional[float]): Probability of variation from cluster 
+                center (0.0-1.0). Defaults to 0.2.
+            seed (Optional[int]): Random seed for reproducibility.
+            rng (Optional[random.Random]): Existing random number generator.
             
         Returns:
-            tuple: (Dataset with clustered sequences, generation parameters)
+            Tuple[Dataset, dict]: A tuple containing:
+                - Dataset: Dataset with clustered sequences
+                - dict: Generation parameters
             
         Raises:
-            ValueError: If parameters are invalid or num_clusters > n
+            ValueError: If parameters are invalid or num_clusters > n.
         """
         # Apply default values
         n = n if n is not None else SYNTHETIC_DEFAULTS["n"]
@@ -426,20 +441,23 @@ class SyntheticDatasetGenerator:
         cfg: SyntheticDatasetConfig, rng: Optional[random.Random] = None
     ) -> tuple[Dataset, dict]:
         """
-        Generate Dataset from SyntheticDatasetConfig (supports modes).
+        Generate Dataset from SyntheticDatasetConfig with support for multiple modes.
         
         Main entry point for configuration-based dataset generation.
         Supports multiple generation modes as specified in the configuration.
         
         Args:
-            cfg: Synthetic dataset configuration
-            rng: Optional random number generator for deterministic generation
+            cfg (SyntheticDatasetConfig): Synthetic dataset configuration.
+            rng (Optional[random.Random]): Optional random number generator 
+                for deterministic generation.
             
         Returns:
-            tuple: (Generated dataset, generation parameters)
+            Tuple[Dataset, dict]: A tuple containing:
+                - Dataset: Generated dataset
+                - dict: Generation parameters
             
         Raises:
-            ValueError: If generation mode is invalid
+            ValueError: If generation mode is invalid.
             
         Supported Modes:
             - random: Completely random sequences
