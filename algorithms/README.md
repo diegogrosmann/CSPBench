@@ -1,94 +1,107 @@
-# Guia para Adição de Novos Algoritmos ao CSPBench
+# Guide: Adding New Algorithms to CSPBench
 
-O framework CSPBench possui uma interface padronizada e documentação detalhada (Google style docstrings) em todos os arquivos, facilitando a integração de novos algoritmos sem modificar o código principal (`main.py`). O registro é automático via decorador.
+CSPBench provides a standardized interface and detailed documentation (Google-style docstrings) across the codebase, making it easy to add new algorithms without changing the core app (`main.py`). Registration is automatic via a decorator.
 
-## Estrutura Recomendada
+## Recommended Structure
 
-Cada algoritmo deve estar em sua própria pasta dentro de `algorithms/`:
+Each algorithm should have its own folder under `algorithms/`:
 
 ```
 algorithms/
-├── meu_algoritmo/
-│   ├── __init__.py          # Expõe o algoritmo
-│   ├── algorithm.py         # Wrapper que implementa a interface Algorithm
-│   ├── config.py            # Configurações específicas do algoritmo
-│   └── implementation.py    # Implementação real do algoritmo
+├── my_algorithm/
+│   ├── __init__.py          # Re-exports the algorithm class
+│   ├── algorithm.py         # Wrapper that implements `CSPAlgorithm`
+│   ├── config.py            # Algorithm-specific default parameters
+│   └── implementation.py    # Core algorithm implementation
 ```
 
-## Passo a Passo para Integração
+## Step-by-Step Integration
 
-1. **Criar a pasta do algoritmo**
+1. Create the algorithm folder
     ```bash
-    mkdir algorithms/meu_algoritmo
+    mkdir algorithms/my_algorithm
     ```
 
-2. **Criar o arquivo de configuração (`config.py`)**
+2. Create `config.py`
     ```python
-    # Exemplo
-    MEU_ALGORITMO_DEFAULTS = {
-        'param1': 'valor_padrao',
-        'param2': 42,
-        'max_time': 300.0,
+    # Example
+    MY_ALGO_DEFAULTS = {
+        "param1": "default_value",
+        "param2": 42,
+        "max_time": 300.0,
     }
     ```
 
-3. **Implementar a lógica principal (`implementation.py`)**
+3. Implement the core logic in `implementation.py`
     ```python
-    def meu_algoritmo_funcao(strings, alphabet, progress_callback=None, **params):
+    def my_algorithm_core(strings, alphabet, report=None, **params):
         """
-        Executa o algoritmo MeuAlgoritmo.
+        Run the core of MyAlgorithm.
+
         Args:
-            strings (list[str]): Lista de strings de entrada.
-            alphabet (str): Alfabeto utilizado.
-            progress_callback (callable, opcional): Callback de progresso.
-            **params: Parâmetros do algoritmo.
+            strings (list[str]): Input strings.
+            alphabet (str): Alphabet used.
+            report (callable, optional): Progress reporter callable taking (progress: float, message: str, **data).
+            **params: Algorithm-specific parameters.
+
         Returns:
-            str: String central encontrada.
+            str: Found center string.
         """
-        if progress_callback:
-            progress_callback("Iniciando processamento...")
-        center = "ACGT"  # Exemplo
-        if progress_callback:
-            progress_callback("Finalizando...")
+        if report:
+            report(0.0, "Starting…")
+        center = alphabet[0] * len(strings[0])  # toy example
+        if report:
+            report(1.0, "Finished.")
         return center
     ```
 
-4. **Criar o wrapper (`algorithm.py`)**
+4. Create the wrapper `algorithm.py`
     ```python
-    from cspbench.domain.algorithms import CSPAlgorithm, register_algorithm
-    from .config import MEU_ALGORITMO_DEFAULTS
-    from .implementation import meu_algoritmo_funcao
-    from utils.distance import max_hamming
+    from src.domain.algorithms import CSPAlgorithm, AlgorithmResult, register_algorithm
+    from .config import MY_ALGO_DEFAULTS
+    from .implementation import my_algorithm_core
 
     @register_algorithm
-    class MeuAlgoritmo(CSPAlgorithm):
-        """
-        Wrapper para integração do MeuAlgoritmo ao framework CSPBench.
-        """
-        name = "Meu Algoritmo"
-        default_params = MEU_ALGORITMO_DEFAULTS
+    class MyAlgorithm(CSPAlgorithm):
+        """Wrapper integrating MyAlgorithm into CSPBench."""
 
-        def __init__(self, strings, alphabet, **params):
-            self.strings = strings
-            self.alphabet = alphabet
-            self.params = {**self.default_params, **params}
+        name = "MyAlgorithm"
+        default_params = MY_ALGO_DEFAULTS
 
-        def run(self):
-            center = meu_algoritmo_funcao(self.strings, self.alphabet, **self.params)
-            dist = max_hamming(center, self.strings)
-            return center, dist
+        def run(self) -> AlgorithmResult:
+            # Use `self._monitor` if present to report progress
+            reporter = None
+            if getattr(self, "_monitor", None) and hasattr(self._monitor, "on_progress"):
+                reporter = lambda p, m, **d: self._monitor.on_progress(p, m, **d)
+
+            center = my_algorithm_core(self.strings, self.alphabet, report=reporter, **self.params)
+
+            # DistanceCalculator is injected by the framework and exposed via attribute access
+            max_dist = self.max_distance(center)  # delegated to DistanceCalculator
+
+            result: AlgorithmResult = {
+                "success": True,
+                "center_string": center,
+                "max_distance": max_dist,
+                "parameters": self.get_actual_params(),
+                "error": None,
+                "metadata": {
+                    "internal_jobs": self.internal_jobs,
+                },
+            }
+            return result
     ```
 
-5. **Expor o algoritmo no `__init__.py`**
+5. Expose the algorithm in `__init__.py`
     ```python
-    from .algorithm import MeuAlgoritmo
+    from .algorithm import MyAlgorithm  # noqa: F401
     ```
 
-6. **(Opcional) Adicionar README.md explicando a heurística, parâmetros e uso.**
+6. (Optional) Add a README.md describing the heuristic, parameters, and usage.
 
-## Observações
+## Notes
 
-- Todos os algoritmos devem implementar a interface `Algorithm` e usar o decorador `@register_algorithm`.
-- O algoritmo aparecerá automaticamente no menu do sistema.
-- Consulte os READMEs dos algoritmos existentes para exemplos detalhados e padrões de documentação.
-- Utilize docstrings no estilo Google para facilitar a geração de documentação automática.
+- All algorithms must implement the `CSPAlgorithm` interface and use the `@register_algorithm` decorator.
+- The algorithm will automatically appear in the CLI/Web menus via the global registry.
+- See existing examples for documentation patterns: `algorithms/baseline/`, `algorithms/blf_ga/`, `algorithms/csc/`, `algorithms/h2_csp/`, `algorithms/dp_csp/`.
+- Prefer English for code, comments, and docs. Use Google-style docstrings for auto-generated documentation.

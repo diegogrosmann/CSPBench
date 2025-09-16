@@ -1,0 +1,255 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!DOCTYPE article PUBLIC "-//NLM//DTD JATS (Z39.96) Journal Publishing DTD v1.2 20190208//EN"
+                  "JATS-publishing1.dtd">
+<article xmlns:mml="http://www.w3.org/1998/Math/MathML" xmlns:xlink="http://www.w3.org/1999/xlink" dtd-version="1.2" article-type="other">
+<front>
+<journal-meta>
+<journal-id></journal-id>
+<journal-title-group>
+<journal-title>Journal of Open Source Software</journal-title>
+<abbrev-journal-title>JOSS</abbrev-journal-title>
+</journal-title-group>
+<issn publication-format="electronic">2475-9066</issn>
+<publisher>
+<publisher-name>Open Journals</publisher-name>
+</publisher>
+</journal-meta>
+<article-meta>
+<article-id pub-id-type="publisher-id">0</article-id>
+<article-id pub-id-type="doi">N/A</article-id>
+<title-group>
+<article-title>CSPBench: A Comprehensive Framework for Closest String
+Problem Benchmarking</article-title>
+</title-group>
+<contrib-group>
+<contrib contrib-type="author">
+<contrib-id contrib-id-type="orcid">https://orcid.org/0000-0003-1088-7867</contrib-id>
+<name>
+<surname>Grosmann</surname>
+<given-names>Diego</given-names>
+</name>
+<xref ref-type="aff" rid="aff-1"/>
+</contrib>
+<aff id="aff-1">
+<institution-wrap>
+<institution>Independent Researcher</institution>
+</institution-wrap>
+</aff>
+</contrib-group>
+<pub-date date-type="pub" publication-format="electronic" iso-8601-date="2025-01-16">
+<day>16</day>
+<month>1</month>
+<year>2025</year>
+</pub-date>
+<volume>¿VOL?</volume>
+<issue>¿ISSUE?</issue>
+<fpage>¿PAGE?</fpage>
+<permissions>
+<copyright-statement>Authors of papers retain copyright and release the
+work under a Creative Commons Attribution 4.0 International License (CC
+BY 4.0)</copyright-statement>
+<copyright-year>1970</copyright-year>
+<copyright-holder>The article authors</copyright-holder>
+<license license-type="open-access" xlink:href="https://creativecommons.org/licenses/by/4.0/">
+<license-p>Authors of papers retain copyright and release the work under
+a Creative Commons Attribution 4.0 International License (CC BY
+4.0)</license-p>
+</license>
+</permissions>
+<kwd-group kwd-group-type="author">
+<kwd>Python</kwd>
+<kwd>bioinformatics</kwd>
+<kwd>computational biology</kwd>
+<kwd>closest string problem</kwd>
+<kwd>benchmarking</kwd>
+<kwd>algorithms</kwd>
+<kwd>motif discovery</kwd>
+<kwd>sequence analysis</kwd>
+</kwd-group>
+</article-meta>
+</front>
+<body>
+<sec id="summary">
+  <title>Summary</title>
+  <p>The <bold>Closest String Problem (CSP)</bold> is a classical
+  NP-hard optimization problem with many applications in computational
+  biology, such as motif discovery, consensus sequence identification,
+  and error correction in biological sequences. Formally, given a set of
+  strings <inline-formula><alternatives>
+  <tex-math><![CDATA[S = \{s_1, \ldots, s_n\}]]></tex-math>
+  <mml:math display="inline" xmlns:mml="http://www.w3.org/1998/Math/MathML"><mml:mrow><mml:mi>S</mml:mi><mml:mo>=</mml:mo><mml:mo stretchy="false" form="prefix">{</mml:mo><mml:msub><mml:mi>s</mml:mi><mml:mn>1</mml:mn></mml:msub><mml:mo>,</mml:mo><mml:mi>…</mml:mi><mml:mo>,</mml:mo><mml:msub><mml:mi>s</mml:mi><mml:mi>n</mml:mi></mml:msub><mml:mo stretchy="false" form="postfix">}</mml:mo></mml:mrow></mml:math></alternatives></inline-formula>
+  of length <inline-formula><alternatives>
+  <tex-math><![CDATA[d]]></tex-math>
+  <mml:math display="inline" xmlns:mml="http://www.w3.org/1998/Math/MathML"><mml:mi>d</mml:mi></mml:math></alternatives></inline-formula>
+  over an alphabet <inline-formula><alternatives>
+  <tex-math><![CDATA[\Sigma]]></tex-math>
+  <mml:math display="inline" xmlns:mml="http://www.w3.org/1998/Math/MathML"><mml:mi>Σ</mml:mi></mml:math></alternatives></inline-formula>,
+  CSP asks for a center string <inline-formula><alternatives>
+  <tex-math><![CDATA[x \in \Sigma^d]]></tex-math>
+  <mml:math display="inline" xmlns:mml="http://www.w3.org/1998/Math/MathML"><mml:mrow><mml:mi>x</mml:mi><mml:mo>∈</mml:mo><mml:msup><mml:mi>Σ</mml:mi><mml:mi>d</mml:mi></mml:msup></mml:mrow></mml:math></alternatives></inline-formula>
+  that minimizes <disp-formula><alternatives>
+  <tex-math><![CDATA[
+  \max_{i} \mathrm{HammingDistance}(x, s_i)
+  ]]></tex-math>
+  <mml:math display="block" xmlns:mml="http://www.w3.org/1998/Math/MathML"><mml:mrow><mml:munder><mml:mo>max</mml:mo><mml:mi>i</mml:mi></mml:munder><mml:mrow><mml:mi mathvariant="normal">H</mml:mi><mml:mi mathvariant="normal">a</mml:mi><mml:mi mathvariant="normal">m</mml:mi><mml:mi mathvariant="normal">m</mml:mi><mml:mi mathvariant="normal">i</mml:mi><mml:mi mathvariant="normal">n</mml:mi><mml:mi mathvariant="normal">g</mml:mi><mml:mi mathvariant="normal">D</mml:mi><mml:mi mathvariant="normal">i</mml:mi><mml:mi mathvariant="normal">s</mml:mi><mml:mi mathvariant="normal">t</mml:mi><mml:mi mathvariant="normal">a</mml:mi><mml:mi mathvariant="normal">n</mml:mi><mml:mi mathvariant="normal">c</mml:mi><mml:mi mathvariant="normal">e</mml:mi></mml:mrow><mml:mrow><mml:mo stretchy="true" form="prefix">(</mml:mo><mml:mi>x</mml:mi><mml:mo>,</mml:mo><mml:msub><mml:mi>s</mml:mi><mml:mi>i</mml:mi></mml:msub><mml:mo stretchy="true" form="postfix">)</mml:mo></mml:mrow></mml:mrow></mml:math></alternatives></disp-formula></p>
+  <p>Recent literature provides context for heuristics and complexity
+  results — for example, heuristic advances on gene sequences
+  (<xref alt="Abdi et al., 2024" rid="ref-Abdi2024_ThreeStageCSP" ref-type="bibr">Abdi
+  et al., 2024</xref>) and fine‑grained complexity limits and algorithms
+  in specific regimes
+  (<xref alt="Abboud et al., 2023" rid="ref-Abboud2023_FasterThanExhaustive" ref-type="bibr">Abboud
+  et al., 2023</xref>). Despite this, a practical, extensible, and
+  reproducible benchmarking framework that unifies algorithms, datasets,
+  and interfaces has remained scarce. <bold>CSPBench</bold> fills this
+  gap with a modular toolkit focused on side‑by‑side evaluation.</p>
+</sec>
+<sec id="statement-of-need">
+  <title>Statement of Need</title>
+  <p>Researchers face three recurring gaps: (i) scarce, apples‑to‑apples
+  comparisons between heuristics and exact/baseline methods; (ii) a
+  disconnect between theory and practice—complexity insights rarely
+  arrive with implementations suitable for bioinformatics data; and
+  (iii) limited reproducibility due to heterogeneous datasets,
+  parameterizations, and missing resource tracking. Tooling to load
+  FASTA data, generate synthetic instances, monitor runs, and archive
+  results consistently remains essential.</p>
+  <p>CSPBench addresses these needs by combining: (a) a modular
+  hexagonal architecture with an auto‑registered algorithm plugin
+  system; (b) baseline, heuristic, and exact implementations executed
+  under identical conditions; (c) dataset support for FASTA, synthetic
+  generation, and optional NCBI Entrez; (d) standardized metrics
+  (max/avg/total Hamming, runtime) with structured metadata; and (e) CLI
+  (menu e batch) e Web (beta) para fluxos distintos.</p>
+</sec>
+<sec id="related-work">
+  <title>Related Work</title>
+  <p>Two recent reference points illustrate the landscape: a three‑stage
+  heuristic tailored to gene sequences
+  (<xref alt="Abdi et al., 2024" rid="ref-Abdi2024_ThreeStageCSP" ref-type="bibr">Abdi
+  et al., 2024</xref>) and complexity limits with improved algorithms in
+  specific regimes
+  (<xref alt="Abboud et al., 2023" rid="ref-Abboud2023_FasterThanExhaustive" ref-type="bibr">Abboud
+  et al., 2023</xref>). Both underscore the value of a practical
+  benchmarking harness that unifies implementations, datasets, and
+  consistent evaluation—precisely the niche addressed by CSPBench.</p>
+</sec>
+<sec id="software-overview">
+  <title>Software Overview</title>
+  <list list-type="bullet">
+    <list-item>
+      <p>Algorithms (auto‑discovered via
+      <monospace>@register_algorithm</monospace>): Baseline (greedy
+      consensus), CSC (clustering + recombinação), BLF‑GA
+      (metaheurística híbrida), H2‑CSP (heurística híbrida), DP‑CSP
+      (exato para instâncias pequenas).
+      </p>
+    </list-item>
+    <list-item>
+      <p>Datasets: geração sintética; leitura de FASTA em
+      <monospace>DATASET_DIRECTORY</monospace>; download opcional via
+      NCBI Entrez quando configurado.
+      </p>
+    </list-item>
+    <list-item>
+      <p>Execução: CLI (Typer) com menu interativo e modo batch; Web
+      (FastAPI, beta) para datasets, algoritmos, batches e
+      monitoramento.
+      </p>
+    </list-item>
+    <list-item>
+      <p>Métricas: distância de Hamming (máx/média/total), tempo de
+      execução, metadados (tamanho, alfabeto, seed, paralelismo interno
+      quando aplicável).
+      </p>
+    </list-item>
+    <list-item>
+      <p>Arquitetura: hexagonal (domain puro; application services;
+      infrastructure; presentation; plugins em
+      <monospace>algorithms/</monospace>).</p>
+    </list-item>
+  </list>
+</sec>
+<sec id="experiments-reproducibility">
+  <title>Experiments &amp; Reproducibility</title>
+  <list list-type="bullet">
+    <list-item>
+      <p>Batches YAML (templates em
+      <monospace>examples/batches/</monospace>) para experimentos
+      repetíveis.
+      </p>
+    </list-item>
+    <list-item>
+      <p>Configuração via <monospace>.env</monospace> e
+      <monospace>config/settings.yaml</monospace>; diretórios de
+      datasets/outputs criados automaticamente.
+      </p>
+    </list-item>
+    <list-item>
+      <p>Seeds determinísticos quando informados; resultados com esquema
+      padronizado para comparação lado a lado.</p>
+    </list-item>
+  </list>
+</sec>
+<sec id="conclusion">
+  <title>Conclusion</title>
+  <p>Backed by a modular architecture and practical baseline, heuristic,
+  and exact methods, CSPBench enables reproducible, apples‑to‑apples
+  comparisons across datasets and parameterizations. It helps quantify
+  trade‑offs between quality and runtime and provides a clear path to
+  integrate future algorithms. The broader context from heuristic
+  advances
+  (<xref alt="Abdi et al., 2024" rid="ref-Abdi2024_ThreeStageCSP" ref-type="bibr">Abdi
+  et al., 2024</xref>) and complexity limits
+  (<xref alt="Abboud et al., 2023" rid="ref-Abboud2023_FasterThanExhaustive" ref-type="bibr">Abboud
+  et al., 2023</xref>) reinforces the value of a dedicated benchmarking
+  toolkit.</p>
+</sec>
+<sec id="acknowledgements">
+  <title>Acknowledgements</title>
+  <p>The author thanks project contributors, users, and the broader
+  computational biology community for feedback and discussions that
+  helped shape the framework. No external financial support was received
+  for the development of this software.</p>
+</sec>
+</body>
+<back>
+<ref-list>
+  <title></title>
+  <ref id="ref-Abdi2024_ThreeStageCSP">
+    <element-citation publication-type="article-journal">
+      <person-group person-group-type="author">
+        <name><surname>Abdi</surname><given-names>Alireza</given-names></name>
+        <name><surname>Djukanovic</surname><given-names>Marko</given-names></name>
+        <name><surname>Tahmasebi Boldaji</surname><given-names>Hesam</given-names></name>
+        <name><surname>Salehi</surname><given-names>Hadis</given-names></name>
+        <name><surname>Kartelj</surname><given-names>Aleksandar</given-names></name>
+      </person-group>
+      <article-title>A three-stage algorithm for the closest string problem on artificial and real gene sequences</article-title>
+      <source>arXiv preprint</source>
+      <year iso-8601-date="2024">2024</year>
+      <uri>https://arxiv.org/abs/2407.13023</uri>
+    </element-citation>
+  </ref>
+  <ref id="ref-Abboud2023_FasterThanExhaustive">
+    <element-citation publication-type="paper-conference">
+      <person-group person-group-type="author">
+        <name><surname>Abboud</surname><given-names>Amir</given-names></name>
+        <name><surname>Fischer</surname><given-names>Nick</given-names></name>
+        <name><surname>Goldenberg</surname><given-names>Elazar</given-names></name>
+        <name><surname>S.</surname><given-names>Karthik C.</given-names></name>
+        <name><surname>Safier</surname><given-names>Ron</given-names></name>
+      </person-group>
+      <article-title>Can you solve closest string faster than exhaustive search?</article-title>
+      <source>31st annual european symposium on algorithms (ESA 2023)</source>
+      <year iso-8601-date="2023">2023</year>
+      <isbn>978-3-95977-295-2</isbn>
+      <issn>1868-8969</issn>
+      <uri>https://doi.org/10.4230/LIPIcs.ESA.2023.3</uri>
+      <pub-id pub-id-type="doi">10.4230/LIPIcs.ESA.2023.3</pub-id>
+      <fpage>3:1</fpage>
+      <lpage>3:17</lpage>
+    </element-citation>
+  </ref>
+</ref-list>
+</back>
+</article>

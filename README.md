@@ -71,13 +71,13 @@ python main.py batch my_experiment.yaml
 
 ## 🧠 Algorithms
 
-- Baseline (Brute Force)
-- BLF-GA (Genetic Algorithm — Blum & Lozano, 2005)
+- Baseline (Greedy consensus)
+- BLF-GA (Genetic Algorithm)
 - CSC (Core String Clustering)
 - DP-CSP (Dynamic Programming)
 - H2-CSP (Hybrid Heuristic)
 
-See more details in algorithms/README.md.
+- Guide to add your own: see `algorithms/README.md` (step‑by‑step on creating a new algorithm and integrating via `@register_algorithm`).
 
 ---
 
@@ -136,10 +136,7 @@ make help-cloud     # Cloud deployment options
 ```
 
 Documentation:
-- deployment/README.md
-- deployment/cloud-run/README.md
-- src/presentation/web/README.md
-- algorithms/README.md
+- `algorithms/README.md` — How to add a new algorithm (plugin guide)
 
 ---
 
