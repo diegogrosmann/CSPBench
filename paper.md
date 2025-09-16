@@ -1,5 +1,5 @@
 ---
-title: 'CSPBench: A Comprehensive Framework for Closest String Problem Benchmarking'
+title: "CSPBench: A Comprehensive Framework for Closest String Problem Benchmarking"
 tags:
   - Python
   - bioinformatics
@@ -22,132 +22,73 @@ bibliography: paper.bib
 
 # Summary
 
-The Closest String Problem (CSP) is a fundamental NP-hard optimization problem in computational biology with applications in motif discovery, consensus sequence identification, and error correction in biological sequences [@Li2002; @Gramm2003]. Given a set of strings, the CSP seeks to find a center string that minimizes the maximum Hamming distance to all input strings. Despite its importance, there is a lack of comprehensive frameworks for systematically comparing and benchmarking CSP algorithms.
+The **Closest String Problem (CSP)** is a classical NP-hard optimization problem with many applications in computational biology, such as motif discovery, consensus sequence identification, and error correction in biological sequences. Formally, given a set of strings \(S = \{s_1, \ldots, s_n\}\) of length \(d\) over an alphabet \(\Sigma\), CSP asks for a center string \(x \in \Sigma^d\) that minimizes  
+\[
+\max_{i} \mathrm{HammingDistance}(x, s_i).
+\]
 
-CSPBench addresses this gap by providing a comprehensive, extensible framework for implementing, testing, and benchmarking CSP algorithms. The framework implements a clean hexagonal architecture [@Martin2017] that separates business logic from infrastructure concerns, making it both maintainable and testable. CSPBench includes multiple user interfaces (web dashboard, command-line tools, and REST API), supports standard biological data formats (FASTA), integrates with NCBI databases, and provides real-time monitoring of algorithm execution.
+Recent work has expanded both theoretical understanding and heuristic methods:
 
-# Statement of need
+- **Abdi et al. (2024)** present a **three-stage heuristic algorithm** combining alphabet pruning, beam search guided by an expected‐distance heuristic, and local search; they test on synthetic and real gene sequence datasets and show improvements in quality vs prior heuristics. :contentReference[oaicite:0]{index=0}  
+- **Abboud et al. (2023)** study complexity limits: for the continuous CSP (center any string in \(\Sigma^d\)) they show that under SETH one cannot do significantly better than exhaustive search; for the discrete CSP (center must be one of the input strings), they give tighter algorithms in certain regimes of string length \(d\), and lower‐bounds in others. :contentReference[oaicite:1]{index=1}
 
-The Closest String Problem has been extensively studied in theoretical computer science and bioinformatics [@Fellows2003; @Gramm2003; @Ma2008], with numerous algorithms proposed ranging from exact solutions to heuristic approaches. However, researchers face several challenges when working with CSP algorithms:
+Despite these advances, there remains a lack of a full benchmarking framework that allows fair comparisons across heuristic and exact methods, supports biological data formats, enables reproducibility with resource tracking, and provides interfaces suited for both research and applied settings. **CSPBench** is intended to fill that gap.
 
-1. **Lack of standardized benchmarking**: No unified framework exists for comparing different CSP algorithms under consistent conditions.
+---
 
-2. **Implementation complexity**: Researchers often need to reimplement algorithms or adapt existing code to their specific needs.
+# Statement of Need
 
-3. **Data handling difficulties**: Working with biological sequence data requires specialized tools and format conversions.
+Researchers working on CSP face several challenges:
 
-4. **Reproducibility issues**: Experiments are often difficult to reproduce due to varying implementations and configurations.
+1. **Benchmarking gap**: although new heuristics such as Abdi et al. (2024) exist, they are tested only in limited contexts; comparisons to exact or baseline methods under identical conditions are rare.  
+2. **Theoretical vs empirical trade-offs**: Abboud et al. (2023) establish lower bounds and complexity regimes, but do not always provide implementations to compare practically, especially on data of biological interest.  
+3. **Limited reproducibility**: differences in dataset choice, string length, alphabet size, configuration of heuristics complicate reproduction and cross-paper comparison.  
+4. **Tooling needs**: the absence of standard tools to load data (FASTA etc.), generate synthetic instances, monitor execution (time, memory, convergence), and archive results with metadata.  
 
-5. **Performance monitoring**: Understanding algorithm behavior and resource usage during execution is challenging.
+CSPBench is designed to address these issues by:
 
-CSPBench was designed to address these challenges by providing a unified platform that standardizes the evaluation process, simplifies algorithm implementation, and enhances reproducibility in CSP research.
+- Offering a modular architecture to integrate both heuristic methods (e.g. beam search + local search) and exact or baseline methods;  
+- Including implementations of algorithms like those by Abdi et al. and discrete/continuous versions where feasible, to enable side-by-side comparison;  
+- Providing support for biological and synthetic datasets, including FASTA support and data generation;  
+- Enabling metrics beyond just solution quality: execution time, memory use, convergence curves;  
+- Multiple interfaces (CLI, Web, REST API) to make the framework usable in different settings.
 
-# Implementation
-
-CSPBench implements a hexagonal architecture [@Martin2017] that cleanly separates the core business logic from external concerns. The architecture consists of three main layers:
-
-- **Domain Layer**: Contains core entities (Dataset, Algorithm, Result) and business rules
-- **Application Layer**: Implements use cases and orchestrates domain operations
-- **Infrastructure Layer**: Handles external concerns like persistence, web interfaces, and algorithm implementations
-
-## Algorithm Implementations
-
-The framework currently includes five CSP algorithm implementations:
-
-1. **Baseline**: A brute-force approach that enumerates all possible center strings
-2. **BLF-GA**: A genetic algorithm implementation based on Blum and Lozano [@Blum2005]
-3. **CSC**: A core string clustering approach that groups similar strings
-4. **DP-CSP**: A dynamic programming solution for bounded distance cases
-5. **H2-CSP**: A hybrid heuristic combining multiple strategies
-
-Each algorithm implements a common interface that enables seamless benchmarking and comparison.
-
-## Data Management
-
-CSPBench provides comprehensive data management capabilities:
-
-- **FASTA file support**: Native import/export of biological sequence data
-- **NCBI integration**: Direct access to sequence databases through Entrez API
-- **Synthetic data generation**: Configurable generation of test datasets
-- **Result archival**: Automatic storage and versioning of experimental results
-
-## User Interfaces
-
-The framework offers multiple interfaces to accommodate different user preferences:
-
-- **Web Dashboard**: Real-time monitoring with interactive visualizations
-- **Command-Line Interface**: Scriptable interface for automated workflows
-- **REST API**: Programmatic access for integration with other tools
-- **Python API**: Direct library usage for custom implementations
-
-## Performance Monitoring
-
-CSPBench includes comprehensive monitoring capabilities:
-
-- **Real-time progress tracking**: WebSocket-based updates during algorithm execution
-- **Resource usage monitoring**: CPU, memory, and disk usage tracking
-- **Performance metrics**: Execution time, solution quality, and convergence analysis
-- **Comparative analysis**: Side-by-side algorithm comparison with statistical analysis
-
-# Examples
-
-## Basic Usage
-
-```python
-from cspbench import CSPBench
-from cspbench.algorithms import BaselineCSP, BLFGA
-from cspbench.datasets import load_fasta
-
-# Load biological sequences
-sequences = load_fasta("sequences.fasta")
-
-# Initialize algorithms
-baseline = BaselineCSP(max_distance=3)
-genetic = BLFGA(population_size=100, generations=50)
-
-# Run benchmark comparison
-benchmark = CSPBench()
-results = benchmark.compare([baseline, genetic], sequences)
-
-# Results include solution quality, execution time, and convergence data
-print(f"Baseline: {results['baseline']['max_distance']}")
-print(f"Genetic: {results['genetic']['max_distance']}")
-```
-
-## Web Interface Usage
-
-CSPBench can be launched as a web application for interactive use:
-
-```bash
-cspbench web --port 8000
-```
-
-This provides a browser-based interface for uploading datasets, configuring algorithms, monitoring execution progress, and analyzing results.
-
-## Large-Scale Benchmarking
-
-For systematic studies, CSPBench supports batch execution with configuration files:
-
-```bash
-cspbench batch run --config benchmark_config.yaml
-```
-
-This enables reproducible large-scale experiments with automatic result archival and comparison.
+---
 
 # Related Work
 
-Several tools exist for specific aspects of CSP research. MEME [@Bailey2009] focuses on motif discovery but does not address the general CSP. GLAM2 [@Frith2008] provides gapped motif discovery but lacks comprehensive benchmarking capabilities. Existing CSP implementations are typically standalone algorithms without standardized evaluation frameworks [@Ma2008; @Gramm2003].
+Below is a summary of the relevant related work, especially focusing on the two recent articles.
 
-CSPBench differentiates itself by providing a unified platform that combines multiple algorithms, standardized evaluation procedures, and comprehensive tooling for CSP research.
+| Work | Contributions | Gaps / Where CSPBench adds value |
+|---|---|---|
+| **Abdi et al. (2024)**: *A Three-Stage Algorithm for the Closest String Problem on Artificial and Real Gene Sequences* | Proposes a heuristic algorithm in three stages; introduces real gene datasets; shows better results vs older heuristics. :contentReference[oaicite:2]{index=2} | No framework provided; limited to heuristic methods; no extensive comparison with exact methods on large alphabets or long string length; little support for reproducibility (e.g. resource monitoring) in published comparison. |
+| **Abboud et al. (2023)**: *Can You Solve Closest String Faster Than Exhaustive Search?* | Provides complexity lower bounds under SETH; distinguishes between continuous vs discrete variants; gives faster algorithms in certain regimes of \(n, d\). :contentReference[oaicite:3]{index=3} | Focus is mainly theoretical; lacks implementation detail for many cases; does not focus on bioinformatics datasets nor data format integration; not designed as a benchmarking tool. |
+| **Other older works** | There are many heuristic and approximation algorithm papers; exact methods, parameterized complexity results; but often fragmented. | No existing toolkit that combines noisy heuristics, exact baselines, interfaces, reproducibility, biological datasets into one extendable benchmarking system. |
+
+---
+
+# Implementation (adapted to only two reference works)
+
+CSPBench will include algorithm implementations that cover or approximate the methods in the two reference papers, plus baseline exact methods, so that comparisons can be meaningful.
+
+## Algorithm Implementations
+
+- **Baseline**: brute-force (exact) enumeration of all possible center strings in \(\Sigma^d\) (continuous CSP).  
+- **Discrete baseline**: checking only input strings as possible centers.  
+- **Three-Stage Heuristic**: reproduction / adaptation of the algorithm by Abdi et al. (2024): (1) alphabet pruning, (2) beam search with expected-distance heuristic, (3) local search.  
+- **Fast discrete / continuous algorithm improvements**: implementing algorithmic ideas from Abboud et al. (2023), especially in their regimes where improvements to exhaustive search are possible.
+
+## Data & Experiments
+
+- Synthetic datasets of varying \(n\), \(d\), alphabet size \(|\Sigma|\), to explore the regimes analyzed in Abboud et al.  
+- Real gene‐sequence datasets of moderate size (as used by Abdi et al.).  
+- Metrics to collect: solution radius (max Hamming distance to input strings), runtime, memory usage, convergence (when applicable), quality of heuristic vs exact.
+
+---
 
 # Conclusion
 
-CSPBench fills a significant gap in computational biology tooling by providing the first comprehensive framework for CSP algorithm benchmarking. Its clean architecture, multiple user interfaces, and extensive monitoring capabilities make it valuable for both algorithm developers and researchers applying CSP methods to biological problems.
+By focusing on the two recent, strong contributions (Abdi et al. 2024; Abboud et al. 2023) and providing other baselines, CSPBench can offer a robust, reproducible, and usable platform for comparing CSP algorithms. This will help researchers understand which algorithms are best under which settings (string length, alphabet size, continuous vs discrete), facilitate reproduction of results, and serve as a foundation for integrating future algorithms.
 
-The framework's extensible design enables easy integration of new algorithms, and its standardized evaluation procedures enhance reproducibility in CSP research. By reducing the technical barriers to CSP research, CSPBench enables researchers to focus on algorithmic innovations rather than implementation details.
+---
 
-# Acknowledgements
-
-The author thanks the computational biology community for algorithm implementations and datasets that inspired this work. Special appreciation goes to the developers of BioPython, FastAPI, and other open-source libraries that made this project possible.
-
-# References
