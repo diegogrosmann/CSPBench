@@ -3,8 +3,8 @@ Batch management API endpoints for CSPBench Web Interface.
 
 This module provides REST API endpoints for batch file management including:
 - CRUD operations for batch configuration files
-- Batch file listing and metadata
-- Batch file validation
+- Batch file listing and metadata extraction
+- YAML validation and secure file handling
 """
 
 import logging
@@ -32,7 +32,17 @@ router = APIRouter(prefix="/api/batches", tags=["batches"])
 
 
 def format_file_size(size_bytes: int) -> str:
-    """Format file size in human readable format."""
+    """Format file size in human readable format.
+    
+    Converts byte values to human-readable strings with appropriate
+    units for display in user interfaces.
+    
+    Args:
+        size_bytes (int): File size in bytes.
+        
+    Returns:
+        str: Formatted size string with units (B, KB, MB, GB).
+    """
     if size_bytes == 0:
         return "0 B"
 
@@ -46,7 +56,21 @@ def format_file_size(size_bytes: int) -> str:
 
 
 def extract_description_from_yaml(file_path: Path) -> Optional[str]:
-    """Extract description from YAML file."""
+    """Extract description from YAML file for metadata display.
+    
+    Attempts to extract description information from YAML batch files
+    by looking for description fields or comment-based descriptions.
+    
+    Args:
+        file_path (Path): Path to YAML file to analyze.
+        
+    Returns:
+        Optional[str]: Extracted description or None if not found.
+        
+    Note:
+        Gracefully handles parsing errors and returns None
+        rather than raising exceptions for malformed files.
+    """
     try:
         with open(file_path, encoding="utf-8") as f:
             content = f.read()
@@ -74,7 +98,21 @@ def extract_description_from_yaml(file_path: Path) -> Optional[str]:
 
 
 def extract_metadata_from_yaml(file_path: Path) -> dict:
-    """Extract complete metadata from YAML file."""
+    """Extract complete metadata from YAML file structure.
+    
+    Parses YAML batch configuration files to extract embedded
+    metadata including author, version, tags, and other properties.
+    
+    Args:
+        file_path (Path): Path to YAML file to parse.
+        
+    Returns:
+        dict: Dictionary containing extracted metadata fields.
+        
+    Note:
+        Returns empty dict if metadata section not found or
+        parsing fails, ensuring robust error handling.
+    """
     try:
         with open(file_path, encoding="utf-8") as f:
             content = yaml.safe_load(f)
@@ -100,7 +138,17 @@ def extract_metadata_from_yaml(file_path: Path) -> dict:
 
 
 def extract_metadata_name_from_yaml(file_path: Path) -> Optional[str]:
-    """Extract metadata.name from YAML file."""
+    """Extract metadata.name field from YAML file.
+    
+    Specifically extracts the name field from the metadata section
+    of YAML batch configuration files for display purposes.
+    
+    Args:
+        file_path (Path): Path to YAML file to parse.
+        
+    Returns:
+        Optional[str]: Metadata name or None if not found.
+    """
     try:
         with open(file_path, encoding="utf-8") as f:
             content = yaml.safe_load(f)
@@ -124,7 +172,27 @@ async def upload_batch_file(
     file: UploadFile = File(..., description="YAML batch configuration file"),
     overwrite: bool = Form(False, description="Whether to overwrite existing file"),
 ):
-    """Upload a new batch configuration from YAML file."""
+    """Upload a new batch configuration from YAML file with validation.
+    
+    Processes uploaded YAML batch configuration files with comprehensive
+    validation, security checks, and conflict resolution.
+    
+    Args:
+        name (str): Desired name for the batch configuration.
+        file (UploadFile): YAML file containing batch configuration.
+        overwrite (bool): Whether to overwrite existing files with same name.
+        
+    Returns:
+        OperationResponse: Upload result with file information.
+        
+    Raises:
+        HTTPException: If file invalid, YAML malformed, or upload fails.
+        
+    Security:
+        - Validates file extensions and content encoding
+        - Sanitizes filenames to prevent security issues
+        - Checks for file existence conflicts
+    """
     try:
         # Validate file type
         if not file.filename.lower().endswith((".yaml", ".yml")):
@@ -188,7 +256,24 @@ async def upload_batch_file(
 
 @router.post("/upload/text", response_model=OperationResponse)
 async def upload_batch_text(request: BatchUploadRequest):
-    """Upload a new batch configuration from YAML content (text)."""
+    """Upload a new batch configuration from YAML content (text input).
+    
+    Processes YAML batch configuration content submitted as text
+    with the same validation and security measures as file upload.
+    
+    Args:
+        request (BatchUploadRequest): YAML content and metadata.
+        
+    Returns:
+        OperationResponse: Upload result with file information.
+        
+    Raises:
+        HTTPException: If content invalid, conflicts exist, or save fails.
+        
+    Note:
+        Provides text-based alternative to file upload for
+        programmatic batch configuration creation.
+    """
     try:
         # Sanitize filename
         safe_name = sanitize_filename(request.name)
@@ -230,7 +315,22 @@ async def upload_batch_text(request: BatchUploadRequest):
 
 @router.get("/", response_model=BatchListResponse)
 async def list_batch_files():
-    """List all batch configuration files."""
+    """List all batch configuration files with metadata extraction.
+    
+    Provides comprehensive listing of batch configuration files
+    with extracted metadata, file statistics, and organization
+    information for management interfaces.
+    
+    Returns:
+        BatchListResponse: Complete list of batch files with metadata.
+        
+    Raises:
+        HTTPException: If directory access fails or listing errors occur.
+        
+    Note:
+        Automatically extracts metadata from YAML files and
+        organizes results with templates prioritized first.
+    """
     try:
         batch_dir = get_batch_directory()
         logger.info(f"Looking for batch files in: {batch_dir}")
@@ -303,7 +403,24 @@ async def list_batch_files():
 
 @router.get("/{filename}")
 async def get_batch_file(filename: str):
-    """Get a specific batch file content."""
+    """Get a specific batch file content with metadata.
+    
+    Retrieves complete batch configuration file content
+    along with path information for editing and display.
+    
+    Args:
+        filename (str): Name of the batch file to retrieve.
+        
+    Returns:
+        dict: File content, metadata, and path information.
+        
+    Raises:
+        HTTPException: If file not found or access denied.
+        
+    Security:
+        - Validates filename and file type
+        - Ensures file exists within allowed directory
+    """
     try:
         batch_dir = get_batch_directory()
         file_path = batch_dir / filename
@@ -343,7 +460,26 @@ async def get_batch_file(filename: str):
 
 @router.post("/{filename}")
 async def save_batch_file(filename: str, content: dict):
-    """Save or update a batch file."""
+    """Save or update a batch file with validation.
+    
+    Creates or updates batch configuration files with content
+    validation and filename sanitization for security.
+    
+    Args:
+        filename (str): Target filename for the batch configuration.
+        content (dict): File content and metadata to save.
+        
+    Returns:
+        dict: Save result with path information.
+        
+    Raises:
+        HTTPException: If filename invalid, content empty, or save fails.
+        
+    Security:
+        - Validates filename characters and format
+        - Ensures proper file extension
+        - Sanitizes content before writing
+    """
     try:
         if not filename.endswith(".yaml"):
             filename += ".yaml"
@@ -395,7 +531,24 @@ async def save_batch_file(filename: str, content: dict):
 
 @router.delete("/{filename}")
 async def delete_batch_file(filename: str):
-    """Delete a batch file."""
+    """Delete a batch file with safety checks.
+    
+    Removes batch configuration files from the system with
+    protection against deleting system templates and validation.
+    
+    Args:
+        filename (str): Name of the batch file to delete.
+        
+    Returns:
+        dict: Deletion result confirmation.
+        
+    Raises:
+        HTTPException: If file not found, protected, or deletion fails.
+        
+    Security:
+        - Prevents deletion of template files
+        - Validates file existence and permissions
+    """
     try:
         batch_dir = get_batch_directory()
         file_path = batch_dir / filename
@@ -425,7 +578,20 @@ async def delete_batch_file(filename: str):
 
 @router.get("/{filename}/download")
 async def download_batch_file(filename: str):
-    """Download a batch file."""
+    """Download a batch file for external use.
+    
+    Provides direct download of batch configuration files
+    in YAML format with appropriate content headers.
+    
+    Args:
+        filename (str): Name of the batch file to download.
+        
+    Returns:
+        FileResponse: YAML file download with proper content type.
+        
+    Raises:
+        HTTPException: If file not found or download fails.
+    """
     try:
         batch_dir = get_batch_directory()
         file_path = batch_dir / filename

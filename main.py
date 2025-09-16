@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
-"""
-CSPBench Main Entry Point - Hexagonal Architecture
+"""CSPBench Main Entry Point - Hexagonal Architecture.
+
+This module serves as the main entry point for CSPBench, implementing a hexagonal
+architecture pattern with dependency injection and modern CLI capabilities.
 
 Features:
   - Load configuration (config/settings.yaml + ENV)
@@ -8,14 +10,14 @@ Features:
   - Modern CLI (Typer)
   - Interactive menu when no args
 
-Key CLI (usar .venv/bin/python):
+Key CLI usage (use .venv/bin/python):
   .venv/bin/python main.py
   .venv/bin/python main.py run <Algorithm> <dataset>
-  .venv/bin/python main.py batch <arquivo.yaml>
+  .venv/bin/python main.py batch <file.yaml>
   .venv/bin/python main.py work-item-create <name> --config conf.yaml
   .venv/bin/python main.py work-item-list
 
-Variáveis de ambiente comuns:
+Common environment variables:
   DATASET_DIRECTORY, LOG_LEVEL, OUTPUT_BASE_DIRECTORY, NCBI_EMAIL, NCBI_API_KEY
 """
 
@@ -30,7 +32,7 @@ import typer
 if __name__ == "__main__":
     try:
         print(
-            "🔧 Inicializando CSPBench... aguarde, carregando módulos e configurações.",
+            "🔧 Initializing CSPBench... please wait, loading modules and configurations.",
             flush=True,
         )
     except Exception:
@@ -54,22 +56,35 @@ try:
 
     LoggerConfig.initialize()
     logger = LoggerConfig.get_logger("CSPBench.Main")
-    logger.info("Sistema de logging inicializado com sucesso")
-    logger.info("Iniciando CSPBench - modo principal")
+    logger.info("Logging system initialized successfully")
+    logger.info("Starting CSPBench - main mode")
 except Exception as e:
-    print(f"⚠️  Aviso: falha ao inicializar logging: {e}")
+    print(f"⚠️  Warning: failed to initialize logging: {e}")
     # Continue execution even if logging fails
     logger = None
 
 
-# Ensure base directories from environment exist (dataset, batch, outputs)
 def _ensure_runtime_directories():
     """Create (if needed) and report status for key runtime directories.
 
-    Directories are taken from environment variables:
-      - DATASET_DIRECTORY
-      - BATCH_DIRECTORY
-      - OUTPUT_BASE_DIRECTORY
+    This function ensures that essential runtime directories exist by checking
+    environment variables and creating directories as needed. It handles three
+    key directories: DATASET_DIRECTORY, BATCH_DIRECTORY, and OUTPUT_BASE_DIRECTORY.
+
+    The function will:
+    - Check if each environment variable is defined
+    - Create the directory if it doesn't exist
+    - Log the status of each directory operation
+    - Continue execution even if some directories fail to be created
+
+    Environment Variables:
+        DATASET_DIRECTORY: Directory for storing datasets
+        BATCH_DIRECTORY: Directory for batch processing files
+        OUTPUT_BASE_DIRECTORY: Base directory for output files
+
+    Note:
+        This function is designed to be fault-tolerant and will not raise
+        exceptions that could prevent the application from starting.
     """
     dir_env_vars = [
         "DATASET_DIRECTORY",
@@ -81,7 +96,7 @@ def _ensure_runtime_directories():
     for var in dir_env_vars:
         raw = os.getenv(var)
         if not raw:
-            msg = f"⚠️  {var} não definida no ambiente (.env)."
+            msg = f"⚠️  {var} not defined in environment (.env)."
             print(msg)
             if logger:
                 logger.warning(msg)
@@ -90,61 +105,61 @@ def _ensure_runtime_directories():
 
         try:
             p = Path(raw).expanduser()
-            # Só criamos se não existir
+            # Only create if it doesn't exist
             if not p.exists():
                 p.mkdir(parents=True, exist_ok=True)
-                msg = f"✅ {var} criada: {p}"
+                msg = f"✅ {var} created: {p}"
                 if logger:
                     logger.info(msg)
                 results.append(f"{var}: CREATED")
             else:
-                msg = f"ℹ️  {var} já existe: {p}"
+                msg = f"ℹ️  {var} already exists: {p}"
                 if logger:
                     logger.debug(msg)
                 results.append(f"{var}: OK")
         except Exception as exc:  # noqa: BLE001
-            msg = f"❌ Falha ao garantir diretório para {var}: {exc} (valor='{raw}')"
+            msg = f"❌ Failed to ensure directory for {var}: {exc} (value='{raw}')"
             print(msg)
             if logger:
                 logger.error(msg, exc_info=True)
             results.append(f"{var}: ERROR")
 
-    # Resumo final compacto (útil em logs agregados)
+    # Compact final summary (useful in aggregated logs)
     if logger:
-        logger.info("Status diretórios base: " + ", ".join(results))
+        logger.info("Base directories status: " + ", ".join(results))
 
 
-# Executa verificação/criação imediatamente após carregar logging & .env
+# Execute verification/creation immediately after loading logging & .env
 try:
     _ensure_runtime_directories()
 except Exception as _e:  # noqa: BLE001
-    # Nunca impedir a inicialização por isso
-    print(f"⚠️  Aviso: erro inesperado ao garantir diretórios base: {_e}")
+    # Never prevent initialization because of this
+    print(f"⚠️  Warning: unexpected error ensuring base directories: {_e}")
     if logger:
         logger.warning(
-            f"Erro inesperado ao garantir diretórios base: {_e}", exc_info=True
+            f"Unexpected error ensuring base directories: {_e}", exc_info=True
         )
 
 
 # IMPORTANT: Import algorithms first to load the global_registry via auto-discovery
 try:  # noqa: WPS501
     if logger:
-        logger.debug("Carregando pacote de algoritmos via auto-discovery")
+        logger.debug("Loading algorithms package via auto-discovery")
     import algorithms  # noqa: F401
 
     if logger:
-        logger.info("Pacote 'algorithms' carregado com sucesso")
+        logger.info("'algorithms' package loaded successfully")
 except Exception as _e:  # noqa: BLE001
-    # Falha ao carregar algoritmos não deve impedir CLI básica
-    error_msg = f"⚠️  Aviso: não foi possível carregar pacote 'algorithms': {_e}"
+    # Failure to load algorithms should not prevent basic CLI
+    error_msg = f"⚠️  Warning: could not load 'algorithms' package: {_e}"
     print(error_msg)
     if logger:
-        logger.warning(f"Falha ao carregar algoritmos: {_e}", exc_info=True)
+        logger.warning(f"Failed to load algorithms: {_e}", exc_info=True)
 
 # Initialize WorkService and pause orphaned running work
 try:
     if logger:
-        logger.debug("Inicializando WorkService global")
+        logger.debug("Initializing global WorkService")
     from src.application.services.work_service import (
         initialize_work_service,
     )
@@ -152,13 +167,13 @@ try:
     work_service = initialize_work_service()
 
     if logger:
-        logger.info("WorkService inicializado com sucesso")
+        logger.info("WorkService initialized successfully")
 except Exception as _e:  # noqa: BLE001
-    # Falha ao inicializar WorkService não deve impedir CLI básica
-    error_msg = f"⚠️  Aviso: não foi possível inicializar WorkService: {_e}"
+    # WorkService initialization failure should not prevent basic CLI
+    error_msg = f"⚠️  Warning: could not initialize WorkService: {_e}"
     print(error_msg)
     if logger:
-        logger.warning(f"Falha ao inicializar WorkService: {_e}", exc_info=True)
+        logger.warning(f"Failed to initialize WorkService: {_e}", exc_info=True)
 
 from src.presentation.cli.commands import register_commands
 from src.presentation.cli.interactive_menu import show_interactive_menu
@@ -175,60 +190,89 @@ register_commands(app)
 
 
 def _dispatch_args(args: list[str]) -> None:
-    """Dispatch parsed CLI arguments (expects no interactive concern)."""
+    """Dispatch parsed CLI arguments without interactive concerns.
+
+    This function handles the execution of CLI commands by normalizing arguments
+    and invoking the appropriate Typer command handlers.
+
+    Args:
+        args: List of command-line arguments to process
+
+    Note:
+        This function performs argument normalization, specifically converting
+        standalone YAML files to 'batch <file>' commands for backward compatibility.
+        
+        The function temporarily modifies sys.argv to ensure proper Typer execution
+        and restores it afterward.
+    """
     import sys as _sys
 
     if logger:
-        logger.debug(f"Despachando argumentos CLI: {args}")
+        logger.debug(f"Dispatching CLI arguments: {args}")
 
     # Normalize invocation with only a YAML file to: batch <file>
-    # (anteriormente usava '--batch' que não existe como opção Typer)
+    # (previously used '--batch' which doesn't exist as a Typer option)
     if len(args) == 1 and args[0].endswith((".yaml", ".yml")):
         if logger:
-            logger.info(f"Normalizando arquivo YAML para comando batch: {args[0]}")
+            logger.info(f"Normalizing YAML file to batch command: {args[0]}")
         args = ["batch", args[0]]
 
     original = _sys.argv[:]
     try:
         if logger:
-            logger.debug(f"Executando comando Typer com argumentos: {args}")
+            logger.debug(f"Executing Typer command with arguments: {args}")
         _sys.argv = ["main.py"] + args
         app()
     finally:
         _sys.argv = original
         if logger:
-            logger.debug("Argumentos sys.argv restaurados")
+            logger.debug("sys.argv arguments restored")
 
 
 def main(args: Optional[list] = None):
-    """Programmatic entrypoint (does NOT show interactive menu on empty args)."""
+    """Programmatic entrypoint that does NOT show interactive menu on empty args.
+
+    This function serves as the main programmatic interface for CSPBench,
+    allowing the application to be invoked from other Python code.
+
+    Args:
+        args: Optional list of command arguments. If None, uses sys.argv[1:]
+
+    Raises:
+        SystemExit: When the application needs to exit with a specific code
+        KeyboardInterrupt: When user interrupts execution (handled gracefully)
+
+    Note:
+        Unlike the __main__ execution path, this function will not show the
+        interactive menu when no arguments are provided.
+    """
     import sys
 
     if args is None:
         args = sys.argv[1:]
 
     if logger:
-        logger.info(f"Ponto de entrada programático iniciado com argumentos: {args}")
+        logger.info(f"Programmatic entry point started with arguments: {args}")
 
     try:
         _dispatch_args(args)
         if logger:
-            logger.info("Execução programática concluída com sucesso")
+            logger.info("Programmatic execution completed successfully")
     except KeyboardInterrupt:
         error_msg = "\n🚫 Operation cancelled by user (Ctrl+C)"
         print(error_msg)
         if logger:
-            logger.warning("Operação cancelada pelo usuário (Ctrl+C)")
+            logger.warning("Operation cancelled by user (Ctrl+C)")
         sys.exit(0)
     except SystemExit:
         if logger:
-            logger.debug("SystemExit capturado - propagando")
+            logger.debug("SystemExit caught - propagating")
         raise
     except Exception as e:
         error_msg = f"❌ Unexpected error: {e}"
         print(error_msg)
         if logger:
-            logger.error(f"Erro inesperado na execução: {e}", exc_info=True)
+            logger.error(f"Unexpected error in execution: {e}", exc_info=True)
         sys.exit(1)
 
 
@@ -238,31 +282,36 @@ if __name__ == "__main__":
     try:
         if len(sys.argv) == 1:
             if logger:
-                logger.info("Nenhum argumento fornecido - iniciando menu interativo")
+                logger.info("No arguments provided - starting interactive menu")
 
             def _invoke(cmd_args: list[str]):  # local to avoid exporting
+                """Local function to invoke commands from interactive menu.
+                
+                Args:
+                    cmd_args: List of command arguments from interactive menu
+                """
                 if logger:
-                    logger.debug(f"Menu interativo invocando comando: {cmd_args}")
+                    logger.debug(f"Interactive menu invoking command: {cmd_args}")
                 _dispatch_args(cmd_args)
 
             show_interactive_menu(_invoke)
         else:
             if logger:
-                logger.info(f"Argumentos CLI fornecidos: {sys.argv[1:]} - modo direto")
+                logger.info(f"CLI arguments provided: {sys.argv[1:]} - direct mode")
             _dispatch_args(sys.argv[1:])
     except KeyboardInterrupt:
         error_msg = "\n🚫 Operation cancelled by user (Ctrl+C)"
         print(error_msg)
         if logger:
-            logger.warning("Operação cancelada pelo usuário (Ctrl+C)")
+            logger.warning("Operation cancelled by user (Ctrl+C)")
         sys.exit(0)
     except SystemExit:
         if logger:
-            logger.debug("SystemExit capturado no main - propagando")
+            logger.debug("SystemExit caught in main - propagating")
         raise
     except Exception as e:
         error_msg = f"❌ Unexpected error: {e}"
         print(error_msg)
         if logger:
-            logger.error(f"Erro inesperado no main: {e}", exc_info=True)
+            logger.error(f"Unexpected error in main: {e}", exc_info=True)
         sys.exit(1)

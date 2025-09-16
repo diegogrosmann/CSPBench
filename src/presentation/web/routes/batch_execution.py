@@ -1,7 +1,9 @@
 """
-Batch Execution API Routes
+Batch Execution API Routes for CSPBench Web Interface.
 
-Provides REST endpoints for batch execution management using unified WorkManager.
+This module provides REST endpoints for batch execution management using the unified
+WorkManager. It handles the complete lifecycle of batch executions from submission
+to completion with comprehensive monitoring and control capabilities.
 """
 
 import logging
@@ -34,22 +36,30 @@ router = APIRouter(prefix="/api/batch", tags=["batch-execution"])
 async def execute_batch(
     request: BatchExecutionRequest, background_tasks: BackgroundTasks
 ) -> BatchExecutionResponse:
-    """
-    Execute batch configuration using unified WorkManager.
+    """Execute batch configuration using unified WorkManager.
 
     This endpoint provides a centralized way to execute batch configurations
     through the unified WorkManager, which handles both work item management
-    and pipeline execution.
+    and pipeline execution with comprehensive validation and error handling.
 
     Args:
-        request: Batch execution configuration
-        current_user: Authenticated user context
+        request (BatchExecutionRequest): Batch execution configuration and options.
+        background_tasks (BackgroundTasks): FastAPI background task manager.
 
     Returns:
-        BatchExecutionResponse: Response with work ID and execution details
+        BatchExecutionResponse: Response with work ID and execution details.
 
     Raises:
-        HTTPException: If configuration loading or execution fails
+        HTTPException: If configuration loading fails, file not found, or execution setup errors.
+        
+    Security:
+        - Validates batch file paths to prevent directory traversal
+        - Ensures files exist and are readable before execution
+        - Sanitizes file paths and configuration data
+        
+    Note:
+        Execution is handled asynchronously with status tracking through work ID.
+        Use monitoring endpoints to track progress and results.
     """
     try:
         logger.info(f"Received batch execution request for file: {request.batch_file}")
@@ -114,14 +124,24 @@ async def execute_batch(
 async def get_batch_status(
     work_id: str, work_manager: WorkManager = Depends(get_work_service)
 ) -> BatchStatusResponse:
-    """
-    Get status of a batch execution.
+    """Get comprehensive status of a batch execution.
+
+    Retrieves detailed status information for batch executions including
+    progress, timing, error information, and configuration metadata.
 
     Args:
-        work_id: Work item ID
+        work_id (str): Unique identifier of the work execution.
+        work_manager (WorkManager): Injected work management service.
 
     Returns:
-        Batch status response
+        BatchStatusResponse: Complete status information with metadata.
+        
+    Raises:
+        HTTPException: If work not found or status retrieval fails.
+        
+    Note:
+        Status includes both execution state and configuration details
+        for comprehensive monitoring and debugging capabilities.
     """
     try:
         work_item = work_manager.get(work_id)
@@ -151,11 +171,23 @@ async def get_batch_status(
 async def list_batches(
     work_manager: WorkManager = Depends(get_work_service),
 ) -> BatchListResponse:
-    """
-    List all batch executions.
+    """List all batch executions with metadata and organization.
+
+    Provides comprehensive listing of all batch executions in the system
+    with metadata extraction and organization for management interfaces.
+
+    Args:
+        work_manager (WorkManager): Injected work management service.
 
     Returns:
-        List of batch executions
+        BatchListResponse: Complete list of batch executions with metadata.
+        
+    Raises:
+        HTTPException: If listing fails due to service errors.
+        
+    Note:
+        Includes configuration metadata, execution origin information,
+        and timing data for comprehensive batch management.
     """
     try:
         work_items = work_manager.list()
@@ -190,15 +222,30 @@ async def list_batches(
 async def control_batch(
     work_id: str, action: str, work_manager: WorkManager = Depends(get_work_service)
 ) -> BatchControlResponse:
-    """
-    Control batch execution (pause, restart, cancel).
+    """Control batch execution with comprehensive action support.
+
+    Provides control operations for batch executions including pause,
+    restart, and cancel with proper state management and validation.
 
     Args:
-        work_id: Work item ID
-        action: Control action (pause, restart, cancel)
+        work_id (str): Unique identifier of the work execution.
+        action (str): Control action to perform ('pause', 'restart', 'cancel').
+        work_manager (WorkManager): Injected work management service.
 
     Returns:
-        Control response
+        BatchControlResponse: Control operation result with status information.
+        
+    Raises:
+        HTTPException: If work not found, action invalid, or control operation fails.
+        
+    Security:
+        - Validates action types against allowed operations
+        - Ensures work exists before attempting control operations
+        - Provides detailed error messages for debugging
+        
+    Note:
+        Control operations are executed synchronously with immediate
+        status updates reflected in the work management system.
     """
     try:
         if action == "pause":

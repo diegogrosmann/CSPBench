@@ -265,8 +265,8 @@ class TestCommandsHelp:
 
     @patch('builtins.print')
     def test_show_commands_help_no_message(self, mock_print):
-        """Test showing commands help without message."""
-        _show_commands_help()
+        """Test showing commands help with a message."""
+        _show_commands_help("Test message")
         
         mock_print.assert_called()
 

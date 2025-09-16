@@ -84,21 +84,26 @@ class TestAlgorithmRoutes:
         """Test get algorithms error handling."""
         from src.presentation.web.routes.algorithms import get_algorithms
         
-        # Mock an algorithm that raises an exception
+        # Mock an algorithm that causes issues when accessing getattr
         class FailingAlgorithm:
             name = "FailingAlgorithm"
+            __doc__ = "Valid documentation"
             
-            @property
-            def __doc__(self):
-                raise Exception("Documentation error")
+            def __getattr__(self, name):
+                if name == "default_params":
+                    raise Exception("Failed to get default params")
+                return getattr(super(), name)
         
         mock_registry.items.return_value = [('failing_algorithm', FailingAlgorithm)]
         
         # Should handle exceptions gracefully
         result = await get_algorithms()
         
-        # Should return empty list or handle error gracefully
+        # Should return list with fallback algorithm info
         assert isinstance(result, list)
+        assert len(result) == 1
+        assert result[0].name == 'failing_algorithm'
+        assert result[0].description == "Valid documentation"
 
     def test_algorithm_info_model(self):
         """Test AlgorithmInfo model creation."""
@@ -154,14 +159,16 @@ class TestDatasetRoutes:
         from src.presentation.web.routes.datasets import router
         assert router is not None
 
-    @patch('src.presentation.web.routes.datasets.get_dataset_service')
-    @pytest.mark.asyncio
-    async def test_dataset_routes_exist(self, mock_get_service):
+    def test_dataset_routes_exist(self):
         """Test that dataset routes exist."""
         from src.presentation.web.routes import datasets
         
         # Test that the module has the expected router
         assert hasattr(datasets, 'router')
+        
+        # Test that router has some routes defined
+        assert datasets.router.routes is not None
+        assert len(datasets.router.routes) > 0
 
     def test_dataset_models_import(self):
         """Test dataset models can be imported."""
@@ -237,12 +244,15 @@ class TestHealthRoutes:
     async def test_health_check_endpoint(self):
         """Test health check endpoint."""
         try:
-            from src.presentation.web.routes.health import health_check
+            from src.presentation.web.routes.health import health_check, HealthStatus
             
             result = await health_check()
             
-            assert isinstance(result, dict)
-            assert 'status' in result
+            # Health check should return a HealthStatus object
+            assert isinstance(result, HealthStatus)
+            assert hasattr(result, 'status')
+            assert result.status in ['healthy', 'error']
+            assert hasattr(result, 'version')
         except ImportError:
             # Health check might not exist or be in different location
             pass

@@ -54,7 +54,24 @@ def _dataset_to_info(
     file_path: str = None,
     generation_params: dict = None,
 ) -> DatasetInfo:
-    """Convert Dataset domain object to DatasetInfo response model."""
+    """Convert Dataset domain object to DatasetInfo response model.
+
+    Transforms internal Dataset objects into API response models with
+    comprehensive metadata, statistics, and type information.
+
+    Args:
+        dataset (Dataset): Domain dataset object to convert.
+        dataset_id (str): Unique identifier for the dataset.
+        file_path (str, optional): Filesystem path if dataset is persisted.
+        generation_params (dict, optional): Parameters used for dataset generation.
+
+    Returns:
+        DatasetInfo: Complete dataset information for API responses.
+
+    Note:
+        Automatically determines dataset type based on generation parameters
+        and calculates human-readable file sizes when applicable.
+    """
     stats = dataset.get_statistics()
 
     # Convert file_path to string if it's a Path object
@@ -100,7 +117,21 @@ def _dataset_to_info(
 
 @router.get("/", response_model=DatasetListResponse)
 async def list_datasets():
-    """List all available datasets."""
+    """List all available datasets with metadata and statistics.
+
+    Provides a comprehensive listing of all datasets in the system
+    with essential metadata for browsing and selection purposes.
+
+    Returns:
+        DatasetListResponse: Paginated list of datasets with total count.
+
+    Raises:
+        HTTPException: If dataset listing fails due to persistence errors.
+
+    Note:
+        Continues processing even if individual dataset loading fails,
+        logging warnings for problematic datasets.
+    """
     try:
         dataset_names = FileDatasetRepository.list_available()
         datasets = []
@@ -124,8 +155,21 @@ async def list_datasets():
 
 @router.get("/{dataset_id}", response_model=DatasetInfo)
 async def get_dataset(dataset_id: str):
-    """Get detailed information about a specific dataset."""
-    try:
+    """Get detailed information about a specific dataset.
+
+    Retrieves comprehensive metadata, statistics, and configuration
+    information for a single dataset by its unique identifier.
+
+    Args:
+        dataset_id (str): Unique identifier of the dataset to retrieve.
+
+    Returns:
+        DatasetInfo: Complete dataset information including statistics.
+
+    Raises:
+        HTTPException: If dataset not found or retrieval fails.
+    """
+    try :
         if not FileDatasetRepository.exists(dataset_id):
             raise HTTPException(
                 status_code=404, detail=f"Dataset '{dataset_id}' not found"
@@ -142,11 +186,25 @@ async def get_dataset(dataset_id: str):
         logger.error(f"Error getting dataset {dataset_id}: {e}")
         raise HTTPException(status_code=500, detail="Failed to retrieve dataset")
 
-
 @router.get("/{dataset_id}/preview", response_model=DatasetPreview)
 async def get_dataset_preview(dataset_id: str, max_sequences: int = 5):
-    """Get dataset preview with sample sequences."""
-    try:
+    """Get dataset preview with sample sequences for inspection.
+
+    Provides a preview of dataset contents including metadata
+    and a configurable number of sample sequences for user inspection
+    before processing or analysis.
+
+    Args:
+        dataset_id (str): Unique identifier of the dataset to preview.
+        max_sequences (int): Maximum number of sequences to include in preview.
+
+    Returns:
+        DatasetPreview: Dataset information with sample sequence data.
+
+    Raises:
+        HTTPException: If dataset not found or preview generation fails.
+    """
+    try :
         if not FileDatasetRepository.exists(dataset_id):
             raise HTTPException(
                 status_code=404, detail=f"Dataset '{dataset_id}' not found"
@@ -180,7 +238,26 @@ async def upload_dataset_file(
     name: str = Form(..., description="Dataset name"),
     file: UploadFile = File(..., description="FASTA file"),
 ):
-    """Upload a new dataset from FASTA file."""
+    """Upload a new dataset from FASTA file with validation.
+
+    Processes uploaded FASTA files, validates format, parses sequences,
+    and creates a new dataset entry in the system with proper metadata.
+
+    Args:
+        name (str): Desired name for the new dataset.
+        file (UploadFile): FASTA file upload containing sequence data.
+
+    Returns:
+        OperationResponse: Upload result with dataset ID and file path.
+
+    Raises:
+        HTTPException: If file format invalid, parsing fails, or upload errors.
+
+    Security:
+        - Validates file extensions for allowed types
+        - Checks file content encoding and format
+        - Sanitizes input data before processing
+    """
     try:
         # Validate file type
         if not file.filename.lower().endswith((".fasta", ".fa", ".txt")):
@@ -243,11 +320,27 @@ async def upload_dataset_file(
         logger.error(f"Error uploading dataset file: {e}")
         raise HTTPException(status_code=500, detail="Failed to upload dataset file")
 
-
 @router.post("/upload/text", response_model=OperationResponse)
 async def upload_dataset_text(request: DatasetUploadRequest):
-    """Upload a new dataset from FASTA content (text)."""
-    try:
+    """Upload a new dataset from FASTA content (text input).
+
+    Processes FASTA content submitted as text, validates format,
+    and creates a new dataset entry with proper parsing and validation.
+
+    Args:
+        request (DatasetUploadRequest): FASTA content and metadata.
+
+    Returns:
+        OperationResponse: Upload result with dataset ID and storage info.
+
+    Raises:
+        HTTPException: If content format invalid or processing fails.
+
+    Note:
+        Provides the same functionality as file upload but accepts
+        text input directly from web forms or API clients.
+    """
+    try :
         # Parse FASTA content
         sequences = []
         current_seq = []
@@ -298,8 +391,26 @@ async def upload_dataset_text(request: DatasetUploadRequest):
 async def generate_synthetic_dataset(
     request: SyntheticDatasetRequest, background_tasks: BackgroundTasks
 ):
-    """Generate a synthetic dataset."""
-    try:
+    """Generate a synthetic dataset using algorithmic methods.
+
+    Initiates background generation of synthetic biological sequences
+    using various algorithms and parameters with progress tracking.
+
+    Args:
+        request (SyntheticDatasetRequest): Generation parameters and configuration.
+        background_tasks (BackgroundTasks): FastAPI background task manager.
+
+    Returns:
+        OperationResponse: Generation initiation result with task ID.
+
+    Raises:
+        HTTPException: If generation setup fails or parameters invalid.
+
+    Note:
+        Generation runs in background with status tracking via task ID.
+        Use generation status endpoint to monitor progress.
+    """
+    try :
         # Generate unique task ID
         task_id = str(uuid.uuid4())
 
@@ -319,19 +430,36 @@ async def generate_synthetic_dataset(
             data={"task_id": task_id},
         )
 
-    except Exception as e:
+    except Exception as e :
         logger.error(f"Error starting synthetic generation: {e}")
         raise HTTPException(
             status_code=500, detail="Failed to start dataset generation"
         )
 
-
 @router.post("/generate/ncbi", response_model=OperationResponse)
 async def generate_ncbi_dataset(
     request: NCBIDatasetRequest, background_tasks: BackgroundTasks
 ):
-    """Download dataset from NCBI."""
-    try:
+    """Download dataset from NCBI databases with filtering options.
+
+    Initiates background download of biological sequences from NCBI
+    databases with query filtering and processing parameters.
+
+    Args:
+        request (NCBIDatasetRequest): NCBI query parameters and filters.
+        background_tasks (BackgroundTasks): FastAPI background task manager.
+
+    Returns:
+        OperationResponse: Download initiation result with task ID.
+
+    Raises:
+        HTTPException: If download setup fails or parameters invalid.
+
+    Note:
+        Download runs in background with progress tracking.
+        Large queries may take significant time to complete.
+    """
+    try :
         # Generate unique task ID
         task_id = str(uuid.uuid4())
 
@@ -351,14 +479,30 @@ async def generate_ncbi_dataset(
             data={"task_id": task_id},
         )
 
-    except Exception as e:
+    except Exception as e :
         logger.error(f"Error starting NCBI download: {e}")
         raise HTTPException(status_code=500, detail="Failed to start dataset download")
 
-
 @router.get("/generation/{task_id}/status", response_model=DatasetGenerationStatus)
 async def get_generation_status(task_id: str):
-    """Get dataset generation status."""
+    """Get dataset generation status and progress information.
+
+    Provides real-time status updates for background dataset generation
+    or download tasks with progress indication and error reporting.
+
+    Args:
+        task_id (str): Unique identifier of the generation task.
+
+    Returns:
+        DatasetGenerationStatus: Current status, progress, and result information.
+
+    Raises:
+        HTTPException: If task ID not found or status retrieval fails.
+
+    Note:
+        Completed or failed tasks are removed after being accessed
+        to prevent memory leaks in the status storage.
+    """
     if task_id not in _generation_status:
         raise HTTPException(status_code=404, detail="Generation task not found")
 
@@ -375,8 +519,22 @@ async def get_generation_status(task_id: str):
 
 @router.put("/{dataset_id}", response_model=OperationResponse)
 async def update_dataset(dataset_id: str, request: DatasetUpdateRequest):
-    """Update dataset metadata."""
-    try:
+    """Update dataset metadata and properties.
+
+    Modifies mutable dataset properties such as name and description
+    while preserving sequence data and statistics.
+
+    Args:
+        dataset_id (str): Unique identifier of dataset to update.
+        request (DatasetUpdateRequest): Updated metadata values.
+
+    Returns:
+        OperationResponse: Update result with success confirmation.
+
+    Raises:
+        HTTPException: If dataset not found or update fails.
+    """
+    try :
         if not FileDatasetRepository.exists(dataset_id):
             raise HTTPException(
                 status_code=404, detail=f"Dataset '{dataset_id}' not found"
@@ -396,17 +554,33 @@ async def update_dataset(dataset_id: str, request: DatasetUpdateRequest):
             success=True, message=f"Dataset '{dataset_id}' updated successfully"
         )
 
-    except DatasetNotFoundError:
+    except DatasetNotFoundError :
         raise HTTPException(status_code=404, detail=f"Dataset '{dataset_id}' not found")
-    except Exception as e:
+    except Exception as e :
         logger.error(f"Error updating dataset {dataset_id}: {e}")
         raise HTTPException(status_code=500, detail="Failed to update dataset")
-
-
+    
 @router.delete("/{dataset_id}", response_model=OperationResponse)
 async def delete_dataset(dataset_id: str):
-    """Delete a dataset."""
-    try:
+    """Delete a dataset and its associated files.
+
+    Removes dataset from the system including metadata and
+    associated files with proper cleanup and validation.
+
+    Args:
+        dataset_id (str): Unique identifier of dataset to delete.
+
+    Returns:
+        OperationResponse: Deletion result with success confirmation.
+
+    Raises:
+        HTTPException: If dataset not found or deletion fails.
+
+    Warning:
+        This operation is irreversible. Ensure proper backup
+        procedures if dataset preservation is required.
+    """
+    try :
         if not FileDatasetRepository.exists(dataset_id):
             raise HTTPException(
                 status_code=404, detail=f"Dataset '{dataset_id}' not found"
@@ -421,15 +595,27 @@ async def delete_dataset(dataset_id: str):
         else:
             raise HTTPException(status_code=500, detail="Failed to delete dataset")
 
-    except Exception as e:
+    except Exception as e :
         logger.error(f"Error deleting dataset {dataset_id}: {e}")
         raise HTTPException(status_code=500, detail="Failed to delete dataset")
-
-
+    
 @router.get("/{dataset_id}/download", response_class=FileResponse)
 async def download_dataset(dataset_id: str):
-    """Download dataset file."""
-    try:
+    """Download dataset file in FASTA format.
+
+    Provides direct file download of dataset in standard FASTA
+    format for use in external tools and applications.
+
+    Args:
+        dataset_id (str): Unique identifier of dataset to download.
+
+    Returns:
+        FileResponse: FASTA file download with appropriate headers.
+
+    Raises:
+        HTTPException: If dataset or file not found.
+    """
+    try :
         if not FileDatasetRepository.exists(dataset_id):
             raise HTTPException(
                 status_code=404, detail=f"Dataset '{dataset_id}' not found"
@@ -446,16 +632,27 @@ async def download_dataset(dataset_id: str):
             path=file_path, filename=f"{dataset_id}.fasta", media_type="text/plain"
         )
 
-    except Exception as e:
+    except Exception as e :
         logger.error(f"Error downloading dataset {dataset_id}: {e}")
         raise HTTPException(status_code=500, detail="Failed to download dataset")
-
-
+    
 async def _generate_synthetic_background(
     task_id: str, request: SyntheticDatasetRequest
 ):
-    """Background task for synthetic dataset generation."""
-    try:
+    """Background task for synthetic dataset generation with progress tracking.
+
+    Executes synthetic dataset generation in background with progress
+    updates and error handling for various generation methods.
+
+    Args:
+        task_id (str): Unique identifier for progress tracking.
+        request (SyntheticDatasetRequest): Generation configuration and parameters.
+
+    Note:
+        Updates global status dictionary with progress information
+        and handles all generation methods with appropriate parameter mapping.
+    """
+    try :
         # Update status
         _generation_status[task_id].progress = 25
         _generation_status[task_id].message = "Configuring generation parameters..."
@@ -517,7 +714,7 @@ async def _generate_synthetic_background(
             dataset_id=dataset_id,
         )
 
-    except Exception as e:
+    except Exception as e :
         logger.error(f"Error in synthetic generation task {task_id}: {e}")
         _generation_status[task_id] = DatasetGenerationStatus(
             status=BaseStatus.FAILED.value,
@@ -525,11 +722,22 @@ async def _generate_synthetic_background(
             message="Generation failed",
             error=str(e),
         )
-
-
+    
 async def _generate_ncbi_background(task_id: str, request: NCBIDatasetRequest):
-    """Background task for NCBI dataset download."""
-    try:
+    """Background task for NCBI dataset download with progress tracking.
+
+    Executes NCBI database queries and sequence downloads in background
+    with progress updates and comprehensive error handling.
+
+    Args:
+        task_id (str): Unique identifier for progress tracking.
+        request (NCBIDatasetRequest): NCBI query configuration and filters.
+
+    Note:
+        Handles NCBI API communication, sequence filtering, and
+        dataset creation with appropriate error recovery.
+    """
+    try :
         # Update status
         _generation_status[task_id].progress = 25
         _generation_status[task_id].message = "Connecting to NCBI..."
@@ -569,7 +777,7 @@ async def _generate_ncbi_background(task_id: str, request: NCBIDatasetRequest):
             dataset_id=dataset_id,
         )
 
-    except Exception as e:
+    except Exception as e :
         logger.error(f"Error in NCBI download task {task_id}: {e}")
         _generation_status[task_id] = DatasetGenerationStatus(
             status=BaseStatus.FAILED.value,
@@ -577,3 +785,4 @@ async def _generate_ncbi_background(task_id: str, request: NCBIDatasetRequest):
             message="Download failed",
             error=str(e),
         )
+    

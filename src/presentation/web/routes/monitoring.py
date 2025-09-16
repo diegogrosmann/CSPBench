@@ -1,5 +1,9 @@
 """
 API routes for monitoring functionality.
+
+This module provides REST API endpoints for monitoring batch executions,
+work status tracking, and real-time progress updates. It integrates with
+the WorkPersistence layer to provide comprehensive monitoring capabilities.
 """
 
 import json
@@ -15,7 +19,11 @@ router = APIRouter(prefix="/api/monitor", tags=["monitoring"])
 
 
 def _get_persistence() -> WorkPersistence:
-    """Get WorkPersistence instance following console pattern."""
+    """Get WorkPersistence instance following console pattern.
+    
+    Returns:
+        WorkPersistence: Configured persistence instance for work data access.
+    """
     return WorkPersistence()
 
 
@@ -28,7 +36,25 @@ async def get_works(
     author: str = None,
     tags: str = None,
 ) -> Dict[str, Any]:
-    """Get list of all works with status information, filtering and pagination."""
+    """Get list of all works with status information, filtering and pagination.
+    
+    Provides comprehensive work listing with metadata enrichment from batch
+    configurations and flexible filtering options for work management.
+    
+    Args:
+        page (int): Page number for pagination (1-based).
+        per_page (int): Number of items per page.
+        status (str, optional): Filter by work status.
+        search (str, optional): Search term for name, description, author, or tags.
+        author (str, optional): Filter by author name.
+        tags (str, optional): Comma-separated list of tags to filter by.
+        
+    Returns:
+        Dict[str, Any]: Paginated list of works with metadata and filter results.
+        
+    Raises:
+        HTTPException: If work listing fails due to persistence errors.
+    """
     try:
         persistence = _get_persistence()
         
@@ -130,7 +156,20 @@ async def get_works(
 
 @router.get("/work/{work_id}/status")
 async def get_work_status(work_id: str) -> Dict[str, Any]:
-    """Get detailed status of a specific work."""
+    """Get detailed status of a specific work.
+    
+    Provides comprehensive status information for a work including
+    configuration details, progress data, and execution metadata.
+    
+    Args:
+        work_id (str): Unique identifier of the work to query.
+        
+    Returns:
+        Dict[str, Any]: Detailed work status and configuration information.
+        
+    Raises:
+        HTTPException: If work is not found or status retrieval fails.
+    """
     try:
         persistence = _get_persistence()
         work = persistence.work_get(work_id)
@@ -168,7 +207,20 @@ async def get_work_status(work_id: str) -> Dict[str, Any]:
 
 @router.get("/work/{work_id}/database-status")
 async def get_work_database_status(work_id: str) -> Dict[str, Any]:
-    """Check if work database is ready for monitoring."""
+    """Check if work database is ready for monitoring.
+    
+    Verifies that the work database contains sufficient progress data
+    for meaningful monitoring and provides readiness status information.
+    
+    Args:
+        work_id (str): Unique identifier of the work to check.
+        
+    Returns:
+        Dict[str, Any]: Database readiness status with reason and message.
+        
+    Raises:
+        HTTPException: If work is not found or database check fails.
+    """
     try:
         persistence = _get_persistence()
         work = persistence.work_get(work_id)
@@ -208,7 +260,21 @@ async def get_work_database_status(work_id: str) -> Dict[str, Any]:
 
 @router.post("/work/{work_id}/action/{action}")
 async def work_action(work_id: str, action: str) -> Dict[str, Any]:
-    """Perform action on work (pause, cancel, restart)."""
+    """Perform action on work (pause, cancel, restart).
+    
+    Executes control actions on work executions including pausing,
+    canceling, and restarting with proper cleanup and state management.
+    
+    Args:
+        work_id (str): Unique identifier of the work to control.
+        action (str): Action to perform ('pause', 'cancel', 'restart').
+        
+    Returns:
+        Dict[str, Any]: Action result with success status and message.
+        
+    Raises:
+        HTTPException: If action is invalid, work not found, or operation fails.
+    """
     try:
         work_service = get_work_service()
 
@@ -245,7 +311,17 @@ async def work_action(work_id: str, action: str) -> Dict[str, Any]:
 
 @router.get("/active-works")
 async def get_active_works() -> Dict[str, Any]:
-    """Get only active (running/queued) works."""
+    """Get only active (running/queued) works.
+    
+    Provides a filtered list of works that are currently active,
+    useful for dashboard displays and active monitoring interfaces.
+    
+    Returns:
+        Dict[str, Any]: List of active works with count information.
+        
+    Raises:
+        HTTPException: If active work retrieval fails.
+    """
     try:
         persistence = _get_persistence()
         work_items, _ = persistence.work_list()  # Unpack the tuple
@@ -267,7 +343,20 @@ async def get_active_works() -> Dict[str, Any]:
 
 @router.get("/work/{work_id}/combinations")
 async def list_work_combinations(work_id: str) -> Dict[str, Any]:
-    """Lista combinações de um work para popular filtros de execução."""
+    """List combinations of a work to populate execution filters.
+    
+    Provides a list of all parameter combinations within a work
+    for detailed execution filtering and analysis.
+    
+    Args:
+        work_id (str): Unique identifier of the work to query.
+        
+    Returns:
+        Dict[str, Any]: List of combinations with metadata.
+        
+    Raises:
+        HTTPException: If work not found or combination listing fails.
+    """
     try:
         persistence = _get_persistence()
         work = persistence.work_get(work_id)
@@ -288,14 +377,28 @@ async def list_work_combinations(work_id: str) -> Dict[str, Any]:
 async def get_combination_executions(
     work_id: str, combination_id: int
 ) -> Dict[str, Any]:
-    """Detalhes e estatísticas das execuções de uma combinação específica."""
+    """Get details and statistics of executions for a specific combination.
+    
+    Provides detailed execution information and aggregated statistics
+    for all executions within a specific parameter combination.
+    
+    Args:
+        work_id (str): Unique identifier of the parent work.
+        combination_id (int): Identifier of the specific combination.
+        
+    Returns:
+        Dict[str, Any]: Execution details, statistics, and metadata.
+        
+    Raises:
+        HTTPException: If work or combination not found, or retrieval fails.
+    """
     try:
         persistence = _get_persistence()
         work = persistence.work_get(work_id)
         if not work:
             raise HTTPException(status_code=404, detail=f"Work {work_id} not found")
         
-        # Verificar se combinação existe
+        # Check if combination exists
         combo_list = persistence.list_combinations(work_id)
         combo_map = {c["combination_id"]: c for c in combo_list}
         combo = combo_map.get(combination_id)
@@ -307,7 +410,7 @@ async def get_combination_executions(
         
         executions = persistence.get_combination_executions_detail(combination_id)
         
-        # Agregar estatísticas
+        # Aggregate statistics
         stats = {
             "Running": 0,
             "Completed": 0,

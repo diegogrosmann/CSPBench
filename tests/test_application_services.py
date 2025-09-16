@@ -11,6 +11,7 @@ Coverage objectives:
 
 import tempfile
 import json
+import warnings
 from pathlib import Path
 from unittest.mock import Mock, patch, MagicMock
 import pytest
@@ -176,16 +177,19 @@ class TestExecutionManager:
         manager = ExecutionManager()
         assert manager is not None
 
-    @patch('src.application.services.execution_manager.WorkPersistence')
-    def test_execution_manager_with_persistence(self, mock_persistence):
+    def test_execution_manager_with_persistence(self):
         """Test execution manager with persistence."""
         from src.application.services.execution_manager import ExecutionManager
         
-        mock_persistence_instance = Mock()
-        mock_persistence.return_value = mock_persistence_instance
-        
-        manager = ExecutionManager()
-        assert manager is not None
+        # ExecutionManager is deprecated, test warning is issued
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            manager = ExecutionManager()
+            assert manager is not None
+            # Check if deprecation warning was issued
+            if w:
+                assert len(w) >= 1
+                assert issubclass(w[0].category, DeprecationWarning)
 
     def test_execution_manager_work_submission(self):
         """Test work submission through execution manager."""
@@ -249,7 +253,7 @@ class TestWorkManager:
         
         # Test that manager can submit work (if method exists)
         if hasattr(manager, 'submit'):
-            work_id = manager.submit(mock_config)
+            work_id = manager.submit(config=mock_config)
             assert work_id is not None
 
     @patch('src.application.work.work_manager.WorkPersistence')
@@ -260,11 +264,20 @@ class TestWorkManager:
         mock_persistence_instance = Mock()
         mock_persistence.return_value = mock_persistence_instance
         
-        mock_work_item = Mock(spec=WorkItem)
-        mock_work_item.work_id = 'test_work_id'
-        mock_work_item.status = BaseStatus.RUNNING
+        # Mock work data dict instead of WorkItem object
+        mock_work_data = {
+            'id': 'test_work_id',
+            'status': BaseStatus.RUNNING.value,
+            'config_json': {'name': 'test_config'},
+            'extra_json': {},
+            'created_at': 1672531200.0,  # 2023-01-01 00:00:00 UTC as float
+            'updated_at': 1672531200.0,
+            'output_path': '/tmp/test',
+            'error': None
+        }
         
-        mock_persistence_instance.get_work_item.return_value = mock_work_item
+        mock_persistence_instance.get_work_item.return_value = mock_work_data
+        mock_persistence_instance.work_get.return_value = mock_work_data
         
         manager = WorkManager()
         

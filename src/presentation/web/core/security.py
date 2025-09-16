@@ -1,5 +1,9 @@
 """
 Security utilities and validators for web interface.
+
+This module provides security validation, sanitization, and configuration
+utilities for the CSPBench web interface to ensure safe handling of user
+inputs and file operations.
 """
 
 import logging
@@ -10,7 +14,11 @@ logger = logging.getLogger(__name__)
 
 
 class SecurityConfig:
-    """Security configuration constants."""
+    """Security configuration constants and limits.
+    
+    This class defines security constraints and limits used throughout
+    the web application to prevent abuse and ensure safe operation.
+    """
 
     MAX_DATASET_SIZE = 50 * 1024 * 1024  # 50MB
     ALLOWED_EXTENSIONS = {".fasta", ".fa", ".txt", ".seq"}
@@ -20,11 +28,30 @@ class SecurityConfig:
 
 
 class SecurityValidator:
-    """Security validation utilities."""
+    """Security validation utilities for user inputs and file operations.
+    
+    This class provides static methods for validating and sanitizing
+    various types of user inputs to prevent security vulnerabilities
+    and ensure data integrity.
+    """
 
     @staticmethod
     def sanitize_filename(filename: str) -> str:
-        """Sanitize filename following security guidelines."""
+        """Sanitize filename following security guidelines.
+        
+        Removes unsafe characters from filenames and ensures they meet
+        security requirements for safe filesystem operations.
+        
+        Args:
+            filename (str): Original filename to sanitize.
+            
+        Returns:
+            str: Sanitized filename safe for filesystem operations.
+            
+        Note:
+            If the input is empty or becomes empty after sanitization,
+            returns a default filename "uploaded_file.fasta".
+        """
         if not filename:
             return "uploaded_file.fasta"
 
@@ -44,7 +71,22 @@ class SecurityValidator:
 
     @staticmethod
     def generate_unique_filename(base_filename: str, directory: Path) -> str:
-        """Generate a unique filename by adding a counter if file already exists."""
+        """Generate a unique filename by adding a counter if file already exists.
+        
+        Ensures filename uniqueness within a directory by appending an
+        incrementing counter when conflicts occur.
+        
+        Args:
+            base_filename (str): Base filename to make unique.
+            directory (Path): Target directory to check for conflicts.
+            
+        Returns:
+            str: Unique filename that doesn't conflict with existing files.
+            
+        Example:
+            If "data.fasta" exists, returns "data_1.fasta".
+            If "data_1.fasta" also exists, returns "data_2.fasta", etc.
+        """
         filename = base_filename
         counter = 1
 
@@ -66,7 +108,22 @@ class SecurityValidator:
 
     @staticmethod
     def validate_dataset_content(content: str) -> bool:
-        """Validate dataset content following security guidelines."""
+        """Validate dataset content following security guidelines.
+        
+        Checks if the provided content is valid FASTA format and
+        meets size restrictions for security purposes.
+        
+        Args:
+            content (str): Dataset content to validate.
+            
+        Returns:
+            bool: True if content is valid and safe, False otherwise.
+            
+        Note:
+            Content is considered valid if it contains both FASTA headers
+            (lines starting with '>') and sequence lines, and doesn't
+            exceed the maximum allowed size.
+        """
         if not content or len(content) > SecurityConfig.MAX_DATASET_SIZE:
             return False
 
@@ -79,7 +136,23 @@ class SecurityValidator:
 
     @staticmethod
     def validate_algorithm_parameters(params: Dict, default_params: Dict) -> Dict:
-        """Validate algorithm parameters against schema."""
+        """Validate algorithm parameters against schema.
+        
+        Validates and sanitizes algorithm parameters by checking types
+        against default parameters and falling back to defaults for
+        invalid values.
+        
+        Args:
+            params (Dict): User-provided parameters to validate.
+            default_params (Dict): Default parameter schema with types.
+            
+        Returns:
+            Dict: Validated parameters with proper types and defaults.
+            
+        Note:
+            Unknown parameters are ignored and logged as warnings.
+            Invalid parameter values fall back to defaults with warnings.
+        """
         validated = {}
 
         for key, value in params.items():
@@ -119,7 +192,20 @@ class SecurityValidator:
 
     @staticmethod
     def validate_file_extension(filename: str) -> bool:
-        """Validate file extension against allowed list."""
+        """Validate file extension against allowed list.
+        
+        Checks if the file extension is in the list of allowed
+        extensions for security purposes.
+        
+        Args:
+            filename (str): Filename to validate.
+            
+        Returns:
+            bool: True if extension is allowed, False otherwise.
+            
+        Note:
+            Extension comparison is case-insensitive.
+        """
         if not filename:
             return False
 
@@ -129,5 +215,15 @@ class SecurityValidator:
 
 # Convenience functions for easy import
 def sanitize_filename(filename: str) -> str:
-    """Sanitize filename using SecurityValidator."""
+    """Sanitize filename using SecurityValidator.
+    
+    Convenience function that delegates to SecurityValidator.sanitize_filename
+    for easier importing and usage.
+    
+    Args:
+        filename (str): Filename to sanitize.
+        
+    Returns:
+        str: Sanitized filename.
+    """
     return SecurityValidator.sanitize_filename(filename)
