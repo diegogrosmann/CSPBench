@@ -59,7 +59,7 @@ jobs:
         pytest --cov=src --cov=algorithms --cov-report=xml --cov-report=term-missing --cov-fail-under=85
       env:
         PYTHONPATH: ${{ github.workspace }}
-        DATABASE_URL: sqlite:///:memory:
+  DATABASE_URL: "sqlite:///:memory:"
         NCBI_EMAIL: test@example.com
         NCBI_API_KEY: test_key
 
