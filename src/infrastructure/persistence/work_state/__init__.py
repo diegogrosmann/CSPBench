@@ -30,16 +30,16 @@ Migration Note:
 Usage Example:
     ```python
     from src.infrastructure.persistence.work_state import WorkPersistence
-    
+
     # Create persistence instance
     persistence = WorkPersistence()
-    
+
     # Create a new work
     persistence.work_create(
         id="benchmark-001",
         config={"algorithms": ["greedy", "genetic"], "datasets": ["dna1"]}
     )
-    
+
     # Query work status
     work = persistence.work_get("benchmark-001")
     print(f"Work status: {work['status']}")
@@ -47,24 +47,24 @@ Usage Example:
 """
 
 from .core import WorkPersistence
-from .models import (
-    Work,
-    Dataset,
-    DatasetSequence,
-    Combination,
-    Execution,
-    ExecutionProgress,
-    Event,
-)
-from .wrappers import (
-    ExecutionScopedPersistence,
-    CombinationScopedPersistence,
-    WorkScopedPersistence,
-)
 from .mixins import (
+    ErrorSummary,
     ExecutionDetail,
     ProgressSummary,
-    ErrorSummary,
+)
+from .models import (
+    Combination,
+    Dataset,
+    DatasetSequence,
+    Event,
+    Execution,
+    ExecutionProgress,
+    Work,
+)
+from .wrappers import (
+    CombinationScopedPersistence,
+    ExecutionScopedPersistence,
+    WorkScopedPersistence,
 )
 
 # Alias for backward compatibility

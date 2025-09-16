@@ -327,9 +327,9 @@ class TestGeneticOperations(unittest.TestCase):
 
             # All characters should be from the restricted alphabet
             for char in mutated:
-                assert (
-                    char in custom_alphabet
-                ), f"Character '{char}' not in alphabet '{custom_alphabet}'"
+                assert char in custom_alphabet, (
+                    f"Character '{char}' not in alphabet '{custom_alphabet}'"
+                )
 
     def test_blocks_parameter_validation(self):
         """Test crossover functions handle blocks parameter correctly."""

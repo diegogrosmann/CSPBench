@@ -23,17 +23,17 @@ router = APIRouter(prefix="/api/algorithms", tags=["algorithms"])
 @router.get("/", response_model=List[AlgorithmInfo])
 async def get_algorithms():
     """Get list of available algorithms with comprehensive metadata.
-    
+
     Retrieves all registered algorithms with their metadata including
     parameters, capabilities, and categorization information for
     display in the web interface.
-    
+
     Returns:
         List[AlgorithmInfo]: Complete list of available algorithms with metadata.
-        
+
     Raises:
         HTTPException: If algorithm registry access fails.
-        
+
     Note:
         Gracefully handles metadata extraction errors for individual algorithms,
         providing basic information even when detailed metadata is unavailable.
@@ -46,7 +46,7 @@ async def get_algorithms():
             try:
                 # Get metadata from class attributes instead of creating instance
                 # This avoids the issue with required constructor arguments
-                
+
                 # Get default parameters from class attribute
                 default_params = getattr(algorithm_cls, "default_params", {})
 
@@ -62,7 +62,7 @@ async def get_algorithms():
                     description = algorithm_cls.__doc__ or f"{name} algorithm"
                 except Exception:
                     description = f"{name} algorithm"
-                
+
                 algorithm_info = AlgorithmInfo(
                     name=name,
                     description=description,
@@ -82,7 +82,7 @@ async def get_algorithms():
                     description = algorithm_cls.__doc__ or f"{name} algorithm"
                 except Exception:
                     description = f"{name} algorithm"
-                
+
                 algorithm_info = AlgorithmInfo(
                     name=name,
                     description=description,
@@ -103,20 +103,20 @@ async def get_algorithms():
 @router.get("/{algorithm_name}")
 async def get_algorithm_info(algorithm_name: str):
     """Get detailed information about a specific algorithm.
-    
+
     Retrieves comprehensive metadata and configuration information
     for a single algorithm including parameters, capabilities,
     and version information.
-    
+
     Args:
         algorithm_name (str): Name/identifier of the algorithm to query.
-        
+
     Returns:
         dict: Detailed algorithm information including all available metadata.
-        
+
     Raises:
         HTTPException: If algorithm not found or information retrieval fails.
-        
+
     Note:
         Provides extended information compared to the list endpoint,
         including version information and detailed parameter schemas

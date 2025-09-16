@@ -30,14 +30,13 @@ from __future__ import annotations
 
 import json
 import math
-import sqlite3
-import tomllib
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List
 
 import matplotlib
+import tomllib
 
 matplotlib.use("Agg")  # headless
 import matplotlib.pyplot as plt
@@ -52,16 +51,17 @@ from src.infrastructure.logging_config import get_logger
 logger = get_logger("CSPBench.Finalization")
 
 
-@dataclass 
+@dataclass
 class FinalizationConfig:
     """
     Configuration for finalization service operations.
-    
+
     Attributes:
         work_id (str): Unique work identifier for export.
         output_dir (Path): Base directory for export artifacts.
         tool_version (Optional[str]): Version of the tool generating exports.
     """
+
     work_id: str
     output_dir: Path
     tool_version: str | None = None
@@ -70,11 +70,11 @@ class FinalizationConfig:
 class FinalizationService:
     """
     Comprehensive finalization and export service.
-    
+
     Handles the complete finalization process for work items including
     database exports, result compilation, visualization generation, and
     artifact manifest creation.
-    
+
     Features:
         - Database table exports in CSV format
         - Optimization trial exports with plots
@@ -82,7 +82,7 @@ class FinalizationService:
         - Full results JSON compilation
         - Export manifest with metadata
         - Summary report generation
-    
+
     Attributes:
         config (FinalizationConfig): Service configuration.
         work_store: Work-scoped persistence store.
@@ -95,7 +95,7 @@ class FinalizationService:
     def __init__(self, config: FinalizationConfig, work_store: Any = None):
         """
         Initialize finalization service with configuration and storage.
-        
+
         Args:
             config (FinalizationConfig): Service configuration.
             work_store: WorkScopedPersistence instance for data access.
@@ -108,17 +108,19 @@ class FinalizationService:
         self.sensitivity_dir = self.output_dir / "sensitivity" / "native"
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.raw_dir.mkdir(exist_ok=True)
-        
+
     def _get_db_connection(self):
         """
         Get database connection (DEPRECATED).
-        
+
         Direct database access should not be used. Use work_store methods instead.
-        
+
         Raises:
             ValueError: If work_store is not available.
         """
-        logger.warning("Direct database access is deprecated. Use work_store methods instead.")
+        logger.warning(
+            "Direct database access is deprecated. Use work_store methods instead."
+        )
         if self.work_store is None:
             raise ValueError("work_store is required for database operations")
         # Get the raw database connection from SQLAlchemy engine
@@ -129,7 +131,7 @@ class FinalizationService:
     def run(self) -> None:
         """
         Execute the complete finalization process.
-        
+
         Performs all finalization operations including database exports,
         specialized exports (Optuna/Sensitivity), result compilation,
         manifest generation, and summary creation.
@@ -160,67 +162,84 @@ class FinalizationService:
     def _dump_sqlite_tables(self) -> Dict[str, Dict[str, Any]]:
         """
         Export database tables using work_store methods instead of direct SQL.
-        
+
         Exports all relevant database tables to CSV format using the work_store
         interface rather than direct database access for better abstraction.
-        
+
         Returns:
             Dict[str, Dict[str, Any]]: Dictionary containing export metadata
                 for each table including row counts and file paths.
         """
         info: Dict[str, Dict[str, Any]] = {}
-        
+
         if self.work_store is None:
             raise ValueError("work_store is required for export operations")
-        
+
         try:
             # Export work data
             work_data = self.work_store.store.get_work_export_data(self.config.work_id)
             if work_data:
                 self._write_csv_data("work", [work_data], info)
-            
+
             # Export combinations
-            combinations_data = self.work_store.store.get_combinations_for_export(self.config.work_id)
+            combinations_data = self.work_store.store.get_combinations_for_export(
+                self.config.work_id
+            )
             if combinations_data:
                 self._write_csv_data("combinations", combinations_data, info)
-            
+
             # Export executions
-            executions_data = self.work_store.store.get_executions_for_export(self.config.work_id)
+            executions_data = self.work_store.store.get_executions_for_export(
+                self.config.work_id
+            )
             if executions_data:
                 self._write_csv_data("executions", executions_data, info)
-            
+
             # Export execution progress
-            progress_data = self.work_store.store.get_execution_progress_for_export(self.config.work_id)
+            progress_data = self.work_store.store.get_execution_progress_for_export(
+                self.config.work_id
+            )
             if progress_data:
                 self._write_csv_data("execution_progress", progress_data, info)
-            
+
             # Export events
-            events_data = self.work_store.store.get_events_for_export(self.config.work_id)
+            events_data = self.work_store.store.get_events_for_export(
+                self.config.work_id
+            )
             if events_data:
                 self._write_csv_data("events", events_data, info)
-            
+
             # Export datasets
-            datasets_data = self.work_store.store.get_datasets_for_export(self.config.work_id)
+            datasets_data = self.work_store.store.get_datasets_for_export(
+                self.config.work_id
+            )
             if datasets_data:
                 self._write_csv_data("datasets", datasets_data, info)
-            
+
             # Export dataset sequences
-            sequences_data = self.work_store.store.get_dataset_sequences_for_export(self.config.work_id)
+            sequences_data = self.work_store.store.get_dataset_sequences_for_export(
+                self.config.work_id
+            )
             if sequences_data:
                 self._write_csv_data("dataset_sequences", sequences_data, info)
-                
+
         except Exception as e:
             logger.error(f"Error dumping tables: {e}")
-        
+
         return info
 
-    def _write_csv_data(self, table_name: str, data: List[Dict[str, Any]], info: Dict[str, Dict[str, Any]]) -> None:
+    def _write_csv_data(
+        self,
+        table_name: str,
+        data: List[Dict[str, Any]],
+        info: Dict[str, Dict[str, Any]],
+    ) -> None:
         """
         Write data to CSV file with proper formatting.
-        
+
         Handles CSV writing with proper escaping for special characters
         and updates the export metadata information.
-        
+
         Args:
             table_name (str): Name of the table being exported.
             data (List[Dict[str, Any]]): Data rows to export.
@@ -228,12 +247,12 @@ class FinalizationService:
         """
         if not data:
             return
-            
+
         csv_path = self.raw_dir / f"{table_name}.csv"
-        
+
         # Get column names from first row
         col_names = list(data[0].keys())
-        
+
         # Write CSV manually (avoid pandas dependency here)
         with csv_path.open("w", encoding="utf-8") as fh:
             fh.write(",".join(col_names) + "\n")
@@ -250,7 +269,7 @@ class FinalizationService:
                             text = '"' + text.replace('"', "''") + '"'
                         formatted.append(text)
                 fh.write(",".join(formatted) + "\n")
-        
+
         info[table_name] = {
             "rows": len(data),
             "file": str(csv_path.relative_to(self.output_dir)),
@@ -264,15 +283,15 @@ class FinalizationService:
     ) -> Path:
         """
         Generate comprehensive full results JSON file.
-        
+
         Compiles all execution results into a single JSON file with
         metadata, table information, and specialized analysis results.
-        
+
         Args:
             tables_info (Dict[str, Dict[str, Any]]): Database table export metadata.
             optuna_exports (Dict[str, Any]): Optimization export results.
             sensitivity_exports (Dict[str, Any]): Sensitivity analysis export results.
-            
+
         Returns:
             Path: Path to the generated full results JSON file.
         """
@@ -280,8 +299,10 @@ class FinalizationService:
         executions: List[Dict[str, Any]] = []
         try:
             # Use the export method instead of direct DB access
-            executions_data = self.work_store.store.get_executions_for_export(self.config.work_id)
-            
+            executions_data = self.work_store.store.get_executions_for_export(
+                self.config.work_id
+            )
+
             for exec_row in executions_data:
                 executions.append(
                     {
@@ -322,16 +343,16 @@ class FinalizationService:
     ) -> Path:
         """
         Generate export manifest with artifact inventory.
-        
+
         Creates a comprehensive manifest file listing all export artifacts
         with metadata and version information.
-        
+
         Args:
             tables_info (Dict[str, Dict[str, Any]]): Database table export metadata.
             full_results_path (Path): Path to full results file.
             optuna_exports (Dict[str, Any]): Optimization export results.
             sensitivity_exports (Dict[str, Any]): Sensitivity analysis export results.
-            
+
         Returns:
             Path: Path to the generated manifest JSON file.
         """
@@ -362,15 +383,15 @@ class FinalizationService:
     ) -> Path:
         """
         Generate human-readable summary report in Markdown format.
-        
+
         Creates a summary report with key statistics and artifact listings
         for easy human consumption of export results.
-        
+
         Args:
             tables_info (Dict[str, Dict[str, Any]]): Database table export metadata.
             full_results_path (Path): Path to full results file.
             manifest_path (Path): Path to manifest file.
-            
+
         Returns:
             Path: Path to the generated summary Markdown file.
         """
@@ -403,23 +424,27 @@ class FinalizationService:
     def _export_optuna_trials_and_plots(self) -> Dict[str, Any]:
         """
         Export optimization trials and generate plots.
-        
+
         Exports optimization trial data and generates visualizations
         without necessarily depending on Optuna storage format.
-        
+
         Strategy:
             1. Read executions whose unit_id starts with 'optimization:'
             2. Group by (task_id, dataset_id, preset_id, algorithm_id)
             3. Generate consolidated trials.csv file
             4. Generate plots for each study (objective_vs_trial, best_objective_vs_trial)
-        
+
         Returns:
             Dict[str, Any]: Dictionary containing export metadata including
                 trials CSV path, study information, and plot paths.
         """
         try:
             # Use work_store method instead of direct DB access
-            executions_data = self.work_store.store.get_optimization_executions_for_export(self.config.work_id)
+            executions_data = (
+                self.work_store.store.get_optimization_executions_for_export(
+                    self.config.work_id
+                )
+            )
         except Exception as e:  # pragma: no cover
             logger.warning(f"Optuna export skipped (query error): {e}")
             return {"studies": []}
@@ -442,7 +467,7 @@ class FinalizationService:
                 params_json = exec_data.get("params_json")
                 result_json = exec_data.get("result_json")
                 objective = exec_data.get("objective")
-                
+
                 # unit pattern: optimization:task:dataset:preset:algorithm:trial
                 parts = unit_id.split(":")
                 if len(parts) < 6:
@@ -534,17 +559,19 @@ class FinalizationService:
     def _export_sensitivity_results_and_plots(self) -> Dict[str, Any]:
         """
         Export sensitivity analysis results and generate plots.
-        
+
         Exports sensitivity analysis results based on events and generates
         visualizations. Future enhancement will integrate native SALib support.
-        
+
         Returns:
             Dict[str, Any]: Dictionary containing export metadata including
                 analyses file path, analysis data, and plot paths.
         """
         try:
             # Use work_store method instead of direct DB access
-            events_data = self.work_store.store.get_sensitivity_events_for_export(self.config.work_id)
+            events_data = self.work_store.store.get_sensitivity_events_for_export(
+                self.config.work_id
+            )
         except Exception as e:  # pragma: no cover
             logger.warning(f"Sensitivity export skipped (query error): {e}")
             return {"analyses": []}
@@ -615,10 +642,10 @@ class FinalizationService:
     def _safe_parse_json(text: str | None) -> Any:
         """
         Safely parse JSON text with fallback.
-        
+
         Args:
             text (Optional[str]): JSON text to parse.
-            
+
         Returns:
             Any: Parsed JSON object, original text if parsing fails, or None.
         """
@@ -633,7 +660,7 @@ class FinalizationService:
     def _now_iso() -> str:
         """
         Get current timestamp in ISO format.
-        
+
         Returns:
             str: Current timestamp in ISO 8601 format with timezone.
         """
@@ -643,7 +670,7 @@ class FinalizationService:
     def detect_tool_version(pyproject_path: Path | None = None) -> str | None:
         """
         Attempt to read version from pyproject.toml (PEP 621).
-        
+
         Tries to extract the tool version from the project configuration
         file for inclusion in export metadata.
 

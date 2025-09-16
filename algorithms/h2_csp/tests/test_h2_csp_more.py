@@ -5,8 +5,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 import algorithms.h2_csp.algorithm as h2_mod  # ensures registration
 from src.domain.algorithms import global_registry
 from src.domain.distance import create_distance_calculator
@@ -63,6 +61,7 @@ def test_exhaustive_block_fallback_duplicates():
     res = alg.run()
     assert res["success"]
     assert any("exhaustive" in t for t in res["metadata"]["techniques"])
+
 
 def test_run_internal_exception(monkeypatch):
     strings = ["AAAA", "AAAT"]

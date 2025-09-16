@@ -70,7 +70,7 @@ class DatasetGenerationOrchestrator:
 
     def _handle_synthetic_generation(self) -> Optional[str]:
         """Handle synthetic dataset generation.
-        
+
         Returns:
             Generated file path or None if cancelled
         """
@@ -111,7 +111,7 @@ class DatasetGenerationOrchestrator:
 
     def _handle_real_generation(self) -> Optional[str]:
         """Handle real dataset generation.
-        
+
         Returns:
             Generated file path or None if cancelled
         """
@@ -161,7 +161,7 @@ class DatasetGenerationOrchestrator:
         self, dataset_type: str, saved_path: str, summary: Dict[str, Any]
     ) -> None:
         """Show generation summary.
-        
+
         Args:
             dataset_type: Type of dataset generated
             saved_path: Path where dataset was saved
@@ -179,11 +179,11 @@ class DatasetGenerationOrchestrator:
     # -------- Helpers --------
     def _save_dataset(self, dataset: Dataset, filename: str) -> str:
         """Persist dataset using FileDatasetRepository and return saved path.
-        
+
         Args:
             dataset: Dataset object to save
             filename: Desired filename
-            
+
         Returns:
             Actual saved file path
         """
@@ -194,11 +194,11 @@ class DatasetGenerationOrchestrator:
         self, ds: Dataset, used_params: Dict[str, Any] | None = None
     ) -> Dict[str, Any]:
         """Build summary statistics for dataset.
-        
+
         Args:
             ds: Dataset object
             used_params: Parameters used for generation
-            
+
         Returns:
             Summary statistics dictionary
         """
@@ -216,10 +216,10 @@ class DatasetGenerationOrchestrator:
         self, params: Dict[str, Any]
     ) -> Tuple[Dataset, Dict[str, Any]]:
         """Dispatch synthetic generation to appropriate method using new defaults.
-        
+
         Args:
             params: Generation parameters dictionary
-            
+
         Returns:
             Tuple of (generated_dataset, used_parameters)
         """

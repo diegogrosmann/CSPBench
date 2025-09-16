@@ -12,10 +12,10 @@ from pydantic import BaseModel
 
 class AlgorithmInfo(BaseModel):
     """Information about an available algorithm.
-    
+
     This model represents metadata and configuration information
     for algorithms available in the CSPBench system.
-    
+
     Attributes:
         name (str): Algorithm identifier/name.
         description (str): Human-readable algorithm description.
@@ -35,10 +35,10 @@ class AlgorithmInfo(BaseModel):
 
 class HealthCheck(BaseModel):
     """Health check response model.
-    
+
     This model represents the system health status including
     component availability and version information.
-    
+
     Attributes:
         status (str): Overall system status (e.g., "healthy", "degraded").
         timestamp (str): ISO timestamp of the health check.

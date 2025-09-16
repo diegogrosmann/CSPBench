@@ -9,7 +9,6 @@ import signal
 import threading
 import time
 from contextlib import contextmanager
-from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import psutil
@@ -23,7 +22,7 @@ from src.infrastructure.persistence.work_state.core import WorkPersistence
 class ExecutionLimitError(Exception):
     """
     Raised when execution limits are exceeded.
-    
+
     This exception is raised when resource limits (memory, CPU, time)
     are exceeded during execution, allowing for graceful handling
     of resource constraint violations.
@@ -38,7 +37,7 @@ class ExecutionController:
 
     Responsibilities:
     - Apply CPU and memory limits
-    - Manage timeouts (per-item and total-batch)  
+    - Manage timeouts (per-item and total-batch)
     - Control execution status (pause/cancel)
     - Monitor resources during execution
 
@@ -74,7 +73,7 @@ class ExecutionController:
         Args:
             work_id: Work ID to check status from WorkService (required)
             resources: Resource configuration (can be None for defaults)
-            
+
         Raises:
             ValueError: If work_id is not found
             ImportError: If required system modules are not available
@@ -99,9 +98,10 @@ class ExecutionController:
             try:
                 base_store = WorkPersistence()
                 work_data = base_store.work_get(work_id)
-                if work_data and work_data.get('config_json'):
+                if work_data and work_data.get("config_json"):
                     from src.domain.config import CSPBenchConfig
-                    config = CSPBenchConfig.from_dict(work_data['config_json'])
+
+                    config = CSPBenchConfig.from_dict(work_data["config_json"])
                     if config and config.resources:
                         self._resources = config.resources
                     else:
@@ -110,7 +110,7 @@ class ExecutionController:
                 else:
                     # Use defaults if no config found
                     self._resources = None
-            except Exception as e:
+            except Exception:
                 # If state.db doesn't exist or has issues, use defaults
                 self._resources = None
 
@@ -166,10 +166,10 @@ class ExecutionController:
     def max_workers(self) -> int:
         """
         Get max workers for executor parallelization (considering memory limits).
-        
+
         Returns the current maximum number of workers, which may be less than
         the configured maximum if memory constraints have forced a reduction.
-        
+
         Returns:
             int: Current maximum number of workers
         """
@@ -179,10 +179,10 @@ class ExecutionController:
     def configured_max_workers(self) -> int:
         """
         Get originally configured max workers (ignoring memory adjustments).
-        
+
         Returns the originally configured maximum workers before any
         dynamic adjustments due to memory constraints.
-        
+
         Returns:
             int: Originally configured maximum workers
         """
@@ -194,9 +194,9 @@ class ExecutionController:
         Get internal jobs for algorithm parallelization.
 
         Returns internal_jobs limited by current memory constraints.
-        When memory forces reduced workers, algorithms should use proportional 
+        When memory forces reduced workers, algorithms should use proportional
         internal parallelism.
-        
+
         Returns:
             int: Current number of internal jobs (limited by current workers)
         """
@@ -207,17 +207,17 @@ class ExecutionController:
     def from_config(cls, work_id: str, config: dict[str, Any]) -> "ExecutionController":
         """
         Create ExecutionController from configuration dictionary.
-        
+
         Factory method to construct ExecutionController from a dictionary
         configuration, reconstructing ResourcesConfig objects from nested dicts.
-        
+
         Args:
             work_id: Work identifier for status checking
             config: Configuration dictionary with cpu, memory, timeouts sections
-            
+
         Returns:
             ExecutionController: Configured controller instance
-            
+
         Example:
             >>> config = {
             ...     "cpu": {"max_workers": 4, "exclusive_cores": True},
@@ -269,7 +269,7 @@ class ExecutionController:
     def timeout_per_item(self) -> int:
         """
         Get timeout per item in seconds.
-        
+
         Returns:
             int: Timeout for individual item processing
         """
@@ -279,7 +279,7 @@ class ExecutionController:
     def timeout_total_batch(self) -> int:
         """
         Get total batch timeout in seconds.
-        
+
         Returns:
             int: Total timeout for entire batch processing
         """
@@ -288,7 +288,7 @@ class ExecutionController:
     def get_batch_elapsed_time(self) -> float:
         """
         Get elapsed time since batch start.
-        
+
         Returns:
             float: Elapsed time in seconds since batch execution started
         """
@@ -303,7 +303,7 @@ class ExecutionController:
 
         Returns:
             BaseStatus: Current execution status from WorkService
-            
+
         Note:
             Returns RUNNING as default if status cannot be determined.
         """
@@ -347,7 +347,7 @@ class ExecutionController:
 
         Raises:
             ExecutionLimitError: If batch timeout exceeded
-            
+
         Note:
             Also triggers cleanup of all active processes when timeout is reached.
         """
@@ -362,7 +362,7 @@ class ExecutionController:
     def _force_cleanup_on_timeout(self) -> None:
         """
         Force cleanup and termination of all processes when batch timeout is reached.
-        
+
         This method is called when batch timeout is exceeded to ensure
         all active processes are properly terminated and cleaned up.
         """
@@ -410,7 +410,7 @@ class ExecutionController:
         Returns:
             List[int]: List of CPU cores to use for algorithm processes,
                       or None if no CPU restriction should be applied
-                      
+
         Note:
             Returns cores 1 to max_workers when exclusive_cores is True,
             or None when exclusive_cores is False.
@@ -433,7 +433,7 @@ class ExecutionController:
     def _apply_main_process_affinity(self) -> None:
         """
         Apply CPU affinity to main application process when exclusive_cores is enabled.
-        
+
         Forces main application to run only on core 0 when exclusive_cores
         configuration is active, leaving other cores for algorithm execution.
         """
@@ -461,7 +461,7 @@ class ExecutionController:
 
         Args:
             process: Process to apply limits to (current process if None)
-            
+
         Note:
             Logs warnings if CPU limits cannot be applied due to system restrictions.
         """
@@ -505,9 +505,9 @@ class ExecutionController:
 
         Args:
             process: Process to monitor (current process if None)
-            
+
         Note:
-            Uses system resource limits where available and falls back to 
+            Uses system resource limits where available and falls back to
             preventive monitoring that reduces workers instead of killing processes.
         """
         if not self._max_memory_gb:
@@ -537,14 +537,14 @@ class ExecutionController:
     ) -> None:
         """
         Start preventive memory monitoring thread that reduces workers instead of killing process.
-        
+
         Monitors memory usage and dynamically adjusts the number of workers
         to prevent memory limit violations. Provides graceful degradation
         instead of process termination.
-        
+
         Args:
             process: Process to monitor (current process if None)
-            
+
         Note:
             The monitor runs in a background thread and adjusts _current_workers
             based on memory pressure thresholds (85% warning, 95% critical).
@@ -623,13 +623,13 @@ class ExecutionController:
 
         Args:
             timeout_seconds: Timeout in seconds (uses config default if None)
-            
+
         Yields:
             None: Context for timeout-controlled execution
-            
+
         Raises:
             TimeoutError: If item execution exceeds timeout
-            
+
         Example:
             >>> with controller.item_timeout(300):
             ...     process_long_running_item()
@@ -688,11 +688,11 @@ class ExecutionController:
     def register_process(self, process: psutil.Process) -> None:
         """
         Register a process for resource monitoring.
-        
+
         Adds process to the list of monitored processes and applies
         CPU limits to it. Registered processes will be cleaned up
         on timeout or controller shutdown.
-        
+
         Args:
             process: Process to register and monitor
         """
@@ -702,7 +702,7 @@ class ExecutionController:
     def cleanup(self) -> None:
         """
         Cleanup execution controller and stop monitoring.
-        
+
         Stops all monitoring threads and terminates any remaining
         active processes. Should be called when execution is complete
         or when shutting down.
@@ -726,10 +726,10 @@ class ExecutionController:
     def get_resource_info(self) -> Dict[str, Any]:
         """
         Get current resource usage information.
-        
+
         Provides detailed information about current resource usage,
         limits, and execution state for monitoring and debugging.
-        
+
         Returns:
             Dict[str, Any]: Resource information including CPU usage,
                            memory usage, thread count, elapsed time,

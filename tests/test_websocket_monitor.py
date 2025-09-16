@@ -5,17 +5,20 @@ Tests for WebSocket real-time monitoring.
 import asyncio
 import json
 import tempfile
+from dataclasses import dataclass
 from pathlib import Path
+from typing import List, Optional
 from unittest.mock import Mock, patch
 
 import pytest
 from fastapi.testclient import TestClient
-from dataclasses import dataclass
-from typing import Optional, List
 
+from src.infrastructure.persistence.work_state.mixins.queries_mixin import (
+    ExecutionDetail,
+    ProgressSummary,
+)
 from src.presentation.web.app import app
 from src.presentation.web.websocket import work_monitor_manager
-from src.infrastructure.persistence.work_state.mixins.queries_mixin import ProgressSummary, ExecutionDetail
 
 
 @pytest.fixture

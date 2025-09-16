@@ -16,7 +16,7 @@ from src.infrastructure.utils.path_utils import get_dataset_directory
 class FileDatasetRepository:
     """
     FASTA file-based dataset repository.
-    
+
     This class provides methods to save, load, and manage datasets stored as FASTA files
     in the file system. It automatically handles path resolution and supports both
     relative and absolute file paths.
@@ -26,10 +26,10 @@ class FileDatasetRepository:
     def _get_base_path(base_path: str | None = None) -> Path:
         """
         Get base path, using environment variable as default.
-        
+
         Args:
             base_path: Optional base path. If None, uses environment variable
-            
+
         Returns:
             Path: Absolute path to the base directory
         """
@@ -49,12 +49,12 @@ class FileDatasetRepository:
     def save(dataset: Dataset, name: str, base_path: str | None = None) -> str:
         """
         Save dataset to FASTA file.
-        
+
         Args:
             dataset: Dataset object containing sequences to save
             name: Name for the FASTA file (without extension)
             base_path: Optional base directory path
-            
+
         Returns:
             str: Full path to the saved file
         """
@@ -73,14 +73,14 @@ class FileDatasetRepository:
     ) -> tuple[Dataset, dict[str, Any]]:
         """
         Load dataset from file and return dataset with metadata.
-        
+
         Args:
             filename: Name of the FASTA file to load
             base_path: Optional base directory path
-            
+
         Returns:
             tuple: Dataset object and dictionary with used parameters
-            
+
         Raises:
             DatasetNotFoundError: If the specified file doesn't exist
         """
@@ -104,10 +104,10 @@ class FileDatasetRepository:
     def list_available(base_path: str | None = None) -> List[str]:
         """
         List available datasets in the repository.
-        
+
         Args:
             base_path: Optional base directory path
-            
+
         Returns:
             List[str]: List of dataset names (without .fasta extension)
         """
@@ -119,11 +119,11 @@ class FileDatasetRepository:
     def exists(filename: str, base_path: str | None = None) -> bool:
         """
         Check if dataset exists in the repository.
-        
+
         Args:
             filename: Name of the FASTA file to check
             base_path: Optional base directory path
-            
+
         Returns:
             bool: True if dataset exists, False otherwise
         """
@@ -135,11 +135,11 @@ class FileDatasetRepository:
     def delete(filename: str, base_path: str | None = None) -> bool:
         """
         Remove dataset from the repository.
-        
+
         Args:
             filename: Name of the FASTA file to delete
             base_path: Optional base directory path
-            
+
         Returns:
             bool: True if dataset was deleted, False if it didn't exist
         """
@@ -157,11 +157,11 @@ class FileDatasetRepository:
 
         If 'filename' is an absolute path, return it directly.
         Otherwise, treat it as a name relative to base path, with optional .fasta extension.
-        
+
         Args:
             filename: File name or path to resolve
             base_path: Base directory for relative paths
-            
+
         Returns:
             Path: Resolved file path
         """
@@ -176,13 +176,13 @@ class FileDatasetRepository:
     def _parse_fasta(file_path: Path) -> List[str]:
         """
         Parse FASTA file supporting multi-line sequences.
-        
+
         Args:
             file_path: Path to the FASTA file to parse
-            
+
         Returns:
             List[str]: List of sequences found in the file
-            
+
         Raises:
             DatasetValidationError: If no sequences are found in the file
         """

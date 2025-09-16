@@ -14,7 +14,7 @@ Key Components:
 
 Architecture:
     The web interface follows a modular, domain-driven design:
-    
+
     - Routes: Domain-specific endpoint handlers (datasets, algorithms, etc.)
     - Core: Shared models, security utilities, and configuration
     - WebSocket: Real-time communication infrastructure
@@ -46,14 +46,14 @@ Development Features:
 
 Example Usage:
     Start the development server::
-    
+
         from src.presentation.web.app import app
         import uvicorn
-        
+
         uvicorn.run(app, host="0.0.0.0", port=8000, reload=True)
-        
+
     Or use the provided launcher::
-    
+
         python -m src.presentation.web.run_web
 
 WebSocket Endpoints:
@@ -71,7 +71,7 @@ API Endpoints:
 
 Deployment:
     The web interface supports multiple deployment scenarios:
-    
+
     - Development: Built-in uvicorn server with hot reload
     - Production: Docker container with optimized settings
     - Cloud: Kubernetes deployment with horizontal scaling

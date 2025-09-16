@@ -11,8 +11,9 @@ This module tests distance calculation functionality including:
 - Factory method for creating calculators
 """
 
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
 
 from src.domain.distance import (
     DistanceCalculator,
@@ -28,7 +29,7 @@ class TestHammingDistanceCalculator:
     def test_init_default_parameters(self):
         """Test initialization with default parameters."""
         calc = HammingDistanceCalculator()
-        
+
         assert calc._strings == []
         assert calc.use_cache is True
         assert calc._cache == {}
@@ -37,7 +38,7 @@ class TestHammingDistanceCalculator:
         """Test initialization with strings and cache disabled."""
         strings = ["ACGT", "AGCT", "ATCG"]
         calc = HammingDistanceCalculator(strings, use_cache=False)
-        
+
         assert calc._strings == strings
         assert calc.use_cache is False
         assert calc._cache is None
@@ -75,7 +76,7 @@ class TestHammingDistanceCalculator:
     def test_distance_different_lengths_raises_error(self):
         """Test that different length strings raise ValueError."""
         calc = HammingDistanceCalculator()
-        
+
         with pytest.raises(ValueError, match="Strings must have the same length"):
             calc.distance("ACG", "ACGT")
 
@@ -83,7 +84,7 @@ class TestHammingDistanceCalculator:
         """Test max_distance calculation with string pool."""
         strings = ["AAAA", "TTTT", "ACGT"]
         calc = HammingDistanceCalculator(strings)
-        
+
         max_dist = calc.max_distance("AAAA")
         assert max_dist == 4  # Distance to "TTTT"
 
@@ -97,7 +98,7 @@ class TestHammingDistanceCalculator:
         """Test min_distance calculation with string pool."""
         strings = ["AAAA", "AAAG", "TTTT"]
         calc = HammingDistanceCalculator(strings)
-        
+
         min_dist = calc.min_distance("AAAA")
         assert min_dist == 0  # Distance to itself
 
@@ -111,7 +112,7 @@ class TestHammingDistanceCalculator:
         """Test average_distance calculation."""
         strings = ["AAAA", "TTTT", "ACGT"]
         calc = HammingDistanceCalculator(strings)
-        
+
         avg_dist = calc.average_distance("AAAA")
         # Distances: 0 (to AAAA), 4 (to TTTT), 3 (to ACGT)
         expected = (0 + 4 + 3) / 3
@@ -127,7 +128,7 @@ class TestHammingDistanceCalculator:
         """Test total_distance calculation."""
         strings = ["AAAA", "TTTT", "ACGT"]
         calc = HammingDistanceCalculator(strings)
-        
+
         total_dist = calc.total_distance("AAAA")
         # Distances: 0 (to AAAA), 4 (to TTTT), 3 (to ACGT)
         assert total_dist == 7
@@ -136,7 +137,7 @@ class TestHammingDistanceCalculator:
         """Test median_distance with odd number of strings."""
         strings = ["AAAA", "AAAT", "TTTT"]  # Distances: 0, 1, 4
         calc = HammingDistanceCalculator(strings)
-        
+
         median_dist = calc.median_distance("AAAA")
         assert median_dist == 1.0  # Middle value
 
@@ -144,7 +145,7 @@ class TestHammingDistanceCalculator:
         """Test median_distance with even number of strings."""
         strings = ["AAAA", "AAAT", "AATT", "TTTT"]  # Distances: 0, 1, 2, 4
         calc = HammingDistanceCalculator(strings)
-        
+
         median_dist = calc.median_distance("AAAA")
         assert median_dist == 1.5  # Average of middle two values
 
@@ -158,10 +159,10 @@ class TestHammingDistanceCalculator:
         """Test distances_to_all with caching enabled."""
         strings = ["AAAA", "TTTT", "ACGT"]
         calc = HammingDistanceCalculator(strings, use_cache=True)
-        
+
         distances = calc.distances_to_all("AAAA")
         assert distances == [0, 4, 3]
-        
+
         # Verify cache is populated
         assert "AAAA" in calc._cache
         assert calc._cache["AAAA"] == [0, 4, 3]
@@ -170,10 +171,10 @@ class TestHammingDistanceCalculator:
         """Test distances_to_all with caching disabled."""
         strings = ["AAAA", "TTTT"]
         calc = HammingDistanceCalculator(strings, use_cache=False)
-        
+
         distances = calc.distances_to_all("AAAA")
         assert distances == [0, 4]
-        
+
         # Verify no cache is used
         assert calc._cache is None
 
@@ -181,14 +182,14 @@ class TestHammingDistanceCalculator:
         """Test that distances_to_all uses cache on subsequent calls."""
         strings = ["AAAA", "TTTT"]
         calc = HammingDistanceCalculator(strings, use_cache=True)
-        
+
         # First call - populates cache
         distances1 = calc.distances_to_all("AAAA")
-        
+
         # Mock the distance method to verify cache is used
-        with patch.object(calc, 'distance') as mock_distance:
+        with patch.object(calc, "distance") as mock_distance:
             distances2 = calc.distances_to_all("AAAA")
-            
+
             # Should return cached result without calling distance method
             assert distances2 == distances1
             mock_distance.assert_not_called()
@@ -200,7 +201,7 @@ class TestLevenshteinDistanceCalculator:
     def test_init_default_parameters(self):
         """Test initialization with default parameters."""
         calc = LevenshteinDistanceCalculator()
-        
+
         assert calc._strings == []
         assert calc.use_cache is True
         assert calc._cache == {}
@@ -261,9 +262,9 @@ class TestDistanceCalculatorStringManagement:
         """Test setting string pool."""
         calc = HammingDistanceCalculator()
         strings = ["AAAA", "TTTT", "ACGT"]
-        
+
         calc.set_strings(strings)
-        
+
         assert calc._strings == strings
         # Verify it's a copy, not reference
         strings.append("GGGG")
@@ -273,11 +274,11 @@ class TestDistanceCalculatorStringManagement:
         """Test that setting strings clears cache."""
         strings = ["AAAA", "TTTT"]
         calc = HammingDistanceCalculator(strings)
-        
+
         # Populate cache
         calc.distances_to_all("AAAA")
         assert len(calc._cache) > 0
-        
+
         # Set new strings should clear cache
         calc.set_strings(["CCCC", "GGGG"])
         assert len(calc._cache) == 0
@@ -286,9 +287,9 @@ class TestDistanceCalculatorStringManagement:
         """Test getting string pool."""
         strings = ["AAAA", "TTTT", "ACGT"]
         calc = HammingDistanceCalculator(strings)
-        
+
         retrieved = calc.get_strings()
-        
+
         assert retrieved == strings
         # Verify it's a copy, not reference
         retrieved.append("GGGG")
@@ -298,13 +299,13 @@ class TestDistanceCalculatorStringManagement:
         """Test cache size reporting."""
         strings = ["AAAA", "TTTT"]
         calc = HammingDistanceCalculator(strings)
-        
+
         assert calc.cache_size() == 0
-        
+
         # Populate cache
         calc.distances_to_all("AAAA")
         assert calc.cache_size() == 1
-        
+
         calc.distances_to_all("TTTT")
         assert calc.cache_size() == 2
 
@@ -317,11 +318,11 @@ class TestDistanceCalculatorStringManagement:
         """Test cache clearing."""
         strings = ["AAAA", "TTTT"]
         calc = HammingDistanceCalculator(strings)
-        
+
         # Populate cache
         calc.distances_to_all("AAAA")
         assert calc.cache_size() > 0
-        
+
         # Clear cache
         calc.clear_cache()
         assert calc.cache_size() == 0
@@ -340,9 +341,9 @@ class TestDistanceCalculatorQualityMetrics:
         """Test diversity metric calculation."""
         calc = HammingDistanceCalculator()
         strings = ["AAAA", "TTTT", "ACGT"]
-        
+
         diversity = calc.diversity_metric(strings)
-        
+
         # Diversity should be between 0 and 1
         assert 0.0 <= diversity <= 1.0
         assert diversity > 0  # Should be positive for different strings
@@ -351,7 +352,7 @@ class TestDistanceCalculatorQualityMetrics:
         """Test diversity metric with identical strings."""
         calc = HammingDistanceCalculator()
         strings = ["AAAA", "AAAA", "AAAA"]
-        
+
         diversity = calc.diversity_metric(strings)
         assert diversity == 0.0  # No diversity
 
@@ -371,7 +372,7 @@ class TestDistanceCalculatorQualityMetrics:
         """Test diversity metric uses internal strings when none provided."""
         strings = ["AAAA", "TTTT"]
         calc = HammingDistanceCalculator(strings)
-        
+
         diversity = calc.diversity_metric()
         assert diversity > 0  # Should use internal strings
 
@@ -379,7 +380,7 @@ class TestDistanceCalculatorQualityMetrics:
         """Test consensus strength with perfect consensus."""
         strings = ["AAAA", "AAAA", "AAAA"]
         calc = HammingDistanceCalculator(strings)
-        
+
         strength = calc.consensus_strength("AAAA")
         assert strength == 1.0  # Perfect consensus
 
@@ -387,7 +388,7 @@ class TestDistanceCalculatorQualityMetrics:
         """Test consensus strength with no consensus."""
         strings = ["AAAA", "TTTT"]
         calc = HammingDistanceCalculator(strings)
-        
+
         strength = calc.consensus_strength("AAAA")
         assert 0.0 <= strength < 1.0  # Some consensus lost
 
@@ -408,15 +409,21 @@ class TestDistanceCalculatorQualityMetrics:
         """Test comprehensive solution quality metrics."""
         strings = ["AAAA", "AAAT", "TTTT"]
         calc = HammingDistanceCalculator(strings)
-        
+
         quality = calc.solution_quality("AAAA")
-        
+
         expected_keys = {
-            "max_distance", "min_distance", "average_distance", 
-            "median_distance", "total_distance", "consensus_strength",
-            "diversity", "num_strings", "string_length"
+            "max_distance",
+            "min_distance",
+            "average_distance",
+            "median_distance",
+            "total_distance",
+            "consensus_strength",
+            "diversity",
+            "num_strings",
+            "string_length",
         }
-        
+
         assert set(quality.keys()) == expected_keys
         assert quality["num_strings"] == 3
         assert quality["string_length"] == 4
@@ -427,14 +434,18 @@ class TestDistanceCalculatorQualityMetrics:
         """Test solution comparison functionality."""
         strings = ["AAAA", "TTTT"]
         calc = HammingDistanceCalculator(strings)
-        
+
         comparison = calc.compare_solutions("AAAA", "GGGG")
-        
+
         expected_keys = {
-            "center1", "center2", "better_solution",
-            "max_distance_diff", "avg_distance_diff", "consensus_diff"
+            "center1",
+            "center2",
+            "better_solution",
+            "max_distance_diff",
+            "avg_distance_diff",
+            "consensus_diff",
         }
-        
+
         assert set(comparison.keys()) == expected_keys
         assert comparison["better_solution"] in ["AAAA", "GGGG"]
         assert isinstance(comparison["max_distance_diff"], (int, float))
@@ -472,7 +483,7 @@ class TestDistanceCalculatorFactory:
         """Test creating calculator with strings and cache settings."""
         strings = ["AAAA", "TTTT"]
         calc = create_distance_calculator("hamming", strings, use_cache=False)
-        
+
         assert isinstance(calc, HammingDistanceCalculator)
         assert calc._strings == strings
         assert calc.use_cache is False
@@ -509,15 +520,15 @@ class TestDistanceCalculatorEdgeCases:
         """Test that caching improves performance for repeated calls."""
         strings = ["AAAA", "TTTT"] * 100  # Large string pool
         calc = HammingDistanceCalculator(strings, use_cache=True)
-        
+
         # First call should populate cache
         distances1 = calc.distances_to_all("AAAA")
-        
+
         # Mock distance method to verify cache usage
-        with patch.object(HammingDistanceCalculator, 'distance') as mock_distance:
+        with patch.object(HammingDistanceCalculator, "distance") as mock_distance:
             # Second call should use cache
             distances2 = calc.distances_to_all("AAAA")
-            
+
             assert distances1 == distances2
             # Distance method should not be called due to caching
             mock_distance.assert_not_called()
@@ -525,11 +536,11 @@ class TestDistanceCalculatorEdgeCases:
     def test_levenshtein_matrix_edge_cases(self):
         """Test Levenshtein distance with matrix edge cases."""
         calc = LevenshteinDistanceCalculator()
-        
+
         # Test with single character strings
         assert calc.distance("A", "B") == 1
         assert calc.distance("A", "A") == 0
-        
+
         # Test with one empty string
         assert calc.distance("A", "") == 1
         assert calc.distance("", "A") == 1
@@ -538,15 +549,15 @@ class TestDistanceCalculatorEdgeCases:
         """Test that string pool changes don't affect other instances."""
         strings1 = ["AAAA", "TTTT"]
         strings2 = ["CCCC", "GGGG"]
-        
+
         calc1 = HammingDistanceCalculator(strings1)
         calc2 = HammingDistanceCalculator(strings2)
-        
+
         # Verify isolated string pools
         assert calc1._strings != calc2._strings
-        
+
         # Change one calculator's strings
         calc1.set_strings(["ATAT"])
-        
+
         # Other calculator should be unaffected
         assert calc2._strings == strings2

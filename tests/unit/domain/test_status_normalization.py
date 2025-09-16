@@ -83,6 +83,7 @@ class TestStatusNormalization:
             assert result == status.value
             assert isinstance(result, str)
 
+
 # Testes legados mantidos para compatibilidade
 def test_normalize_status_enum():
     assert normalize_status(BaseStatus.RUNNING) == "running"

@@ -22,16 +22,16 @@ from abc import ABC, abstractmethod
 class DistanceCalculator(ABC):
     """
     Abstract class for distance calculator with string pool and optimized cache.
-    
+
     Provides a framework for calculating distances between strings with
     support for string pools, caching, and various quality metrics.
-    
+
     Features:
     - String pool management
     - Distance caching for performance
     - Quality metrics calculation
     - Solution comparison utilities
-    
+
     Attributes:
         _strings: Pool of strings for calculations
         use_cache: Whether to use cache for repeated calculations

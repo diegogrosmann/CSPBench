@@ -27,19 +27,19 @@ Features:
 Usage:
     The CLI is accessed through the main entry point and provides
     various commands for different aspects of the CSPBench workflow::
-        
+
         # Execute batch configuration
         python main.py batch config.yaml
-        
+
         # Monitor work progress
         python main.py monitor work_id
-        
+
         # List available algorithms
         python main.py algorithms
-        
+
         # Start web interface
         python main.py web
-        
+
         # Generate datasets interactively
         python main.py datasetsave
 

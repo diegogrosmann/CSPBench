@@ -7,8 +7,7 @@ providing type-safe database operations and automatic schema management.
 
 import json
 import time
-from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict
 
 from sqlalchemy import (
     CheckConstraint,
@@ -19,9 +18,8 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
-    create_engine,
 )
-from sqlalchemy.orm import Session, relationship, sessionmaker, declarative_base
+from sqlalchemy.orm import declarative_base, relationship
 from sqlalchemy.types import TypeDecorator
 
 Base = declarative_base()
@@ -30,22 +28,22 @@ Base = declarative_base()
 class JSONType(TypeDecorator):
     """
     Custom SQLAlchemy type for storing JSON data in database.
-    
+
     This type automatically serializes Python dictionaries and lists to JSON strings
     for storage and deserializes them back when retrieving from the database.
     """
-    
+
     impl = Text
     cache_ok = True
 
     def process_bind_param(self, value, dialect):
         """
         Convert Python dict/list to JSON string for database storage.
-        
+
         Args:
             value: Python object to serialize
             dialect: SQLAlchemy dialect (unused)
-            
+
         Returns:
             str: JSON string representation, or None if value is None
         """
@@ -56,11 +54,11 @@ class JSONType(TypeDecorator):
     def process_result_value(self, value, dialect):
         """
         Convert JSON string back to Python dict/list when retrieving from database.
-        
+
         Args:
             value: JSON string from database
             dialect: SQLAlchemy dialect (unused)
-            
+
         Returns:
             Any: Deserialized Python object, or None if value is None
         """
@@ -72,10 +70,10 @@ class JSONType(TypeDecorator):
 class Work(Base):
     """
     Work table model representing a benchmark work unit.
-    
+
     A work represents a complete benchmark execution containing multiple datasets,
     algorithm combinations, and their results.
-    
+
     Attributes:
         id: Unique identifier for the work
         config_json: JSON configuration for the work
@@ -86,27 +84,37 @@ class Work(Base):
         error: Error message if work failed
         extra_json: Additional metadata
     """
-    
-    __tablename__ = 'work'
-    
+
+    __tablename__ = "work"
+
     id = Column(String, primary_key=True, nullable=False)
     config_json = Column(JSONType, default=dict, nullable=False)
-    status = Column(String, CheckConstraint("status IN ('queued', 'running', 'paused', 'canceled', 'completed', 'failed', 'error')"), nullable=False)
+    status = Column(
+        String,
+        CheckConstraint(
+            "status IN ('queued', 'running', 'paused', 'canceled', 'completed', 'failed', 'error')"
+        ),
+        nullable=False,
+    )
     created_at = Column(Float, nullable=False)
     updated_at = Column(Float)
     output_path = Column(String)
     error = Column(Text)
     extra_json = Column(JSONType, default=dict)
-    
+
     # Relationships
-    datasets = relationship("Dataset", back_populates="work", cascade="all, delete-orphan")
-    combinations = relationship("Combination", back_populates="work", cascade="all, delete-orphan")
+    datasets = relationship(
+        "Dataset", back_populates="work", cascade="all, delete-orphan"
+    )
+    combinations = relationship(
+        "Combination", back_populates="work", cascade="all, delete-orphan"
+    )
     events = relationship("Event", back_populates="work", cascade="all, delete-orphan")
 
     def to_dict(self) -> Dict[str, Any]:
         """
         Convert work model to dictionary representation.
-        
+
         Returns:
             Dict[str, Any]: Dictionary containing all work attributes
         """
@@ -125,10 +133,10 @@ class Work(Base):
 class Dataset(Base):
     """
     Dataset table model representing a collection of sequences.
-    
+
     Datasets contain the input sequences used for CSP algorithm benchmarking.
     Each dataset belongs to a specific work and can contain multiple sequences.
-    
+
     Attributes:
         id: Auto-incremented primary key
         dataset_id: Original string identifier
@@ -136,28 +144,30 @@ class Dataset(Base):
         name: Human-readable dataset name
         meta_json: Metadata about the dataset
     """
-    
-    __tablename__ = 'datasets'
-    
+
+    __tablename__ = "datasets"
+
     id = Column(Integer, primary_key=True, autoincrement=True, nullable=False)
     dataset_id = Column(String, nullable=False)  # Original string ID
-    work_id = Column(String, ForeignKey('work.id', ondelete='CASCADE'), nullable=False)
+    work_id = Column(String, ForeignKey("work.id", ondelete="CASCADE"), nullable=False)
     name = Column(String, nullable=False)
     meta_json = Column(JSONType, default=dict)
-    
+
     # Unique constraint for dataset_id within work
     __table_args__ = (
-        UniqueConstraint('work_id', 'dataset_id', name='unique_dataset_per_work'),
+        UniqueConstraint("work_id", "dataset_id", name="unique_dataset_per_work"),
     )
-    
+
     # Relationships
     work = relationship("Work", back_populates="datasets")
-    sequences = relationship("DatasetSequence", back_populates="dataset", cascade="all, delete-orphan")
+    sequences = relationship(
+        "DatasetSequence", back_populates="dataset", cascade="all, delete-orphan"
+    )
 
     def to_dict(self) -> Dict[str, Any]:
         """
         Convert dataset model to dictionary representation.
-        
+
         Returns:
             Dict[str, Any]: Dictionary containing all dataset attributes
         """
@@ -173,29 +183,34 @@ class Dataset(Base):
 class DatasetSequence(Base):
     """
     Dataset sequence table model representing individual sequences within a dataset.
-    
+
     Each sequence is stored separately to enable efficient querying and processing
     of large datasets.
-    
+
     Attributes:
         dataset_id: Foreign key to the parent dataset
         seq_index: Index of the sequence within the dataset
         sequence: The actual sequence string
     """
-    
-    __tablename__ = 'dataset_sequences'
-    
-    dataset_id = Column(Integer, ForeignKey('datasets.id', ondelete='CASCADE'), primary_key=True, nullable=False)
+
+    __tablename__ = "dataset_sequences"
+
+    dataset_id = Column(
+        Integer,
+        ForeignKey("datasets.id", ondelete="CASCADE"),
+        primary_key=True,
+        nullable=False,
+    )
     seq_index = Column(Integer, primary_key=True, nullable=False)
     sequence = Column(Text, nullable=False)
-    
+
     # Relationships
     dataset = relationship("Dataset", back_populates="sequences")
 
     def to_dict(self) -> Dict[str, Any]:
         """
         Convert dataset sequence model to dictionary representation.
-        
+
         Returns:
             Dict[str, Any]: Dictionary containing all sequence attributes
         """
@@ -209,10 +224,10 @@ class DatasetSequence(Base):
 class Combination(Base):
     """
     Combination table model representing an algorithm-dataset-preset combination.
-    
+
     A combination defines a specific test case within a work, pairing a dataset
     with an algorithm configuration (preset) for execution.
-    
+
     Attributes:
         id: Auto-incremented primary key
         work_id: Foreign key to the parent work
@@ -227,35 +242,45 @@ class Combination(Base):
         started_at: Timestamp when execution started
         finished_at: Timestamp when execution finished
     """
-    
-    __tablename__ = 'combinations'
-    
+
+    __tablename__ = "combinations"
+
     id = Column(Integer, primary_key=True, nullable=False)
-    work_id = Column(String, ForeignKey('work.id', ondelete='CASCADE'), nullable=False)
+    work_id = Column(String, ForeignKey("work.id", ondelete="CASCADE"), nullable=False)
     task_id = Column(String, nullable=False)
     dataset_id = Column(String, nullable=False)  # Removed FK constraint for now
     preset_id = Column(String, nullable=False)
     algorithm_id = Column(String, nullable=False)
     mode = Column(String, nullable=False)
-    status = Column(String, CheckConstraint("status IN ('queued', 'running', 'paused', 'canceled', 'completed', 'failed', 'error')"), nullable=False)
+    status = Column(
+        String,
+        CheckConstraint(
+            "status IN ('queued', 'running', 'paused', 'canceled', 'completed', 'failed', 'error')"
+        ),
+        nullable=False,
+    )
     total_sequences = Column(Integer, nullable=False)
     created_at = Column(Float, nullable=False)
     started_at = Column(Float)
     finished_at = Column(Float)
-    
+
     # Constraints
     __table_args__ = (
-        UniqueConstraint('work_id', 'task_id', 'dataset_id', 'preset_id', 'algorithm_id'),
+        UniqueConstraint(
+            "work_id", "task_id", "dataset_id", "preset_id", "algorithm_id"
+        ),
     )
-    
+
     # Relationships
     work = relationship("Work", back_populates="combinations")
-    executions = relationship("Execution", back_populates="combination", cascade="all, delete-orphan")
+    executions = relationship(
+        "Execution", back_populates="combination", cascade="all, delete-orphan"
+    )
 
     def to_dict(self) -> Dict[str, Any]:
         """
         Convert combination model to dictionary representation.
-        
+
         Returns:
             Dict[str, Any]: Dictionary containing all combination attributes
         """
@@ -278,10 +303,10 @@ class Combination(Base):
 class Execution(Base):
     """
     Execution table model representing a single algorithm execution.
-    
+
     An execution represents the processing of one sequence by one algorithm
     configuration, containing the parameters used and results obtained.
-    
+
     Attributes:
         id: Auto-incremented primary key
         unit_id: Unique identifier for the execution unit
@@ -294,33 +319,45 @@ class Execution(Base):
         result_json: Results obtained from execution
         objective: Objective function value
     """
-    
-    __tablename__ = 'executions'
-    
+
+    __tablename__ = "executions"
+
     id = Column(Integer, primary_key=True, nullable=False)
     unit_id = Column(String, nullable=False)
-    combination_id = Column(Integer, ForeignKey('combinations.id', ondelete='CASCADE'), nullable=False)
+    combination_id = Column(
+        Integer, ForeignKey("combinations.id", ondelete="CASCADE"), nullable=False
+    )
     sequencia = Column(Integer, nullable=False)
-    status = Column(String, CheckConstraint("status IN ('queued', 'running', 'paused', 'canceled', 'completed', 'failed', 'error')"), nullable=False)
+    status = Column(
+        String,
+        CheckConstraint(
+            "status IN ('queued', 'running', 'paused', 'canceled', 'completed', 'failed', 'error')"
+        ),
+        nullable=False,
+    )
     started_at = Column(Float)
     finished_at = Column(Float)
     params_json = Column(JSONType, default=dict)
     result_json = Column(JSONType, default=dict)
     objective = Column(Float)
-    
+
     # Constraints
     __table_args__ = (
-        UniqueConstraint('unit_id', 'combination_id', name='unique_unit_per_combination'),
+        UniqueConstraint(
+            "unit_id", "combination_id", name="unique_unit_per_combination"
+        ),
     )
-    
+
     # Relationships
     combination = relationship("Combination", back_populates="executions")
-    progress = relationship("ExecutionProgress", back_populates="execution", cascade="all, delete-orphan")
+    progress = relationship(
+        "ExecutionProgress", back_populates="execution", cascade="all, delete-orphan"
+    )
 
     def to_dict(self) -> Dict[str, Any]:
         """
         Convert execution model to dictionary representation.
-        
+
         Returns:
             Dict[str, Any]: Dictionary containing all execution attributes
         """
@@ -341,10 +378,10 @@ class Execution(Base):
 class ExecutionProgress(Base):
     """
     Execution progress table model for tracking algorithm execution progress.
-    
+
     This table stores progress updates during algorithm execution, allowing
     real-time monitoring of long-running operations.
-    
+
     Attributes:
         id: Auto-incremented primary key
         execution_id: Foreign key to the parent execution
@@ -352,22 +389,26 @@ class ExecutionProgress(Base):
         message: Progress message or description
         timestamp: Timestamp when progress was recorded
     """
-    
-    __tablename__ = 'execution_progress'
-    
+
+    __tablename__ = "execution_progress"
+
     id = Column(Integer, primary_key=True, nullable=False)
-    execution_id = Column(Integer, ForeignKey('executions.id', ondelete='CASCADE'), nullable=False)
-    progress = Column(Float, CheckConstraint("progress >= 0.0 AND progress <= 1.0"), nullable=False)
+    execution_id = Column(
+        Integer, ForeignKey("executions.id", ondelete="CASCADE"), nullable=False
+    )
+    progress = Column(
+        Float, CheckConstraint("progress >= 0.0 AND progress <= 1.0"), nullable=False
+    )
     message = Column(Text, nullable=False)
     timestamp = Column(Float, nullable=False)
-    
+
     # Relationships
     execution = relationship("Execution", back_populates="progress")
 
     def to_dict(self) -> Dict[str, Any]:
         """
         Convert execution progress model to dictionary representation.
-        
+
         Returns:
             Dict[str, Any]: Dictionary containing all progress attributes
         """
@@ -383,10 +424,10 @@ class ExecutionProgress(Base):
 class Event(Base):
     """
     Event table model for logging system events and errors.
-    
+
     Events provide audit trail and debugging information for work execution,
     capturing errors, progress updates, and other significant occurrences.
-    
+
     Attributes:
         id: Auto-incremented primary key
         work_id: Foreign key to the parent work
@@ -395,23 +436,33 @@ class Event(Base):
         entity_data_json: JSON data about the event entity
         timestamp: Timestamp when event occurred
     """
-    
-    __tablename__ = 'events'
-    
+
+    __tablename__ = "events"
+
     id = Column(Integer, primary_key=True, nullable=False)
-    work_id = Column(String, ForeignKey('work.id', ondelete='CASCADE'), nullable=False)
-    event_type = Column(String, CheckConstraint("event_type IN ('error', 'progress', 'warning')"), nullable=False)
-    event_category = Column(String, CheckConstraint("event_category IN ('work', 'task', 'dataset', 'preset', 'combination', 'unit', 'algorithm', 'other')"), nullable=False)
+    work_id = Column(String, ForeignKey("work.id", ondelete="CASCADE"), nullable=False)
+    event_type = Column(
+        String,
+        CheckConstraint("event_type IN ('error', 'progress', 'warning')"),
+        nullable=False,
+    )
+    event_category = Column(
+        String,
+        CheckConstraint(
+            "event_category IN ('work', 'task', 'dataset', 'preset', 'combination', 'unit', 'algorithm', 'other')"
+        ),
+        nullable=False,
+    )
     entity_data_json = Column(JSONType, default=dict, nullable=False)
     timestamp = Column(Float, nullable=False, default=time.time)
-    
+
     # Relationships
     work = relationship("Work", back_populates="events")
 
     def to_dict(self) -> Dict[str, Any]:
         """
         Convert event model to dictionary representation.
-        
+
         Returns:
             Dict[str, Any]: Dictionary containing all event attributes
         """

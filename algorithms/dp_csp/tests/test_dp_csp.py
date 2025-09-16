@@ -112,6 +112,6 @@ def test_dp_csp_matches_baseline_distance_small():
     dp = build_dp(strings, alphabet, search_strategy="binary")
     dp_res = dp.run()
     assert dp_res["success"] is True
-    assert (
-        dp_res["max_distance"] <= b_res["max_distance"]
-    ), "DP exato não deve ser pior que baseline"
+    assert dp_res["max_distance"] <= b_res["max_distance"], (
+        "DP exato não deve ser pior que baseline"
+    )

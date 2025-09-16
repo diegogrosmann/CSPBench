@@ -14,10 +14,10 @@ from pydantic import BaseModel, Field, field_validator
 
 class BatchExecutionRequest(BaseModel):
     """Request model for batch execution.
-    
+
     This model handles requests to execute batch configurations with
     proper validation of file paths and monitoring options.
-    
+
     Attributes:
         batch_file (str): Relative path to batch YAML file in batches/ directory.
         monitor_type (str): Type of monitoring ('none', 'log', 'websocket').
@@ -34,16 +34,16 @@ class BatchExecutionRequest(BaseModel):
     @classmethod
     def validate_batch_file(cls, v: str):
         """Validate batch file path.
-        
+
         Ensures the batch file path is safe and points to a valid
         YAML configuration file within the allowed directory structure.
-        
+
         Args:
             v (str): Batch file path to validate.
-            
+
         Returns:
             str: Validated and sanitized file path.
-            
+
         Raises:
             ValueError: If path is empty, contains unsafe patterns, or wrong extension.
         """
@@ -63,16 +63,16 @@ class BatchExecutionRequest(BaseModel):
     @classmethod
     def validate_monitor_type(cls, v: str):
         """Validate monitor type.
-        
+
         Ensures the monitoring type is one of the supported options
         for batch execution tracking.
-        
+
         Args:
             v (str): Monitor type to validate.
-            
+
         Returns:
             str: Validated monitor type.
-            
+
         Raises:
             ValueError: If monitor type is not in the allowed list.
         """
@@ -84,10 +84,10 @@ class BatchExecutionRequest(BaseModel):
 
 class BatchExecutionResponse(BaseModel):
     """Response model for batch execution submission.
-    
+
     This model provides information about a successfully submitted
     batch execution including tracking details and output location.
-    
+
     Attributes:
         work_id (str): Unique identifier for tracking this execution.
         status (str): Initial execution status after submission.
@@ -107,10 +107,10 @@ class BatchExecutionResponse(BaseModel):
 
 class BatchStatusResponse(BaseModel):
     """Response model for batch execution status.
-    
+
     This model provides current status information for batch executions
     including progress, timing, and error information.
-    
+
     Attributes:
         work_id (str): Unique identifier for this execution.
         status (str): Current execution status.
@@ -136,10 +136,10 @@ class BatchStatusResponse(BaseModel):
 
 class BatchResultsResponse(BaseModel):
     """Response model for batch execution results.
-    
+
     This model provides comprehensive information about completed
     batch executions including output files and execution statistics.
-    
+
     Attributes:
         work_id (str): Unique identifier for this execution.
         status (str): Final execution status.
@@ -165,10 +165,10 @@ class BatchResultsResponse(BaseModel):
 
 class BatchControlResponse(BaseModel):
     """Response model for batch control operations (cancel, pause, restart).
-    
+
     This model provides feedback for control operations performed on
     batch executions such as cancellation, pausing, or restarting.
-    
+
     Attributes:
         work_id (str): Unique identifier for the affected execution.
         operation (str): Type of control operation performed.
@@ -186,10 +186,10 @@ class BatchControlResponse(BaseModel):
 
 class BatchListResponse(BaseModel):
     """Response model for listing batch executions.
-    
+
     This model provides a paginated list of batch executions with
     filtering and total count information.
-    
+
     Attributes:
         executions (List[BatchStatusResponse]): List of batch execution statuses.
         total (int): Total number of executions in the system.
@@ -205,10 +205,10 @@ class BatchListResponse(BaseModel):
 
 class BatchProgressUpdate(BaseModel):
     """Model for real-time progress updates via WebSocket.
-    
+
     This model represents real-time progress updates sent through
     WebSocket connections to provide live execution monitoring.
-    
+
     Attributes:
         work_id (str): Unique identifier for the execution being updated.
         timestamp (datetime): When this progress update was generated.

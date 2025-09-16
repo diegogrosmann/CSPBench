@@ -9,14 +9,14 @@ functionality across all interfaces.
 Interface Components:
     - CLI (Command Line Interface): Optimized for automated scripts, CI/CD pipelines,
       and batch processing scenarios with comprehensive argument parsing
-    - TUI (Terminal User Interface): Interactive terminal-based interface for 
+    - TUI (Terminal User Interface): Interactive terminal-based interface for
       developers and researchers who prefer console-based workflows
     - Web Interface: Modern, responsive web-based UI with real-time monitoring,
       WebSocket support, and comprehensive visualization capabilities
 
 Architecture Principles:
     The presentation layer follows hexagonal architecture principles:
-    
+
     - Controllers: Handle user input validation and coordinate with application services
     - Views: Render data presentation and manage user interface state transitions
     - Routes: Define web endpoints, request/response handling, and API documentation
@@ -45,17 +45,17 @@ Development Status:
 
 Example Usage:
     Web Interface::
-    
+
         from src.presentation.web.app import app
         import uvicorn
-        
+
         # Start development server
         uvicorn.run(app, host="0.0.0.0", port=8000, reload=True)
-        
+
     CLI Interface (planned)::
-    
+
         from src.presentation.cli import CLIApplication
-        
+
         cli = CLIApplication()
         cli.run(['benchmark', '--config', 'batch.yaml'])
 
@@ -74,6 +74,6 @@ Future Enhancements:
 __all__ = [
     # Will be populated as components are implemented
     # "CLIApplication",
-    # "TUIApplication", 
+    # "TUIApplication",
     # "WebApplication"
 ]

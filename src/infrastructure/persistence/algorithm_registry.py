@@ -13,7 +13,7 @@ from src.domain.errors import AlgorithmNotFoundError, AlgorithmRegistrationError
 class DomainAlgorithmRegistry:
     """
     Algorithm registry based on the global domain registry.
-    
+
     This class provides a registry for CSP algorithms, allowing registration,
     retrieval, and management of algorithm implementations. It uses the global
     domain registry as the underlying storage mechanism.
@@ -22,10 +22,10 @@ class DomainAlgorithmRegistry:
     def register_algorithm(self, algorithm_class: Type[CSPAlgorithm]) -> None:
         """
         Register an algorithm class in the registry.
-        
+
         Args:
             algorithm_class: CSPAlgorithm subclass to register
-            
+
         Raises:
             AlgorithmRegistrationError: If the class doesn't inherit from CSPAlgorithm
         """
@@ -41,13 +41,13 @@ class DomainAlgorithmRegistry:
     def get_algorithm(self, name: str) -> Type[CSPAlgorithm]:
         """
         Get algorithm class by name.
-        
+
         Args:
             name: Name of the algorithm to retrieve
-            
+
         Returns:
             Type[CSPAlgorithm]: The algorithm class
-            
+
         Raises:
             AlgorithmNotFoundError: If algorithm is not found
         """
@@ -59,7 +59,7 @@ class DomainAlgorithmRegistry:
     def list_algorithms(self) -> List[str]:
         """
         List all available algorithm names.
-        
+
         Returns:
             List[str]: List of registered algorithm names
         """
@@ -68,10 +68,10 @@ class DomainAlgorithmRegistry:
     def algorithm_exists(self, name: str) -> bool:
         """
         Check if an algorithm is registered.
-        
+
         Args:
             name: Name of the algorithm to check
-            
+
         Returns:
             bool: True if algorithm exists, False otherwise
         """
@@ -80,13 +80,13 @@ class DomainAlgorithmRegistry:
     def get_algorithm_metadata(self, name: str) -> Dict[str, Any]:
         """
         Get metadata information about an algorithm.
-        
+
         Args:
             name: Name of the algorithm
-            
+
         Returns:
             Dict[str, Any]: Dictionary containing algorithm metadata
-            
+
         Raises:
             AlgorithmNotFoundError: If algorithm is not found
         """
@@ -105,11 +105,11 @@ class DomainAlgorithmRegistry:
     def register(self, name: str, algorithm_class: Type[CSPAlgorithm]) -> None:
         """
         Register an algorithm with a custom name (legacy method).
-        
+
         Args:
             name: Custom name for the algorithm
             algorithm_class: CSPAlgorithm subclass to register
-            
+
         Raises:
             AlgorithmRegistrationError: If the class doesn't inherit from CSPAlgorithm
         """
@@ -123,10 +123,10 @@ class DomainAlgorithmRegistry:
     def get(self, name: str) -> Type[CSPAlgorithm]:
         """
         Get algorithm class by name (legacy method).
-        
+
         Args:
             name: Name of the algorithm to retrieve
-            
+
         Returns:
             Type[CSPAlgorithm]: The algorithm class
         """
@@ -135,7 +135,7 @@ class DomainAlgorithmRegistry:
     def list_available(self) -> List[str]:
         """
         List available algorithms.
-        
+
         Returns:
             List[str]: List of registered algorithm names
         """
@@ -144,10 +144,10 @@ class DomainAlgorithmRegistry:
     def exists(self, name: str) -> bool:
         """
         Check if algorithm exists.
-        
+
         Args:
             name: Name of the algorithm to check
-            
+
         Returns:
             bool: True if algorithm exists, False otherwise
         """
@@ -156,13 +156,13 @@ class DomainAlgorithmRegistry:
     def get_info(self, name: str) -> Dict[str, Any]:
         """
         Get detailed information about an algorithm.
-        
+
         Args:
             name: Name of the algorithm
-            
+
         Returns:
             Dict[str, Any]: Dictionary containing algorithm information
-            
+
         Raises:
             AlgorithmNotFoundError: If algorithm is not found
         """
@@ -186,13 +186,13 @@ class DomainAlgorithmRegistry:
     ) -> CSPAlgorithm:
         """
         Create an instance of the specified algorithm.
-        
+
         Args:
             name: Name of the algorithm to instantiate
             strings: List of strings for the algorithm
             alphabet: Alphabet to use
             **params: Additional parameters for the algorithm
-            
+
         Returns:
             CSPAlgorithm: Configured algorithm instance
         """

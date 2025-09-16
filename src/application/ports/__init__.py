@@ -9,7 +9,7 @@ concerns.
 Key Interfaces:
     - AlgorithmRegistry: Algorithm management and discovery
     - ExportPort: Result export and formatting
-    - ExecutorPort: Execution orchestration  
+    - ExecutorPort: Execution orchestration
     - ExecutorInterface: Execution control interface
 
 These interfaces allow the application layer to remain independent
@@ -22,7 +22,7 @@ modules (application layer) don't depend on low-level modules
 
 Example:
     Using ports for dependency injection:
-    
+
     >>> from src.application.ports import AlgorithmRegistry
     >>> def service_function(registry: AlgorithmRegistry):
     ...     algorithms = registry.list_algorithms()

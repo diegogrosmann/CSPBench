@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import logging
 from concurrent.futures import ProcessPoolExecutor
-from pathlib import Path
 from typing import Any, Optional
 
 try:
@@ -55,7 +54,7 @@ def _trial_worker(
     work_id: str | None = None,
 ) -> tuple[dict[str, Any], str]:
     """Function executed in subprocess for an optimization trial (needs to be picklable).
-    
+
     Args:
         optimization_unit_id: Unique identifier for this optimization unit
         trial_number: Trial sequence number
@@ -69,7 +68,7 @@ def _trial_worker(
         algorithm_name: Name of algorithm to execute
         cpu_config: CPU configuration for worker process
         work_id: Work identifier for status checking
-        
+
     Returns:
         Tuple of (trial_result_dict, optimization_unit_id)
     """
@@ -83,9 +82,6 @@ def _trial_worker(
     )
     from src.infrastructure.persistence.work_state.core import (  # local import
         WorkPersistence,
-    )
-    from src.infrastructure.persistence.work_state.wrappers.execution_scoped import (
-        ExecutionScopedPersistence,
     )
     from src.infrastructure.persistence.work_state.wrappers.work_scoped import (
         WorkScopedPersistence,
@@ -215,12 +211,12 @@ class OptimizationExecutor(AbstractExecutionEngine):
         alg: AlgParams,
     ) -> BaseStatus:
         """Execute optimization using Optuna.
-        
+
         Args:
             task: Optimization task configuration
             dataset_obj: Dataset to optimize on
             alg: Algorithm parameters configuration
-            
+
         Returns:
             Final execution status
         """
@@ -259,7 +255,9 @@ class OptimizationExecutor(AbstractExecutionEngine):
 
             logger.info(f"Optuna study created: {study_name}")
 
-            logger.info(f"Starting optimization: {trials} trials, direction: {direction}")
+            logger.info(
+                f"Starting optimization: {trials} trials, direction: {direction}"
+            )
 
             try:
                 max_workers = self._execution_controller.get_worker_config()["cpu"][
@@ -334,12 +332,12 @@ class OptimizationExecutor(AbstractExecutionEngine):
         self, study_name: str, direction: str, config: dict
     ) -> Any:
         """Create an Optuna study with specified configuration.
-        
+
         Args:
             study_name: Name for the study
             direction: Optimization direction ('minimize' or 'maximize')
             config: Configuration dictionary with sampler/pruner settings
-            
+
         Returns:
             Configured Optuna study object
         """
@@ -409,11 +407,11 @@ class OptimizationExecutor(AbstractExecutionEngine):
         self, trial: Any, optimization_params: dict
     ) -> dict[str, Any]:
         """Generate trial parameters based on optimization configuration.
-        
+
         Args:
             trial: Optuna trial object
             optimization_params: Parameter space configuration
-            
+
         Returns:
             Generated parameters for this trial
         """
@@ -482,7 +480,7 @@ class OptimizationExecutor(AbstractExecutionEngine):
         max_workers,
     ) -> tuple[int, int]:
         """Execute optimization in parallel.
-        
+
         Args:
             study: Optuna study object
             task: Optimization task configuration
@@ -496,7 +494,7 @@ class OptimizationExecutor(AbstractExecutionEngine):
             base_params: Base algorithm parameters
             optimization_params: Optimization parameter configuration
             max_workers: Maximum number of worker processes
-            
+
         Returns:
             Tuple of (completed_trials, failed_trials)
         """
@@ -600,7 +598,7 @@ class OptimizationExecutor(AbstractExecutionEngine):
         optimization_params,
     ) -> tuple[int, int]:
         """Execute optimization sequentially.
-        
+
         Args:
             study: Optuna study object
             task: Optimization task configuration
@@ -613,7 +611,7 @@ class OptimizationExecutor(AbstractExecutionEngine):
             dataset_id: Dataset identifier
             base_params: Base algorithm parameters
             optimization_params: Optimization parameter configuration
-            
+
         Returns:
             Tuple of (completed_trials, failed_trials)
         """
@@ -706,7 +704,6 @@ class OptimizationExecutor(AbstractExecutionEngine):
             return None  # In-memory storage
 
         # For any storage value (True or string), save in work directory
-        from pathlib import Path
         from src.infrastructure.utils.path_utils import get_output_base_directory
 
         # Use current work's output directory (where results are stored)
@@ -728,7 +725,7 @@ class OptimizationExecutor(AbstractExecutionEngine):
 
     def _get_combination_info(self) -> dict[str, str]:
         """Get current combination information.
-        
+
         Returns:
             Dictionary with combination identifiers
         """
@@ -741,11 +738,11 @@ class OptimizationExecutor(AbstractExecutionEngine):
 
     def _create_study_name(self, task: Any, combination_info: dict[str, str]) -> str:
         """Create unique study name based on combination.
-        
+
         Args:
             task: Task configuration object
             combination_info: Dictionary with combination identifiers
-            
+
         Returns:
             Unique study name string
         """

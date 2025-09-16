@@ -37,7 +37,7 @@ from src.domain.errors import (
 class BatchMetadata:
     """
     Batch metadata configuration for legacy compatibility.
-    
+
     Attributes:
         nome (str): Batch name.
         descricao (str): Batch description.
@@ -47,7 +47,7 @@ class BatchMetadata:
         tags (List[str]): List of tags.
         timeout_global (Optional[int]): Global timeout in seconds.
     """
-    
+
     nome: str
     descricao: str
     autor: str
@@ -61,12 +61,12 @@ class BatchMetadata:
 class InfrastructureConfig:
     """
     Infrastructure configuration for legacy compatibility.
-    
+
     Attributes:
         history (Dict[str, Any]): History configuration.
         result (Dict[str, Any]): Result configuration.
     """
-    
+
     history: Dict[str, Any] = field(default_factory=dict)
     result: Dict[str, Any] = field(default_factory=dict)
 
@@ -75,13 +75,13 @@ class InfrastructureConfig:
 class ExportConfig:
     """
     Export configuration for legacy compatibility.
-    
+
     Attributes:
         enabled (bool): Whether export is enabled.
         destination (str): Export destination path.
         formats (Dict[str, Any]): Export format configuration.
     """
-    
+
     enabled: bool = True
     destination: str = "outputs"
     formats: Dict[str, Any] = field(default_factory=lambda: {"json": True})
@@ -91,13 +91,13 @@ class ExportConfig:
 class PlotsConfig:
     """
     Plots configuration for legacy compatibility.
-    
+
     Attributes:
         enabled (bool): Whether plotting is enabled.
         plot_convergence (bool): Whether to plot convergence.
         style (str): Plot style to use.
     """
-    
+
     enabled: bool = True
     plot_convergence: bool = True
     style: str = "seaborn-v0_8"
@@ -107,13 +107,13 @@ class PlotsConfig:
 class MonitoringConfig:
     """
     Monitoring configuration for legacy compatibility.
-    
+
     Attributes:
         enabled (bool): Whether monitoring is enabled.
         interface (str): Monitoring interface type.
         update_interval (int): Update interval in seconds.
     """
-    
+
     enabled: bool = True
     interface: str = "simple"
     update_interval: int = 5
@@ -123,12 +123,12 @@ class MonitoringConfig:
 class LoggingConfig:
     """
     Logging configuration for legacy compatibility.
-    
+
     Attributes:
         level (str): Logging level.
         output (Dict[str, Any]): Output configuration.
     """
-    
+
     level: str = "INFO"
     output: Dict[str, Any] = field(default_factory=lambda: {"console": True})
 
@@ -137,12 +137,12 @@ class LoggingConfig:
 class SystemConfig:
     """
     System configuration for legacy compatibility.
-    
+
     Attributes:
         reproducibility (Dict[str, Any]): Reproducibility settings.
         checkpointing (Dict[str, Any]): Checkpointing settings.
     """
-    
+
     reproducibility: Dict[str, Any] = field(
         default_factory=lambda: {"global_seed": None, "strict_mode": False}
     )
@@ -155,7 +155,7 @@ class SystemConfig:
 class OptimizationConfig:
     """
     Optimization configuration for legacy compatibility.
-    
+
     Attributes:
         nome (str): Optimization name.
         study_name (str): Study name.
@@ -166,7 +166,7 @@ class OptimizationConfig:
         target_algorithm (str): Target algorithm name.
         parameters (Dict[str, Any]): Optimization parameters.
     """
-    
+
     nome: str
     study_name: str
     direction: str
@@ -181,7 +181,7 @@ class OptimizationConfig:
 class SensitivityConfig:
     """
     Sensitivity analysis configuration for legacy compatibility.
-    
+
     Attributes:
         nome (str): Analysis name.
         analysis_method (str): Analysis method ("morris", "sobol", etc.).
@@ -192,7 +192,7 @@ class SensitivityConfig:
         parameters (Dict[str, Any]): Analysis parameters.
         output_metrics (List[str]): Output metrics to analyze.
     """
-    
+
     nome: str
     analysis_method: str
     target_datasets: List[str]
@@ -207,7 +207,7 @@ class SensitivityConfig:
 class BatchConfig:
     """
     Lightweight batch configuration container for ExperimentService compatibility.
-    
+
     Attributes:
         metadata: Batch metadata.
         task: Task configuration.
@@ -224,7 +224,7 @@ class BatchConfig:
         system (SystemConfig): System configuration.
         resources (Optional[Any]): Resource configuration.
     """
-    
+
     metadata: Any
     task: Any
     datasets: List[Any] = field(default_factory=list)
@@ -244,7 +244,7 @@ class BatchConfig:
 class ConfigurationParser:
     """
     Parser utility expected by unit tests.
-    
+
     Provides static methods for parsing various configuration file formats
     and extracting different configuration sections for legacy compatibility.
     """
@@ -253,16 +253,16 @@ class ConfigurationParser:
     def load_file(path: str | Path) -> Dict[str, Any]:
         """
         Load configuration from file.
-        
+
         Supports YAML and JSON formats with automatic format detection
         based on file extension.
-        
+
         Args:
             path (Union[str, Path]): Path to configuration file.
-            
+
         Returns:
             Dict[str, Any]: Parsed configuration data.
-            
+
         Raises:
             BatchConfigurationError: If file not found, unsupported format,
                                    or invalid structure.
@@ -289,13 +289,13 @@ class ConfigurationParser:
     def parse_metadata(config: Dict[str, Any]) -> BatchMetadata:
         """
         Extract batch metadata from configuration.
-        
+
         Args:
             config (Dict[str, Any]): Configuration dictionary.
-            
+
         Returns:
             BatchMetadata: Extracted metadata.
-            
+
         Raises:
             BatchConfigurationError: If metadata section not found.
         """
@@ -316,10 +316,10 @@ class ConfigurationParser:
     def parse_infrastructure_config(config: Dict[str, Any]) -> InfrastructureConfig:
         """
         Extract infrastructure configuration.
-        
+
         Args:
             config (Dict[str, Any]): Configuration dictionary.
-            
+
         Returns:
             InfrastructureConfig: Extracted infrastructure configuration.
         """
@@ -332,10 +332,10 @@ class ConfigurationParser:
     def parse_export_config(config: Dict[str, Any]) -> ExportConfig:
         """
         Extract export configuration.
-        
+
         Args:
             config (Dict[str, Any]): Configuration dictionary.
-            
+
         Returns:
             ExportConfig: Extracted export configuration.
         """
@@ -350,10 +350,10 @@ class ConfigurationParser:
     def parse_plots_config(config: Dict[str, Any]) -> PlotsConfig:
         """
         Extract plots configuration.
-        
+
         Args:
             config (Dict[str, Any]): Configuration dictionary.
-            
+
         Returns:
             PlotsConfig: Extracted plots configuration.
         """
@@ -368,10 +368,10 @@ class ConfigurationParser:
     def parse_monitoring_config(config: Dict[str, Any]) -> MonitoringConfig:
         """
         Extract monitoring configuration.
-        
+
         Args:
             config (Dict[str, Any]): Configuration dictionary.
-            
+
         Returns:
             MonitoringConfig: Extracted monitoring configuration.
         """
@@ -386,10 +386,10 @@ class ConfigurationParser:
     def parse_logging_config(config: Dict[str, Any]) -> LoggingConfig:
         """
         Extract logging configuration.
-        
+
         Args:
             config (Dict[str, Any]): Configuration dictionary.
-            
+
         Returns:
             LoggingConfig: Extracted logging configuration.
         """
@@ -403,10 +403,10 @@ class ConfigurationParser:
     def parse_system_config(config: Dict[str, Any]) -> SystemConfig:
         """
         Extract system configuration.
-        
+
         Args:
             config (Dict[str, Any]): Configuration dictionary.
-            
+
         Returns:
             SystemConfig: Extracted system configuration.
         """
@@ -424,10 +424,10 @@ class ConfigurationParser:
     def parse_resources_config(config: Dict[str, Any]) -> Dict[str, Any]:
         """
         Extract resources configuration.
-        
+
         Args:
             config (Dict[str, Any]): Configuration dictionary.
-            
+
         Returns:
             Dict[str, Any]: Resources configuration containing parallel settings.
         """
@@ -443,10 +443,10 @@ class ConfigurationParser:
     def parse_optimization_configs(config: Dict[str, Any]) -> List[OptimizationConfig]:
         """
         Extract optimization configurations.
-        
+
         Args:
             config (Dict[str, Any]): Configuration dictionary.
-            
+
         Returns:
             List[OptimizationConfig]: List of optimization configurations.
         """
@@ -472,10 +472,10 @@ class ConfigurationParser:
     def parse_sensitivity_configs(config: Dict[str, Any]) -> List[SensitivityConfig]:
         """
         Extract sensitivity analysis configurations.
-        
+
         Args:
             config (Dict[str, Any]): Configuration dictionary.
-            
+
         Returns:
             List[SensitivityConfig]: List of sensitivity configurations.
         """
@@ -503,10 +503,10 @@ class ConfigurationParser:
 class ConfigParser:
     """
     Simple configuration parser facade for ExperimentService compatibility.
-    
+
     Provides aliases to ConfigurationParser methods for backward compatibility.
     """
-    
+
     parse_config = staticmethod(ConfigurationParser.load_file)
     load_config = staticmethod(ConfigurationParser.load_file)
 
@@ -514,21 +514,21 @@ class ConfigParser:
 class ConfigurationValidator:
     """
     Configuration validation utilities for legacy compatibility.
-    
+
     Provides validation methods for different configuration types and structures.
     """
-    
+
     @staticmethod
     def validate_batch_structure(config: Dict[str, Any]) -> str:
         """
         Validate batch configuration structure and determine type.
-        
+
         Args:
             config (Dict[str, Any]): Configuration dictionary to validate.
-            
+
         Returns:
             str: Configuration type ('experiment', 'optimization', 'sensitivity').
-            
+
         Raises:
             BatchConfigurationError: If structure is invalid or unrecognized.
         """
@@ -553,10 +553,10 @@ class ConfigurationValidator:
     def validate_optimization_config(config: OptimizationConfig) -> None:
         """
         Validate optimization configuration.
-        
+
         Args:
             config (OptimizationConfig): Optimization configuration to validate.
-            
+
         Raises:
             OptimizationConfigurationError: If configuration is invalid.
         """
@@ -569,10 +569,10 @@ class ConfigurationValidator:
     def validate_sensitivity_config(config: SensitivityConfig) -> None:
         """
         Validate sensitivity analysis configuration.
-        
+
         Args:
             config (SensitivityConfig): Sensitivity configuration to validate.
-            
+
         Raises:
             SensitivityConfigurationError: If configuration is invalid.
         """

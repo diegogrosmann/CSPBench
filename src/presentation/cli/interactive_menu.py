@@ -1,7 +1,7 @@
 """Console interactive menu for selecting and executing batch files.
 
 This module provides an interactive terminal interface for selecting and executing
-CSPBench batch configuration files. It's separated from main.py to keep the 
+CSPBench batch configuration files. It's separated from main.py to keep the
 entrypoint slim and focused only on argument routing and bootstrapping.
 
 The module provides functionality to:
@@ -24,13 +24,13 @@ AppInvoker = Callable[[list[str]], None]
 
 def show_interactive_menu(app_invoke: AppInvoker) -> None:
     """Show interactive interface for batch file selection.
-    
+
     This function displays an interactive menu that allows users to:
     1. Browse available batch files in the configured directory
     2. View file descriptions extracted from comments
     3. Select and execute a batch file
     4. Access manual command options
-    
+
     Args:
         app_invoke: Callable that can invoke Typer app commands with arguments
     """
@@ -62,7 +62,7 @@ def show_interactive_menu(app_invoke: AppInvoker) -> None:
 
 def _show_commands_help(message: str) -> None:
     """Display help message with available commands when no batch files are found.
-    
+
     Args:
         message: Message to display before the commands list
     """
@@ -80,7 +80,7 @@ def _show_commands_help(message: str) -> None:
 
 def _display_batch_files(batch_files: List[Path]) -> None:
     """Display numbered list of available batch files with descriptions.
-    
+
     Args:
         batch_files: List of batch file paths to display
     """
@@ -95,13 +95,13 @@ def _display_batch_files(batch_files: List[Path]) -> None:
 
 def _extract_file_description(batch_file: Path) -> str:
     """Extract description from batch file comments.
-    
+
     Searches for the first meaningful comment line in the file that starts with '#'
     and doesn't contain separator characters like '='.
-    
+
     Args:
         batch_file: Path to the batch file to analyze
-        
+
     Returns:
         Description string extracted from comments, or default message
     """
@@ -131,12 +131,12 @@ def _display_manual_commands() -> None:
 
 def _get_user_selection(batch_files: List[Path]) -> Optional[Path]:
     """Get user selection from available batch files.
-    
+
     Prompts the user to select a batch file by number and validates the input.
-    
+
     Args:
         batch_files: List of available batch files
-        
+
     Returns:
         Selected batch file path, or None if user cancels or provides invalid input
     """

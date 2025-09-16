@@ -17,7 +17,7 @@ Features:
 
 Example:
     Basic usage of the work service:
-    
+
     >>> work_service = get_work_service()
     >>> work_id = work_service.execute(config)
     >>> status = work_service.get_status(work_id)
@@ -32,12 +32,12 @@ from typing import Optional
 from fastapi import FastAPI
 
 from src.application.work.work_manager import WorkManager
-from src.infrastructure.persistence.work_state.core import WorkPersistence
 
 # Global state
 _global_work_service: Optional[WorkManager] = None
 
 logger = logging.getLogger(__name__)
+
 
 def get_work_service() -> WorkManager:
     """
@@ -48,7 +48,7 @@ def get_work_service() -> WorkManager:
 
     Raises:
         RuntimeError: If WorkService not initialized.
-        
+
     Note:
         Auto-initializes if not already done for convenience.
     """
@@ -62,13 +62,13 @@ def get_work_service() -> WorkManager:
 def initialize_work_service() -> WorkManager:
     """
     Initialize the global WorkService with persistent storage.
-    
+
     Also pauses any running work items from previous sessions to prevent
     orphaned work items that cannot be controlled.
 
     Returns:
         WorkManager: Initialized WorkService instance.
-        
+
     Raises:
         RuntimeError: If WorkService initialization fails.
     """
@@ -80,7 +80,7 @@ def initialize_work_service() -> WorkManager:
 
     try:
         _global_work_service = WorkManager()
-        
+
         # Perform initialization cleanup and recovery
         init_summary = _global_work_service.initialize()
         logger.info(f"WorkManager initialization completed: {init_summary}")
@@ -96,7 +96,7 @@ def initialize_work_service() -> WorkManager:
 def cleanup_work_service() -> None:
     """
     Cleanup the global WorkService and close connections.
-    
+
     Properly closes repository connections and resets global state.
     Should be called during application shutdown.
     """
@@ -121,10 +121,10 @@ async def work_service_lifespan(app: FastAPI):
 
     Initializes WorkService on startup and cleans up on shutdown.
     Provides proper resource management for FastAPI applications.
-    
+
     Args:
         app (FastAPI): FastAPI application instance.
-        
+
     Yields:
         None: Application runs between startup and shutdown.
     """
@@ -146,10 +146,10 @@ async def work_service_lifespan(app: FastAPI):
 def get_work_status(work_id: str):
     """
     Get work status from the global WorkService.
-    
+
     Args:
         work_id (str): Unique work identifier.
-        
+
     Returns:
         Optional[str]: Current work status, None if not found.
     """
@@ -159,10 +159,10 @@ def get_work_status(work_id: str):
 def get_work_details(work_id: str):
     """
     Get work details from the global WorkService.
-    
+
     Args:
         work_id (str): Unique work identifier.
-        
+
     Returns:
         Optional[WorkItem]: Work item instance, None if not found.
     """
@@ -172,7 +172,7 @@ def get_work_details(work_id: str):
 def list_all_work():
     """
     List all work items from the global WorkService.
-    
+
     Returns:
         List[WorkItem]: List of all work items as WorkItem instances.
     """
@@ -182,11 +182,11 @@ def list_all_work():
 def control_work(work_id: str, action: str) -> bool:
     """
     Control work execution (pause, cancel, restart).
-    
+
     Args:
         work_id (str): Unique work identifier.
         action (str): Control action ('pause', 'cancel', 'restart').
-        
+
     Returns:
         bool: True if action successful, False otherwise.
     """

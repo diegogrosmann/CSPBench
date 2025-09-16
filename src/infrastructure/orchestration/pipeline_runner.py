@@ -24,7 +24,6 @@ from src.infrastructure.execution_control import (
 from src.infrastructure.logging_config import get_logger
 from src.infrastructure.persistence.work_state import (
     WorkScopedPersistence,
-    WorkPersistence,
 )
 from src.infrastructure.persistence.work_state.wrappers.combination_scoped import (
     CombinationScopedPersistence,
@@ -40,10 +39,10 @@ logger = get_logger("CSPBench.PipelineRunner")
 
 class PipelineRunner:
     """Main pipeline runner with support for pause/cancel/resume operations."""
-    
+
     def __init__(self, work_store: WorkScopedPersistence):
         """Initialize pipeline runner.
-        
+
         Args:
             work_store: Work-scoped persistence wrapper
         """
@@ -57,7 +56,7 @@ class PipelineRunner:
 
     def run(self, config: CSPBenchConfig) -> None:
         """Execute the pipeline following the new reorganized flow.
-        
+
         Args:
             config: Complete CSPBench configuration
         """
@@ -102,9 +101,11 @@ class PipelineRunner:
 
             # Check if work was paused or canceled during execution
             current_work_status = self.work_store.get_work_status()
-            
+
             if current_work_status in [BaseStatus.PAUSED, BaseStatus.CANCELED]:
-                logger.info(f"Pipeline was {current_work_status.lower()} during execution")
+                logger.info(
+                    f"Pipeline was {current_work_status.lower()} during execution"
+                )
                 # Don't update status - keep as is (paused/canceled)
                 self.final_status_to_set = None
             elif status == BaseStatus.RUNNING:
@@ -131,15 +132,23 @@ class PipelineRunner:
             # Cleanup execution controller
             if self.execution_controller:
                 self.execution_controller.cleanup()
-            
+
             # Check if final export should be done (before updating final status)
             final_work_status = self.work_store.get_work_status()
-            should_export = final_work_status in [BaseStatus.COMPLETED, BaseStatus.ERROR, BaseStatus.FAILED]
-            
+            should_export = final_work_status in [
+                BaseStatus.COMPLETED,
+                BaseStatus.ERROR,
+                BaseStatus.FAILED,
+            ]
+
             # If we have a pending status to set, also check if it requires export
-            if hasattr(self, 'final_status_to_set') and self.final_status_to_set:
-                should_export = should_export or self.final_status_to_set in [BaseStatus.COMPLETED, BaseStatus.ERROR, BaseStatus.FAILED]
-            
+            if hasattr(self, "final_status_to_set") and self.final_status_to_set:
+                should_export = should_export or self.final_status_to_set in [
+                    BaseStatus.COMPLETED,
+                    BaseStatus.ERROR,
+                    BaseStatus.FAILED,
+                ]
+
             if should_export:
                 logger.info(f"Starting final export (status: {final_work_status})")
                 # Finalization export (raw db + manifest + full_results + summary)
@@ -164,7 +173,7 @@ class PipelineRunner:
                         base = os.environ.get("OUTPUT_BASE_DIRECTORY", "./data/outputs")
                         output_dir = Path(base) / self.work_id
                     output_dir.mkdir(parents=True, exist_ok=True)
-                    
+
                     # Use WorkScopedPersistence instead of accessing db_path
                     cfg = FinalizationConfig(
                         work_id=self.work_id,
@@ -177,15 +186,15 @@ class PipelineRunner:
                     logger.error(f"Error during export finalization: {fe}")
             else:
                 logger.info(f"Final export skipped due to status: {final_work_status}")
-                
+
             # Now update the final status after export is complete
-            if hasattr(self, 'final_status_to_set') and self.final_status_to_set:
+            if hasattr(self, "final_status_to_set") and self.final_status_to_set:
                 logger.info(f"Setting final work status to: {self.final_status_to_set}")
                 self.work_store.update_work_status(self.final_status_to_set)
 
     def _generate_all_datasets(self, config: CSPBenchConfig) -> None:
         """Phase 1: Generate all necessary datasets.
-        
+
         Args:
             config: CSPBench configuration containing dataset definitions
         """
@@ -209,7 +218,6 @@ class PipelineRunner:
 
         # Process each used dataset
         for dataset_id in sorted(used_dataset_ids):
-
             logger.info(f"Processing dataset: {dataset_id}")
 
             try:
@@ -225,7 +233,7 @@ class PipelineRunner:
 
     def _generate_pipeline_combinations(self, config: CSPBenchConfig) -> None:
         """Phase 2: Generate all possible pipeline combinations.
-        
+
         Args:
             config: CSPBench configuration containing tasks and algorithms
         """
@@ -256,7 +264,6 @@ class PipelineRunner:
 
                 # task.datasets is now List[str] containing dataset IDs
                 for dataset_id in task.datasets:
-
                     # task.algorithms is now List[str] containing algorithm preset IDs
                     for preset_id in task.algorithms:
                         # Get preset from config.algorithms dictionary
@@ -295,10 +302,10 @@ class PipelineRunner:
 
     def _execute_combinations(self, config: CSPBenchConfig) -> BaseStatus:
         """Phase 3: Execute all pending combinations.
-        
+
         Args:
             config: CSPBench configuration
-            
+
         Returns:
             Final execution status
         """
@@ -358,12 +365,12 @@ class PipelineRunner:
         work_combination: CombinationScopedPersistence,
     ) -> BaseStatus:
         """Execute a single combination.
-        
+
         Args:
             combination: Combination data dictionary
             config: CSPBench configuration
             work_combination: Combination-scoped persistence wrapper
-            
+
         Returns:
             Execution status for this combination
         """
@@ -418,19 +425,18 @@ class PipelineRunner:
         self, work_combination, task, alg, dataset_obj, config
     ) -> BaseStatus:
         """Execute a single algorithm with proper result capture.
-        
+
         Args:
             work_combination: Combination-scoped persistence wrapper
             task: Task configuration object
             alg: Algorithm parameters object
             dataset_obj: Dataset object to process
             config: Complete CSPBench configuration
-            
+
         Returns:
             Algorithm execution status
         """
         try:
-
             engine: ExecutionEngine = self._get_executor(work_combination, config, task)
 
             result_status = engine.run(
@@ -448,23 +454,18 @@ class PipelineRunner:
 
     def _process_dataset(self, dataset_config) -> None:
         """Process a dataset (cache or generate new).
-        
+
         Args:
             dataset_config: Dataset configuration object
         """
         dataset_id = getattr(dataset_config, "id", None)
 
         # Check cache first
-        if (
-            self.work_store
-            and dataset_id
-        ):
+        if self.work_store and dataset_id:
             try:
                 dataset_obj = self.work_store.get_dataset(dataset_id)
                 if dataset_obj is None or not dataset_obj.sequences:
-                    logger.warning(
-                        f"Dataset {dataset_id} found in cache but is empty"
-                    )
+                    logger.warning(f"Dataset {dataset_id} found in cache but is empty")
                 else:
                     self.datasets_cache[dataset_id] = dataset_obj
                     return
@@ -496,11 +497,11 @@ class PipelineRunner:
 
     def _find_task(self, config: CSPBenchConfig, task_id: str):
         """Find a task by ID.
-        
+
         Args:
             config: CSPBench configuration
             task_id: Task identifier to find
-            
+
         Returns:
             Task object or None if not found
         """
@@ -513,12 +514,12 @@ class PipelineRunner:
         self, config: CSPBenchConfig, preset_id: str, algorithm_id: str
     ):
         """Find an algorithm within a preset using the new structure.
-        
+
         Args:
             config: CSPBench configuration
             preset_id: Algorithm preset identifier
             algorithm_id: Algorithm identifier within the preset
-            
+
         Returns:
             Algorithm object or None if not found
         """
@@ -533,12 +534,12 @@ class PipelineRunner:
 
     def _get_executor(self, work_combination, batch_config, task) -> ExecutionEngine:
         """Factory method to get appropriate execution engine based on task type.
-        
+
         Args:
             work_combination: Combination-scoped persistence wrapper
             batch_config: Batch configuration object
             task: Task configuration object
-            
+
         Returns:
             Appropriate execution engine instance
         """
@@ -565,31 +566,35 @@ class PipelineRunner:
 
     def _wait_for_all_executions_to_complete(self, max_wait_time: int = 60) -> None:
         """Wait for all executions in progress to finish before finalizing pipeline.
-        
+
         Args:
             max_wait_time: Maximum wait time in seconds
         """
         logger.info("Checking executions in progress...")
-        
+
         start_time = time.time()
         check_interval = 2.0  # Check every 2 seconds
-        
+
         while time.time() - start_time < max_wait_time:
             # Search for executions still in progress
             running_executions = self.work_store.get_running_executions()
-            
+
             if not running_executions:
                 logger.info("All executions have been completed")
                 return
-                
-            logger.info(f"Waiting for {len(running_executions)} executions in progress to complete...")
-            
+
+            logger.info(
+                f"Waiting for {len(running_executions)} executions in progress to complete..."
+            )
+
             # Log running executions for debug
             for execution in running_executions[:5]:  # Show only first 5
-                logger.debug(f"Execution in progress: {execution.get('unit_id', 'unknown')}")
-            
+                logger.debug(
+                    f"Execution in progress: {execution.get('unit_id', 'unknown')}"
+                )
+
             time.sleep(check_interval)
-        
+
         # If we got here, timeout was reached
         remaining_executions = self.work_store.get_running_executions()
         if remaining_executions:
@@ -597,19 +602,21 @@ class PipelineRunner:
                 f"Timeout reached waiting for {len(remaining_executions)} executions to complete. "
                 f"Some executions may be left in inconsistent state."
             )
-            
+
             # Force timeout on pending executions
             for execution in remaining_executions:
                 try:
-                    execution_id = execution.get('id')
-                    unit_id = execution.get('unit_id', 'unknown')
+                    execution_id = execution.get("id")
+                    unit_id = execution.get("unit_id", "unknown")
                     logger.warning(f"Forcing timeout for execution: {unit_id}")
-                    
+
                     # Use execution_scoped to update status
                     execution_store = self.work_store.for_execution(unit_id)
                     execution_store.update_execution_status(
                         status=BaseStatus.FAILED.value,
-                        result={"error": "Execution timeout during pipeline finalization"},
+                        result={
+                            "error": "Execution timeout during pipeline finalization"
+                        },
                     )
                 except Exception as e:
                     logger.error(f"Error forcing timeout on execution {unit_id}: {e}")

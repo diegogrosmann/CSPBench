@@ -166,7 +166,7 @@ def _exhaustive_block(
     out: list[str] = []
     seen_out: set[str] = set()
     expected_length = r - l
-    
+
     for d, s in candidates:
         # Ensure candidate has correct length
         if len(s) != expected_length:
@@ -174,9 +174,9 @@ def _exhaustive_block(
                 s = s[:expected_length]
             else:
                 # Pad with last character or use first character from alphabet
-                pad_char = s[-1] if s else (alphabet[0] if alphabet else 'A')
+                pad_char = s[-1] if s else (alphabet[0] if alphabet else "A")
                 s = s.ljust(expected_length, pad_char)
-        
+
         if s not in seen_out:
             out.append(s)
             seen_out.add(s)
@@ -218,7 +218,7 @@ def _beam_search_block(
     segs = [s[l:r] for s in strings]
     finals: list[tuple[int, str]] = []
     expected_length = r - l
-    
+
     for cand in beam:
         # Ensure candidate has correct length
         if len(cand) != expected_length:
@@ -226,9 +226,9 @@ def _beam_search_block(
                 cand = cand[:expected_length]
             else:
                 # Pad with last character or use first character from alphabet
-                pad_char = cand[-1] if cand else (alphabet[0] if alphabet else 'A')
+                pad_char = cand[-1] if cand else (alphabet[0] if alphabet else "A")
                 cand = cand.ljust(expected_length, pad_char)
-        
+
         d = max(distance_fn(cand, seg) for seg in segs)
         finals.append((d, cand))
     finals.sort(key=lambda x: x[0])
@@ -240,7 +240,7 @@ def _fuse_blocks(
 ) -> str:
     if len(selected) != len(blocks):
         raise ValueError("Selected candidates count mismatch blocks count")
-    
+
     # Validate each candidate has the correct length for its block
     corrected_candidates = []
     for i, (candidate, (start, end)) in enumerate(zip(selected, blocks)):
@@ -255,15 +255,15 @@ def _fuse_blocks(
                 if candidate:
                     pad_char = candidate[-1]
                 else:
-                    pad_char = 'A'  # Default fallback character
+                    pad_char = "A"  # Default fallback character
                 corrected_candidate = candidate.ljust(expected_length, pad_char)
-            
+
             corrected_candidates.append(corrected_candidate)
         else:
             corrected_candidates.append(candidate)
-    
+
     fused = "".join(corrected_candidates)
-    
+
     # Final validation and correction if needed
     if len(fused) != total_length:
         if len(fused) > total_length:
@@ -271,9 +271,9 @@ def _fuse_blocks(
             fused = fused[:total_length]
         else:
             # Pad to correct length with last character or 'A'
-            pad_char = fused[-1] if fused else 'A'
+            pad_char = fused[-1] if fused else "A"
             fused = fused.ljust(total_length, pad_char)
-    
+
     return fused
 
 
@@ -485,7 +485,7 @@ class H2CSPAlgorithm(CSPAlgorithm):
         if not cands:
             cands = [seg_consensus]
             tech += "+fallback"
-        
+
         # Final validation: ensure all candidates have correct length
         expected_length = r - l
         validated_cands = []
@@ -498,12 +498,12 @@ class H2CSPAlgorithm(CSPAlgorithm):
                     if cand:
                         pad_char = cand[-1]
                     elif seg_consensus:
-                        pad_char = seg_consensus[0] if seg_consensus else 'A'
+                        pad_char = seg_consensus[0] if seg_consensus else "A"
                     else:
-                        pad_char = self.alphabet[0] if self.alphabet else 'A'
+                        pad_char = self.alphabet[0] if self.alphabet else "A"
                     cand = cand.ljust(expected_length, pad_char)
             validated_cands.append(cand)
-        
+
         return validated_cands, tech
 
     # ------------------------- global refinement ------------------------

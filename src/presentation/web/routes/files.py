@@ -24,16 +24,16 @@ router = APIRouter(tags=["files"])
 
 def format_file_size(size_bytes: int) -> str:
     """Format file size in human readable format.
-    
+
     Converts byte values to human-readable format with appropriate
     units (B, KB, MB, GB) for display purposes.
-    
+
     Args:
         size_bytes (int): File size in bytes.
-        
+
     Returns:
         str: Human-readable file size with units.
-        
+
     Example:
         >>> format_file_size(1024)
         "1.0 KB"
@@ -61,19 +61,19 @@ router = APIRouter()
 @router.get("/api/files/download")
 async def download_file(path: str):
     """Download a specific file with security validation.
-    
+
     Provides secure file download with path validation to prevent
     directory traversal attacks and unauthorized file access.
-    
+
     Args:
         path (str): File path to download.
-        
+
     Returns:
         FileResponse: File download response with proper headers.
-        
+
     Raises:
         HTTPException: If path is invalid, file not found, or access denied.
-        
+
     Security:
         - Validates path against allowed directories
         - Prevents directory traversal attacks
@@ -113,19 +113,19 @@ async def download_file(path: str):
 @router.get("/api/files/download-zip/{work_id}")
 async def download_execution_zip(work_id: str):
     """Download all files from an execution as a ZIP archive.
-    
+
     Creates a compressed ZIP archive containing all files from
     a work execution directory for convenient bulk download.
-    
+
     Args:
         work_id (str): Unique identifier of the work execution.
-        
+
     Returns:
         StreamingResponse: ZIP file download stream with appropriate headers.
-        
+
     Raises:
         HTTPException: If work directory not found or ZIP creation fails.
-        
+
     Note:
         Files are organized in the ZIP maintaining their relative
         directory structure from the work directory.
@@ -170,19 +170,19 @@ async def download_execution_zip(work_id: str):
 @router.get("/api/files/list/{work_id}")
 async def list_execution_files(work_id: str):
     """List all files in an execution directory with categorization.
-    
+
     Provides a comprehensive file listing with categorization
     (logs, outputs, all) and metadata for display and selection.
-    
+
     Args:
         work_id (str): Unique identifier of the work execution.
-        
+
     Returns:
         dict: Categorized file listings with metadata.
-        
+
     Raises:
         HTTPException: If work directory not found or listing fails.
-        
+
     Note:
         Files are categorized based on extensions:
         - Logs: .log, .txt files
@@ -230,10 +230,10 @@ async def list_works() -> List[Dict[str, Any]]:
 
     Returns basic metadata for all work directories to enable
     UI selection and navigation of available results.
-    
+
     Returns:
         List[Dict[str, Any]]: List of work directories with metadata.
-        
+
     Note:
         Includes manifest information if available for enhanced
         metadata display and organization.
@@ -274,17 +274,17 @@ async def download_selected_files_zip(work_id: str, paths: List[str]):
 
     Creates a ZIP archive containing only selected files from
     a work directory with security validation and path checking.
-    
+
     Args:
         work_id (str): Work directory identifier.
         paths (List[str]): List of file paths to include in ZIP.
-        
+
     Returns:
         StreamingResponse: ZIP file containing selected files.
-        
+
     Raises:
         HTTPException: If work not found, paths invalid, or ZIP creation fails.
-        
+
     Security:
         - Validates all paths are within work directory
         - Prevents directory traversal attacks

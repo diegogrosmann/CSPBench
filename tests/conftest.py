@@ -19,8 +19,8 @@ from __future__ import annotations
 import os
 import shutil
 from pathlib import Path
-import pytest
 
+import pytest
 
 _ARTIFACT_DIR_NAMES = [
     "test_batches",
@@ -56,6 +56,8 @@ def _cleanup_test_artifacts():  # pragma: no cover - housekeeping
         except Exception:  # noqa: BLE001
             # Best effort cleanup; ignore failures
             pass
+
+
 """Config pytest: garante que diretório raiz esteja no sys.path para importar 'algorithms'."""
 
 import sys

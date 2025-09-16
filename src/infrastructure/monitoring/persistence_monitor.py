@@ -10,7 +10,7 @@ persistence wrapper.
 Features:
 - on_progress: records progress (with optional throttling)
 - on_warning: records warning associated with the unit
-- on_error: records error (or warning if only message)  
+- on_error: records error (or warning if only message)
 - is_cancelled: allows external cancellation via ExecutionController or internal flag
 
 Throttling: avoids excessive progress recording based on minimum percentage delta
@@ -42,7 +42,7 @@ class PersistenceMonitor(AlgorithmMonitor):
 
     Attributes:
         _exec_store: Execution-scoped persistence wrapper
-        _min_delta_pct: Minimum progress delta to persist  
+        _min_delta_pct: Minimum progress delta to persist
         _min_interval_s: Minimum interval between persistences
         _last_progress: Last recorded progress value
         _last_time: Last persistence timestamp
@@ -51,7 +51,7 @@ class PersistenceMonitor(AlgorithmMonitor):
         _logger: Logger instance for this class
 
     Example:
-        >>> exec_store = ExecutionScopedPersistence(work_id="123", unit_id="algo1")  
+        >>> exec_store = ExecutionScopedPersistence(work_id="123", unit_id="algo1")
         >>> monitor = PersistenceMonitor(exec_store, min_delta_pct=1.0, min_interval_s=0.5)
         >>> monitor.on_progress(50.0, "Processing data...")
         >>> monitor.on_warning("Low memory detected")
@@ -59,7 +59,7 @@ class PersistenceMonitor(AlgorithmMonitor):
 
     __slots__ = (
         "_exec_store",
-        "_min_delta_pct", 
+        "_min_delta_pct",
         "_min_interval_s",
         "_last_progress",
         "_last_time",
@@ -78,13 +78,13 @@ class PersistenceMonitor(AlgorithmMonitor):
     ) -> None:
         """
         Initialize PersistenceMonitor with execution store and throttling settings.
-        
+
         Args:
             exec_store: Execution-scoped persistence wrapper for event storage
             min_delta_pct: Minimum progress delta to persist (default 1.0%)
-            min_interval_s: Minimum interval between persistences (default 0.5s)  
+            min_interval_s: Minimum interval between persistences (default 0.5s)
             execution_controller: Optional controller for status checks
-            
+
         Note:
             Progress throttling helps reduce database load while ensuring
             significant progress changes are captured.
@@ -121,7 +121,7 @@ class PersistenceMonitor(AlgorithmMonitor):
 
         Returns:
             PersistenceMonitor: Configured PersistenceMonitor instance
-            
+
         Example:
             >>> controller = ExecutionController("work_123")
             >>> exec_store = ExecutionScopedPersistence("work_123", "unit_1")
@@ -137,21 +137,19 @@ class PersistenceMonitor(AlgorithmMonitor):
     # ---------------------------------------------------------------------
     # AlgorithmMonitor API Implementation
     # ---------------------------------------------------------------------
-    
-    def on_progress(
-        self, progress: float, message: str, /, **data: Any
-    ) -> None:
+
+    def on_progress(self, progress: float, message: str, /, **data: Any) -> None:
         """
         Persist progress event with optional throttling (non-critical operation).
-        
+
         Records progress to the execution store if throttling conditions are met.
         Progress persistence errors are logged but don't interrupt execution.
-        
+
         Args:
             progress: Progress percentage (0.0 to 100.0)
             message: Progress description message
             **data: Additional progress data (currently unused)
-            
+
         Note:
             This is a non-critical operation - errors are logged but execution continues.
             Throttling prevents excessive database writes while capturing key milestones.
@@ -172,20 +170,20 @@ class PersistenceMonitor(AlgorithmMonitor):
                 e,
                 progress,
                 message,
-                exc_info=False  # Reduced verbosity for progress errors
+                exc_info=False,  # Reduced verbosity for progress errors
             )
 
     def on_warning(self, message: str, /, **data: Any) -> None:
         """
         Persist warning event.
-        
+
         Records a warning associated with the current execution unit.
         Warnings indicate non-fatal issues that should be tracked.
-        
+
         Args:
             message: Warning message describing the issue
             **data: Additional context data for the warning
-            
+
         Raises:
             Exception: Re-raises any persistence errors after logging
         """
@@ -207,15 +205,15 @@ class PersistenceMonitor(AlgorithmMonitor):
     ) -> None:
         """
         Persist error event (or warning if only message).
-        
+
         Records either a full error (if exception provided) or treats
         it as a categorized warning (if only message provided).
-        
+
         Args:
             message: Error/warning message
             exc: Optional exception object for full error recording
             **data: Additional context data
-            
+
         Note:
             If exc is None, the event is recorded as a warning with error categorization.
             If exc is provided, it's recorded as a full error event.
@@ -231,7 +229,9 @@ class PersistenceMonitor(AlgorithmMonitor):
                     if data
                     else {"as_error_message": message}
                 )
-                self._exec_store.unit_warning(self._exec_store._unit_id, message, context)
+                self._exec_store.unit_warning(
+                    self._exec_store._unit_id, message, context
+                )
         except Exception as e:
             self._logger.error(
                 "Error persisting error/warning: %s (message=%s, exc=%s, data=%s)",
@@ -245,13 +245,13 @@ class PersistenceMonitor(AlgorithmMonitor):
     def is_cancelled(self) -> bool:
         """
         Check if execution is cancelled via ExecutionController or internal flag.
-        
+
         Checks both internal cancellation flag and ExecutionController status.
         Only CANCELED status from ExecutionController is considered cancellation.
-        
+
         Returns:
             bool: True if execution should be cancelled, False otherwise
-            
+
         Note:
             COMPLETED/FAILED work status doesn't trigger cancellation since
             individual executions may still be in progress when pipeline finishes.
@@ -259,7 +259,7 @@ class PersistenceMonitor(AlgorithmMonitor):
         # Check internal flag first (explicit cancellation by user/system)
         if self._cancelled:
             return True
-            
+
         # Check ExecutionController if available
         if self._execution_controller:
             try:
@@ -285,11 +285,11 @@ class PersistenceMonitor(AlgorithmMonitor):
     # ------------------------------------------------------------------
     # Extension Methods
     # ------------------------------------------------------------------
-    
+
     def cancel(self) -> None:
         """
         Signal external cancellation.
-        
+
         Sets internal cancellation flag to True, which will be detected
         by subsequent calls to is_cancelled().
         """
@@ -300,11 +300,11 @@ class PersistenceMonitor(AlgorithmMonitor):
     def execution(self) -> ExecutionScopedPersistence:
         """
         Return the execution-scoped persistence store.
-        
+
         Provides direct access to the underlying persistence store for
         algorithms that need additional persistence operations beyond
         the standard monitoring interface.
-        
+
         Returns:
             ExecutionScopedPersistence: The execution store instance
         """

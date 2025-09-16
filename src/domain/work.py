@@ -11,7 +11,7 @@ status transitions, timing information, and execution metadata.
 
 Features:
     - Status transition management with validation
-    - Configuration serialization and deserialization  
+    - Configuration serialization and deserialization
     - Timestamp tracking for lifecycle events
     - Error handling and metadata storage
     - Dictionary conversion for persistence operations
@@ -98,7 +98,7 @@ class WorkItem:
                 - id: Work identifier
                 - config_json: Configuration as JSON string or dict
                 - status: Status string value
-                - created_at: Creation timestamp  
+                - created_at: Creation timestamp
                 - updated_at: Update timestamp
                 - output_path: Output path string
                 - error: Optional error message
@@ -150,7 +150,7 @@ class WorkItem:
     def _touch(self) -> None:
         """
         Update the last modified timestamp.
-        
+
         Updates the updated_at field with the current timestamp to track
         when the work item was last modified.
         """

@@ -1,0 +1,61 @@
+# CODEOWNERS file for CSPBench
+# 
+# This file defines who should review pull requests for different parts of the codebase.
+# Each line is a file pattern followed by one or more owners.
+#
+# Global Owners
+* @diegogrosmann
+
+# Core Architecture
+src/domain/ @diegogrosmann
+src/application/ @diegogrosmann
+
+# Infrastructure & External Integrations
+src/infrastructure/ @diegogrosmann
+src/utils/ @diegogrosmann
+
+# Algorithm Implementations
+algorithms/ @diegogrosmann
+src/infrastructure/algorithms/ @diegogrosmann
+
+# User Interfaces
+src/presentation/web/ @diegogrosmann
+src/presentation/cli/ @diegogrosmann
+
+# Configuration & Build
+pyproject.toml @diegogrosmann
+requirements.txt @diegogrosmann
+Dockerfile @diegogrosmann
+docker-compose.yml @diegogrosmann
+
+# CI/CD & DevOps
+.github/ @diegogrosmann
+.pre-commit-config.yaml @diegogrosmann
+
+# Documentation
+docs/ @diegogrosmann
+README.md @diegogrosmann
+CONTRIBUTING.md @diegogrosmann
+CHANGELOG.md @diegogrosmann
+
+# Academic & Research Files
+paper.md @diegogrosmann
+paper.bib @diegogrosmann
+CITATION.cff @diegogrosmann
+
+# Security & Configuration
+.env.example @diegogrosmann
+.gitleaks.toml @diegogrosmann
+config/ @diegogrosmann
+
+# Testing
+tests/ @diegogrosmann
+conftest.py @diegogrosmann
+
+# Examples & Datasets
+examples/ @diegogrosmann
+datasets/ @diegogrosmann
+
+# Deployment
+deploy/ @diegogrosmann
+scripts/ @diegogrosmann

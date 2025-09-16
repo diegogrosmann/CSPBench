@@ -7,7 +7,6 @@ the WorkPersistence layer to provide comprehensive monitoring capabilities.
 """
 
 import json
-from pathlib import Path
 from typing import Any, Dict
 
 from fastapi import APIRouter, HTTPException
@@ -20,7 +19,7 @@ router = APIRouter(prefix="/api/monitor", tags=["monitoring"])
 
 def _get_persistence() -> WorkPersistence:
     """Get WorkPersistence instance following console pattern.
-    
+
     Returns:
         WorkPersistence: Configured persistence instance for work data access.
     """
@@ -37,10 +36,10 @@ async def get_works(
     tags: str = None,
 ) -> Dict[str, Any]:
     """Get list of all works with status information, filtering and pagination.
-    
+
     Provides comprehensive work listing with metadata enrichment from batch
     configurations and flexible filtering options for work management.
-    
+
     Args:
         page (int): Page number for pagination (1-based).
         per_page (int): Number of items per page.
@@ -48,16 +47,16 @@ async def get_works(
         search (str, optional): Search term for name, description, author, or tags.
         author (str, optional): Filter by author name.
         tags (str, optional): Comma-separated list of tags to filter by.
-        
+
     Returns:
         Dict[str, Any]: Paginated list of works with metadata and filter results.
-        
+
     Raises:
         HTTPException: If work listing fails due to persistence errors.
     """
     try:
         persistence = _get_persistence()
-        
+
         # Get all works using WorkPersistence
         work_items, _ = persistence.work_list()
 
@@ -157,16 +156,16 @@ async def get_works(
 @router.get("/work/{work_id}/status")
 async def get_work_status(work_id: str) -> Dict[str, Any]:
     """Get detailed status of a specific work.
-    
+
     Provides comprehensive status information for a work including
     configuration details, progress data, and execution metadata.
-    
+
     Args:
         work_id (str): Unique identifier of the work to query.
-        
+
     Returns:
         Dict[str, Any]: Detailed work status and configuration information.
-        
+
     Raises:
         HTTPException: If work is not found or status retrieval fails.
     """
@@ -208,16 +207,16 @@ async def get_work_status(work_id: str) -> Dict[str, Any]:
 @router.get("/work/{work_id}/database-status")
 async def get_work_database_status(work_id: str) -> Dict[str, Any]:
     """Check if work database is ready for monitoring.
-    
+
     Verifies that the work database contains sufficient progress data
     for meaningful monitoring and provides readiness status information.
-    
+
     Args:
         work_id (str): Unique identifier of the work to check.
-        
+
     Returns:
         Dict[str, Any]: Database readiness status with reason and message.
-        
+
     Raises:
         HTTPException: If work is not found or database check fails.
     """
@@ -258,20 +257,21 @@ async def get_work_database_status(work_id: str) -> Dict[str, Any]:
             status_code=500, detail=f"Failed to check database status: {str(e)}"
         )
 
+
 @router.post("/work/{work_id}/action/{action}")
 async def work_action(work_id: str, action: str) -> Dict[str, Any]:
     """Perform action on work (pause, cancel, restart).
-    
+
     Executes control actions on work executions including pausing,
     canceling, and restarting with proper cleanup and state management.
-    
+
     Args:
         work_id (str): Unique identifier of the work to control.
         action (str): Action to perform ('pause', 'cancel', 'restart').
-        
+
     Returns:
         Dict[str, Any]: Action result with success status and message.
-        
+
     Raises:
         HTTPException: If action is invalid, work not found, or operation fails.
     """
@@ -312,13 +312,13 @@ async def work_action(work_id: str, action: str) -> Dict[str, Any]:
 @router.get("/active-works")
 async def get_active_works() -> Dict[str, Any]:
     """Get only active (running/queued) works.
-    
+
     Provides a filtered list of works that are currently active,
     useful for dashboard displays and active monitoring interfaces.
-    
+
     Returns:
         Dict[str, Any]: List of active works with count information.
-        
+
     Raises:
         HTTPException: If active work retrieval fails.
     """
@@ -344,16 +344,16 @@ async def get_active_works() -> Dict[str, Any]:
 @router.get("/work/{work_id}/combinations")
 async def list_work_combinations(work_id: str) -> Dict[str, Any]:
     """List combinations of a work to populate execution filters.
-    
+
     Provides a list of all parameter combinations within a work
     for detailed execution filtering and analysis.
-    
+
     Args:
         work_id (str): Unique identifier of the work to query.
-        
+
     Returns:
         Dict[str, Any]: List of combinations with metadata.
-        
+
     Raises:
         HTTPException: If work not found or combination listing fails.
     """
@@ -362,7 +362,7 @@ async def list_work_combinations(work_id: str) -> Dict[str, Any]:
         work = persistence.work_get(work_id)
         if not work:
             raise HTTPException(status_code=404, detail=f"Work {work_id} not found")
-        
+
         combos = persistence.list_combinations(work_id)
         return {"combinations": combos, "total": len(combos)}
     except HTTPException:
@@ -378,17 +378,17 @@ async def get_combination_executions(
     work_id: str, combination_id: int
 ) -> Dict[str, Any]:
     """Get details and statistics of executions for a specific combination.
-    
+
     Provides detailed execution information and aggregated statistics
     for all executions within a specific parameter combination.
-    
+
     Args:
         work_id (str): Unique identifier of the parent work.
         combination_id (int): Identifier of the specific combination.
-        
+
     Returns:
         Dict[str, Any]: Execution details, statistics, and metadata.
-        
+
     Raises:
         HTTPException: If work or combination not found, or retrieval fails.
     """
@@ -397,7 +397,7 @@ async def get_combination_executions(
         work = persistence.work_get(work_id)
         if not work:
             raise HTTPException(status_code=404, detail=f"Work {work_id} not found")
-        
+
         # Check if combination exists
         combo_list = persistence.list_combinations(work_id)
         combo_map = {c["combination_id"]: c for c in combo_list}
@@ -407,9 +407,9 @@ async def get_combination_executions(
                 status_code=404,
                 detail=f"Combination {combination_id} not found for work {work_id}",
             )
-        
+
         executions = persistence.get_combination_executions_detail(combination_id)
-        
+
         # Aggregate statistics
         stats = {
             "Running": 0,
@@ -448,7 +448,7 @@ async def get_combination_executions(
                     "total_sequences": ex.total_sequences,
                 }
             )
-        
+
         return {
             "work_id": work_id,
             "combination_id": combination_id,

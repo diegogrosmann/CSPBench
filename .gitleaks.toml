@@ -1,0 +1,24 @@
+# Gitleaks configuration for CSPBench
+# This file defines rules and allowlists for detecting secrets
+
+[extend]
+# Use the default configuration
+useDefault = true
+
+[allowlist]
+description = "Global allowlist for CSPBench repository"
+
+# Allow test and mock files paths
+paths = [
+    "tests/vcr_cassettes/.*\\.yaml",
+    "\\.env\\.example",
+    "(examples/|docs/|README\\.md|CHANGELOG\\.md)",
+    "tests/.*"
+]
+
+# Allow test API keys and mock secrets
+regexes = [
+    "40aff1a7f51fc7e0711203ea3b2f5ae37c09",
+    "(localhost|127\\.0\\.0\\.1|example\\.com|test_.*|mock_.*|sample_.*)",
+    "(MIT|Apache-2\\.0|GPL-3\\.0|BSD-3-Clause)"
+]

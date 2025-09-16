@@ -303,7 +303,9 @@ class TestBLFGAAlgorithm:
     def test_block_redivision_mechanism(self):
         """Test dynamic block redivision."""
         algo = self.create_algorithm(
-            rediv_freq=5, max_gens=15, seed=42  # Redivide blocks every 5 generations
+            rediv_freq=5,
+            max_gens=15,
+            seed=42,  # Redivide blocks every 5 generations
         )
 
         result = algo.run()
@@ -457,9 +459,9 @@ class TestBLFGAAlgorithm:
                 "initial_fitness",
             ]
             for field in success_fields:
-                assert (
-                    field in metadata
-                ), f"Missing field {field} in successful run metadata"
+                assert field in metadata, (
+                    f"Missing field {field} in successful run metadata"
+                )
 
     def test_adaptive_mutation_without_current_population(self):
         """Test adaptive mutation when current population is not yet set."""

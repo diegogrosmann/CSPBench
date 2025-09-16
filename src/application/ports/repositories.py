@@ -42,7 +42,7 @@ from src.infrastructure.persistence.work_state.wrappers.combination_scoped impor
 class AlgorithmRegistry(Protocol):
     """
     Port for algorithm registry.
-    
+
     Defines the interface for algorithm management, including registration,
     discovery, and metadata retrieval. This port abstracts the algorithm
     storage and retrieval mechanism from the application layer.
@@ -57,7 +57,7 @@ class AlgorithmRegistry(Protocol):
 
         Returns:
             type[CSPAlgorithm]: Algorithm class.
-            
+
         Raises:
             KeyError: If algorithm not found.
         """
@@ -110,7 +110,7 @@ class AlgorithmRegistry(Protocol):
 class ExportPort(Protocol):
     """
     Port for result export.
-    
+
     Defines the interface for exporting results in various formats
     and managing export destinations. This port abstracts the export
     mechanism from the application layer.
@@ -177,7 +177,7 @@ class ExportPort(Protocol):
 class ExecutionEngine(Protocol):
     """
     Port for pipeline task execution engines.
-    
+
     Defines the interface for executing individual tasks within
     the pipeline execution framework. This port abstracts the
     task execution mechanism from the application layer.
@@ -191,7 +191,7 @@ class ExecutionEngine(Protocol):
     ):
         """
         Initialize execution engine.
-        
+
         Args:
             combination_store (CombinationScopedPersistence): Store for combination data.
             execution_controller (ExecutionController): Execution control interface.
@@ -222,7 +222,7 @@ class ExecutionEngine(Protocol):
 class AbstractAlgorithmRegistry(ABC):
     """
     Abstract base class for algorithm registry.
-    
+
     Provides a concrete base class that can be inherited by
     infrastructure implementations of the AlgorithmRegistry port.
     """
@@ -231,10 +231,10 @@ class AbstractAlgorithmRegistry(ABC):
     def get_algorithm(self, name: str) -> type[CSPAlgorithm]:
         """
         Get algorithm class by name.
-        
+
         Args:
             name (str): Algorithm name.
-            
+
         Returns:
             type[CSPAlgorithm]: Algorithm class.
         """
@@ -244,7 +244,7 @@ class AbstractAlgorithmRegistry(ABC):
     def list_algorithms(self) -> List[str]:
         """
         List available algorithms.
-        
+
         Returns:
             List[str]: Available algorithm names.
         """
@@ -254,7 +254,7 @@ class AbstractAlgorithmRegistry(ABC):
     def register_algorithm(self, algorithm_class: type[CSPAlgorithm]) -> None:
         """
         Register new algorithm.
-        
+
         Args:
             algorithm_class (type[CSPAlgorithm]): Algorithm class to register.
         """
@@ -264,10 +264,10 @@ class AbstractAlgorithmRegistry(ABC):
     def algorithm_exists(self, name: str) -> bool:
         """
         Check if algorithm exists.
-        
+
         Args:
             name (str): Algorithm name.
-            
+
         Returns:
             bool: True if exists, False otherwise.
         """
@@ -277,10 +277,10 @@ class AbstractAlgorithmRegistry(ABC):
     def get_algorithm_metadata(self, name: str) -> Dict[str, Any]:
         """
         Get algorithm metadata.
-        
+
         Args:
             name (str): Algorithm name.
-            
+
         Returns:
             Dict[str, Any]: Algorithm metadata.
         """
@@ -290,7 +290,7 @@ class AbstractAlgorithmRegistry(ABC):
 class AbstractExportPort(ABC):
     """
     Abstract base class for result export.
-    
+
     Provides a concrete base class that can be inherited by
     infrastructure implementations of the ExportPort.
     """
@@ -301,12 +301,12 @@ class AbstractExportPort(ABC):
     ) -> str:
         """
         Export results in specific format.
-        
+
         Args:
             results (Dict[str, Any]): Result data to export.
             format_type (str): Export format.
             destination (str): Export destination path.
-            
+
         Returns:
             str: Path of exported file.
         """
@@ -318,12 +318,12 @@ class AbstractExportPort(ABC):
     ) -> str:
         """
         Export batch results.
-        
+
         Args:
             batch_results (List[Dict[str, Any]]): List of results to export.
             format_type (str): Export format.
             destination (str): Export destination path.
-            
+
         Returns:
             str: Path of exported file.
         """
@@ -333,7 +333,7 @@ class AbstractExportPort(ABC):
     def get_supported_formats(self) -> List[str]:
         """
         List supported formats.
-        
+
         Returns:
             List[str]: Available export formats.
         """
@@ -345,11 +345,11 @@ class AbstractExportPort(ABC):
     ) -> str:
         """
         Export optimization results.
-        
+
         Args:
             optimization_data (Dict[str, Any]): Optimization data to export.
             destination (str): Export destination path.
-            
+
         Returns:
             str: Path of exported file.
         """
@@ -359,7 +359,7 @@ class AbstractExportPort(ABC):
 class AbstractExecutionEngine(ABC):
     """
     Abstract base class for task execution engines.
-    
+
     Provides a concrete base class that can be inherited by
     infrastructure implementations of the ExecutionEngine port.
     """
@@ -372,7 +372,7 @@ class AbstractExecutionEngine(ABC):
     ):
         """
         Initialize execution engine.
-        
+
         Args:
             combination_store (CombinationScopedPersistence): Store for combination data.
             execution_controller (ExecutionController): Execution control interface.
@@ -391,12 +391,12 @@ class AbstractExecutionEngine(ABC):
     ) -> BaseStatus:
         """
         Execute a specific task.
-        
+
         Args:
             task (TaskConfig): Task configuration to execute.
             dataset_obj (Dataset): Dataset object for the task.
             alg (AlgParams): Algorithm parameters.
-            
+
         Returns:
             BaseStatus: Execution status result.
         """

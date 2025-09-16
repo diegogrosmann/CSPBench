@@ -8,7 +8,6 @@ import json
 import logging
 import time
 from dataclasses import asdict
-from pathlib import Path
 from typing import Any, Dict, List, Optional, Set
 
 from src.infrastructure.persistence.work_state.core import WorkPersistence
@@ -136,13 +135,17 @@ class WorkMonitorSession:
                     await self._check_for_updates()
                     await asyncio.sleep(self.update_interval)
                 except Exception as e:
-                    logger.error(f"[WEBSOCKET] Erro no loop de monitoramento para work {self.work_id}: {e}")
+                    logger.error(
+                        f"[WEBSOCKET] Erro no loop de monitoramento para work {self.work_id}: {e}"
+                    )
                     await asyncio.sleep(self.update_interval)
 
         except asyncio.CancelledError:
             pass
         except Exception as e:
-            logger.error(f"[WEBSOCKET] Loop de monitoramento falhou para work {self.work_id}: {e}")
+            logger.error(
+                f"[WEBSOCKET] Loop de monitoramento falhou para work {self.work_id}: {e}"
+            )
 
     async def _send_initial_snapshot(self) -> None:
         """Send initial complete snapshot."""
@@ -191,8 +194,10 @@ class WorkMonitorSession:
                 for combo in combinations_list:
                     combo_id = combo.get("combination_id")
                     if combo_id:
-                        combo_executions = self._persistence.get_combination_executions_detail(
-                            combo_id
+                        combo_executions = (
+                            self._persistence.get_combination_executions_detail(
+                                combo_id
+                            )
                         )
                         all_executions.extend(combo_executions)
                         # Atualiza cache para cada combinação
@@ -209,8 +214,10 @@ class WorkMonitorSession:
                         "combination_id"
                     )
                     if combination_id:
-                        all_executions = self._persistence.get_combination_executions_detail(
-                            combination_id
+                        all_executions = (
+                            self._persistence.get_combination_executions_detail(
+                                combination_id
+                            )
                         )
                         self._executions_cache[combination_id] = all_executions
                         self._executions_state_cache[combination_id] = {
@@ -229,7 +236,9 @@ class WorkMonitorSession:
 
             # Buscar todos os eventos (se método existir)
             try:
-                events = self._persistence.event_list_by_work(self.work_id)[-50:]  # últimos 50
+                events = self._persistence.event_list_by_work(self.work_id)[
+                    -50:
+                ]  # últimos 50
             except AttributeError:
                 events = []
 
@@ -275,12 +284,14 @@ class WorkMonitorSession:
             # Verificar status do work INDEPENDENTE do progress_summary
             work_data = self._persistence.work_get(self.work_id)
             current_work_status = work_data.get("status") if work_data else None
-            
+
             final_statuses = ["completed", "failed", "cancelled", "error"]
             is_final_status = current_work_status in final_statuses
-            
+
             if is_final_status:
-                logger.info(f"[WEBSOCKET] Work {self.work_id} finalizou com status {current_work_status}")
+                logger.info(
+                    f"[WEBSOCKET] Work {self.work_id} finalizou com status {current_work_status}"
+                )
                 asyncio.create_task(self._handle_work_completion())
 
             # Obter progress_summary para atualizações de progresso
@@ -309,9 +320,7 @@ class WorkMonitorSession:
             previous_combination_id = self.last_combination_id
             if progress_summary.current_combination_details:
                 current_combination_id = (
-                    progress_summary.current_combination_details.get(
-                        "combination_id"
-                    )
+                    progress_summary.current_combination_details.get("combination_id")
                 )
 
                 # Caso de mudança de combinação (existe nova e difere da anterior)
@@ -322,8 +331,10 @@ class WorkMonitorSession:
                 ):
                     try:
                         # Flush final da combinação anterior antes de trocar
-                        prev_execs = self._persistence.get_combination_executions_detail(
-                            previous_combination_id
+                        prev_execs = (
+                            self._persistence.get_combination_executions_detail(
+                                previous_combination_id
+                            )
                         )
                         self._executions_cache[previous_combination_id] = prev_execs
                         self._executions_state_cache[previous_combination_id] = {
@@ -353,8 +364,10 @@ class WorkMonitorSession:
                     and previous_combination_id not in self._flushed_combinations
                 ):
                     try:
-                        prev_execs = self._persistence.get_combination_executions_detail(
-                            previous_combination_id
+                        prev_execs = (
+                            self._persistence.get_combination_executions_detail(
+                                previous_combination_id
+                            )
                         )
                         await self._send_update(
                             progress_summary=None,
@@ -411,14 +424,14 @@ class WorkMonitorSession:
                         # Buscar TODAS as execuções para atualização incremental também
                         try:
                             all_executions_for_update = []
-                            combinations_list = self._persistence.list_combinations(self.work_id)
+                            combinations_list = self._persistence.list_combinations(
+                                self.work_id
+                            )
                             for combo in combinations_list:
                                 combo_id = combo.get("combination_id")
                                 if combo_id:
-                                    combo_executions = (
-                                        self._persistence.get_combination_executions_detail(
-                                            combo_id
-                                        )
+                                    combo_executions = self._persistence.get_combination_executions_detail(
+                                        combo_id
                                     )
                                     all_executions_for_update.extend(combo_executions)
                             full_execs_serialized = [
@@ -453,14 +466,18 @@ class WorkMonitorSession:
                         self._update_executions_state(executions)
 
         except Exception as e:
-            logger.error(f"[WEBSOCKET] Exception em _check_for_updates para work {self.work_id}: {e}")
+            logger.error(
+                f"[WEBSOCKET] Exception em _check_for_updates para work {self.work_id}: {e}"
+            )
 
     async def _send_work_status_event(
         self, old_status: Optional[str], new_status: str
     ) -> None:
         """Send work status change event."""
-        logger.info(f"[WEBSOCKET] 🔄 Enviando evento de mudança de status para work {self.work_id}: {old_status} -> {new_status}")
-        
+        logger.info(
+            f"[WEBSOCKET] 🔄 Enviando evento de mudança de status para work {self.work_id}: {old_status} -> {new_status}"
+        )
+
         event = ProgressMessage(
             type=MessageType.EVENT,
             work_id=self.work_id,
@@ -562,9 +579,7 @@ class WorkMonitorSession:
         new_events = []
 
         try:
-            events = persistence.get_events(
-                self.work_id, limit=10
-            )
+            events = persistence.get_events(self.work_id, limit=10)
             for event in events:
                 event_timestamp = event.get("timestamp", 0)
                 if event_timestamp > self.last_event_timestamp:
@@ -708,7 +723,9 @@ class WorkMonitorSession:
                         for e in executions
                     }
                 except Exception as e:
-                    logger.error(f"Error loading executions for combination {combination_id}: {e}")
+                    logger.error(
+                        f"Error loading executions for combination {combination_id}: {e}"
+                    )
                     return None
             return [
                 serialize_execution_detail(e)
@@ -723,28 +740,40 @@ class WorkMonitorSession:
     async def _handle_work_completion(self) -> None:
         """Handle work completion - send final snapshot and cleanup."""
         try:
-            logger.info(f"[WEBSOCKET] Finalizando work {self.work_id} - enviando snapshot final")
-            
+            logger.info(
+                f"[WEBSOCKET] Finalizando work {self.work_id} - enviando snapshot final"
+            )
+
             # Enviar snapshot final
             try:
-                final_message = await self._build_snapshot_message(update_tracking=False)
+                final_message = await self._build_snapshot_message(
+                    update_tracking=False
+                )
                 if final_message:
                     await self._broadcast_message(final_message)
             except Exception as snapshot_error:
-                logger.error(f"[WEBSOCKET] Erro ao enviar snapshot final para work {self.work_id}: {snapshot_error}")
-            
+                logger.error(
+                    f"[WEBSOCKET] Erro ao enviar snapshot final para work {self.work_id}: {snapshot_error}"
+                )
+
             # Período de graça antes de parar o monitoramento
             await asyncio.sleep(30)
-            
+
             if self.running:
-                logger.info(f"[WEBSOCKET] Parando monitoramento para work {self.work_id}")
+                logger.info(
+                    f"[WEBSOCKET] Parando monitoramento para work {self.work_id}"
+                )
                 await self.stop()
-            
+
         except asyncio.CancelledError:
-            logger.debug(f"[WEBSOCKET] _handle_work_completion cancelado para work {self.work_id}")
+            logger.debug(
+                f"[WEBSOCKET] _handle_work_completion cancelado para work {self.work_id}"
+            )
             raise
         except Exception as e:
-            logger.error(f"[WEBSOCKET] Erro em _handle_work_completion para work {self.work_id}: {e}")
+            logger.error(
+                f"[WEBSOCKET] Erro em _handle_work_completion para work {self.work_id}: {e}"
+            )
 
     async def _broadcast_message(self, message: ProgressMessage) -> None:
         """Broadcast message to all subscribers."""
@@ -753,7 +782,9 @@ class WorkMonitorSession:
 
         # Log important events only
         if message.type in [MessageType.ERROR]:
-            logger.info(f"[WEBSOCKET] Broadcasting {message.type.value} para {len(self.subscribers)} subscribers do work {self.work_id}")
+            logger.info(
+                f"[WEBSOCKET] Broadcasting {message.type.value} para {len(self.subscribers)} subscribers do work {self.work_id}"
+            )
 
         # Convert to WebSocket message
         ws_message = message.to_websocket_message()
@@ -781,9 +812,7 @@ class WorkMonitorManager:
         self.sessions: Dict[str, WorkMonitorSession] = {}
         self._lock = asyncio.Lock()
 
-    async def get_or_create_session(
-        self, work_id: str
-    ) -> WorkMonitorSession:
+    async def get_or_create_session(self, work_id: str) -> WorkMonitorSession:
         """Get existing session or create new one."""
         async with self._lock:
             if work_id not in self.sessions:

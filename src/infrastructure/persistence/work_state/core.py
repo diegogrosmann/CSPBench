@@ -7,28 +7,29 @@ providing better code organization and maintainability.
 
 import logging
 import os
-import time
 import threading
 from contextlib import contextmanager
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Optional
+
 from sqlalchemy import create_engine, event
-from sqlalchemy.orm import sessionmaker, Session, scoped_session
+from sqlalchemy.orm import Session, scoped_session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from .models import Base
 from .mixins import (
-    WorkCRUDMixin,
+    CombinationCRUDMixin,
     DatasetCRUDMixin,
     DatasetSequenceCRUDMixin,
-    CombinationCRUDMixin, 
-    ExecutionCRUDMixin,
-    ExecutionProgressCRUDMixin,
-    EventCRUDMixin,
-    QueriesMixin,
-    ExecutionDetail,
-    ProgressSummary,
     ErrorSummary,
+    EventCRUDMixin,
+    ExecutionCRUDMixin,
+    ExecutionDetail,
+    ExecutionProgressCRUDMixin,
+    ProgressSummary,
+    QueriesMixin,
+    WorkCRUDMixin,
 )
+from .models import Base
+
 
 class WorkPersistence(
     WorkCRUDMixin,
@@ -42,10 +43,10 @@ class WorkPersistence(
 ):
     """
     Work state persistence using SQLAlchemy ORM with thread-safe operations.
-    
+
     Orchestrates database access through specialized mixins for each table,
     providing better code organization and maintainability.
-    
+
     Implements best practices for SQLAlchemy concurrency:
     - Scoped sessions for thread safety
     - Connection pooling for performance
@@ -70,102 +71,109 @@ class WorkPersistence(
     def __init__(self, database_url: Optional[str] = None):
         """
         Initialize SQLAlchemy persistence with database connection.
-        
+
         Args:
             database_url: Database URL. If None, will try to get from environment
                          or use default SQLite path.
-                         
+
         Raises:
             ValueError: If database URL is invalid
             ConnectionError: If database connection fails
         """
         self._logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}")
         self._local = threading.local()
-        
+
         # Get database URL from environment or use default
         if database_url is None:
             database_url = self._get_database_url()
-        
+
         # Store the database URL for db_path extraction
         self._database_url = database_url
-        
+
         # Create engine with proper configuration for concurrency
         self._engine = self._create_engine(database_url)
-        
+
         # Use scoped_session for thread safety
         session_factory = sessionmaker(bind=self._engine)
         self._session_factory = scoped_session(session_factory)
-        
+
         # Create tables
         self._init_schema()
-        
-        self._logger.info(f"Initialized SQLAlchemy persistence with URL: {database_url}")
+
+        self._logger.info(
+            f"Initialized SQLAlchemy persistence with URL: {database_url}"
+        )
 
     def _create_engine(self, database_url: str):
         """
         Create SQLAlchemy engine with appropriate configuration.
-        
+
         Configures engine based on database type (SQLite, PostgreSQL, etc.)
         with optimal settings for concurrency and performance.
-        
+
         Args:
             database_url: Database connection URL
-            
+
         Returns:
             Engine: Configured SQLAlchemy engine
-            
+
         Note:
             SQLite databases get WAL mode and busy timeout configuration.
             Other databases get connection pooling configuration.
         """
         engine_kwargs = {
-            'echo': False,  # Set to True for SQL debugging
-            'future': True,  # Use SQLAlchemy 2.0+ features
+            "echo": False,  # Set to True for SQL debugging
+            "future": True,  # Use SQLAlchemy 2.0+ features
         }
-        
+
         # Convert URL object to string if needed
         url_str = str(database_url)
-        
+
         # Configure based on database type
-        if url_str.startswith('sqlite:'):
-            engine_kwargs.update({
-                'poolclass': StaticPool,
-                'connect_args': {
-                    'check_same_thread': False,  # Allow multi-threading
-                    'timeout': 30,  # Connection timeout
-                },
-                'pool_pre_ping': True,  # Verify connections before use
-            })
+        if url_str.startswith("sqlite:"):
+            engine_kwargs.update(
+                {
+                    "poolclass": StaticPool,
+                    "connect_args": {
+                        "check_same_thread": False,  # Allow multi-threading
+                        "timeout": 30,  # Connection timeout
+                    },
+                    "pool_pre_ping": True,  # Verify connections before use
+                }
+            )
         else:
             # For other databases (PostgreSQL, MySQL, etc.)
-            engine_kwargs.update({
-                'pool_size': 10,  # Connection pool size
-                'max_overflow': 20,  # Max additional connections
-                'pool_pre_ping': True,  # Verify connections before use
-                'pool_recycle': 3600,  # Recycle connections after 1 hour
-            })
-        
+            engine_kwargs.update(
+                {
+                    "pool_size": 10,  # Connection pool size
+                    "max_overflow": 20,  # Max additional connections
+                    "pool_pre_ping": True,  # Verify connections before use
+                    "pool_recycle": 3600,  # Recycle connections after 1 hour
+                }
+            )
+
         engine = create_engine(database_url, **engine_kwargs)
-        
+
         # Add SQLite-specific event listeners
-        if url_str.startswith('sqlite:'):
+        if url_str.startswith("sqlite:"):
             self._configure_sqlite_pragmas(engine)
-        
+
         return engine
 
     def _configure_sqlite_pragmas(self, engine) -> None:
         """
         Configure SQLite pragmas for better concurrency and performance.
-        
+
         Sets up event listeners to configure SQLite-specific settings:
         - WAL mode for better concurrency
         - Normal synchronous mode for performance
         - Foreign key constraints enabled
         - Busy timeout for locked database handling
-        
+
         Args:
             engine: SQLAlchemy engine for SQLite database
         """
+
         @event.listens_for(engine, "connect")
         def set_sqlite_pragma(dbapi_connection, connection_record):
             """Configure SQLite for better concurrency and performance."""
@@ -183,28 +191,28 @@ class WorkPersistence(
     def _get_database_url(self) -> str:
         """
         Get database URL from environment or use default.
-        
+
         Checks environment variables in order:
         1. DB_URL - Full database URL
         2. DB_PATH - Path for SQLite database
         3. Default to 'work_state.db' in current directory
-        
+
         Returns:
             str: Database connection URL
         """
         # Try environment variables first
-        db_url = os.getenv('DB_URL')
+        db_url = os.getenv("DB_URL")
         if db_url:
             return db_url
-            
+
         # Default SQLite database
-        db_path = os.getenv('DB_PATH', 'work_state.db')
+        db_path = os.getenv("DB_PATH", "work_state.db")
         return f"sqlite:///{db_path}"
 
     def _init_schema(self) -> None:
         """
         Initialize database schema.
-        
+
         Creates all tables defined in the Base metadata if they don't exist.
         This is safe to call multiple times.
         """
@@ -213,30 +221,30 @@ class WorkPersistence(
     def get_session(self) -> Session:
         """
         Get a new database session.
-        
+
         Returns a scoped session that is thread-safe and properly managed.
         The session is tied to the current thread and will be reused for
         subsequent calls within the same thread.
-        
+
         Returns:
             Session: Thread-scoped SQLAlchemy session
-            
+
         Note:
             Use session_scope() context manager for automatic transaction management.
         """
         return self._session_factory()
-    
+
     def get_new_session(self) -> Session:
         """
         Get a new session instance (for testing purposes).
-        
+
         This creates a new unscoped session instance that is not tied to
         the thread-local scoped session factory. Useful for testing scenarios
         where you need fresh sessions.
-        
+
         Returns:
             Session: New SQLAlchemy session instance
-            
+
         Warning:
             Remember to close this session manually when done.
         """
@@ -246,16 +254,16 @@ class WorkPersistence(
     def session_scope(self):
         """
         Provide a transactional scope around a series of operations.
-        
+
         This is the recommended way to handle database operations as it
         ensures proper transaction management and cleanup.
-        
+
         Yields:
             Session: Database session within transaction scope
-            
+
         Raises:
             Exception: Any exception raised within the context will cause rollback
-            
+
         Example:
             >>> with persistence.session_scope() as session:
             ...     work = Work(...)
@@ -266,7 +274,7 @@ class WorkPersistence(
         try:
             yield session
             session.commit()
-        except Exception as e:
+        except Exception:
             session.rollback()
             raise
         finally:
@@ -275,7 +283,7 @@ class WorkPersistence(
     def __enter__(self):
         """
         Context manager entry.
-        
+
         Returns:
             WorkPersistence: Self instance for context manager protocol
         """
@@ -284,12 +292,12 @@ class WorkPersistence(
     def __exit__(self, exc_type, exc_val, exc_tb):
         """
         Context manager exit.
-        
+
         Ensures proper cleanup of resources when exiting context.
-        
+
         Args:
             exc_type: Exception type if exception occurred
-            exc_val: Exception value if exception occurred  
+            exc_val: Exception value if exception occurred
             exc_tb: Exception traceback if exception occurred
         """
         self.close()
@@ -297,31 +305,33 @@ class WorkPersistence(
     def close(self):
         """
         Close the database engine and clean up resources.
-        
+
         Removes scoped sessions and disposes of the engine connection pool.
         Call this when shutting down the application to ensure clean resource cleanup.
         """
-        if hasattr(self, '_session_factory'):
+        if hasattr(self, "_session_factory"):
             self._session_factory.remove()
-            
-        if hasattr(self, '_engine'):
+
+        if hasattr(self, "_engine"):
             self._engine.dispose()
 
     # === COMPATIBILITY METHODS ===
     # Methods for compatibility with wrappers that expect specific methods
-    
-    def combination_error(self, work_id: str, combination_id: str, error: Exception) -> None:
+
+    def combination_error(
+        self, work_id: str, combination_id: str, error: Exception
+    ) -> None:
         """
         Register a combination error as an event.
-        
+
         Compatibility method for CombinationScopedPersistence wrappers.
         Creates an error event associated with the combination for tracking purposes.
-        
+
         Args:
             work_id: Work identifier
             combination_id: Combination identifier where error occurred
             error: Exception that occurred during combination processing
-            
+
         Note:
             This method provides backward compatibility with existing wrapper interfaces.
         """
@@ -332,20 +342,20 @@ class WorkPersistence(
             entity_data={
                 "combination_id": combination_id,
                 "error_type": error.__class__.__name__,
-                "error_message": str(error)
-            }
+                "error_message": str(error),
+            },
         )
 
     def clear_all_progress_for_non_finalized_executions(self) -> int:
         """
         Clear progress entries for all non-finalized executions system-wide.
-        
+
         Removes all progress entries for executions that are not finalized
         (status: 'queued', 'running', 'paused') across all works in the system.
-        
+
         Returns:
             int: Total number of progress entries removed
-            
+
         Note:
             This is a system-wide cleanup operation that affects all works.
             Use with caution in multi-work environments.
@@ -357,6 +367,6 @@ class WorkPersistence(
 __all__ = [
     "WorkPersistence",
     "ExecutionDetail",
-    "ProgressSummary", 
+    "ProgressSummary",
     "ErrorSummary",
 ]

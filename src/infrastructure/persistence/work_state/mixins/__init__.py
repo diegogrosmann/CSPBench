@@ -8,18 +8,18 @@ The mixins can be combined to create a complete persistence layer by multiple
 inheritance, providing a modular and maintainable approach to database operations.
 """
 
-from .work_mixin import WorkCRUDMixin
 from .combination_mixin import CombinationCRUDMixin
 from .dataset_mixin import DatasetCRUDMixin
 from .dataset_sequence_mixin import DatasetSequenceCRUDMixin
 from .event_mixin import EventCRUDMixin
 from .execution_mixin import ExecutionCRUDMixin
 from .execution_progress_mixin import ExecutionProgressCRUDMixin
-from .queries_mixin import QueriesMixin, ExecutionDetail, ProgressSummary, ErrorSummary
+from .queries_mixin import ErrorSummary, ExecutionDetail, ProgressSummary, QueriesMixin
+from .work_mixin import WorkCRUDMixin
 
 __all__ = [
     "WorkCRUDMixin",
-    "CombinationCRUDMixin", 
+    "CombinationCRUDMixin",
     "DatasetCRUDMixin",
     "DatasetSequenceCRUDMixin",
     "EventCRUDMixin",
@@ -27,6 +27,6 @@ __all__ = [
     "ExecutionProgressCRUDMixin",
     "QueriesMixin",
     "ExecutionDetail",
-    "ProgressSummary", 
+    "ProgressSummary",
     "ErrorSummary",
 ]

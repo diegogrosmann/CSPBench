@@ -38,24 +38,24 @@ from src.infrastructure.persistence.dataset_repository import FileDatasetReposit
 def load_dataset(cfg: DatasetAny) -> tuple[Dataset, dict]:
     """
     Load or generate a Dataset from a DatasetConfig.
-    
+
     This is the main entry point for dataset loading. It dispatches
     to the appropriate loader based on the configuration type.
-    
+
     Args:
         cfg (DatasetAny): Dataset configuration specifying type and parameters.
-        
+
     Returns:
         Tuple[Dataset, dict]: A tuple containing:
             - Dataset: Loaded or generated dataset object
             - dict: Parameters used for loading/generation
-            
+
     Raises:
         TypeError: If dataset configuration type is not supported.
-        
+
     Supported Types:
         - SyntheticDatasetConfig: Generates synthetic data
-        - FileDatasetConfig: Loads from file system  
+        - FileDatasetConfig: Loads from file system
         - EntrezDatasetConfig: Downloads from NCBI Entrez
     """
     if isinstance(cfg, SyntheticDatasetConfig):

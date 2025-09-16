@@ -26,9 +26,9 @@ router = APIRouter(prefix="/health", tags=["health"])
 
 class HealthStatus(BaseModel):
     """Health status model.
-    
+
     Simple health status response for basic health checks.
-    
+
     Attributes:
         status (str): Overall system health status.
         version (str): Application version information.
@@ -40,14 +40,14 @@ class HealthStatus(BaseModel):
 
 def get_version():
     """Get application version from multiple sources.
-    
+
     Attempts to retrieve version information from various sources
     in order of preference: pyproject.toml, environment variable,
     or fallback to default version.
-    
+
     Returns:
         str: Version string with 'v' prefix.
-        
+
     Note:
         This function gracefully handles errors and always returns
         a valid version string, defaulting to "v0.1.0" if needed.
@@ -70,7 +70,7 @@ def get_version():
         env_version = os.getenv("CSPBENCH_VERSION")
         if env_version:
             return env_version
-        
+
         return "v0.1.0"
     except Exception:
         return "v0.1.0"
@@ -79,13 +79,13 @@ def get_version():
 @router.get("/")
 async def health_check():
     """Basic health check endpoint.
-    
+
     Provides a simple health status check with minimal resource usage.
     Suitable for load balancer health checks and basic monitoring.
-    
+
     Returns:
         HealthStatus: Basic health status with version information.
-        
+
     Note:
         This endpoint always returns a response, using "error" status
         if system components are unavailable rather than raising exceptions.
@@ -103,14 +103,14 @@ async def health_check():
 @router.get("/detailed", response_model=HealthCheck)
 async def detailed_health_check():
     """Detailed health check following security guidelines.
-    
+
     Provides comprehensive health information including component
     status checks and detailed system information for monitoring
     and debugging purposes.
-    
+
     Returns:
         HealthCheck: Detailed health status with component breakdown.
-        
+
     Raises:
         HTTPException: If critical system components fail completely.
     """
@@ -149,14 +149,14 @@ async def detailed_health_check():
 @router.get("/metrics")
 async def get_metrics():
     """Basic metrics endpoint for monitoring systems.
-    
+
     Provides system metrics in a format suitable for monitoring
     systems like Prometheus. Can be extended with additional
     performance and operational metrics as needed.
-    
+
     Returns:
         dict: System metrics including component counts and status.
-        
+
     Note:
         This endpoint gracefully handles errors and returns
         error information rather than failing completely.
@@ -176,14 +176,14 @@ async def get_metrics():
 @router.get("/status")
 async def get_system_status():
     """Get system status for UI display.
-    
+
     Provides system status information specifically formatted
     for display in user interfaces with appropriate status
     types and user-friendly messages.
-    
+
     Returns:
         dict: UI-friendly system status with display information.
-        
+
     Note:
         Status types (success, warning, danger) are designed
         for Bootstrap or similar UI framework integration.
@@ -219,14 +219,14 @@ async def get_system_status():
 @router.get("/version")
 async def get_system_version():
     """Get system version information.
-    
+
     Provides comprehensive version information including
     application version, Python runtime, and architecture
     details for debugging and support purposes.
-    
+
     Returns:
         dict: Detailed version and system information.
-        
+
     Note:
         This endpoint is useful for support and debugging
         to identify exact system configuration and versions.

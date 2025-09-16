@@ -51,12 +51,12 @@ async def execute_batch(
 
     Raises:
         HTTPException: If configuration loading fails, file not found, or execution setup errors.
-        
+
     Security:
         - Validates batch file paths to prevent directory traversal
         - Ensures files exist and are readable before execution
         - Sanitizes file paths and configuration data
-        
+
     Note:
         Execution is handled asynchronously with status tracking through work ID.
         Use monitoring endpoints to track progress and results.
@@ -135,10 +135,10 @@ async def get_batch_status(
 
     Returns:
         BatchStatusResponse: Complete status information with metadata.
-        
+
     Raises:
         HTTPException: If work not found or status retrieval fails.
-        
+
     Note:
         Status includes both execution state and configuration details
         for comprehensive monitoring and debugging capabilities.
@@ -181,10 +181,10 @@ async def list_batches(
 
     Returns:
         BatchListResponse: Complete list of batch executions with metadata.
-        
+
     Raises:
         HTTPException: If listing fails due to service errors.
-        
+
     Note:
         Includes configuration metadata, execution origin information,
         and timing data for comprehensive batch management.
@@ -234,15 +234,15 @@ async def control_batch(
 
     Returns:
         BatchControlResponse: Control operation result with status information.
-        
+
     Raises:
         HTTPException: If work not found, action invalid, or control operation fails.
-        
+
     Security:
         - Validates action types against allowed operations
         - Ensures work exists before attempting control operations
         - Provides detailed error messages for debugging
-        
+
     Note:
         Control operations are executed synchronously with immediate
         status updates reflected in the work management system.

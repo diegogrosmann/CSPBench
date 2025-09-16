@@ -15,36 +15,36 @@ from pydantic import BaseModel, Field, field_validator
 
 class DatasetType(str, Enum):
     """Types of datasets supported by the system.
-    
+
     This enum defines the different methods available for creating
     datasets in the CSPBench system.
     """
 
     SYNTHETIC = "synthetic"  # Algorithmically generated datasets
-    FILE = "file"           # User-uploaded FASTA files
-    NCBI = "ncbi"          # Downloaded from NCBI databases
+    FILE = "file"  # User-uploaded FASTA files
+    NCBI = "ncbi"  # Downloaded from NCBI databases
 
 
 class SyntheticMethod(str, Enum):
     """Synthetic dataset generation methods.
-    
+
     This enum defines the available algorithms for generating
     synthetic biological sequence datasets.
     """
 
-    RANDOM = "random"        # Completely random sequences
-    NOISE = "noise"         # Add noise to base sequence
-    CLUSTERED = "clustered" # Generate clustered sequences
-    MUTATIONS = "mutations" # Apply mutations to base sequence
+    RANDOM = "random"  # Completely random sequences
+    NOISE = "noise"  # Add noise to base sequence
+    CLUSTERED = "clustered"  # Generate clustered sequences
+    MUTATIONS = "mutations"  # Apply mutations to base sequence
 
 
 class DatasetInfo(BaseModel):
     """Dataset information response model.
-    
+
     This model provides comprehensive metadata and statistics
     about a dataset, including sequence statistics, creation
     information, and storage details.
-    
+
     Attributes:
         id (str): Unique dataset identifier.
         name (str): Human-readable dataset name.
@@ -90,10 +90,10 @@ class DatasetInfo(BaseModel):
 
 class DatasetPreview(BaseModel):
     """Dataset preview with sample sequences.
-    
+
     This model provides a preview of dataset contents including
     metadata and a sample of the actual sequences for user inspection.
-    
+
     Attributes:
         info (DatasetInfo): Complete dataset metadata.
         sample_sequences (List[str]): First few sequences for preview.
@@ -109,10 +109,10 @@ class DatasetPreview(BaseModel):
 
 class DatasetUploadRequest(BaseModel):
     """Request for uploading dataset content.
-    
+
     This model validates and handles user requests to upload
     FASTA-formatted sequence data to create new datasets.
-    
+
     Attributes:
         name (str): Desired name for the new dataset.
         content (str): FASTA-formatted sequence content.
@@ -125,16 +125,16 @@ class DatasetUploadRequest(BaseModel):
     @classmethod
     def validate_fasta_content(cls, v: str):
         """Validate FASTA content format.
-        
+
         Ensures the uploaded content follows valid FASTA format
         with proper headers and sequence data.
-        
+
         Args:
             v (str): Content to validate.
-            
+
         Returns:
             str: Validated content.
-            
+
         Raises:
             ValueError: If content is empty or invalid FASTA format.
         """
@@ -154,10 +154,10 @@ class DatasetUploadRequest(BaseModel):
 
 class SyntheticDatasetRequest(BaseModel):
     """Request for synthetic dataset generation.
-    
+
     This model handles requests to generate synthetic biological
     sequence datasets using various algorithms and parameters.
-    
+
     Attributes:
         name (str): Name for the generated dataset.
         method (SyntheticMethod): Algorithm to use for generation.
@@ -209,10 +209,10 @@ class SyntheticDatasetRequest(BaseModel):
 
 class NCBIDatasetRequest(BaseModel):
     """Request for NCBI dataset download.
-    
+
     This model handles requests to download biological sequences
     from NCBI databases with filtering and processing options.
-    
+
     Attributes:
         name (str): Name for the downloaded dataset.
         query (str): NCBI search query string.
@@ -243,16 +243,16 @@ class NCBIDatasetRequest(BaseModel):
     @classmethod
     def validate_max_sequences(cls, v):
         """Validate max_sequences limit.
-        
+
         Ensures the maximum sequences requested doesn't exceed
         system limits for performance and resource management.
-        
+
         Args:
             v: Value to validate.
-            
+
         Returns:
             Validated value.
-            
+
         Raises:
             ValueError: If value exceeds maximum allowed limit.
         """
@@ -265,10 +265,10 @@ class NCBIDatasetRequest(BaseModel):
 
 class DatasetListResponse(BaseModel):
     """Response for dataset listing.
-    
+
     This model provides a paginated list of datasets with
     metadata for display and navigation purposes.
-    
+
     Attributes:
         datasets (List[DatasetInfo]): List of dataset information.
         total (int): Total number of datasets available.
@@ -280,10 +280,10 @@ class DatasetListResponse(BaseModel):
 
 class DatasetUpdateRequest(BaseModel):
     """Request for updating dataset metadata.
-    
+
     This model handles requests to modify dataset properties
     such as name and other mutable metadata fields.
-    
+
     Attributes:
         name (Optional[str]): New name for the dataset.
     """
@@ -293,11 +293,11 @@ class DatasetUpdateRequest(BaseModel):
 
 class OperationResponse(BaseModel):
     """Generic operation response.
-    
+
     This model provides a standardized response format for
     various dataset operations including success status,
     messages, and optional additional data.
-    
+
     Attributes:
         success (bool): Whether the operation completed successfully.
         message (str): Human-readable result description.
@@ -311,10 +311,10 @@ class OperationResponse(BaseModel):
 
 class DatasetGenerationStatus(BaseModel):
     """Dataset generation status response.
-    
+
     This model tracks the progress and status of dataset generation
     operations, particularly for long-running tasks like NCBI downloads.
-    
+
     Attributes:
         status (str): Current status (pending, running, completed, failed).
         progress (int): Completion percentage (0-100).

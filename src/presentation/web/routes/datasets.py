@@ -169,7 +169,7 @@ async def get_dataset(dataset_id: str):
     Raises:
         HTTPException: If dataset not found or retrieval fails.
     """
-    try :
+    try:
         if not FileDatasetRepository.exists(dataset_id):
             raise HTTPException(
                 status_code=404, detail=f"Dataset '{dataset_id}' not found"
@@ -185,6 +185,7 @@ async def get_dataset(dataset_id: str):
     except Exception as e:
         logger.error(f"Error getting dataset {dataset_id}: {e}")
         raise HTTPException(status_code=500, detail="Failed to retrieve dataset")
+
 
 @router.get("/{dataset_id}/preview", response_model=DatasetPreview)
 async def get_dataset_preview(dataset_id: str, max_sequences: int = 5):
@@ -204,7 +205,7 @@ async def get_dataset_preview(dataset_id: str, max_sequences: int = 5):
     Raises:
         HTTPException: If dataset not found or preview generation fails.
     """
-    try :
+    try:
         if not FileDatasetRepository.exists(dataset_id):
             raise HTTPException(
                 status_code=404, detail=f"Dataset '{dataset_id}' not found"
@@ -320,6 +321,7 @@ async def upload_dataset_file(
         logger.error(f"Error uploading dataset file: {e}")
         raise HTTPException(status_code=500, detail="Failed to upload dataset file")
 
+
 @router.post("/upload/text", response_model=OperationResponse)
 async def upload_dataset_text(request: DatasetUploadRequest):
     """Upload a new dataset from FASTA content (text input).
@@ -340,7 +342,7 @@ async def upload_dataset_text(request: DatasetUploadRequest):
         Provides the same functionality as file upload but accepts
         text input directly from web forms or API clients.
     """
-    try :
+    try:
         # Parse FASTA content
         sequences = []
         current_seq = []
@@ -410,7 +412,7 @@ async def generate_synthetic_dataset(
         Generation runs in background with status tracking via task ID.
         Use generation status endpoint to monitor progress.
     """
-    try :
+    try:
         # Generate unique task ID
         task_id = str(uuid.uuid4())
 
@@ -430,11 +432,12 @@ async def generate_synthetic_dataset(
             data={"task_id": task_id},
         )
 
-    except Exception as e :
+    except Exception as e:
         logger.error(f"Error starting synthetic generation: {e}")
         raise HTTPException(
             status_code=500, detail="Failed to start dataset generation"
         )
+
 
 @router.post("/generate/ncbi", response_model=OperationResponse)
 async def generate_ncbi_dataset(
@@ -459,7 +462,7 @@ async def generate_ncbi_dataset(
         Download runs in background with progress tracking.
         Large queries may take significant time to complete.
     """
-    try :
+    try:
         # Generate unique task ID
         task_id = str(uuid.uuid4())
 
@@ -479,9 +482,10 @@ async def generate_ncbi_dataset(
             data={"task_id": task_id},
         )
 
-    except Exception as e :
+    except Exception as e:
         logger.error(f"Error starting NCBI download: {e}")
         raise HTTPException(status_code=500, detail="Failed to start dataset download")
+
 
 @router.get("/generation/{task_id}/status", response_model=DatasetGenerationStatus)
 async def get_generation_status(task_id: str):
@@ -534,7 +538,7 @@ async def update_dataset(dataset_id: str, request: DatasetUpdateRequest):
     Raises:
         HTTPException: If dataset not found or update fails.
     """
-    try :
+    try:
         if not FileDatasetRepository.exists(dataset_id):
             raise HTTPException(
                 status_code=404, detail=f"Dataset '{dataset_id}' not found"
@@ -554,12 +558,13 @@ async def update_dataset(dataset_id: str, request: DatasetUpdateRequest):
             success=True, message=f"Dataset '{dataset_id}' updated successfully"
         )
 
-    except DatasetNotFoundError :
+    except DatasetNotFoundError:
         raise HTTPException(status_code=404, detail=f"Dataset '{dataset_id}' not found")
-    except Exception as e :
+    except Exception as e:
         logger.error(f"Error updating dataset {dataset_id}: {e}")
         raise HTTPException(status_code=500, detail="Failed to update dataset")
-    
+
+
 @router.delete("/{dataset_id}", response_model=OperationResponse)
 async def delete_dataset(dataset_id: str):
     """Delete a dataset and its associated files.
@@ -580,7 +585,7 @@ async def delete_dataset(dataset_id: str):
         This operation is irreversible. Ensure proper backup
         procedures if dataset preservation is required.
     """
-    try :
+    try:
         if not FileDatasetRepository.exists(dataset_id):
             raise HTTPException(
                 status_code=404, detail=f"Dataset '{dataset_id}' not found"
@@ -595,10 +600,11 @@ async def delete_dataset(dataset_id: str):
         else:
             raise HTTPException(status_code=500, detail="Failed to delete dataset")
 
-    except Exception as e :
+    except Exception as e:
         logger.error(f"Error deleting dataset {dataset_id}: {e}")
         raise HTTPException(status_code=500, detail="Failed to delete dataset")
-    
+
+
 @router.get("/{dataset_id}/download", response_class=FileResponse)
 async def download_dataset(dataset_id: str):
     """Download dataset file in FASTA format.
@@ -615,7 +621,7 @@ async def download_dataset(dataset_id: str):
     Raises:
         HTTPException: If dataset or file not found.
     """
-    try :
+    try:
         if not FileDatasetRepository.exists(dataset_id):
             raise HTTPException(
                 status_code=404, detail=f"Dataset '{dataset_id}' not found"
@@ -632,10 +638,11 @@ async def download_dataset(dataset_id: str):
             path=file_path, filename=f"{dataset_id}.fasta", media_type="text/plain"
         )
 
-    except Exception as e :
+    except Exception as e:
         logger.error(f"Error downloading dataset {dataset_id}: {e}")
         raise HTTPException(status_code=500, detail="Failed to download dataset")
-    
+
+
 async def _generate_synthetic_background(
     task_id: str, request: SyntheticDatasetRequest
 ):
@@ -652,7 +659,7 @@ async def _generate_synthetic_background(
         Updates global status dictionary with progress information
         and handles all generation methods with appropriate parameter mapping.
     """
-    try :
+    try:
         # Update status
         _generation_status[task_id].progress = 25
         _generation_status[task_id].message = "Configuring generation parameters..."
@@ -714,7 +721,7 @@ async def _generate_synthetic_background(
             dataset_id=dataset_id,
         )
 
-    except Exception as e :
+    except Exception as e:
         logger.error(f"Error in synthetic generation task {task_id}: {e}")
         _generation_status[task_id] = DatasetGenerationStatus(
             status=BaseStatus.FAILED.value,
@@ -722,7 +729,8 @@ async def _generate_synthetic_background(
             message="Generation failed",
             error=str(e),
         )
-    
+
+
 async def _generate_ncbi_background(task_id: str, request: NCBIDatasetRequest):
     """Background task for NCBI dataset download with progress tracking.
 
@@ -737,7 +745,7 @@ async def _generate_ncbi_background(task_id: str, request: NCBIDatasetRequest):
         Handles NCBI API communication, sequence filtering, and
         dataset creation with appropriate error recovery.
     """
-    try :
+    try:
         # Update status
         _generation_status[task_id].progress = 25
         _generation_status[task_id].message = "Connecting to NCBI..."
@@ -777,7 +785,7 @@ async def _generate_ncbi_background(task_id: str, request: NCBIDatasetRequest):
             dataset_id=dataset_id,
         )
 
-    except Exception as e :
+    except Exception as e:
         logger.error(f"Error in NCBI download task {task_id}: {e}")
         _generation_status[task_id] = DatasetGenerationStatus(
             status=BaseStatus.FAILED.value,
@@ -785,4 +793,3 @@ async def _generate_ncbi_background(task_id: str, request: NCBIDatasetRequest):
             message="Download failed",
             error=str(e),
         )
-    

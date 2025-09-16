@@ -201,7 +201,7 @@ def _dispatch_args(args: list[str]) -> None:
     Note:
         This function performs argument normalization, specifically converting
         standalone YAML files to 'batch <file>' commands for backward compatibility.
-        
+
         The function temporarily modifies sys.argv to ensure proper Typer execution
         and restores it afterward.
     """
@@ -286,7 +286,7 @@ if __name__ == "__main__":
 
             def _invoke(cmd_args: list[str]):  # local to avoid exporting
                 """Local function to invoke commands from interactive menu.
-                
+
                 Args:
                     cmd_args: List of command arguments from interactive menu
                 """

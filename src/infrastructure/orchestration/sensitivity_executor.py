@@ -13,7 +13,6 @@ from __future__ import annotations
 import random
 import time
 from concurrent.futures import ProcessPoolExecutor
-from pathlib import Path
 from statistics import variance
 from typing import Any
 
@@ -49,7 +48,7 @@ def _sample_worker(
     work_id: str | None = None,
 ) -> tuple[dict[str, Any], str]:
     """Function executed in subprocess for a sensitivity analysis sample (needs to be picklable).
-    
+
     Args:
         sensitivity_unit_id: Unique identifier for this sensitivity unit
         sample_number: Sample sequence number
@@ -62,7 +61,7 @@ def _sample_worker(
         algorithm_name: Name of algorithm to execute
         cpu_config: CPU configuration for worker process
         work_id: Work identifier for status checking
-        
+
     Returns:
         Tuple of (sample_result_dict, sensitivity_unit_id)
     """
@@ -77,12 +76,6 @@ def _sample_worker(
     )
     from src.infrastructure.persistence.work_state.core import (  # local import
         WorkPersistence,
-    )
-    from src.infrastructure.persistence.work_state.wrappers.execution_scoped import (
-        ExecutionScopedPersistence,
-    )
-    from src.infrastructure.persistence.work_state.wrappers.work_scoped import (
-        WorkScopedPersistence,
     )
 
     logger = get_logger("CSPBench.SampleWorker")
@@ -208,7 +201,7 @@ class SensitivityExecutor(AbstractExecutionEngine):
         batch_config: CSPBenchConfig,
     ):
         """Initialize sensitivity executor.
-        
+
         Args:
             combination_store: Scoped persistence for combination data
             execution_controller: Controller for execution limits and status
@@ -223,12 +216,12 @@ class SensitivityExecutor(AbstractExecutionEngine):
         alg: AlgParams,
     ) -> BaseStatus:
         """Execute sensitivity analysis by parameter sampling.
-        
+
         Args:
             task: Sensitivity analysis task configuration
             dataset_obj: Dataset to analyze
             alg: Algorithm parameters configuration
-            
+
         Returns:
             Final execution status
         """
@@ -378,12 +371,12 @@ class SensitivityExecutor(AbstractExecutionEngine):
         rng: random.Random,
     ) -> dict[str, Any]:
         """Generate sample parameters based on sensitivity configuration.
-        
+
         Args:
             base_params: Base algorithm parameters
             sensitivity_params: Sensitivity parameter configuration
             rng: Random number generator
-            
+
         Returns:
             Generated parameters for this sample
         """
@@ -453,7 +446,7 @@ class SensitivityExecutor(AbstractExecutionEngine):
         rng,
     ) -> tuple[int, int, list[dict[str, Any]]]:
         """Execute sensitivity analysis in parallel.
-        
+
         Args:
             task: Sensitivity task configuration
             dataset_obj: Dataset object
@@ -466,7 +459,7 @@ class SensitivityExecutor(AbstractExecutionEngine):
             dataset_id: Dataset identifier
             max_workers: Maximum number of worker processes
             rng: Random number generator
-            
+
         Returns:
             Tuple of (completed_samples, failed_samples, results)
         """
@@ -565,7 +558,7 @@ class SensitivityExecutor(AbstractExecutionEngine):
         rng,
     ) -> tuple[int, int, list[dict[str, Any]]]:
         """Execute sensitivity analysis sequentially.
-        
+
         Args:
             task: Sensitivity task configuration
             dataset_obj: Dataset object
@@ -577,7 +570,7 @@ class SensitivityExecutor(AbstractExecutionEngine):
             alphabet: Alphabet used
             dataset_id: Dataset identifier
             rng: Random number generator
-            
+
         Returns:
             Tuple of (completed_samples, failed_samples, results)
         """
@@ -661,12 +654,12 @@ class SensitivityExecutor(AbstractExecutionEngine):
         method: str,
     ) -> dict[str, float]:
         """Perform sensitivity analysis based on sample results.
-        
+
         Args:
             results: List of sample execution results
             sensitivity_params: Sensitivity parameter configuration
             method: Analysis method to use
-            
+
         Returns:
             Dictionary of parameter sensitivity scores
         """
@@ -702,7 +695,9 @@ class SensitivityExecutor(AbstractExecutionEngine):
                 if param_name in sample_params and result.get("objective") is not None:
                     param_value = sample_params[param_name]
                     # Only include numeric values for correlation analysis
-                    if isinstance(param_value, (int, float)) and not isinstance(param_value, bool):
+                    if isinstance(param_value, (int, float)) and not isinstance(
+                        param_value, bool
+                    ):
                         param_values.append(float(param_value))
                         param_objectives.append(float(result["objective"]))
 
@@ -713,9 +708,13 @@ class SensitivityExecutor(AbstractExecutionEngine):
 
                     # Ensure both arrays are numpy arrays with numeric dtype
                     param_values_array = np.array(param_values, dtype=np.float64)
-                    param_objectives_array = np.array(param_objectives, dtype=np.float64)
-                    
-                    correlation = np.corrcoef(param_values_array, param_objectives_array)[0, 1]
+                    param_objectives_array = np.array(
+                        param_objectives, dtype=np.float64
+                    )
+
+                    correlation = np.corrcoef(
+                        param_values_array, param_objectives_array
+                    )[0, 1]
                     param_scores[param_name] = (
                         abs(correlation) if not np.isnan(correlation) else 0.0
                     )
@@ -723,7 +722,9 @@ class SensitivityExecutor(AbstractExecutionEngine):
                     # Fallback to simple variance calculation if numpy not available
                     param_scores[param_name] = overall_variance
                 except (ValueError, TypeError) as e:
-                    logger.warning(f"Error calculating correlation for {param_name}: {e}")
+                    logger.warning(
+                        f"Error calculating correlation for {param_name}: {e}"
+                    )
                     param_scores[param_name] = overall_variance
             else:
                 param_scores[param_name] = 0.0
@@ -739,7 +740,7 @@ class SensitivityExecutor(AbstractExecutionEngine):
         self, param_scores: dict[str, float], method: str, num_samples: int
     ) -> None:
         """Store sensitivity analysis results.
-        
+
         Args:
             param_scores: Parameter sensitivity scores
             method: Analysis method used
@@ -764,6 +765,4 @@ class SensitivityExecutor(AbstractExecutionEngine):
             )
             logger.info("Sensitivity analysis results stored")
         except Exception as e:
-            logger.warning(
-                f"Error storing sensitivity analysis results: {e}"
-            )
+            logger.warning(f"Error storing sensitivity analysis results: {e}")

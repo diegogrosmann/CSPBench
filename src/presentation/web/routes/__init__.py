@@ -7,7 +7,7 @@ facilitate maintainability.
 
 Route Modules:
     pages: HTML page routes for serving Jinja2 templates
-    health: System health check and monitoring endpoints  
+    health: System health check and monitoring endpoints
     algorithms: Algorithm discovery and metadata endpoints
     datasets: Dataset management CRUD operations
     batches: Batch configuration file management
@@ -29,7 +29,7 @@ Usage:
 
 Security:
     - Input validation through Pydantic models
-    - Path sanitization for file operations  
+    - Path sanitization for file operations
     - Authorization checks where applicable
     - Rate limiting and abuse prevention
 """

@@ -2,7 +2,7 @@
 """
 Web Interface Launcher for CSPBench Development and Production.
 
-This script provides a convenient and configurable way to start the CSPBench web 
+This script provides a convenient and configurable way to start the CSPBench web
 interface with proper environment configuration, security settings, and development
 features. It follows CSPBench guidelines for environment management and includes
 comprehensive logging and error handling.
@@ -26,15 +26,15 @@ def main():
 
     Environment Variables:
         WEB_HOST (str): Host address to bind to (default: "0.0.0.0")
-        PORT (str): Primary port configuration (default: "8000") 
+        PORT (str): Primary port configuration (default: "8000")
         WEB_PORT (str): Alternative port configuration (fallback)
         DEBUG (str): Enable debug mode with detailed logging (default: "false")
         RELOAD (str): Enable auto-reload for development (default: follows DEBUG)
         LOG_LEVEL (str): Uvicorn logging level (default: follows DEBUG)
-        
+
     Features Enabled:
         - Algorithm execution type selection interface
-        - Modular component-based UI architecture  
+        - Modular component-based UI architecture
         - Dataset upload, management, and generation tools
         - Real-time execution monitoring with WebSocket
         - Comprehensive results visualization and analysis
@@ -45,18 +45,18 @@ def main():
     Raises:
         ImportError: If required dependencies (uvicorn, FastAPI) are not installed
         SystemExit: If configuration errors or startup failures occur
-        
+
     Example:
         Run with default configuration::
-        
+
             python src/presentation/web/run_web.py
-            
+
         Run with custom configuration::
-        
+
             WEB_HOST=localhost PORT=3000 DEBUG=true python run_web.py
-            
+
         Production deployment::
-        
+
             WEB_HOST=0.0.0.0 PORT=80 DEBUG=false python run_web.py
 
     Note:
@@ -109,7 +109,7 @@ def main():
 
         # Configure reload directories for development
         reload_dirs = [str(project_root / "src")] if reload else None
-        
+
         # Start the uvicorn server with optimized configuration
         uvicorn.run(
             app=app,
@@ -144,7 +144,9 @@ def main():
 
     except PermissionError as e:
         print(f"❌ Permission Error: {e}")
-        print("💡 Try using a different port (>1024) or run with appropriate permissions")
+        print(
+            "💡 Try using a different port (>1024) or run with appropriate permissions"
+        )
         sys.exit(1)
 
     except Exception as e:

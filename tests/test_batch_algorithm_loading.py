@@ -81,13 +81,13 @@ resources:
         expected_algorithms = ["BLF-GA", "H2-CSP"]
 
         assert set(algorithms) == set(expected_algorithms), (
-            f"Algoritmos carregados: {algorithms}, " f"Esperados: {expected_algorithms}"
+            f"Algoritmos carregados: {algorithms}, Esperados: {expected_algorithms}"
         )  # Verificar que algoritmos comentados foram ignorados
         commented_algorithms = ["Baseline", "CSC", "DP-CSP"]
         for alg in commented_algorithms:
-            assert (
-                alg not in algorithms
-            ), f"Algoritmo comentado '{alg}' foi carregado incorretamente"
+            assert alg not in algorithms, (
+                f"Algoritmo comentado '{alg}' foi carregado incorretamente"
+            )
 
     def test_all_enabled_algorithms_are_loaded(self):
         """Testa se todos os algoritmos são carregados quando não comentados."""
@@ -99,7 +99,7 @@ resources:
         expected_algorithms = ["Baseline", "BLF-GA", "CSC", "H2-CSP", "DP-CSP"]
 
         assert set(algorithms) == set(expected_algorithms), (
-            f"Algoritmos carregados: {algorithms}, " f"Esperados: {expected_algorithms}"
+            f"Algoritmos carregados: {algorithms}, Esperados: {expected_algorithms}"
         )
 
     def test_all_commented_algorithms_result_in_empty_list(self):
@@ -120,8 +120,7 @@ resources:
         expected_1 = ["Baseline", "CSC", "DP-CSP"]  # BLF-GA e H²-CSP comentados
 
         assert set(algorithms_1) == set(expected_1), (
-            f"Preset 1 - Algoritmos carregados: {algorithms_1}, "
-            f"Esperados: {expected_1}"
+            f"Preset 1 - Algoritmos carregados: {algorithms_1}, Esperados: {expected_1}"
         )
 
         # Testar segundo preset
@@ -129,8 +128,7 @@ resources:
         expected_2 = ["BLF-GA", "H2-CSP"]  # Baseline, CSC e DP-CSP comentados
 
         assert set(algorithms_2) == set(expected_2), (
-            f"Preset 2 - Algoritmos carregados: {algorithms_2}, "
-            f"Esperados: {expected_2}"
+            f"Preset 2 - Algoritmos carregados: {algorithms_2}, Esperados: {expected_2}"
         )
 
     def test_no_algorithm_list_loads_all_params(self):
@@ -143,7 +141,7 @@ resources:
         expected_algorithms = ["Baseline", "BLF-GA", "CSC"]
 
         assert set(algorithms) == set(expected_algorithms), (
-            f"Algoritmos carregados: {algorithms}, " f"Esperados: {expected_algorithms}"
+            f"Algoritmos carregados: {algorithms}, Esperados: {expected_algorithms}"
         )
 
     def test_empty_algorithm_list_results_in_empty_preset(self):
@@ -171,12 +169,12 @@ resources:
                 "BLF-GA",
                 "H2-CSP",
             ], f"Algoritmo inesperado carregado: {item.name}"
-            assert isinstance(
-                item.params, dict
-            ), f"Parâmetros do algoritmo {item.name} devem ser um dicionário"
-            assert (
-                len(item.params) > 0
-            ), f"Algoritmo {item.name} deve ter parâmetros definidos"
+            assert isinstance(item.params, dict), (
+                f"Parâmetros do algoritmo {item.name} devem ser um dicionário"
+            )
+            assert len(item.params) > 0, (
+                f"Algoritmo {item.name} deve ter parâmetros definidos"
+            )
 
     def test_preset_metadata_is_preserved(self):
         """Testa se metadados do preset são preservados durante o carregamento."""
@@ -302,9 +300,9 @@ resources:
                     if item.name == "BLF-GA":
                         blfga_params.append(item.params)
 
-        assert (
-            len(blfga_params) > 0
-        ), "Deve encontrar pelo menos um conjunto de parâmetros BLF-GA"
+        assert len(blfga_params) > 0, (
+            "Deve encontrar pelo menos um conjunto de parâmetros BLF-GA"
+        )
 
         # Verificar que todos têm campos obrigatórios
         for params in blfga_params:

@@ -14,10 +14,10 @@ from pydantic import BaseModel, Field, field_validator
 
 class BatchFileInfo(BaseModel):
     """Batch file information model.
-    
+
     This model represents metadata and information about batch configuration
     files stored in the system, including file properties and embedded metadata.
-    
+
     Attributes:
         name (str): Batch file name.
         description (Optional[str]): File description.
@@ -51,10 +51,10 @@ class BatchFileInfo(BaseModel):
 
 class BatchListResponse(BaseModel):
     """Batch files list response model.
-    
+
     This model provides a response structure for listing batch files,
     including pagination information and file metadata.
-    
+
     Attributes:
         files (List[BatchFileInfo]): List of batch file information objects.
         total (int): Total number of batch files available.
@@ -66,10 +66,10 @@ class BatchListResponse(BaseModel):
 
 class BatchUploadRequest(BaseModel):
     """Request for uploading batch configuration content.
-    
+
     This model handles and validates requests to upload new batch
     configuration files to the system with proper YAML validation.
-    
+
     Attributes:
         name (str): Name for the batch configuration file.
         content (str): YAML batch configuration content.
@@ -84,16 +84,16 @@ class BatchUploadRequest(BaseModel):
     @classmethod
     def validate_yaml_content(cls, v: str):
         """Validate YAML content format.
-        
+
         Ensures the uploaded content is valid YAML format that can
         be parsed successfully.
-        
+
         Args:
             v (str): YAML content to validate.
-            
+
         Returns:
             str: Validated YAML content.
-            
+
         Raises:
             ValueError: If content is empty or invalid YAML format.
         """
@@ -112,16 +112,16 @@ class BatchUploadRequest(BaseModel):
     @classmethod
     def validate_name(cls, v: str):
         """Validate batch configuration name.
-        
+
         Ensures the batch name is safe for filesystem operations
         by removing potentially dangerous characters.
-        
+
         Args:
             v (str): Batch name to validate.
-            
+
         Returns:
             str: Validated and sanitized batch name.
-            
+
         Raises:
             ValueError: If name is empty or contains invalid characters.
         """
@@ -139,10 +139,10 @@ class BatchUploadRequest(BaseModel):
 
 class OperationResponse(BaseModel):
     """Generic operation response model.
-    
+
     This model provides a standardized response format for various
     batch operations including success status, messages, and optional data.
-    
+
     Attributes:
         success (bool): Whether the operation completed successfully.
         message (str): Human-readable operation result message.

@@ -14,13 +14,13 @@ def create_mock_work_store(db_path: Path):
     """Create a mock work_store that provides access to the SQLite database."""
     # Keep a persistent connection to prevent "Cannot operate on a closed database" error
     persistent_conn = sqlite3.connect(db_path)
-    
+
     def get_connection():
         return persistent_conn
-    
+
     mock_engine = Mock()
     mock_engine.raw_connection = get_connection
-    
+
     def get_work_export_data(work_id: str):
         conn = sqlite3.connect(db_path)
         cur = conn.cursor()
@@ -29,11 +29,11 @@ def create_mock_work_store(db_path: Path):
         if row:
             return {"id": row[0], "status": row[1]}
         return {}
-    
+
     def get_combinations_for_export(work_id: str):
         # No combinations table in minimal test db
         return []
-    
+
     def get_executions_for_export(work_id: str):
         conn = sqlite3.connect(db_path)
         cur = conn.cursor()
@@ -41,21 +41,23 @@ def create_mock_work_store(db_path: Path):
         rows = cur.fetchall()
         results = []
         for row in rows:
-            results.append({
-                "id": row[0],
-                "combination_id": row[1],
-                "status": row[2],
-                "params_json": row[3],
-                "result_json": row[4],
-                "objective": row[5],
-                "unit_id": row[6],
-                "sequencia": row[7]
-            })
+            results.append(
+                {
+                    "id": row[0],
+                    "combination_id": row[1],
+                    "status": row[2],
+                    "params_json": row[3],
+                    "result_json": row[4],
+                    "objective": row[5],
+                    "unit_id": row[6],
+                    "sequencia": row[7],
+                }
+            )
         return results
-    
+
     def get_execution_progress_for_export(work_id: str):
         return []
-    
+
     def get_events_for_export(work_id: str):
         conn = sqlite3.connect(db_path)
         cur = conn.cursor()
@@ -63,20 +65,22 @@ def create_mock_work_store(db_path: Path):
         rows = cur.fetchall()
         results = []
         for row in rows:
-            results.append({
-                "id": row[0],
-                "event_type": row[1],
-                "entity_data_json": row[2],
-                "timestamp": row[3]
-            })
+            results.append(
+                {
+                    "id": row[0],
+                    "event_type": row[1],
+                    "entity_data_json": row[2],
+                    "timestamp": row[3],
+                }
+            )
         return results
-    
+
     def get_datasets_for_export(work_id: str):
         return []
-    
+
     def get_dataset_sequences_for_export(work_id: str):
         return []
-    
+
     def get_optimization_executions_for_export(work_id: str):
         conn = sqlite3.connect(db_path)
         cur = conn.cursor()
@@ -84,33 +88,39 @@ def create_mock_work_store(db_path: Path):
         rows = cur.fetchall()
         results = []
         for row in rows:
-            results.append({
-                "id": row[0],
-                "combination_id": row[1],
-                "status": row[2],
-                "params_json": row[3],
-                "result_json": row[4],
-                "objective": row[5],
-                "unit_id": row[6],
-                "sequencia": row[7]
-            })
+            results.append(
+                {
+                    "id": row[0],
+                    "combination_id": row[1],
+                    "status": row[2],
+                    "params_json": row[3],
+                    "result_json": row[4],
+                    "objective": row[5],
+                    "unit_id": row[6],
+                    "sequencia": row[7],
+                }
+            )
         return results
-    
+
     def get_sensitivity_events_for_export(work_id: str):
         conn = sqlite3.connect(db_path)
         cur = conn.cursor()
-        cur.execute("SELECT * FROM events WHERE event_type = 'progress' AND entity_data_json LIKE '%\"unit_id\": \"sensitivity_analysis\"%'")
+        cur.execute(
+            "SELECT * FROM events WHERE event_type = 'progress' AND entity_data_json LIKE '%\"unit_id\": \"sensitivity_analysis\"%'"
+        )
         rows = cur.fetchall()
         results = []
         for row in rows:
-            results.append({
-                "id": row[0],
-                "event_type": row[1],
-                "entity_data_json": row[2],
-                "timestamp": row[3]
-            })
+            results.append(
+                {
+                    "id": row[0],
+                    "event_type": row[1],
+                    "entity_data_json": row[2],
+                    "timestamp": row[3],
+                }
+            )
         return results
-    
+
     mock_store = Mock()
     mock_store._engine = mock_engine
     mock_store.get_work_export_data = get_work_export_data
@@ -120,12 +130,14 @@ def create_mock_work_store(db_path: Path):
     mock_store.get_events_for_export = get_events_for_export
     mock_store.get_datasets_for_export = get_datasets_for_export
     mock_store.get_dataset_sequences_for_export = get_dataset_sequences_for_export
-    mock_store.get_optimization_executions_for_export = get_optimization_executions_for_export
+    mock_store.get_optimization_executions_for_export = (
+        get_optimization_executions_for_export
+    )
     mock_store.get_sensitivity_events_for_export = get_sensitivity_events_for_export
-    
+
     mock_work_store = Mock()
     mock_work_store.store = mock_store
-    
+
     return mock_work_store
 
 

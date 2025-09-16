@@ -22,6 +22,7 @@ logger = get_logger("CSPBench.AlgorithmRunner")
 
 class AlgorithmExecutionError(Exception):
     """Exception raised during algorithm execution."""
+
     pass
 
 
@@ -62,7 +63,9 @@ def run_algorithm(
     # Check first if not paused or canceled
     initial_status = execution_controller.check_status()
     if initial_status in [BaseStatus.PAUSED, BaseStatus.CANCELED]:
-        logger.info(f"Algorithm '{algorithm_name}' will not be executed - current status: {initial_status.value}")
+        logger.info(
+            f"Algorithm '{algorithm_name}' will not be executed - current status: {initial_status.value}"
+        )
         return {
             "status": initial_status,
             "algorithm_result": None,
@@ -114,7 +117,9 @@ def run_algorithm(
         pre_execution_status = execution_controller.check_status()
         if pre_execution_status in [BaseStatus.PAUSED, BaseStatus.CANCELED]:
             duration = time.time() - t0
-            logger.info(f"Algorithm '{algorithm_name}' will not be executed - status changed to: {pre_execution_status.value}")
+            logger.info(
+                f"Algorithm '{algorithm_name}' will not be executed - status changed to: {pre_execution_status.value}"
+            )
             return {
                 "status": pre_execution_status,
                 "algorithm_result": None,

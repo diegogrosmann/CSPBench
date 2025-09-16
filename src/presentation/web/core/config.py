@@ -22,11 +22,11 @@ logger = get_logger("CSPBench.WebConfig")
 
 class WebConfig:
     """Configuration management for CSPBench web interface.
-    
+
     This class manages web application configuration including environment
     variables, paths, and service initialization. It implements the
     singleton pattern to ensure consistent configuration across the application.
-    
+
     Attributes:
         config (Optional[CSPBenchConfig]): Core CSPBench configuration.
         web_host (str): Web server bind address.
@@ -44,7 +44,7 @@ class WebConfig:
 
     def __init__(self):
         """Initialize the configuration.
-        
+
         Loads configuration from environment variables and sets up
         default paths using the standardized path utilities.
         """
@@ -75,10 +75,10 @@ class WebConfig:
     @classmethod
     def get_instance(cls) -> "WebConfig":
         """Get singleton instance.
-        
+
         Returns the singleton WebConfig instance, creating it if necessary.
         This method is thread-safe using double-checked locking pattern.
-        
+
         Returns:
             WebConfig: The singleton configuration instance.
         """
@@ -90,13 +90,13 @@ class WebConfig:
 
     def initialize_services(self):
         """Initialize CSPBench configuration and services.
-        
+
         Loads the core CSPBench configuration and initializes required
         services for the web application.
-        
+
         Returns:
             bool: True if initialization succeeded, False otherwise.
-            
+
         Note:
             This method handles exceptions gracefully and logs errors
             to help with debugging configuration issues.
@@ -119,13 +119,13 @@ class WebConfig:
 
     def get_pipeline_service(self):  # -> PipelineService: Service doesn't exist
         """Get pipeline service instance.
-        
+
         Returns the pipeline service instance, initializing services
         if they haven't been initialized yet.
-        
+
         Returns:
             PipelineService or None: Pipeline service instance or None if not available.
-            
+
         Note:
             Currently returns None as the PipelineService doesn't exist yet.
         """
@@ -136,10 +136,10 @@ class WebConfig:
 
     def get_config(self) -> CSPBenchConfig:
         """Get CSPBench configuration.
-        
+
         Returns the core CSPBench configuration, initializing it
         if it hasn't been loaded yet.
-        
+
         Returns:
             CSPBenchConfig: The core configuration object.
         """
@@ -154,9 +154,9 @@ class WebConfig:
 
 def get_web_config() -> WebConfig:
     """Get the global web config instance.
-    
+
     Convenience function to access the singleton WebConfig instance.
-    
+
     Returns:
         WebConfig: The global configuration instance.
     """

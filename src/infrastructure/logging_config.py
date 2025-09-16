@@ -8,7 +8,7 @@ across different deployment scenarios.
 
 Features:
     - Environment-variable driven configuration
-    - Rotating file handlers with size limits  
+    - Rotating file handlers with size limits
     - Configurable log levels and formatting
     - Console and file output options
     - Thread-safe logger initialization
@@ -24,14 +24,14 @@ Environment Variables:
 
 Example:
     Basic setup using environment variables::
-        
+
         import os
         os.environ['LOG_LEVEL'] = 'INFO'
         os.environ['LOG_DIRECTORY'] = 'logs'
-        
+
         from src.infrastructure.logging_config import setup_logging_from_env
         setup_logging_from_env()
-        
+
         logger = get_logger(__name__)
         logger.info("Application started")
 """
@@ -60,13 +60,13 @@ def setup_basic_logging(
 
     Args:
         level: Log level (DEBUG, INFO, WARNING, ERROR) - defaults to LOG_LEVEL env var
-        log_dir: Directory for log files - defaults to LOG_DIRECTORY env var  
+        log_dir: Directory for log files - defaults to LOG_DIRECTORY env var
         base_name: Base name for log files - defaults to LOG_BASE_NAME env var
         max_bytes: Maximum file size before rotation - defaults to LOG_MAX_BYTES env var
         backup_count: Number of backups to maintain - defaults to LOG_BACKUP_COUNT env var
         log_file_path: Full file path (overrides log_dir + base_name combination)
         log_to_stdout: Whether to log to console instead of file - defaults to LOG_TO_STDOUT env var
-        
+
     Note:
         This function configures the root logger and will affect all loggers
         in the application. Call only once during application initialization.
@@ -129,10 +129,10 @@ def setup_logging_from_env() -> None:
     This is a convenience function that sets up logging entirely from .env configuration.
     It's equivalent to calling setup_basic_logging() with no arguments, which will
     use all environment variable defaults.
-    
+
     Environment Variables Used:
         - LOG_LEVEL: Logging level (default: INFO)
-        - LOG_DIRECTORY: Log file directory (default: outputs/logs)  
+        - LOG_DIRECTORY: Log file directory (default: outputs/logs)
         - LOG_BASE_NAME: Log file base name (default: cspbench)
         - LOG_MAX_BYTES: Max file size for rotation (default: 10485760)
         - LOG_BACKUP_COUNT: Number of backup files (default: 5)
@@ -154,7 +154,7 @@ def get_logger(name: str) -> logging.Logger:
 
     Returns:
         Configured logger instance ready for use
-        
+
     Example:
         module_logger = get_logger(__name__)
         module_logger.info("Module initialized")
@@ -164,11 +164,11 @@ def get_logger(name: str) -> logging.Logger:
 
 class LoggerConfig:
     """Centralized logger configuration manager.
-    
+
     This class provides a singleton-like interface for managing logging
     configuration across the application. It ensures logging is initialized
     only once and provides methods for runtime configuration changes.
-    
+
     Attributes:
         _initialized: Whether logging has been set up
         _log_level: Current logging level
@@ -180,10 +180,10 @@ class LoggerConfig:
     @classmethod
     def initialize(cls, level: Optional[str] = None, **kwargs) -> None:
         """Initialize logging configuration.
-        
+
         Sets up logging if not already initialized. This method is idempotent
         and safe to call multiple times.
-        
+
         Args:
             level: Logging level to use (defaults to LOG_LEVEL env var)
             **kwargs: Additional arguments passed to setup_basic_logging()
@@ -198,7 +198,7 @@ class LoggerConfig:
     @classmethod
     def get_level(cls) -> str:
         """Get the current logging level.
-        
+
         Returns:
             Current logging level as string (e.g., 'INFO', 'DEBUG')
         """
@@ -207,9 +207,9 @@ class LoggerConfig:
     @classmethod
     def set_level(cls, level: str) -> None:
         """Change the logging level at runtime.
-        
+
         Updates both the class state and the actual logger configuration.
-        
+
         Args:
             level: New logging level (DEBUG, INFO, WARNING, ERROR)
         """
@@ -219,7 +219,7 @@ class LoggerConfig:
     @classmethod
     def is_initialized(cls) -> bool:
         """Check if logging has been initialized.
-        
+
         Returns:
             True if logging configuration has been set up, False otherwise
         """
@@ -238,7 +238,7 @@ class LoggerConfig:
 
         Returns:
             Configured logger instance
-            
+
         Example:
             logger = LoggerConfig.get_logger(__name__)
             logger.info("Logger obtained with auto-initialization")

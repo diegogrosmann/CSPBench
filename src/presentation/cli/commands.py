@@ -126,10 +126,10 @@ def _show_final_status_message(work_id: str) -> None:
 
 def register_commands(app: typer.Typer) -> None:
     """Register all CLI commands in the Typer application.
-    
+
     This function sets up all available CLI commands including batch execution,
     work management, algorithm listing, web interface, and dataset generation.
-    
+
     Args:
         app: Typer application instance to register commands with
     """
@@ -148,7 +148,7 @@ def register_commands(app: typer.Typer) -> None:
 
         Uses WorkManager for consistent execution workflow between CLI and Web.
         Automatically shows progress monitoring interface unless --no-monitor is used.
-        
+
         Args:
             batch: Path to batch configuration YAML file
             no_monitor: Flag to disable real-time progress monitoring
@@ -159,9 +159,9 @@ def register_commands(app: typer.Typer) -> None:
             config = load_cspbench_config(batch)
 
             extra = {"origin": "cli", "batch_file": str(batch)}
-            
+
             from src.application.services.work_service import get_work_service
-            
+
             work_manager = get_work_service()
 
             work_id = work_manager.execute(config=config, extra=extra)
@@ -190,15 +190,13 @@ def register_commands(app: typer.Typer) -> None:
 
     @work_app.command("restart")
     def work_restart(
-        work_id: str = typer.Argument(
-            ..., help="Work ID to be restarted"
-        ),
+        work_id: str = typer.Argument(..., help="Work ID to be restarted"),
         no_monitor: bool = typer.Option(
             False, "--no-monitor", help="Disable progress monitoring interface"
         ),
     ):
         """Restart a work item using WorkService.
-        
+
         Args:
             work_id: Identifier of the work item to restart
             no_monitor: Flag to disable real-time progress monitoring
@@ -235,7 +233,7 @@ def register_commands(app: typer.Typer) -> None:
     @work_app.command("list")
     def work_list():
         """List all work items using WorkService.
-        
+
         Displays a summary of all work items including their IDs and current status.
         """
         from src.application.services.work_service import get_work_service
@@ -256,10 +254,10 @@ def register_commands(app: typer.Typer) -> None:
     @work_app.command("status")
     def work_status(work_id: str):
         """Get work item status using WorkService.
-        
+
         Displays detailed status information for a specific work item including
         creation time, last update, and any error messages.
-        
+
         Args:
             work_id: Identifier of the work item to check
         """
@@ -284,7 +282,7 @@ def register_commands(app: typer.Typer) -> None:
     @app.command()
     def algorithms():
         """List available algorithms.
-        
+
         Displays all registered algorithms in the global algorithm registry
         along with their descriptions.
         """
@@ -308,10 +306,10 @@ def register_commands(app: typer.Typer) -> None:
         dev: bool = typer.Option(None, "--dev", help="Run in development mode"),
     ) -> None:
         """Start the web interface.
-        
+
         Launches the FastAPI web server with configurable host, port, and development
         mode settings. Uses environment variables as defaults when options are not provided.
-        
+
         Args:
             host: Network interface to bind to (default: 0.0.0.0)
             port: Port number to listen on (default: 8080)
@@ -370,7 +368,7 @@ def register_commands(app: typer.Typer) -> None:
     @app.command(name="datasetsave")
     def dataset_save() -> None:
         """Interactive synthetic dataset generation wizard.
-        
+
         Launches an interactive command-line wizard that guides users through
         the process of generating synthetic datasets or downloading real datasets
         from NCBI databases.

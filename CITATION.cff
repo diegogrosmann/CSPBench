@@ -1,18 +1,46 @@
 cff-version: 1.2.0
+title: "CSPBench: A Comprehensive Framework for Closest String Problem Benchmarking"
 message: "If you use this software, please cite it as below."
+type: software
 authors:
-  - family-names: "Grosmann"
-    given-names: "Diego"
+  - given-names: Diego
+    family-names: Grosmann
+    email: diego.grosmann@ifma.edu.br
     orcid: "https://orcid.org/0000-0003-1088-7867"
-title: "CSPBench: A Framework for Closest String Problem Algorithms"
-version: "0.1.0" 
-date-released: 2025-07-11
+    affiliation: "Independent Researcher"
 repository-code: "https://github.com/diegogrosmann/CSPBench"
+url: "https://github.com/diegogrosmann/CSPBench"
+abstract: >-
+  CSPBench is a comprehensive framework for benchmarking and analyzing 
+  Closest String Problem (CSP) algorithms. The framework implements a 
+  clean hexagonal architecture and provides multiple user interfaces 
+  including a web dashboard, command-line tools, and REST API. It 
+  includes implementations of five different CSP algorithms and supports 
+  biological sequence data from FASTA files and NCBI databases. The 
+  framework is designed for reproducible research with automated 
+  experiment configuration, real-time monitoring, and comprehensive 
+  result archival.
 keywords:
-  - "closest string problem"
-  - "bioinformatics"
-  - "computational biology"
-  - "algorithm benchmarking"
-  - "genetic algorithms"
-license: "CC-BY-NC-SA-4.0"
-abstract: "CSPBench is a comprehensive framework for implementing, testing, and benchmarking algorithms for the Closest String Problem, a fundamental challenge in computational biology and bioinformatics." 
+  - bioinformatics
+  - closest-string-problem
+  - algorithms
+  - benchmarking
+  - optimization
+  - computational-biology
+  - motif-discovery
+  - sequence-analysis
+  - python
+  - research-software
+license: MIT
+version: "1.0.0"
+doi: "10.5281/zenodo.XXXXX"
+date-released: "2025-01-16"
+preferred-citation:
+  type: article
+  authors:
+    - given-names: Diego
+      family-names: Grosmann
+      email: diego.grosmann@ifma.edu.br
+      orcid: "https://orcid.org/0000-0003-1088-7867"
+      affiliation: "IFMA"
+  title: "CSPBench: A Comprehensive Framework for Closest String Problem Benchmarking"

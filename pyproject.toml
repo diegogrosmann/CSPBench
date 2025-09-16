@@ -4,17 +4,17 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "cspbench"
-version = "0.1.0"
-description = "Framework for Closest String Problem with hexagonal architecture"
+version = "1.0.0"
+description = "A comprehensive framework for benchmarking Closest String Problem algorithms with hexagonal architecture"
 readme = "README.md"
 authors = [
     {name = "Diego Grosmann", email = "diego.grosmann@example.com"}
 ]
-license = {text = "CC-BY-NC-SA-4.0"}
+license = {text = "MIT"}
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Science/Research",
-    "License :: Other/Proprietary License",
+    "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
@@ -23,8 +23,11 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Topic :: Scientific/Engineering :: Bio-Informatics",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Operating System :: OS Independent",
 ]
 requires-python = ">=3.8"
+keywords = ["bioinformatics", "closest-string-problem", "algorithms", "benchmarking", "optimization"]
 dependencies = [
     "typer>=0.9.0",
     "PyYAML>=6.0",
@@ -52,12 +55,33 @@ dependencies = [
 dev = [
     "pytest>=7.0.0",
     "pytest-asyncio>=0.21.0",
+    "pytest-cov>=4.0.0",
+    "coverage[toml]>=7.0.0",
+    "black>=22.0.0",
+    "ruff>=0.1.0",
+    "mypy>=1.0.0",
+    "pre-commit>=3.0.0",
+    "bandit>=1.7.0",
+    "pip-audit>=2.6.0",
+]
+docs = [
+    "mkdocs>=1.5.0",
+    "mkdocs-material>=9.0.0",
+    "mkdocstrings[python]>=0.23.0",
+]
+test = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-cov>=4.0.0",
+    "coverage[toml]>=7.0.0",
 ]
 
 [project.urls]
-Homepage = "https://github.com/diegogrosmann/csp-blfga"
-Repository = "https://github.com/diegogrosmann/csp-blfga"
-Issues = "https://github.com/diegogrosmann/csp-blfga/issues"
+Homepage = "https://github.com/diegogrosmann/CSPBench"
+Repository = "https://github.com/diegogrosmann/CSPBench"
+Issues = "https://github.com/diegogrosmann/CSPBench/issues"
+Documentation = "https://diegogrosmann.github.io/CSPBench"
+Changelog = "https://github.com/diegogrosmann/CSPBench/blob/main/CHANGELOG.md"
 
 [project.scripts]
 cspbench = "main:app"
@@ -92,6 +116,8 @@ extend-exclude = '''
 [tool.ruff]
 line-length = 88
 target-version = "py38"
+
+[tool.ruff.lint]
 select = [
     "E",   # pycodestyle errors
     "W",   # pycodestyle warnings
@@ -107,7 +133,7 @@ ignore = [
     "C901",  # too complex
 ]
 
-[tool.ruff.per-file-ignores]
+[tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401"]  # Allow unused imports in __init__.py
 "tests/**/*.py" = ["F401", "F811"]  # Allow unused imports and redefinitions in tests
 
@@ -190,5 +216,9 @@ exclude_lines = [
 
 [tool.deptry]
 per_rule_ignores = { DEP002 = ["python-multipart", "pytest-asyncio", "jinja2", "websockets"] }
+
+[tool.bandit]
+exclude_dirs = ["tests", "docs", "build", "dist"]
+skips = ["B101", "B601"]  # Skip assert statements and shell=True (pode ajustar conforme necessário)
 
 

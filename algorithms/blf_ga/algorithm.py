@@ -160,7 +160,10 @@ class BLFGAAlgorithm(CSPAlgorithm):
         n = len(self.strings) if self.strings else 0
         L = len(self.strings[0]) if self.strings else 0
         p["pop_size"] = self._resolve_dynamic(
-            p.get("pop_size", BLF_GA_DEFAULTS["pop_size"]), n if n > 0 else 1, "multiplier", p.get("min_pop_size", BLF_GA_DEFAULTS["min_pop_size"])  # type: ignore[arg-type]
+            p.get("pop_size", BLF_GA_DEFAULTS["pop_size"]),
+            n if n > 0 else 1,
+            "multiplier",
+            p.get("min_pop_size", BLF_GA_DEFAULTS["min_pop_size"]),  # type: ignore[arg-type]
         )
         p["initial_blocks"] = self._resolve_dynamic(
             p.get("initial_blocks", BLF_GA_DEFAULTS["initial_blocks"]),

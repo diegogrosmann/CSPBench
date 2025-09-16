@@ -11,32 +11,30 @@ import signal
 import sys
 import time
 from datetime import datetime, timedelta
-from pathlib import Path
-from typing import List, Optional, Dict, Any
+from typing import List
 
+from src.infrastructure.logging_config import get_logger
 from src.infrastructure.persistence.work_state.core import (
-    WorkPersistence,
     ExecutionDetail,
     ProgressSummary,
-    ErrorSummary,
+    WorkPersistence,
 )
-from src.infrastructure.logging_config import get_logger
 
 pm_logger = get_logger("CSPBench.CLI.ProgressMonitor")
 
 
 class ProgressMonitor:
     """Real-time progress monitor using curses, htop-style interface.
-    
+
     This class provides a terminal-based interface for monitoring the progress
     of CSPBench work executions. It displays real-time information about:
     - Overall work progress
     - Individual algorithm executions
     - System status and logs
     - Resource usage
-    
+
     The interface supports keyboard navigation and can pause/resume work execution.
-    
+
     Attributes:
         work_id: The identifier of the work item being monitored
         running: Flag indicating if the monitor is active
@@ -51,10 +49,10 @@ class ProgressMonitor:
 
     def __init__(self, work_id: str):
         """Initialize the progress monitor.
-        
+
         Args:
             work_id: The identifier of the work item to monitor
-            
+
         Raises:
             ValueError: If the work item is not found or fails to initialize
         """
@@ -70,13 +68,15 @@ class ProgressMonitor:
         self.previous_status = None
 
         # Create WorkPersistence with default configuration
-        print(f"⚙️ Connecting to persistence system...", end="\r")
+        print("⚙️ Connecting to persistence system...", end="\r")
         self.persistence = WorkPersistence()
 
         # Wait for work to exist and be in execution
-        print(f"⏳ Waiting for work to be available and running...", end="\r")
+        print("⏳ Waiting for work to be available and running...", end="\r")
         if not self._wait_for_work_ready(timeout=60):
-            raise ValueError(f"Timeout: Work '{work_id}' not found or failed to start execution")
+            raise ValueError(
+                f"Timeout: Work '{work_id}' not found or failed to start execution"
+            )
 
         print(" " * 60, end="\r")
         print("✅ Monitor initialized successfully!")
@@ -96,52 +96,60 @@ class ProgressMonitor:
 
         while time.time() - start_time < timeout:
             current_time = time.time()
-            
+
             # Periodic logging
             if current_time - last_log >= 5:
                 elapsed = int(current_time - start_time)
                 print(f"   Waiting for work ({elapsed}s)...", end="\r")
                 last_log = current_time
-            
+
             try:
                 # Check if work exists
                 work = self.persistence.work_get(self.work_id)
                 if not work:
                     time.sleep(1)
                     continue
-                
-                status = work.get('status')
+
+                status = work.get("status")
                 print(f"   Work found with status: {status}", end="\r")
-                
+
                 # For final statuses, allow monitoring
                 if status in ["completed", "failed", "canceled", "error"]:
                     print(" " * 60, end="\r")
                     print(f"   Work in final state: {status}")
                     self.previous_status = status
                     return True
-                
+
                 # For execution statuses, check if there's progress data
                 if status in ["running", "queued"]:
                     try:
-                        progress_data = self.persistence.get_work_progress_summary(self.work_id)
-                        if progress_data and progress_data.global_execution.get("Total", 0) > 0:
-                            print(f"   Work ready: status={status}, total_sequences={progress_data.global_execution.get('Total', 0)}", end="\r")
+                        progress_data = self.persistence.get_work_progress_summary(
+                            self.work_id
+                        )
+                        if (
+                            progress_data
+                            and progress_data.global_execution.get("Total", 0) > 0
+                        ):
+                            print(
+                                f"   Work ready: status={status}, total_sequences={progress_data.global_execution.get('Total', 0)}",
+                                end="\r",
+                            )
                             self.previous_status = status
                             return True
                     except Exception as e:
                         pm_logger.error("[PM] Error getting work progress: %s", e)
                         pass  # Still no progress data
-                        
+
             except Exception as e:
                 pm_logger.debug("[PM] Error checking work: %s", e)
-            
+
             time.sleep(1)
-        
+
         return False
 
     def signal_handler(self, signum, frame):
         """Handle Ctrl+C gracefully by pausing the work.
-        
+
         Args:
             signum: Signal number
             frame: Current stack frame
@@ -149,10 +157,10 @@ class ProgressMonitor:
         try:
             # Import and use WorkService to pause the work
             from src.application.services.work_service import get_work_service
-            
+
             work_service = get_work_service()
             success = work_service.pause(self.work_id)
-            
+
             if success:
                 pm_logger.info(f"Work {self.work_id} paused via Ctrl+C")
                 print(f"\n✅ Work {self.work_id} paused successfully!")
@@ -160,23 +168,23 @@ class ProgressMonitor:
             else:
                 pm_logger.warning(f"Failed to pause work {self.work_id} via Ctrl+C")
                 print(f"\n⚠️  Could not pause work {self.work_id}")
-                
+
         except Exception as e:
             pm_logger.error(f"Error pausing work {self.work_id} via Ctrl+C: {e}")
             print(f"\n❌ Error pausing work: {e}")
-        
+
         self.running = False
 
     def format_progress_bar(
         self, progress: float, width: int, show_percent: bool = True
     ) -> str:
         """Create a text-based progress bar.
-        
+
         Args:
             progress: Progress value between 0.0 and 1.0
             width: Width of the progress bar in characters
             show_percent: Whether to show percentage alongside the bar
-            
+
         Returns:
             Formatted progress bar string
         """
@@ -189,10 +197,10 @@ class ProgressMonitor:
 
     def format_execution_time(self, elapsed_seconds: float) -> str:
         """Format execution time as mm:ss.mmm.
-        
+
         Args:
             elapsed_seconds: Elapsed time in seconds
-            
+
         Returns:
             Formatted time string
         """
@@ -208,12 +216,12 @@ class ProgressMonitor:
 
     def draw_header(self, stdscr, progress: ProgressSummary, work_status: str):
         """Draw the header with summary information.
-        
+
         Args:
             stdscr: Curses screen object
             progress: Progress summary data
             work_status: Current work status
-            
+
         Returns:
             Number of lines used by the header
         """
@@ -299,7 +307,7 @@ class ProgressMonitor:
 
     def draw_executions_list(self, stdscr, y_pos: int):
         """Draw the list of executions with visual status indicators.
-        
+
         Args:
             stdscr: Curses screen object
             y_pos: Starting Y position for the execution list
@@ -366,7 +374,7 @@ class ProgressMonitor:
 
     def draw_footer(self, stdscr):
         """Draw the footer with controls, legend and status.
-        
+
         Args:
             stdscr: Curses screen object
         """
@@ -391,7 +399,7 @@ class ProgressMonitor:
 
     def draw_log_panel(self, stdscr, y_pos: int, max_height: int):
         """Draw a small panel with recent error and warning logs.
-        
+
         Args:
             stdscr: Curses screen object
             y_pos: Starting Y position for the log panel
@@ -443,7 +451,7 @@ class ProgressMonitor:
 
     def run(self, stdscr):
         """Main monitoring loop.
-        
+
         Args:
             stdscr: Curses screen object
         """
@@ -501,7 +509,7 @@ class ProgressMonitor:
                         continue
 
                     work = self.persistence.work_get(self.work_id)
-                    work_status = work.get('status') if work else "unknown"
+                    work_status = work.get("status") if work else "unknown"
 
                     # Detect status change from 'queued' to something other than 'running'
                     if (
@@ -551,37 +559,37 @@ class ProgressMonitor:
                     # Fetch only events from events table (not execution errors)
                     # Get recent events of relevant types (warnings, errors, info, progress)
                     recent_events = self.persistence.get_events(
-                        self.work_id, limit=4, event_types=['warning', 'error', 'info', 'progress']
+                        self.work_id,
+                        limit=4,
+                        event_types=["warning", "error", "info", "progress"],
                     )
 
                     logs = []
                     # Only show actual events from events table, not algorithm execution errors
                     for event in recent_events:
-                        event_type = event.get('event_type', 'unknown')
-                        message = event.get('message', 'No message')
-                        unit_id = event.get('entity_data', {}).get('unit_id', 'N/A')
-                        
+                        event_type = event.get("event_type", "unknown")
+                        message = event.get("message", "No message")
+                        unit_id = event.get("entity_data", {}).get("unit_id", "N/A")
+
                         # Use appropriate icon based on event type
-                        if event_type == 'error':
-                            log_type = 'error'
-                        elif event_type == 'warning':
-                            log_type = 'warning'
+                        if event_type == "error":
+                            log_type = "error"
+                        elif event_type == "warning":
+                            log_type = "warning"
                         else:
-                            log_type = 'info'  # For progress, info, and other types
-                        
+                            log_type = "info"  # For progress, info, and other types
+
                         logs.append(
                             {
                                 "type": log_type,
-                                "timestamp": event.get('timestamp', 0),
+                                "timestamp": event.get("timestamp", 0),
                                 "message": f"Unit {unit_id[:8]}: {message}",
                             }
                         )
-                    
+
                     self.logs = sorted(
                         logs, key=lambda x: x.get("timestamp", 0), reverse=True
-                    )[
-                        :2
-                    ]  # Keep only 2 most recent
+                    )[:2]  # Keep only 2 most recent
 
                     # Calculate layout - fixed small log panel
                     log_panel_height = (
@@ -656,7 +664,7 @@ class ProgressMonitor:
 
     def handle_pause(self, stdscr):
         """Show a confirmation dialog for pausing the work.
-        
+
         Args:
             stdscr: Curses screen object
         """
@@ -704,17 +712,17 @@ class ProgressMonitor:
             try:
                 # Import and use WorkService to actually pause the work
                 from src.application.services.work_service import get_work_service
-                
+
                 work_service = get_work_service()
                 success = work_service.pause(self.work_id)
-                
+
                 if success:
                     self.show_paused_confirmation_screen(stdscr)
                     self.running = False
                 else:
                     # Show error if couldn't pause
                     self.show_action_error_screen(stdscr, "pause")
-                    
+
             except Exception as e:
                 pm_logger.error(f"Error pausing work {self.work_id}: {e}")
                 self.show_action_error_screen(stdscr, "pause")
@@ -722,7 +730,7 @@ class ProgressMonitor:
 
     def show_paused_confirmation_screen(self, stdscr):
         """Display a screen when the work is successfully paused.
-        
+
         Args:
             stdscr: Curses screen object
         """
@@ -750,7 +758,7 @@ class ProgressMonitor:
 
     def show_paused_screen(self, stdscr, status: str, progress):
         """Display a paused screen when the work is paused.
-        
+
         Args:
             stdscr: Curses screen object
             status: Current work status
@@ -762,9 +770,7 @@ class ProgressMonitor:
         title = f"⏸️ Work Paused: {status.upper()}"
         finished = progress.global_execution["Finished"]
         total = progress.global_execution["Total"]
-        pause_progress = (
-            f"Progress at pause: {finished}/{total} executions completed."
-        )
+        pause_progress = f"Progress at pause: {finished}/{total} executions completed."
 
         stdscr.addstr(
             h // 2 - 1,
@@ -774,9 +780,7 @@ class ProgressMonitor:
         )
         stdscr.addstr(h // 2, (w - len(pause_progress)) // 2, pause_progress)
         stdscr.addstr(h // 2 + 1, (w - 60) // 2, "Work was paused successfully.")
-        stdscr.addstr(
-            h // 2 + 2, (w - 40) // 2, "Monitor will exit in 3 seconds..."
-        )
+        stdscr.addstr(h // 2 + 2, (w - 40) // 2, "Monitor will exit in 3 seconds...")
         stdscr.refresh()
 
         for _ in range(30):
@@ -788,7 +792,7 @@ class ProgressMonitor:
         self, stdscr, old_status: str, new_status: str, progress: ProgressSummary
     ):
         """Display a screen when work status changes from queued to non-running status.
-        
+
         Args:
             stdscr: Curses screen object
             old_status: Previous work status
@@ -842,7 +846,7 @@ class ProgressMonitor:
 
     def show_final_screen(self, stdscr, status: str, progress: ProgressSummary):
         """Display a final summary screen when the work is done.
-        
+
         Args:
             stdscr: Curses screen object
             status: Final work status
@@ -883,7 +887,7 @@ class ProgressMonitor:
 
     def show_action_error_screen(self, stdscr, action: str):
         """Display an error screen when an action fails.
-        
+
         Args:
             stdscr: Curses screen object
             action: The action that failed (e.g., "pause")
@@ -912,7 +916,7 @@ class ProgressMonitor:
 
     def start(self):
         """Start the progress monitor.
-        
+
         Returns:
             Exit code (0 for success, 1 for error)
         """
@@ -929,7 +933,7 @@ class ProgressMonitor:
             print(f"Error starting monitor: {e}")
             return 1
         finally:
-            if hasattr(self, 'persistence'):
+            if hasattr(self, "persistence"):
                 self.persistence.close()
 
 

@@ -1,53 +1,200 @@
-# CSPBench - Closest Str### Cloud Deployment
-```bash
-# Deploy seguro no Google Cloud Run (recomendado)
-make deploy-cloud-run-secure PROJECT_ID=meu-projeto
+# CSPBench - Closest String Problem Benchmark
 
-# Ou com variáveis de ambiente
-export NCBI_EMAIL="seu-email@exemplo.com"
-export NCBI_API_KEY="sua-chave-api"
-make deploy-cloud-run-env PROJECT_ID=meu-projeto
+[![CI](https://github.com/diegogrosmann/CSPBench/workflows/CI/badge.svg)](https://github.com/diegogrosmann/CSPBench/actions)
+[![Coverage](https://codecov.io/gh/diegogrosmann/CSPBench/branch/main/graph/badge.svg)](https://codecov.io/gh/diegogrosmann/CSPBench)
+[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.XXXXX.svg)](https://doi.org/10.5281/zenodo.XXXXX)
+[![Python](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 
-# Ver todas as opções de cloud deployment
-make help-cloud
-```blem Benchmark
+A comprehensive framework for benchmarking and analyzing Closest String Problem (CSP) algorithms with clean architecture design and research-grade reproducibility.
 
-Framework para benchmarking e análise de algoritmos do Problema da String Mais Próxima (Closest String Problem).
+## 🔬 Research Context
+
+The Closest String Problem is a fundamental NP-hard optimization problem in computational biology and theoretical computer science. Given a set of strings, the goal is to find a center string that minimizes the maximum Hamming distance to all input strings. This problem has applications in:
+
+- **Motif Discovery**: Finding conserved regions in DNA/protein sequences
+- **Consensus Sequence Identification**: Determining representative sequences
+- **Error Correction**: Correcting sequencing errors in biological data
+- **Pattern Recognition**: Identifying common patterns in string data
+
+## ✨ Key Features
+
+- **🏗️ Clean Architecture**: Hexagonal architecture for maintainability and testability
+- **📊 Comprehensive Benchmarking**: Compare multiple CSP algorithms systematically
+- **🧬 Bioinformatics Integration**: Native support for FASTA files and NCBI data
+- **🌐 Web Interface**: User-friendly dashboard for experiment management
+- **📈 Performance Monitoring**: Real-time progress tracking and resource monitoring
+- **🔄 Reproducible Research**: Automated experiment configuration and result archival
+- **📦 Containerized Deployment**: Docker and cloud-ready configurations
+- **🔧 Extensible Design**: Easy algorithm integration and custom metrics
 
 ## 🚀 Quick Start
 
-### Execução Local
+### Installation
+
+#### Option 1: pip (Recommended)
 ```bash
-# 1. Instalar dependências
-make install
-
-# 2. Executar interface web
-make run-web
+pip install cspbench
 ```
 
-### Docker (Desenvolvimento)
+#### Option 2: From Source
 ```bash
-# Executar com Docker Compose
-cd deployment/docker && docker-compose up --build
-
-# Ou usando o Makefile
-make deploy-local
+git clone https://github.com/diegogrosmann/CSPBench.git
+cd CSPBench
+pip install -e .
 ```
 
-### Cloud Deployment
+#### Option 3: Docker
 ```bash
-# Deploy no Google Cloud Run
-export NCBI_EMAIL="seu-email@exemplo.com"
-cd deployment/cloud-run
-./deploy.sh SEU_PROJECT_ID us-central1
+docker run -p 8000:8000 diegogrosmann/cspbench:latest
 ```
 
-## 📁 Estrutura do Projeto
+### Basic Usage
+
+#### Command Line Interface
+```bash
+# Run a simple benchmark
+cspbench run --algorithm baseline --dataset examples/data.fasta
+
+# Web interface
+cspbench web --port 8000
+
+# Generate synthetic datasets
+cspbench dataset generate --sequences 100 --length 50 --alphabet DNA
+```
+
+#### Python API
+```python
+from cspbench import CSPBench
+from cspbench.algorithms import BaselineCSP
+from cspbench.datasets import load_fasta
+
+# Load data
+sequences = load_fasta("path/to/sequences.fasta")
+
+# Initialize algorithm
+algorithm = BaselineCSP(max_distance=3)
+
+# Run benchmark
+benchmark = CSPBench()
+results = benchmark.run(algorithm, sequences)
+
+print(f"Best solution: {results.center_string}")
+print(f"Max distance: {results.max_distance}")
+print(f"Runtime: {results.execution_time:.2f}s")
+```
+
+## 📚 Documentation
+
+- **[User Guide](https://diegogrosmann.github.io/CSPBench/user-guide/)**: Comprehensive usage instructions
+- **[API Reference](https://diegogrosmann.github.io/CSPBench/api/)**: Complete API documentation
+- **[Algorithm Guide](https://diegogrosmann.github.io/CSPBench/algorithms/)**: Implemented algorithms overview
+- **[Developer Guide](https://diegogrosmann.github.io/CSPBench/contributing/)**: Contributing and extending CSPBench
+
+## 🧪 Included Algorithms
+
+| Algorithm | Type | Time Complexity | Space Complexity | Reference |
+|-----------|------|-----------------|------------------|-----------|
+| **Baseline** | Brute Force | O(k^l \* n \* l) | O(l) | - |
+| **BLF-GA** | Genetic Algorithm | O(g \* p \* n \* l) | O(p \* l) | [Blum & Lozano, 2005] |
+| **CSC** | Core String Clustering | O(n² \* l) | O(n \* l) | [Custom] |
+| **DP-CSP** | Dynamic Programming | O(n \* l \* d) | O(l \* d) | [Custom] |
+| **H2-CSP** | Hybrid Heuristic | O(n \* l \* log(l)) | O(n \* l) | [Custom] |
+
+## 📊 Example Results
+
+```python
+# Benchmark comparison on synthetic data
+results = benchmark.compare_algorithms(
+    algorithms=[BaselineCSP(), BLFGA(), CSC(), DPCSP()],
+    dataset="synthetic_100x20",
+    metrics=["solution_quality", "runtime", "memory_usage"]
+)
+
+# Results automatically saved to outputs/benchmark_TIMESTAMP/
+```
+
+## 🏗️ Architecture
+
+CSPBench follows hexagonal architecture principles:
 
 ```
-CSPBench/
-├── src/                    # Código fonte (Arquitetura Hexagonal)
-│   ├── application/        # Casos de uso e serviços
+src/
+├── domain/              # Core business logic
+│   ├── entities/        # Domain entities (Dataset, Algorithm, Result)
+│   ├── repositories/    # Repository interfaces
+│   └── services/        # Domain services
+├── application/         # Use cases and application services
+│   ├── services/        # Application services
+│   └── use_cases/       # Business use cases
+├── infrastructure/      # External concerns
+│   ├── persistence/     # Database implementations
+│   ├── algorithms/      # Algorithm implementations
+│   └── external/        # External service integrations
+└── presentation/        # User interfaces
+    ├── cli/             # Command-line interface
+    ├── web/             # Web interface
+    └── api/             # REST API
+```
+
+## 🤝 Contributing
+
+We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
+
+### Development Setup
+
+```bash
+# Clone repository
+git clone https://github.com/diegogrosmann/CSPBench.git
+cd CSPBench
+
+# Install development dependencies
+pip install -e ".[dev]"
+
+# Run tests
+pytest
+
+# Run linting
+ruff check .
+ruff format .
+
+# Install pre-commit hooks
+pre-commit install
+```
+
+## � Citation
+
+If you use CSPBench in your research, please cite:
+
+```bibtex
+@software{grosmann2025cspbench,
+  title={CSPBench: A Comprehensive Framework for Closest String Problem Benchmarking},
+  author={Grosmann, Diego},
+  year={2025},
+  url={https://github.com/diegogrosmann/CSPBench},
+  doi={10.5281/zenodo.XXXXX}
+}
+```
+
+## 📜 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🙏 Acknowledgments
+
+- National Center for Biotechnology Information (NCBI) for sequence data access
+- The computational biology community for algorithm implementations and datasets
+- Contributors and users who have helped improve this framework
+
+## 📞 Support
+
+- **Issues**: [GitHub Issues](https://github.com/diegogrosmann/CSPBench/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/diegogrosmann/CSPBench/discussions)
+- **Email**: diego.grosmann@example.com
+
+---
+
+**CSPBench** - Making bioinformatics research more reproducible, one benchmark at a time. 🧬
 │   ├── domain/            # Entidades e regras de negócio
 │   ├── infrastructure/    # Adaptadores externos
 │   └── presentation/      # CLI e Web Interface
