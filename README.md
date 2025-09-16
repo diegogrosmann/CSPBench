@@ -1,7 +1,6 @@
 # CSPBench
 
-[![CI](https://github.com/diegogrosmann/CSPBench/workflows/CI/badge.svg)](https://github.com/diegogrosmann/CSPBench/actions)
-[![Coverage](https://codecov.io/gh/diegogrosmann/CSPBench/branch/main/graph/badge.svg)](https://codecov.io/gh/diegogrosmann/CSPBench)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.17136438.svg)](https://doi.org/10.5281/zenodo.17136438)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 
