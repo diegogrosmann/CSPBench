@@ -58,7 +58,7 @@ src    </h1>
 
                         <div class="docstring"><p>CSPBench - Framework for Closest String Problem Algorithm Benchmarking.</p>
 
-<p>This package provides a comprehensive, modular framework for testing and comparing 
+<p>This package provides a comprehensive, modular framework for testing and comparing
 algorithms that solve the Closest String Problem (CSP). The implementation follows
 hexagonal architecture principles with clear separation of concerns across
 domain, application, infrastructure, and presentation layers.</p>
@@ -154,7 +154,7 @@ results = work_service.get_results(work_id)
                         <div class="pdoc-code codehilite"><pre><span></span><span id="L-1"><a href="#L-1"><span class="linenos"> 1</span></a><span class="sd">&quot;&quot;&quot;</span>
 </span><span id="L-2"><a href="#L-2"><span class="linenos"> 2</span></a><span class="sd">CSPBench - Framework for Closest String Problem Algorithm Benchmarking.</span>
 </span><span id="L-3"><a href="#L-3"><span class="linenos"> 3</span></a>
-</span><span id="L-4"><a href="#L-4"><span class="linenos"> 4</span></a><span class="sd">This package provides a comprehensive, modular framework for testing and comparing </span>
+</span><span id="L-4"><a href="#L-4"><span class="linenos"> 4</span></a><span class="sd">This package provides a comprehensive, modular framework for testing and comparing</span>
 </span><span id="L-5"><a href="#L-5"><span class="linenos"> 5</span></a><span class="sd">algorithms that solve the Closest String Problem (CSP). The implementation follows</span>
 </span><span id="L-6"><a href="#L-6"><span class="linenos"> 6</span></a><span class="sd">hexagonal architecture principles with clear separation of concerns across</span>
 </span><span id="L-7"><a href="#L-7"><span class="linenos"> 7</span></a><span class="sd">domain, application, infrastructure, and presentation layers.</span>
@@ -171,7 +171,7 @@ results = work_service.get_results(work_id)
 </span><span id="L-18"><a href="#L-18"><span class="linenos">18</span></a>
 </span><span id="L-19"><a href="#L-19"><span class="linenos">19</span></a><span class="sd">Architecture:</span>
 </span><span id="L-20"><a href="#L-20"><span class="linenos">20</span></a><span class="sd">    The framework follows hexagonal (ports and adapters) architecture:</span>
-</span><span id="L-21"><a href="#L-21"><span class="linenos">21</span></a><span class="sd">    </span>
+</span><span id="L-21"><a href="#L-21"><span class="linenos">21</span></a>
 </span><span id="L-22"><a href="#L-22"><span class="linenos">22</span></a><span class="sd">    - Domain Layer: Core business logic, algorithm interfaces, and entities</span>
 </span><span id="L-23"><a href="#L-23"><span class="linenos">23</span></a><span class="sd">    - Application Layer: Use cases, service orchestration, and workflow management</span>
 </span><span id="L-24"><a href="#L-24"><span class="linenos">24</span></a><span class="sd">    - Infrastructure Layer: Data persistence, external adapters, and technical concerns</span>
@@ -181,7 +181,7 @@ results = work_service.get_results(work_id)
 </span><span id="L-28"><a href="#L-28"><span class="linenos">28</span></a><span class="sd">    Basic usage for programmatic access::</span>
 </span><span id="L-29"><a href="#L-29"><span class="linenos">29</span></a>
 </span><span id="L-30"><a href="#L-30"><span class="linenos">30</span></a><span class="sd">        from src.application.services.work_service import get_work_service</span>
-</span><span id="L-31"><a href="#L-31"><span class="linenos">31</span></a><span class="sd">        </span>
+</span><span id="L-31"><a href="#L-31"><span class="linenos">31</span></a>
 </span><span id="L-32"><a href="#L-32"><span class="linenos">32</span></a><span class="sd">        # Create and execute a benchmarking work</span>
 </span><span id="L-33"><a href="#L-33"><span class="linenos">33</span></a><span class="sd">        work_service = get_work_service()</span>
 </span><span id="L-34"><a href="#L-34"><span class="linenos">34</span></a><span class="sd">        work_id = work_service.create_batch_work(</span>
@@ -189,20 +189,20 @@ results = work_service.get_results(work_id)
 </span><span id="L-36"><a href="#L-36"><span class="linenos">36</span></a><span class="sd">            algorithms=[&#39;brute_force&#39;, &#39;heuristic&#39;],</span>
 </span><span id="L-37"><a href="#L-37"><span class="linenos">37</span></a><span class="sd">            tasks=[&#39;closest_string&#39;]</span>
 </span><span id="L-38"><a href="#L-38"><span class="linenos">38</span></a><span class="sd">        )</span>
-</span><span id="L-39"><a href="#L-39"><span class="linenos">39</span></a><span class="sd">        </span>
+</span><span id="L-39"><a href="#L-39"><span class="linenos">39</span></a>
 </span><span id="L-40"><a href="#L-40"><span class="linenos">40</span></a><span class="sd">        # Monitor progress via web interface or programmatically</span>
 </span><span id="L-41"><a href="#L-41"><span class="linenos">41</span></a><span class="sd">        status = work_service.get_status(work_id)</span>
-</span><span id="L-42"><a href="#L-42"><span class="linenos">42</span></a><span class="sd">        </span>
+</span><span id="L-42"><a href="#L-42"><span class="linenos">42</span></a>
 </span><span id="L-43"><a href="#L-43"><span class="linenos">43</span></a><span class="sd">        # Access results when completed</span>
 </span><span id="L-44"><a href="#L-44"><span class="linenos">44</span></a><span class="sd">        results = work_service.get_results(work_id)</span>
 </span><span id="L-45"><a href="#L-45"><span class="linenos">45</span></a>
 </span><span id="L-46"><a href="#L-46"><span class="linenos">46</span></a><span class="sd">Web Interface:</span>
 </span><span id="L-47"><a href="#L-47"><span class="linenos">47</span></a><span class="sd">    Start the web interface with::</span>
-</span><span id="L-48"><a href="#L-48"><span class="linenos">48</span></a><span class="sd">    </span>
+</span><span id="L-48"><a href="#L-48"><span class="linenos">48</span></a>
 </span><span id="L-49"><a href="#L-49"><span class="linenos">49</span></a><span class="sd">        python -m src.presentation.web.run_web</span>
-</span><span id="L-50"><a href="#L-50"><span class="linenos">50</span></a><span class="sd">        </span>
+</span><span id="L-50"><a href="#L-50"><span class="linenos">50</span></a>
 </span><span id="L-51"><a href="#L-51"><span class="linenos">51</span></a><span class="sd">    Or access via Docker::</span>
-</span><span id="L-52"><a href="#L-52"><span class="linenos">52</span></a><span class="sd">    </span>
+</span><span id="L-52"><a href="#L-52"><span class="linenos">52</span></a>
 </span><span id="L-53"><a href="#L-53"><span class="linenos">53</span></a><span class="sd">        docker run -p 8000:8000 cspbench:latest</span>
 </span><span id="L-54"><a href="#L-54"><span class="linenos">54</span></a>
 </span><span id="L-55"><a href="#L-55"><span class="linenos">55</span></a><span class="sd">Version:</span>
