@@ -66,10 +66,13 @@ jobs:
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v3
       with:
-        file: ./coverage.xml
-        flags: unittests
-        name: codecov-umbrella
+        files: ./coverage.xml
+        flags: unittests,py${{ matrix.python-version }}
+        name: py-${{ matrix.python-version }}
         fail_ci_if_error: false
+        verbose: true
+      env:
+        CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
     - name: Upload test results
       uses: actions/upload-artifact@v3
