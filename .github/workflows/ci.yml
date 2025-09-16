@@ -59,17 +59,20 @@ jobs:
         pytest --cov=src --cov=algorithms --cov-report=xml --cov-report=term-missing --cov-fail-under=85
       env:
         PYTHONPATH: ${{ github.workspace }}
-        DATABASE_URL: sqlite:///:memory:
+  DATABASE_URL: "sqlite:///:memory:"
         NCBI_EMAIL: test@example.com
         NCBI_API_KEY: test_key
 
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v3
       with:
-        file: ./coverage.xml
-        flags: unittests
-        name: codecov-umbrella
+        files: ./coverage.xml
+        flags: unittests,py${{ matrix.python-version }}
+        name: py-${{ matrix.python-version }}
         fail_ci_if_error: false
+        verbose: true
+      env:
+        CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
     - name: Upload test results
       uses: actions/upload-artifact@v3
