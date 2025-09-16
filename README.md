@@ -23,6 +23,8 @@ The Closest String Problem seeks a "center" string that minimizes the maximum di
 ```bash
 git clone https://github.com/diegogrosmann/CSPBench.git
 cd CSPBench
+python3 -m venv venv
+source venv/bin/activate
 pip install -e .
 ```
 
