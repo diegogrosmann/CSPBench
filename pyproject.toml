@@ -8,7 +8,7 @@ version = "1.0.0"
 description = "A comprehensive framework for benchmarking Closest String Problem algorithms with hexagonal architecture"
 readme = "README.md"
 authors = [
-    {name = "Diego Grosmann", email = "diego.grosmann@example.com"}
+    {name = "Diego Grosmann", email = "diego.grosmann@ifma.edu.br"}
 ]
 license = {text = "MIT"}
 classifiers = [
