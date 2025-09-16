@@ -313,6 +313,6 @@ Contributors will be:
 
 - **GitHub Issues**: For bugs and feature requests
 - **GitHub Discussions**: For questions and general discussion
-- **Email**: diego.grosmann@example.com
+- **Email**: diego.grosmann@ifma.edu.br
 
 Thank you for contributing to CSPBench! 🎉
