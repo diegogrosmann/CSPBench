@@ -1,251 +1,134 @@
 """
-Portas da Aplicação - Interfaces para Infraestrutura
+Application Ports - Infrastructure Interfaces.
 
-Este módulo define as interfaces (ports) que devem ser implementadas
-pela camada de infraestrutura seguindo o padrão de arquitetura hexagonal.
+This module defines the interfaces (ports) that must be implemented
+by the infrastructure layer following the hexagonal architecture pattern.
+
+These ports decouple the application layer from specific infrastructure
+implementations, allowing for easy testing and component replacement.
+
+Key Interfaces:
+    - AlgorithmRegistry: Algorithm management and discovery
+    - ExportPort: Result export and formatting
+    - ExecutionEngine: Task execution orchestration
+
+The interfaces defined here serve as contracts between the application
+layer and infrastructure implementations, ensuring loose coupling and
+high testability.
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional, Protocol, runtime_checkable, Tuple
+from typing import (
+    Any,
+    Dict,
+    List,
+    Protocol,
+    runtime_checkable,
+)
 
 from src.domain import CSPAlgorithm, Dataset
+from src.domain.config import (
+    AlgParams,
+    CSPBenchConfig,
+    TaskConfig,
+)
+from src.domain.status import BaseStatus
+from src.infrastructure.execution_control import ExecutionController
+from src.infrastructure.persistence.work_state.wrappers.combination_scoped import (
+    CombinationScopedPersistence,
+)
 
 
-@runtime_checkable
-class DatasetRepository(Protocol):
-    """Port para repositório de datasets."""
-
-    def save(self, dataset: Dataset, name: str) -> str:
-        """
-        Salva dataset com nome específico.
-
-        Args:
-            dataset: Dataset a ser salvo
-            name: Nome para identificar o dataset
-
-        Returns:
-            str: Identificador ou caminho do dataset salvo
-        """
-        ...
-
-    def load(self, identifier: str) -> Dataset:
-        """
-        Carrega dataset por identificador.
-
-        Args:
-            identifier: Identificador do dataset
-
-        Returns:
-            Dataset: Dataset carregado
-        """
-        ...
-
-    def list_available(self) -> List[str]:
-        """
-        Lista datasets disponíveis.
-
-        Returns:
-            List[str]: Lista de identificadores disponíveis
-        """
-        ...
-
-    def exists(self, identifier: str) -> bool:
-        """
-        Verifica se dataset existe.
-
-        Args:
-            identifier: Identificador do dataset
-
-        Returns:
-            bool: True se existe
-        """
-        ...
-
-    def delete(self, identifier: str) -> bool:
-        """
-        Remove dataset.
-
-        Args:
-            identifier: Identificador do dataset
-
-        Returns:
-            bool: True se removido com sucesso
-        """
-        ...
-
-
-@runtime_checkable
 class AlgorithmRegistry(Protocol):
-    """Port para registry de algoritmos."""
+    """
+    Port for algorithm registry.
+
+    Defines the interface for algorithm management, including registration,
+    discovery, and metadata retrieval. This port abstracts the algorithm
+    storage and retrieval mechanism from the application layer.
+    """
 
     def get_algorithm(self, name: str) -> type[CSPAlgorithm]:
         """
-        Obtém classe de algoritmo por nome.
+        Get algorithm class by name.
 
         Args:
-            name: Nome do algoritmo
+            name (str): Algorithm name.
 
         Returns:
-            type[CSPAlgorithm]: Classe do algoritmo
+            type[CSPAlgorithm]: Algorithm class.
+
+        Raises:
+            KeyError: If algorithm not found.
         """
         ...
 
     def list_algorithms(self) -> List[str]:
         """
-        Lista algoritmos disponíveis.
+        List available algorithms.
 
         Returns:
-            List[str]: Nomes dos algoritmos disponíveis
+            List[str]: Available algorithm names.
         """
         ...
 
     def register_algorithm(self, algorithm_class: type[CSPAlgorithm]) -> None:
         """
-        Registra novo algoritmo.
+        Register new algorithm.
 
         Args:
-            algorithm_class: Classe do algoritmo a ser registrada
-        """
-        ...
-
-
-@runtime_checkable
-class EntrezDatasetRepository(Protocol):
-    """Port para repositório de datasets Entrez/NCBI."""
-
-    def fetch_dataset(
-        self, query: str, db: str = "nucleotide", retmax: int = 20, **kwargs
-    ) -> Tuple[List[str], Dict[str, Any]]:
-        """
-        Busca e baixa dataset do NCBI usando Entrez API.
-
-        Args:
-            query: Query de busca no NCBI
-            db: Base de dados NCBI (nucleotide, protein, etc.)
-            retmax: Número máximo de sequências
-            **kwargs: Parâmetros adicionais (email, api_key, etc.)
-
-        Returns:
-            Tuple[List[str], Dict[str, Any]]: (sequências, metadados)
-        """
-        ...
-
-    def is_available(self) -> bool:
-        """
-        Verifica se o serviço Entrez está disponível.
-
-        Returns:
-            bool: True se disponível
-        """
-        ...
-
-
-class AlgorithmRegistry(Protocol):
-    """Port para registry de algoritmos."""
-
-    def get_algorithm(self, name: str) -> type[CSPAlgorithm]:
-        """
-        Obtém classe de algoritmo por nome.
-
-        Args:
-            name: Nome do algoritmo
-
-        Returns:
-            type[CSPAlgorithm]: Classe do algoritmo
-        """
-        ...
-
-    def list_algorithms(self) -> List[str]:
-        """
-        Lista algoritmos disponíveis.
-
-        Returns:
-            List[str]: Nomes dos algoritmos disponíveis
-        """
-        ...
-
-    def register_algorithm(self, algorithm_class: type[CSPAlgorithm]) -> None:
-        """
-        Registra novo algoritmo.
-
-        Args:
-            algorithm_class: Classe do algoritmo a ser registrada
+            algorithm_class (type[CSPAlgorithm]): Algorithm class to register.
         """
         ...
 
     def algorithm_exists(self, name: str) -> bool:
         """
-        Verifica se algoritmo existe.
+        Check if algorithm exists.
 
         Args:
-            name: Nome do algoritmo
+            name (str): Algorithm name.
 
         Returns:
-            bool: True se existe
+            bool: True if exists, False otherwise.
         """
         ...
 
     def get_algorithm_metadata(self, name: str) -> Dict[str, Any]:
         """
-        Obtém metadados de algoritmo.
+        Get algorithm metadata.
 
         Args:
-            name: Nome do algoritmo
+            name (str): Algorithm name.
 
         Returns:
-            Dict[str, Any]: Metadados do algoritmo
-        """
-        ...
-
-
-@runtime_checkable
-class EntrezDatasetRepository(Protocol):
-    """Port para repositório de datasets Entrez/NCBI."""
-
-    def fetch_dataset(
-        self, query: str, db: str = "nucleotide", retmax: int = 20, **kwargs
-    ) -> Tuple[List[str], Dict[str, Any]]:
-        """
-        Busca e baixa dataset do NCBI usando Entrez API.
-
-        Args:
-            query: Query de busca no NCBI
-            db: Base de dados NCBI (nucleotide, protein, etc.)
-            retmax: Número máximo de sequências
-            **kwargs: Parâmetros adicionais (email, api_key, etc.)
-
-        Returns:
-            Tuple[List[str], Dict[str, Any]]: (sequências, metadados)
-        """
-        ...
-
-    def is_available(self) -> bool:
-        """
-        Verifica se o serviço Entrez está disponível.
-
-        Returns:
-            bool: True se disponível
+            Dict[str, Any]: Algorithm metadata including description, parameters, etc.
         """
         ...
 
 
 @runtime_checkable
 class ExportPort(Protocol):
-    """Port para exportação de resultados."""
+    """
+    Port for result export.
+
+    Defines the interface for exporting results in various formats
+    and managing export destinations. This port abstracts the export
+    mechanism from the application layer.
+    """
 
     def export_results(
         self, results: Dict[str, Any], format_type: str, destination: str
     ) -> str:
         """
-        Exporta resultados em formato específico.
+        Export results in specific format.
 
         Args:
-            results: Dados dos resultados
-            format_type: Formato de exportação (csv, json, xlsx, etc.)
-            destination: Destino da exportação
+            results (Dict[str, Any]): Result data to export.
+            format_type (str): Export format (csv, json, xlsx, etc.).
+            destination (str): Export destination path.
 
         Returns:
-            str: Caminho do arquivo exportado
+            str: Path of exported file.
         """
         ...
 
@@ -253,24 +136,24 @@ class ExportPort(Protocol):
         self, batch_results: List[Dict[str, Any]], format_type: str, destination: str
     ) -> str:
         """
-        Exporta resultados de batch.
+        Export batch results.
 
         Args:
-            batch_results: Lista de resultados
-            format_type: Formato de exportação
-            destination: Destino da exportação
+            batch_results (List[Dict[str, Any]]): List of results to export.
+            format_type (str): Export format.
+            destination (str): Export destination path.
 
         Returns:
-            str: Caminho do arquivo exportado
+            str: Path of exported file.
         """
         ...
 
     def get_supported_formats(self) -> List[str]:
         """
-        Lista formatos suportados.
+        List supported formats.
 
         Returns:
-            List[str]: Formatos disponíveis
+            List[str]: Available export formats.
         """
         ...
 
@@ -278,230 +161,243 @@ class ExportPort(Protocol):
         self, optimization_data: Dict[str, Any], destination: str
     ) -> str:
         """
-        Exporta resultados de otimização.
+        Export optimization results.
 
         Args:
-            optimization_data: Dados da otimização
-            destination: Destino da exportação
+            optimization_data (Dict[str, Any]): Optimization data to export.
+            destination (str): Export destination path.
 
         Returns:
-            str: Caminho do arquivo exportado
+            str: Path of exported file.
         """
         ...
 
 
 @runtime_checkable
-class ExecutorPort(Protocol):
-    """Port para execução de algoritmos."""
+class ExecutionEngine(Protocol):
+    """
+    Port for pipeline task execution engines.
 
-    def execute_batch(
-        self, batch_config: Dict[str, Any], monitoring_service=None
-    ) -> List[Dict[str, Any]]:
-        """
-        Executa batch de experimentos.
+    Defines the interface for executing individual tasks within
+    the pipeline execution framework. This port abstracts the
+    task execution mechanism from the application layer.
+    """
 
-        Args:
-            batch_config: Configuração do batch
-            monitoring_service: Serviço de monitoramento (opcional)
-
-        Returns:
-            List[Dict[str, Any]]: Lista de resultados
-        """
-        ...
-
-    def execute_optimization(
+    def __init__(
         self,
-        algorithm_name: str,
-        dataset: Dataset,
-        optimization_config: Dict[str, Any],
-        monitoring_service=None,
-        config_index: int = 1,
-        total_configs: int = 1,
-        dataset_index: int = 1,
-        total_datasets: int = 1,
-    ) -> Dict[str, Any]:
+        combination_store: CombinationScopedPersistence,
+        execution_controller: ExecutionController,
+        batch_config: CSPBenchConfig,
+    ):
         """
-        Executa otimização de hiperparâmetros.
+        Initialize execution engine.
 
         Args:
-            algorithm_name: Nome do algoritmo
-            dataset: Dataset para otimização
-            optimization_config: Configuração da otimização
-            monitoring_service: Serviço de monitoramento (opcional)
-
-        Returns:
-            Dict[str, Any]: Resultados da otimização
+            combination_store (CombinationScopedPersistence): Store for combination data.
+            execution_controller (ExecutionController): Execution control interface.
+            batch_config (CSPBenchConfig): Batch configuration.
         """
         ...
 
-    def execute_sensitivity_analysis(
-        self, algorithm_name: str, dataset: Dataset, sensitivity_config: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    def run(
+        self,
+        task: TaskConfig,
+        dataset_obj: Dataset,
+        alg: AlgParams,
+    ) -> BaseStatus:
         """
-        Executa análise de sensibilidade.
+        Execute a specific task.
 
         Args:
-            algorithm_name: Nome do algoritmo
-            dataset: Dataset para análise
-            sensitivity_config: Configuração da análise
+            task (TaskConfig): Task configuration to execute.
+            dataset_obj (Dataset): Dataset object for the task.
+            alg (AlgParams): Algorithm parameters.
 
         Returns:
-            Dict[str, Any]: Resultados da análise
+            BaseStatus: Execution status result.
         """
         ...
-
-    def get_execution_status(self, execution_id: str) -> str:
-        """
-        Obtém status de execução.
-
-        Args:
-            execution_id: ID da execução
-
-        Returns:
-            str: Status da execução
-        """
-        ...
-
-    def cancel_execution(self, execution_id: str) -> bool:
-        """
-        Cancela execução em andamento.
-
-        Args:
-            execution_id: ID da execução
-
-        Returns:
-            bool: True se cancelada com sucesso
-        """
-        ...
-
-
-# Interfaces ABC alternativas para casos onde Protocol não é adequado
-
-
-class AbstractDatasetRepository(ABC):
-    """Interface ABC para repositório de datasets."""
-
-    @abstractmethod
-    def save(self, dataset: Dataset, name: str) -> str:
-        """Salva dataset com nome específico."""
-        pass
-
-    @abstractmethod
-    def load(self, identifier: str) -> Dataset:
-        """Carrega dataset por identificador."""
-        pass
-
-    @abstractmethod
-    def list_available(self) -> List[str]:
-        """Lista datasets disponíveis."""
-        pass
-
-    @abstractmethod
-    def exists(self, identifier: str) -> bool:
-        """Verifica se dataset existe."""
-        pass
-
-    @abstractmethod
-    def delete(self, identifier: str) -> bool:
-        """Remove dataset."""
-        pass
 
 
 class AbstractAlgorithmRegistry(ABC):
-    """Interface ABC para registry de algoritmos."""
+    """
+    Abstract base class for algorithm registry.
+
+    Provides a concrete base class that can be inherited by
+    infrastructure implementations of the AlgorithmRegistry port.
+    """
 
     @abstractmethod
     def get_algorithm(self, name: str) -> type[CSPAlgorithm]:
-        """Obtém classe de algoritmo por nome."""
+        """
+        Get algorithm class by name.
+
+        Args:
+            name (str): Algorithm name.
+
+        Returns:
+            type[CSPAlgorithm]: Algorithm class.
+        """
         pass
 
     @abstractmethod
     def list_algorithms(self) -> List[str]:
-        """Lista algoritmos disponíveis."""
+        """
+        List available algorithms.
+
+        Returns:
+            List[str]: Available algorithm names.
+        """
         pass
 
     @abstractmethod
     def register_algorithm(self, algorithm_class: type[CSPAlgorithm]) -> None:
-        """Registra novo algoritmo."""
+        """
+        Register new algorithm.
+
+        Args:
+            algorithm_class (type[CSPAlgorithm]): Algorithm class to register.
+        """
         pass
 
     @abstractmethod
     def algorithm_exists(self, name: str) -> bool:
-        """Verifica se algoritmo existe."""
+        """
+        Check if algorithm exists.
+
+        Args:
+            name (str): Algorithm name.
+
+        Returns:
+            bool: True if exists, False otherwise.
+        """
         pass
 
     @abstractmethod
     def get_algorithm_metadata(self, name: str) -> Dict[str, Any]:
-        """Obtém metadados de algoritmo."""
+        """
+        Get algorithm metadata.
+
+        Args:
+            name (str): Algorithm name.
+
+        Returns:
+            Dict[str, Any]: Algorithm metadata.
+        """
         pass
 
 
 class AbstractExportPort(ABC):
-    """Interface ABC para exportação de resultados."""
+    """
+    Abstract base class for result export.
+
+    Provides a concrete base class that can be inherited by
+    infrastructure implementations of the ExportPort.
+    """
 
     @abstractmethod
     def export_results(
         self, results: Dict[str, Any], format_type: str, destination: str
     ) -> str:
-        """Exporta resultados em formato específico."""
+        """
+        Export results in specific format.
+
+        Args:
+            results (Dict[str, Any]): Result data to export.
+            format_type (str): Export format.
+            destination (str): Export destination path.
+
+        Returns:
+            str: Path of exported file.
+        """
         pass
 
     @abstractmethod
     def export_batch_results(
         self, batch_results: List[Dict[str, Any]], format_type: str, destination: str
     ) -> str:
-        """Exporta resultados de batch."""
+        """
+        Export batch results.
+
+        Args:
+            batch_results (List[Dict[str, Any]]): List of results to export.
+            format_type (str): Export format.
+            destination (str): Export destination path.
+
+        Returns:
+            str: Path of exported file.
+        """
         pass
 
     @abstractmethod
     def get_supported_formats(self) -> List[str]:
-        """Lista formatos suportados."""
+        """
+        List supported formats.
+
+        Returns:
+            List[str]: Available export formats.
+        """
         pass
 
     @abstractmethod
     def export_optimization_results(
         self, optimization_data: Dict[str, Any], destination: str
     ) -> str:
-        """Exporta resultados de otimização."""
+        """
+        Export optimization results.
+
+        Args:
+            optimization_data (Dict[str, Any]): Optimization data to export.
+            destination (str): Export destination path.
+
+        Returns:
+            str: Path of exported file.
+        """
         pass
 
 
-class AbstractExecutorPort(ABC):
-    """Interface ABC para execução de algoritmos."""
+class AbstractExecutionEngine(ABC):
+    """
+    Abstract base class for task execution engines.
 
-    @abstractmethod
-    def execute_batch(self, batch_config: Dict[str, Any]) -> List[Dict[str, Any]]:
-        """Executa batch de experimentos."""
-        pass
+    Provides a concrete base class that can be inherited by
+    infrastructure implementations of the ExecutionEngine port.
+    """
 
-    @abstractmethod
-    def execute_optimization(
+    def __init__(
         self,
-        algorithm_name: str,
-        dataset: Dataset,
-        optimization_config: Dict[str, Any],
-        monitoring_service=None,
-        config_index: int = 1,
-        total_configs: int = 1,
-        dataset_index: int = 1,
-        total_datasets: int = 1,
-    ) -> Dict[str, Any]:
-        """Executa otimização de hiperparâmetros."""
-        pass
+        combination_store: CombinationScopedPersistence,
+        execution_controller: ExecutionController,
+        batch_config: CSPBenchConfig,
+    ):
+        """
+        Initialize execution engine.
+
+        Args:
+            combination_store (CombinationScopedPersistence): Store for combination data.
+            execution_controller (ExecutionController): Execution control interface.
+            batch_config (CSPBenchConfig): Batch configuration.
+        """
+        self._combination_store = combination_store
+        self._execution_controller = execution_controller
+        self._batch_config = batch_config
 
     @abstractmethod
-    def execute_sensitivity_analysis(
-        self, algorithm_name: str, dataset: Dataset, sensitivity_config: Dict[str, Any]
-    ) -> Dict[str, Any]:
-        """Executa análise de sensibilidade."""
-        pass
+    def run(
+        self,
+        task: TaskConfig,
+        dataset_obj: Dataset,
+        alg: AlgParams,
+    ) -> BaseStatus:
+        """
+        Execute a specific task.
 
-    @abstractmethod
-    def get_execution_status(self, execution_id: str) -> str:
-        """Obtém status de execução."""
-        pass
+        Args:
+            task (TaskConfig): Task configuration to execute.
+            dataset_obj (Dataset): Dataset object for the task.
+            alg (AlgParams): Algorithm parameters.
 
-    @abstractmethod
-    def cancel_execution(self, execution_id: str) -> bool:
-        """Cancela execução em andamento."""
+        Returns:
+            BaseStatus: Execution status result.
+        """
         pass

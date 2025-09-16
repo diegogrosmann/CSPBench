@@ -5,8 +5,14 @@ Domain module containing the core business logic for CSPBench.
 Implements algorithms, metrics, and data entities without external dependencies.
 """
 
-from .algorithms import Algorithm, CSPAlgorithm, global_registry, register_algorithm
-from .dataset import Dataset, SyntheticDatasetGenerator
+from .algorithms import CSPAlgorithm, global_registry, register_algorithm
+from .dataset import Dataset
+from .distance import (
+    DistanceCalculator,
+    HammingDistanceCalculator,
+    LevenshteinDistanceCalculator,
+    create_distance_calculator,
+)
 from .errors import (
     AlgorithmError,
     AlgorithmExecutionError,
@@ -30,37 +36,27 @@ from .errors import (
     SensitivityConfigurationError,
     SensitivityExecutionError,
 )
-from .metrics import (
-    DistanceCalculator,
-    QualityEvaluator,
-    average_distance,
-    consensus_strength,
-    diversity_metric,
-    hamming_distance,
-    max_distance,
-    max_hamming,
-    median_distance,
-    solution_quality,
-)
+from .work import WorkItem, WorkStatus
 
 __all__ = [
     # Algorithms
     "CSPAlgorithm",
-    "Algorithm",
     "register_algorithm",
     "global_registry",
-    # Metrics
-    "hamming_distance",
-    "max_distance",
-    "max_hamming",
-    "average_distance",
-    "median_distance",
+    # Distance calculators
+    "DistanceCalculator",
+    "HammingDistanceCalculator",
+    "LevenshteinDistanceCalculator",
+    "create_distance_calculator",
+    # Work entities
+    "WorkStatus",
+    "WorkItem",
+    # Metrics and quality evaluation
     "diversity_metric",
     "consensus_strength",
     "solution_quality",
-    "DistanceCalculator",
     "QualityEvaluator",
-    # Dataset
+    # Datasets
     "Dataset",
     "SyntheticDatasetGenerator",
     # Errors
@@ -86,3 +82,14 @@ __all__ = [
     "OptimizationExecutionError",
     "SensitivityExecutionError",
 ]
+
+
+# Lazy re-export to avoid circular import with application layer
+def __getattr__(name):  # PEP 562
+    if name == "SyntheticDatasetGenerator":
+        from src.application.services.dataset_generator import (
+            SyntheticDatasetGenerator as _SDG,
+        )
+
+        return _SDG
+    raise AttributeError(name)

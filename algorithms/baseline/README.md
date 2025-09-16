@@ -52,29 +52,32 @@ The **Baseline** is a simple and efficient deterministic algorithm that implemen
 
 ## 🧮 Parameters
 
-The Baseline algorithm **has no configurable parameters**, ensuring:
-- Total reproducibility
-- Ease of use
-- No tuning required
-- Consistent behavior
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `tie_break` | `str` | `"lex"` | Strategy to resolve ties between equally good symbols at a position. Options: `lex` (lexicographic min), `first` (first encountered), `random` (uniform choice using algorithm RNG/seed). |
+
+Notes:
+- `random` maintains reproducibility when a `seed` is provided to the algorithm constructor.
+- Changing `tie_break` can produce different but distance-equivalent consensus strings when multiple optimal symbols exist per position.
 
 ## 💻 Usage Example
 
 ### **Basic Usage**
 ```python
-from algorithms.baseline.algorithm import BaselineAlg
+from algorithms.baseline import BaselineAlg
+from src.domain.distance import create_distance_calculator
 
-# Example dataset
 strings = ["ACGTACGT", "AGGTACGT", "ACGTAAGT"]
 alphabet = "ACGT"
+calc = create_distance_calculator("hamming", strings)
 
-# Create and run algorithm
-algorithm = BaselineAlg(strings, alphabet)
-center, distance, metadata = algorithm.run()
+alg = BaselineAlg(strings=strings, alphabet=alphabet, distance_calculator=calc, seed=42, tie_break="lex")
+result = alg.run()
 
-print(f"Found center: {center}")
-print(f"Maximum distance: {distance}")
-print(f"Metadata: {metadata}")
+print("Center:", result["center_string"])            # consensus string
+print("Max distance:", result["max_distance"])       # d*
+print("Parameters:", result["parameters"])           # actual params (incl. tie_break)
+print("Execution time:", result["metadata"]["execution_time"])  # seconds
 ```
 
 ### **Via Framework**
@@ -101,34 +104,31 @@ task:
 
 ## 🔬 Algorithmic Analysis
 
-### **Pseudocode**
+### **Pseudocode (Frequency-Based Greedy Consensus)**
 ```
-function baseline_consensus(strings, alphabet):
+function greedy_consensus(strings, alphabet, tie_break="lex"):
     L = length(strings[0])
-    consensus = ""
-    
-    for position in range(L):
-        # Count frequencies
-        counts = {}
-        for symbol in alphabet:
-            counts[symbol] = 0
-        
-        for string in strings:
-            symbol = string[position]
-            counts[symbol] += 1
-        
-        # Find most frequent symbol
-        max_count = 0
-        best_symbol = alphabet[0]  # Tie-breaking
-        
-        for symbol in alphabet:
-            if counts[symbol] > max_count:
-                max_count = counts[symbol]
-                best_symbol = symbol
-        
-        consensus += best_symbol
-    
-    return consensus
+    consensus = []
+    for pos in 0..L-1:
+        # Count symbol frequencies at this column
+        counts = {c: 0 for c in alphabet}
+        for s in strings:
+            counts[s[pos]] += 1
+        max_count = max(counts.values())
+        candidates = [c for c in alphabet if counts[c] == max_count]
+        if len(candidates) == 1:
+            chosen = candidates[0]
+        else:
+            if tie_break == 'lex':
+                chosen = min(candidates)
+            elif tie_break == 'first':
+                chosen = candidates[0]
+            elif tie_break == 'random':
+                chosen = random_choice(candidates)
+            else:
+                chosen = min(candidates)
+        consensus.append(chosen)
+    return join(consensus)
 ```
 
 ### **Mathematical Analysis**
@@ -164,6 +164,20 @@ def visualize_consensus(strings, alphabet):
     plt.colorbar(label='Frequency')
     plt.title('Consensus by Position')
     plt.show()
+```
+
+## ✅ Testing & Quality
+
+High-level tests (pytest) ensure:
+- Correct consensus on controlled examples
+- Deterministic output for same seed & params
+- Tie-breaking strategies produce expected alternatives
+- Proper error handling for empty inputs / alphabet
+- Metadata fields presence & basic invariants
+
+Run all tests:
+```bash
+.venv/bin/python -m pytest -k baseline -v
 ```
 
 ## 🔗 Integration with CSPBench

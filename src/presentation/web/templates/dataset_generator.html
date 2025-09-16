@@ -2,10 +2,371 @@
 
 {% block title %}CSPBench - Dataset Generator{% endblock %}
 
+{% block extra_css %}
+<style>
+.dataset-generator-container {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+.section-header {
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+.section-header h2 {
+    color: #495057;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+}
+
+.section-header p {
+    color: #6c757d;
+    font-size: 1.1rem;
+}
+
+.dataset-type-selector {
+    background: #f8f9fa;
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.type-buttons {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.type-button {
+    padding: 1rem 2rem;
+    border: 2px solid #e9ecef;
+    border-radius: 8px;
+    background: white;
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    min-width: 200px;
+}
+
+.type-button.active {
+    border-color: #007bff;
+    background: #007bff;
+    color: white;
+}
+
+.type-button:hover:not(.active) {
+    border-color: #007bff;
+    background: #f8f9ff;
+}
+
+.generator-section {
+    display: none;
+    background: white;
+    border: 1px solid #e9ecef;
+    border-radius: 12px;
+    padding: 2rem;
+    margin-bottom: 2rem;
+}
+
+.generator-section.active {
+    display: block;
+}
+
+.generator-form {
+    display: grid;
+    gap: 1.5rem;
+}
+
+.form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1.5rem;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+}
+
+.form-group label {
+    font-weight: 500;
+    color: #495057;
+    margin-bottom: 0.5rem;
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+    padding: 0.75rem;
+    border: 1px solid #ced4da;
+    border-radius: 6px;
+    font-size: 1rem;
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+    outline: none;
+    border-color: #007bff;
+    box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+}
+
+.form-group small {
+    color: #6c757d;
+    font-size: 0.875rem;
+    margin-top: 0.25rem;
+}
+
+.method-params {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-top: 1rem;
+}
+
+.generation-controls {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    margin-top: 2rem;
+    flex-wrap: wrap;
+}
+
+.btn-generate {
+    padding: 1rem 2rem;
+    background: linear-gradient(135deg, #28a745, #20c997);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 1.1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    min-width: 200px;
+}
+
+.btn-generate:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
+}
+
+.btn-generate:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.btn-cancel {
+    padding: 1rem 2rem;
+    background: #6c757d;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 1.1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.btn-cancel:hover {
+    background: #5a6268;
+}
+
+.generation-status {
+    display: none;
+    background: #fff3cd;
+    border: 1px solid #ffeaa7;
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-top: 2rem;
+}
+
+.generation-status.show {
+    display: block;
+}
+
+.progress-bar {
+    width: 100%;
+    height: 8px;
+    background: #e9ecef;
+    border-radius: 4px;
+    margin: 1rem 0;
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #007bff, #20c997);
+    border-radius: 4px;
+    width: 0%;
+    transition: width 0.3s ease;
+}
+
+.status-message {
+    color: #856404;
+    font-weight: 500;
+    margin-bottom: 0.5rem;
+}
+
+.results-section {
+    display: none;
+    background: #d4edda;
+    border: 1px solid #c3e6cb;
+    border-radius: 12px;
+    padding: 2rem;
+    margin-top: 2rem;
+}
+
+.results-section.show {
+    display: block;
+}
+
+.results-content {
+    display: grid;
+    gap: 2rem;
+}
+
+.dataset-info {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 8px;
+}
+
+.dataset-details {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.dataset-detail-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.dataset-detail-label {
+    font-weight: 500;
+    color: #495057;
+}
+
+.dataset-detail-value {
+    color: #6c757d;
+}
+
+.dataset-preview {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 8px;
+}
+
+.sequence-preview {
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 6px;
+    padding: 1rem;
+    font-family: 'Courier New', monospace;
+    font-size: 0.875rem;
+    max-height: 200px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    margin-top: 1rem;
+}
+
+.results-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    margin-top: 1.5rem;
+    flex-wrap: wrap;
+}
+
+.download-button {
+    padding: 0.75rem 1.5rem;
+    background: #007bff;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.download-button:hover {
+    background: #0056b3;
+    transform: translateY(-1px);
+}
+
+.use-button {
+    padding: 0.75rem 1.5rem;
+    background: #28a745;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.use-button:hover {
+    background: #1e7e34;
+    transform: translateY(-1px);
+}
+
+.secondary-button {
+    padding: 0.75rem 1.5rem;
+    background: #6c757d;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.secondary-button:hover {
+    background: #5a6268;
+    transform: translateY(-1px);
+}
+
+@media (max-width: 768px) {
+    .dataset-generator-container {
+        padding: 1rem;
+    }
+    
+    .form-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .type-buttons {
+        flex-direction: column;
+        align-items: center;
+    }
+    
+    .generation-controls {
+        flex-direction: column;
+        align-items: center;
+    }
+    
+    .results-actions {
+        flex-direction: column;
+        align-items: center;
+    }
+}
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="dataset-generator-container">
-    <h2>🧬 Dataset Generator</h2>
-    <p>Create synthetic datasets or download real datasets from NCBI for CSP algorithm testing.</p>
+    <div class="section-header">
+        <h2>🧬 Dataset Generator</h2>
+        <p>Create synthetic datasets or download real datasets from NCBI for CSP algorithm testing.</p>
+    </div>
     
     <!-- Dataset Type Selection -->
     <div class="dataset-type-selector">
@@ -26,8 +387,15 @@
         <form id="synthetic-form" class="generator-form">
             <div class="form-grid">
                 <div class="form-group">
+                    <label for="synthetic-name">Dataset Name</label>
+                    <input type="text" id="synthetic-name" name="name" required 
+                           placeholder="Enter dataset name...">
+                    <small>Unique name for your dataset</small>
+                </div>
+                
+                <div class="form-group">
                     <label for="synthetic-sequences">Number of Sequences</label>
-                    <input type="number" id="synthetic-sequences" name="sequences" 
+                    <input type="number" id="synthetic-sequences" name="n" 
                            min="3" max="1000" value="20" required>
                     <small>Number of sequences to generate (3-1000)</small>
                 </div>
@@ -44,59 +412,51 @@
                     <select id="synthetic-alphabet" name="alphabet" required>
                         <option value="ACGT">DNA (ACGT)</option>
                         <option value="ACGU">RNA (ACGU)</option>
-                        <option value="ACDEFGHIKLMNPQRSTVWY">Protein (20 amino acids)</option>
-                        <option value="01">Binary (01)</option>
-                        <option value="custom">Custom...</option>
+                        <option value="ABCDEFGHIJKLMNOPQRSTUVWXYZ">Protein (26 letters)</option>
+                        <option value="01">Binary (0, 1)</option>
                     </select>
-                    <input type="text" id="custom-alphabet" name="custom_alphabet" 
-                           placeholder="Enter custom alphabet" style="display: none;">
                     <small>Character set for sequence generation</small>
                 </div>
                 
                 <div class="form-group">
                     <label for="synthetic-method">Generation Method</label>
-                    <select id="synthetic-method" name="method" required>
-                        <option value="random">Random Generation</option>
-                        <option value="noise">Center-based with Noise</option>
+                    <select id="synthetic-method" name="method" required onchange="updateMethodParams()">
+                        <option value="random">Random Sequences</option>
+                        <option value="noise">Noise-based (from center)</option>
                         <option value="clustered">Clustered Sequences</option>
                         <option value="mutations">Mutation-based</option>
                     </select>
-                    <small>Method for generating sequences</small>
+                    <small>Algorithm for sequence generation</small>
+                </div>
+                
+                <div class="form-group">
+                    <label for="synthetic-seed">Random Seed (Optional)</label>
+                    <input type="number" id="synthetic-seed" name="seed" min="0">
+                    <small>For reproducible results (leave empty for random)</small>
                 </div>
             </div>
             
             <!-- Method-specific parameters -->
-            <div id="method-params" class="method-parameters">
-                <!-- Parameters will be dynamically loaded here -->
-            </div>
-            
-            <div class="form-grid">
-                <div class="form-group">
-                    <label for="synthetic-seed">Seed (Optional)</label>
-                    <input type="number" id="synthetic-seed" name="seed" 
-                           placeholder="Enter seed for reproducibility">
-                    <small>Leave empty for random generation</small>
-                </div>
-                
-                <div class="form-group">
-                    <label for="synthetic-filename">Output Filename</label>
-                    <input type="text" id="synthetic-filename" name="filename" 
-                           placeholder="auto-generated" pattern="[a-zA-Z0-9._-]+\.fasta$">
-                    <small>Filename ending in .fasta (auto-generated if empty)</small>
+            <div id="method-params" class="method-params">
+                <div id="method-params-content">
+                    <!-- Will be populated by JavaScript -->
                 </div>
             </div>
-            
-            <button type="submit" class="generate-button">
-                🧪 Generate Synthetic Dataset
-            </button>
         </form>
     </div>
 
-    <!-- NCBI Dataset Downloader -->
+    <!-- NCBI Dataset Generator -->
     <div id="ncbi-generator" class="generator-section">
         <h3>🌐 NCBI Dataset Download</h3>
         <form id="ncbi-form" class="generator-form">
             <div class="form-grid">
+                <div class="form-group">
+                    <label for="ncbi-name">Dataset Name</label>
+                    <input type="text" id="ncbi-name" name="name" required 
+                           placeholder="Enter dataset name...">
+                    <small>Unique name for your dataset</small>
+                </div>
+                
                 <div class="form-group">
                     <label for="ncbi-query">Search Query</label>
                     <input type="text" id="ncbi-query" name="query" 
@@ -106,7 +466,7 @@
                 
                 <div class="form-group">
                     <label for="ncbi-database">Database</label>
-                    <select id="ncbi-database" name="database" required>
+                    <select id="ncbi-database" name="db" required>
                         <option value="nucleotide">Nucleotide</option>
                         <option value="protein">Protein</option>
                         <option value="genome">Genome</option>
@@ -118,55 +478,56 @@
                 <div class="form-group">
                     <label for="ncbi-max-sequences">Max Sequences</label>
                     <input type="number" id="ncbi-max-sequences" name="max_sequences" 
-                           min="1" max="1000" value="50" required>
-                    <small>Maximum sequences to download (1-1000)</small>
+                           min="1" max="10000" value="100">
+                    <small>Maximum sequences to download (1-10000)</small>
                 </div>
                 
                 <div class="form-group">
-                    <label for="ncbi-min-length">Min Length</label>
-                    <input type="number" id="ncbi-min-length" name="min_length" 
-                           min="1" max="50000" value="100" required>
-                    <small>Minimum sequence length</small>
+                    <label for="ncbi-min-length">Min Length (Optional)</label>
+                    <input type="number" id="ncbi-min-length" name="min_length" min="1">
+                    <small>Minimum sequence length filter</small>
                 </div>
                 
                 <div class="form-group">
-                    <label for="ncbi-max-length">Max Length</label>
-                    <input type="number" id="ncbi-max-length" name="max_length" 
-                           min="1" max="50000" value="2000" required>
-                    <small>Maximum sequence length</small>
+                    <label for="ncbi-max-length">Max Length (Optional)</label>
+                    <input type="number" id="ncbi-max-length" name="max_length" min="1">
+                    <small>Maximum sequence length filter</small>
                 </div>
                 
                 <div class="form-group">
-                    <label for="ncbi-filename">Output Filename</label>
-                    <input type="text" id="ncbi-filename" name="filename" 
-                           placeholder="auto-generated" pattern="[a-zA-Z0-9._-]+\.fasta$">
-                    <small>Filename ending in .fasta (auto-generated if empty)</small>
+                    <label for="ncbi-uniform">Uniformization Policy</label>
+                    <select id="ncbi-uniform" name="uniform_policy">
+                        <option value="">No uniformization</option>
+                        <option value="strict">Strict (keep most common length)</option>
+                        <option value="pad">Pad to max length</option>
+                        <option value="trim">Trim to min length</option>
+                    </select>
+                    <small>How to handle different sequence lengths</small>
                 </div>
             </div>
-            
-            <button type="submit" class="generate-button">
-                🌐 Download NCBI Dataset
-            </button>
         </form>
     </div>
     
-    <!-- Generation Status -->
-    <div id="generation-status" class="status-section" style="display: none;">
-        <h3>📊 Generation Status</h3>
-        <div class="status-content">
-            <div class="progress-bar">
-                <div id="progress-fill" class="progress-fill"></div>
-            </div>
-            <div id="status-message" class="status-message">Initializing...</div>
-            <div id="status-details" class="status-details"></div>
-        </div>
-        <button id="cancel-generation" class="cancel-button" style="display: none;">
+    <!-- Generation Controls -->
+    <div class="generation-controls">
+        <button id="generate-btn" class="btn-generate" onclick="startGeneration()">
+            🚀 Generate Dataset
+        </button>
+        <button id="cancel-btn" class="btn-cancel" onclick="cancelGeneration()" style="display: none;">
             ❌ Cancel Generation
         </button>
     </div>
     
+    <!-- Generation Status -->
+    <div id="generation-status" class="generation-status">
+        <div class="status-message" id="status-message">Initializing...</div>
+        <div class="progress-bar">
+            <div class="progress-fill" id="progress-fill"></div>
+        </div>
+    </div>
+    
     <!-- Results Section -->
-    <div id="results-section" class="results-section" style="display: none;">
+    <div id="results-section" class="results-section">
         <h3>✅ Dataset Generated Successfully</h3>
         <div class="results-content">
             <div class="dataset-info">
@@ -187,8 +548,8 @@
                 <button id="download-dataset" class="download-button">
                     💾 Download Dataset
                 </button>
-                <button id="use-in-execution" class="use-button">
-                    🚀 Use in Algorithm Execution
+                <button id="view-in-manager" class="use-button">
+                    📁 View in Manager
                 </button>
                 <button id="generate-another" class="secondary-button">
                     🔄 Generate Another Dataset
@@ -196,31 +557,23 @@
             </div>
         </div>
     </div>
-    
-    <!-- Saved Datasets Manager -->
-    <div class="saved-datasets-section">
-        <h3>📁 Saved Datasets</h3>
-        <div id="saved-datasets-list" class="datasets-list">
-            <div class="loading-message">Loading saved datasets...</div>
-        </div>
-        <button id="refresh-datasets" class="refresh-button">
-            🔄 Refresh List
-        </button>
-    </div>
 </div>
 
 <script>
-// Initialize dataset generator components
+// Global variables
+let currentGenerationType = 'synthetic';
+let currentTaskId = null;
+let statusInterval = null;
+
+// Initialize page
 document.addEventListener('DOMContentLoaded', function() {
-    if (typeof DatasetGenerator !== 'undefined') {
-        new DatasetGenerator();
-    } else {
-        console.warn('DatasetGenerator class not loaded');
-    }
+    updateMethodParams();
 });
 
-// Basic tab switching (fallback if DatasetGenerator not loaded)
+// Switch between dataset types
 function switchDatasetType(type) {
+    currentGenerationType = type;
+    
     const syntheticTab = document.getElementById('synthetic-tab');
     const ncbiTab = document.getElementById('ncbi-tab');
     const syntheticGenerator = document.getElementById('synthetic-generator');
@@ -237,6 +590,384 @@ function switchDatasetType(type) {
         syntheticGenerator.classList.remove('active');
         ncbiGenerator.classList.add('active');
     }
+}
+
+// Update method-specific parameters
+function updateMethodParams() {
+    const method = document.getElementById('synthetic-method').value;
+    const paramsContent = document.getElementById('method-params-content');
+    
+    let html = '';
+    
+    switch (method) {
+        case 'random':
+            html = '<p><strong>Random Method:</strong> Generates completely random sequences using the selected alphabet.</p>';
+            break;
+            
+        case 'noise':
+            html = `
+                <div class="form-group">
+                    <label for="base-sequence">Base Sequence (Optional)</label>
+                    <input type="text" id="base-sequence" name="base_sequence" 
+                           placeholder="Leave empty to auto-generate">
+                    <small>Center sequence for noise generation</small>
+                </div>
+                <div class="form-group">
+                    <label for="noise-rate">Noise Rate</label>
+                    <input type="number" id="noise-rate" name="noise_rate" 
+                           min="0" max="1" step="0.01" value="0.1">
+                    <small>Probability of noise per position (0.0-1.0)</small>
+                </div>
+            `;
+            break;
+            
+        case 'clustered':
+            html = `
+                <div class="form-group">
+                    <label for="num-clusters">Number of Clusters</label>
+                    <input type="number" id="num-clusters" name="num_clusters" 
+                           min="1" max="10" value="2">
+                    <small>Number of sequence clusters to generate</small>
+                </div>
+                <div class="form-group">
+                    <label for="cluster-distance">Cluster Distance</label>
+                    <input type="number" id="cluster-distance" name="cluster_distance" 
+                           min="0" max="1" step="0.01" value="0.2">
+                    <small>Distance between cluster centers (0.0-1.0)</small>
+                </div>
+            `;
+            break;
+            
+        case 'mutations':
+            html = `
+                <div class="form-group">
+                    <label for="base-sequence-mut">Base Sequence (Optional)</label>
+                    <input type="text" id="base-sequence-mut" name="base_sequence" 
+                           placeholder="Leave empty to auto-generate">
+                    <small>Base sequence for mutations</small>
+                </div>
+                <div class="form-group">
+                    <label for="mutation-rate">Mutation Rate</label>
+                    <input type="number" id="mutation-rate" name="mutation_rate" 
+                           min="0" max="1" step="0.01" value="0.1">
+                    <small>Probability of mutation per position (0.0-1.0)</small>
+                </div>
+                <div class="form-group">
+                    <label for="mutation-types">Mutation Types</label>
+                    <select id="mutation-types" name="mutation_types" multiple>
+                        <option value="substitution" selected>Substitution</option>
+                        <option value="insertion">Insertion</option>
+                        <option value="deletion">Deletion</option>
+                    </select>
+                    <small>Types of mutations to apply</small>
+                </div>
+            `;
+            break;
+    }
+    
+    paramsContent.innerHTML = html;
+}
+
+// Start dataset generation
+async function startGeneration() {
+    try {
+        const generateBtn = document.getElementById('generate-btn');
+        const cancelBtn = document.getElementById('cancel-btn');
+        
+        // Disable generate button, show cancel button
+        generateBtn.disabled = true;
+        generateBtn.textContent = '🔄 Starting...';
+        cancelBtn.style.display = 'inline-block';
+        
+        // Prepare form data
+        let formData;
+        let endpoint;
+        
+        if (currentGenerationType === 'synthetic') {
+            formData = collectSyntheticFormData();
+            endpoint = '/api/datasets/generate/synthetic';
+        } else {
+            formData = collectNCBIFormData();
+            endpoint = '/api/datasets/generate/ncbi';
+        }
+        
+        // Start generation
+        const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(formData)
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+            currentTaskId = result.data.task_id;
+            showGenerationStatus();
+            startStatusPolling();
+        } else {
+            throw new Error(result.detail || 'Generation failed');
+        }
+        
+    } catch (error) {
+        console.error('Generation error:', error);
+        showError('Failed to start generation: ' + error.message);
+        resetGenerationControls();
+    }
+}
+
+// Collect synthetic form data
+function collectSyntheticFormData() {
+    const form = document.getElementById('synthetic-form');
+    const formData = new FormData(form);
+    const data = {};
+    
+    // Basic fields
+    data.name = formData.get('name');
+    data.method = formData.get('method');
+    data.n = parseInt(formData.get('n'));
+    data.alphabet = formData.get('alphabet');
+    
+    if (formData.get('seed')) {
+        data.seed = parseInt(formData.get('seed'));
+    }
+    
+    // Method-specific fields
+    switch (data.method) {
+        case 'random':
+            data.length = parseInt(formData.get('length'));
+            break;
+            
+        case 'noise':
+            if (formData.get('base_sequence')) {
+                data.base_sequence = formData.get('base_sequence');
+            }
+            data.noise_rate = parseFloat(formData.get('noise_rate') || 0.1);
+            break;
+            
+        case 'clustered':
+            data.length = parseInt(formData.get('length'));
+            data.num_clusters = parseInt(formData.get('num_clusters') || 2);
+            data.cluster_distance = parseFloat(formData.get('cluster_distance') || 0.2);
+            break;
+            
+        case 'mutations':
+            if (formData.get('base_sequence')) {
+                data.base_sequence = formData.get('base_sequence');
+            }
+            data.mutation_rate = parseFloat(formData.get('mutation_rate') || 0.1);
+            
+            // Handle multiple selection for mutation types
+            const mutationSelect = document.getElementById('mutation-types');
+            if (mutationSelect) {
+                data.mutation_types = Array.from(mutationSelect.selectedOptions).map(option => option.value);
+            }
+            break;
+    }
+    
+    return data;
+}
+
+// Collect NCBI form data
+function collectNCBIFormData() {
+    const form = document.getElementById('ncbi-form');
+    const formData = new FormData(form);
+    const data = {};
+    
+    data.name = formData.get('name');
+    data.query = formData.get('query');
+    data.db = formData.get('db');
+    
+    if (formData.get('max_sequences')) {
+        data.max_sequences = parseInt(formData.get('max_sequences'));
+    }
+    
+    if (formData.get('min_length')) {
+        data.min_length = parseInt(formData.get('min_length'));
+    }
+    
+    if (formData.get('max_length')) {
+        data.max_length = parseInt(formData.get('max_length'));
+    }
+    
+    if (formData.get('uniform_policy')) {
+        data.uniform_policy = formData.get('uniform_policy');
+    }
+    
+    return data;
+}
+
+// Show generation status
+function showGenerationStatus() {
+    document.getElementById('generation-status').classList.add('show');
+    document.getElementById('results-section').classList.remove('show');
+}
+
+// Start status polling
+function startStatusPolling() {
+    statusInterval = setInterval(async () => {
+        try {
+            const response = await fetch(`/api/datasets/generation/${currentTaskId}/status`);
+            const status = await response.json();
+            
+            updateStatusDisplay(status);
+            
+            if (status.status === 'completed') {
+                clearInterval(statusInterval);
+                await showGenerationResults(status.dataset_id);
+                resetGenerationControls();
+            } else if (status.status === 'failed') {
+                clearInterval(statusInterval);
+                showError('Generation failed: ' + (status.error || 'Unknown error'));
+                resetGenerationControls();
+            }
+            
+        } catch (error) {
+            console.error('Status polling error:', error);
+            clearInterval(statusInterval);
+            showError('Failed to get generation status');
+            resetGenerationControls();
+        }
+    }, 1000);
+}
+
+// Update status display
+function updateStatusDisplay(status) {
+    document.getElementById('status-message').textContent = status.message;
+    document.getElementById('progress-fill').style.width = status.progress + '%';
+}
+
+// Show generation results
+async function showGenerationResults(datasetId) {
+    try {
+        // Get dataset preview
+        const response = await fetch(`/api/datasets/${datasetId}/preview`);
+        const data = await response.json();
+        
+        if (response.ok) {
+            populateDatasetDetails(data.info);
+            populateSequencePreview(data.sample_sequences);
+            
+            // Store dataset ID for download
+            document.getElementById('download-dataset').onclick = () => downloadDataset(datasetId);
+            
+            document.getElementById('generation-status').classList.remove('show');
+            document.getElementById('results-section').classList.add('show');
+        } else {
+            throw new Error(data.detail || 'Failed to load results');
+        }
+        
+    } catch (error) {
+        console.error('Results error:', error);
+        showError('Failed to load generation results');
+    }
+}
+
+// Populate dataset details
+function populateDatasetDetails(info) {
+    const detailsContainer = document.getElementById('dataset-details');
+    
+    const details = [
+        { label: 'Name', value: info.name },
+        { label: 'Type', value: info.type.toUpperCase() },
+        { label: 'Sequences', value: info.size },
+        { label: 'Length', value: info.uniform_lengths ? info.max_length : `${info.min_length}-${info.max_length}` },
+        { label: 'Alphabet', value: info.alphabet },
+        { label: 'Diversity', value: `${(info.diversity * 100).toFixed(1)}%` },
+        { label: 'File Size', value: info.file_size || 'N/A' }
+    ];
+    
+    detailsContainer.innerHTML = details.map(detail => `
+        <div class="dataset-detail-item">
+            <span class="dataset-detail-label">${detail.label}</span>
+            <span class="dataset-detail-value">${detail.value}</span>
+        </div>
+    `).join('');
+}
+
+// Populate sequence preview
+function populateSequencePreview(sequences) {
+    const previewContainer = document.getElementById('sequence-preview');
+    
+    let previewText = '';
+    sequences.forEach((seq, index) => {
+        previewText += `>sequence_${index}\n${seq}\n`;
+    });
+    
+    previewContainer.textContent = previewText;
+}
+
+// Download dataset
+async function downloadDataset(datasetId) {
+    try {
+        const response = await fetch(`/api/datasets/${datasetId}/download`);
+        
+        if (response.ok) {
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${datasetId}.fasta`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+            
+            showSuccess('Dataset downloaded successfully');
+        } else {
+            const error = await response.json();
+            showError(error.detail || 'Download failed');
+        }
+    } catch (error) {
+        console.error('Download error:', error);
+        showError('Download failed');
+    }
+}
+
+// Cancel generation
+function cancelGeneration() {
+    if (statusInterval) {
+        clearInterval(statusInterval);
+    }
+    resetGenerationControls();
+    document.getElementById('generation-status').classList.remove('show');
+}
+
+// Reset generation controls
+function resetGenerationControls() {
+    const generateBtn = document.getElementById('generate-btn');
+    const cancelBtn = document.getElementById('cancel-btn');
+    
+    generateBtn.disabled = false;
+    generateBtn.textContent = '🚀 Generate Dataset';
+    cancelBtn.style.display = 'none';
+    
+    currentTaskId = null;
+}
+
+// Generate another dataset
+function generateAnother() {
+    document.getElementById('results-section').classList.remove('show');
+    // Form will remain filled for convenience
+}
+
+// View in manager
+function viewInManager() {
+    window.location.href = '/dataset/manage';
+}
+
+// Event handlers
+document.getElementById('generate-another').onclick = generateAnother;
+document.getElementById('view-in-manager').onclick = viewInManager;
+
+// Utility functions
+function showSuccess(message) {
+    alert('✅ ' + message);
+}
+
+function showError(message) {
+    alert('❌ ' + message);
 }
 </script>
 {% endblock %}

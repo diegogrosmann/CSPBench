@@ -1,0 +1,76 @@
+# ===================================================================
+# TESTE: Algoritmos Sem Lista - Apenas algorithm_params
+# ===================================================================
+metadata:
+  name: "Test No Algorithm List"
+  description: "Teste sem lista algorithms, apenas algorithm_params"
+  author: "Test"
+  version: "1.0"
+  creation_date: "2025-01-24"
+  tags: ["test", "no_list"]
+
+datasets:
+  - id: dataset_test
+    name: "Test Dataset"
+    type: "synthetic"
+    parameters:
+      mode: "random"
+      n: 5
+      L: 10
+      alphabet: "ACGT"
+      seed: 42
+
+algorithms:
+  - id: "test_no_algorithm_list"
+    name: "Configuration without Algorithm List"
+    description: "Testing configuration that omits the algorithms list entirely"
+    # Nota: sem lista 'algorithms' - deve usar todos os algorithm_params
+    
+    algorithm_params:
+      "Baseline":
+        tie_break: "lex"
+      "BLF-GA":
+        pop_size: 20
+        max_gens: 50
+        seed: 42
+      "CSC":
+        min_d: 2
+        d_factor: 0.75
+
+task:
+  type: "experiment"
+
+experiment:
+  tasks:
+    - name: "Test No Algorithm List"
+      datasets:
+        - "dataset_test"
+      algorithms:
+        - "test_no_algorithm_list"
+      repetitions: 1
+
+output:
+  logging: true
+  results:
+    formats:
+      csv: false
+      json: true
+      parquet: false
+      pickle: false
+    partial_results: false
+
+resources:
+  cpu:
+    exclusive_cores: false
+    max_workers: 1
+    internal_jobs: 1
+  memory:
+    max_memory_gb: null
+  timeouts:
+    timeout_per_item: 60
+    timeout_total_batch: 300
+
+system:
+  global_seed: null
+  distance_method: "hamming"
+  enable_distance_cache: true

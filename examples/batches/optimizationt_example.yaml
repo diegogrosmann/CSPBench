@@ -1,0 +1,253 @@
+# ===================================================================
+# STANDARDIZED TEMPLATE CSPBench - UNIFIED STRUCTURE v0.8
+# ===================================================================
+# This template defines the standard structure for all batch types.
+# Infrastructure settings (paths, directories) are configured in .env
+# This template only contains execution-specific configurations
+# 
+# Supported types: execution, optimization, sensitivity
+# Usage: Copy this template and adapt for your specific needs
+#
+# =====================================================================
+# SECTION 1: METADATA (REQUIRED FOR ALL)
+# =====================================================================
+# This section contains basic information about the batch.
+# All fields are required for traceability and documentation.
+metadata:
+  name: "Otimização Example"                  # Descriptive batch name (string)
+  description: "Detailed description of what the batch does"
+    # Complete description (string)    
+  author: "Author Name"               # Responsible author (string)
+  version: "1.0"                      # Batch version (string)
+  creation_date: "2025-07-13"         # Creation date in YYYY-MM-DD format
+  tags: ["tag1", "tag2"]              # Tags for categorization (list)
+
+# =====================================================================
+# SECTION 2: DATASETS (STANDARDIZED FOR ALL)
+# =====================================================================
+# Defines the datasets available for use in the batch.
+# Each dataset has a unique ID that can be referenced in executions.
+# Supported types: synthetic, file, entrez
+datasets:
+  # === SYNTHETIC DATASETS ===
+  # Generate artificial data for testing and development
+  - id: "synthetic_small_dataset"                  # string: Unique dataset ID
+    name: "Small"              # string: Descriptive name
+    type: "synthetic"                 # string: Dataset type
+    parameters:                       # Parameters specific to synthetic datasets:
+      # Modo de geração: "random" | "noise" | "mutations" | "clustered"
+      mode: "random"
+
+      # Parâmetros comuns
+      n: 8
+      L: 10
+      alphabet: "ACGT"
+      seed: null
+
+  - id: "synthetic_medium_dataset"                  # string: Unique dataset ID
+    name: "Medio"              # string: Descriptive name
+    type: "synthetic"                 # string: Dataset type
+    parameters:                       # Parameters specific to synthetic datasets:
+      # Modo de geração: "random" | "noise" | "mutations" | "clustered"
+      mode: "random"
+
+      # Parâmetros comuns
+      n: 40
+      L: 80
+      alphabet: "ACGT"
+      seed: null
+
+# =====================================================================
+# SECTION 3: ALGORITHMS (STANDARDIZED FOR ALL)
+# =====================================================================
+# Defines algorithm configurations that can be reused.
+# Allows creating parameter "presets" for different scenarios.
+algorithms:
+  - id: "full_config"              # string: Unique configuration ID
+    name: "Full Configuration"     # string: Descriptive name
+    description: "Algorithms with full parameters"           # string: Detailed description
+    algorithms:                       # list: List of algorithms included in this configuration
+      - "Baseline"                    # Baseline algorithm (simplest)
+      - "BLF-GA"                      # Block-based Genetic Algorithm (main)
+      - "CSC"                         # Closest String with Constraints
+      - "H2-CSP"                       # Heuristic Closest String Problem
+      - "DP-CSP"                      # Dynamic Programming CSP
+    algorithm_params:                 # dict: Algorithm parameters (optional - empty dict {} if not needed)
+      # Algorithms without parameters listed here will use empty parameters automatically
+      # Example with parameters:
+      # "BLF-GA":
+      #   population_size: 100
+      #   generations: 50
+                                      
+  - id: "small_config"              # string: Unique configuration ID
+    name: "Small Configuration"                            # string: Descriptive name
+    description: "Small Configuration"      # string: Detailed description
+    algorithms:                       # list: List of algorithms included in this configuration
+      - "CSC"                         # Closest String with Constraints
+      - "H2-CSP"                       # Heuristic Closest String Problem
+    algorithm_params: {}              # dict: Empty parameters - algorithms will use default/empty parameters
+    
+# =====================================================================
+# SECTION 4: TASK TYPE (REQUIRED)
+# =====================================================================
+# Defines the type of operation to be performed.
+# Each type has specific configurations in the corresponding section.
+task:
+  type: "optimization"                  # string: Task type
+                                      # "experiment" = run algorithms with fixed parameters
+                                      # "optimization" = optimize hyperparameters with Optuna
+                                      # "sensitivity" = analyze sensitivity with SALib
+
+# =====================================================================
+# SECTION 5A: SPECIFIC CONFIGURATION - EXPERIMENT
+# =====================================================================
+# Use this section when task.type = "experiment"
+# Runs algorithms on datasets with pre-defined parameters
+experiment:
+  tasks:
+    
+# =====================================================================
+# SECTION 5B: SPECIFIC CONFIGURATION - OPTIMIZATION
+# =====================================================================
+# Use this section when task.type = "optimization"
+# Optimize algorithm hyperparameters using Optuna
+optimization:
+  # Optimization framework (global configuration)
+  framework: "optuna"                    # string: Optimization framework (only "optuna" supported)
+    
+  # List of optimization tasks to perform
+  tasks:
+    - id: "opt_blfga_small"           # string: Unique task ID
+      name: "BLF-GA Optimization Small Dataset"     # string: Descriptive optimization name
+      
+      # Specific datasets and algorithm configuration to optimize
+      datasets: 
+        - "synthetic_small_dataset"   # list: Dataset IDs to use (reference to section 2)
+      algorithm_config: 
+        - "full_config"               # string: Algorithm configuration ID (reference to section 3)
+      
+      # Parameters to optimize (override algorithm_params from section 4)
+      # Supported types: int, uniform (float), categorical
+      parameters:
+        "BLF-GA":                     # string: Algorithm name (must exist in configuration)
+          pop_size:                   # Parameter name (must exist in algorithm)
+            type: "int"               # string: Parameter type
+            low: 10                   # int: Minimum value (for int/uniform)
+            high: 50                  # int: Maximum value (for int/uniform)
+            step: 5                   # int: Step for integer values (optional)
+          
+          max_gens:
+            type: "int"
+            low: 50
+            high: 200
+            step: 25
+          
+          cross_prob:
+            type: "uniform"           # uniform float between low and high
+            low: 0.6
+            high: 0.95
+          
+          mut_prob:
+            type: "uniform"
+            low: 0.01
+            high: 0.3
+          
+          crossover_type:
+            type: "categorical"       # Choice between discrete values
+            choices:                  # list: Available options
+              - "one_point"
+              - "uniform"
+              - "blend_blocks"  
+
+      # Specific configurations
+      config:
+        study_name: "blfga_small_study"  # string: Study name for identification
+        direction: "minimize"            # string: Optimization direction
+        trials: 10                       # int: Number of trials/attempts (50-1000 recommended)
+        timeout_per_trial: 180          # int: Timeout per trial in seconds (60-600)
+        sampler: "TPESampler"           # string: Specific sampling algorithm
+        pruner: "MedianPruner"          # string: Specific pruning algorithm
+        storage: "blfga_small_study.db" # string|boolean|null: Storage configuration
+    
+    - id: "opt_csc_medium"            # string: Unique task ID
+      name: "CSC Optimization Medium Dataset"
+      datasets: 
+        - "synthetic_medium_dataset"
+      algorithm_config: 
+        - "small_config"               # Reference configuration ID with CSC
+      
+      parameters:
+         "CSC":                        # Algorithm name in configuration
+           min_d:
+             type: "int"
+             low: 1
+             high: 4
+           d_factor:
+             type: "uniform"
+             low: 0.5
+             high: 0.9
+           min_blocks:
+             type: "int"
+             low: 2
+             high: 6
+           max_blocks:
+             type: "int"
+             low: 4
+             high: 10
+      
+      config:
+        study_name: "csc_medium_study"   # string: Study name for identification
+        direction: "minimize"            # string: Optimization direction
+        trials: 15                       # int: Number of trials/attempts
+        timeout_per_trial: 240          # int: Timeout per trial in seconds
+        storage: "csc_medium_study.db"   # string: Storage configuration
+
+# =====================================================================
+# SECTION 7: RESOURCE SETTINGS (OPTIONAL)
+# =====================================================================
+# Control of computational resource usage
+resources:
+  # CPU limitations
+  cpu:
+    # Do not use the same cores as the main application during tests
+    exclusive_cores: true            # bool: If true, tests do not share cores with the main app
+    max_workers: null                 # int|null: Maximum number of cores to use (null = all available)
+    internal_jobs: 4                  # int: Maximum internal parallel jobs per algorithm
+                                      # Controls internal algorithm parallelism (threads/processes)
+                                      # Suggested value: 4 for CPUs with 8+ cores
+                                      # Relation: max_workers × internal_jobs ≤ CPU_cores
+  # Timeouts and limits
+  timeouts:
+    timeout_per_item: 300       # int: Timeout per individual algorithm execution (seconds)
+                                      # Applied to each algorithm run independently
+                                      # Common values: 1800 (30min), 3600 (1h), 7200 (2h)
+    timeout_total_batch: 21600        # int: Total timeout for entire batch execution (seconds)
+                                      # Applied to the complete batch process
+                                      # Common values: 21600 (6h), 43200 (12h), 86400 (24h)
+    
+# =====================================================================
+# SECTION 8: SYSTEM SETTINGS (OPTIONAL)
+# =====================================================================
+# General system configurations and behavior
+system:
+  # Global seed substitution - overrides all local seeds
+  global_seed: null                   # int|null: Global seed that replaces all algorithm and dataset seeds
+                                      # When set, substitutes ALL seed parameters throughout configuration
+                                      # null = use individual seeds, int = override all with this value
+  
+  seed_increment: true                # bool: Whether to increment seeds for each repetition
+                                      # When true, each repetition uses incremented seeds:
+                                      # - If global_seed is set: repetition_1: global_seed+1, repetition_2: global_seed+2, etc.
+                                      # - If global_seed is null: increments individual algorithm seeds
+                                      # This ensures different seeds while maintaining reproducibility
+                                      # false = all repetitions use the same seeds
+  
+  # Distance calculation method
+  distance_method: "hamming"          # string: Method for distance calculation
+                                      # "hamming" = Hamming distance (current implementation)
+                                      # Future: "levenshtein", "edit", "custom"
+  
+  # Distance calculation cache
+  enable_distance_cache: true         # bool: Enable caching for distance calculations
+                                      # true = cache results for better performance
+                                      # false = calculate distances every time (uses less memory)

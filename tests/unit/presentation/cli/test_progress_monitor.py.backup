@@ -1,0 +1,1083 @@
+"""
+Comprehensive test suite for ProgressMonitor curses-based monitoring interface.
+
+This module tests the curses-based real-time progress monitoring system,
+including terminal UI components, keyboard navigation, screen rendering,
+and integration with work persistence system.
+"""
+
+import argparse
+import curses
+import signal
+import sys
+import time
+from datetime import datetime, timedelta
+from typing import List, Optional, Dict, Any
+from unittest.mock import Mock, MagicMock, patch, call, PropertyMock
+import pytest
+
+from src.presentation.cli.progress_monitor import ProgressMonitor, main
+from src.infrastructure.persistence.work_state.core import (
+    ExecutionDetail,
+    ProgressSummary,
+)
+
+
+# Curses mock decorator to simplify test setup
+def mock_curses_decorators(func):
+    """Decorator to mock curses functions for testing."""
+    return patch('curses.A_REVERSE', 2)(
+        patch('curses.A_BOLD', 1)(
+            patch('curses.color_pair', return_value=1)(func)
+        )
+    )
+
+
+class TestProgressMonitor:
+    """Test suite for ProgressMonitor class."""
+
+    @pytest.fixture
+    def mock_persistence(self):
+        """Create mock persistence object with proper method signatures."""
+        mock = Mock()
+        
+        # Mock work_get method
+        mock.work_get.return_value = {
+            'status': 'running',
+            'id': 'test-work-id'
+        }
+        
+        # Mock progress summary
+        progress_summary = Mock(spec=ProgressSummary)
+        progress_summary.global_progress = 0.5
+        progress_summary.global_execution = {'Finished': 50, 'Total': 100, 'Running': 1}
+        progress_summary.tasks = {'Running': 'Task-1', 'Finished': 0, 'Total': 1}
+        progress_summary.datasets = {'Running': 'Dataset-1', 'Finished': 0, 'Total': 1}
+        progress_summary.configs = {'Running': 'Config-1', 'Finished': 0, 'Total': 1}
+        progress_summary.algorithms = {'Running': 'Algorithm-1', 'Finished': 0, 'Total': 1}
+        progress_summary.execution = {'Finished': 25, 'Running': 1, 'Total': 50}
+        progress_summary.current_combination_details = {
+            'combination_id': 'combo-123',
+            'task_id': 'Task-1',
+            'dataset_id': 'Dataset-1',
+            'preset_id': 'Config-1'
+        }
+        
+        mock.get_work_progress_summary.return_value = progress_summary
+        
+        # Mock execution details
+        exec_detail = Mock(spec=ExecutionDetail)
+        exec_detail.sequencia = 1
+        exec_detail.algorithm_id = 'TestAlgorithm'
+        exec_detail.status = 'running'
+        exec_detail.progress = 0.75
+        exec_detail.progress_message = 'Processing...'
+        exec_detail.started_at = time.time() - 10
+        exec_detail.finished_at = None
+        
+        mock.get_combination_executions_detail.return_value = [exec_detail]
+        
+        # Mock events
+        mock.get_events.return_value = [
+            {
+                'event_type': 'info',
+                'message': 'Test message',
+                'timestamp': time.time(),
+                'entity_data': {'unit_id': 'unit-123'}
+            }
+        ]
+        
+        mock.close.return_value = None
+        return mock
+
+    @pytest.fixture
+    def mock_work_service(self):
+        """Create mock work service."""
+        mock = Mock()
+        mock.pause.return_value = True
+        return mock
+
+    @pytest.fixture
+    def mock_stdscr(self):
+        """Create mock curses screen object."""
+        mock = Mock()
+        mock.getmaxyx.return_value = (24, 80)  # Standard terminal size
+        mock.getch.return_value = -1  # No key pressed
+        mock.addstr = Mock()
+        mock.refresh = Mock()
+        mock.clear = Mock()
+        mock.nodelay = Mock()
+        mock.timeout = Mock()
+        return mock
+
+    def test_init_successful(self, mock_persistence):
+        """Test successful ProgressMonitor initialization."""
+        with patch('src.presentation.cli.progress_monitor.WorkPersistence') as mock_wp:
+            mock_wp.return_value = mock_persistence
+            
+            # Test initialization
+            with patch.object(ProgressMonitor, '_wait_for_work_ready'):
+                    monitor = ProgressMonitor("test-work-id")
+            
+            assert monitor.work_id == "test-work-id"
+            assert monitor.running is True
+            assert monitor.refresh_interval == 0.1
+            assert monitor.scroll_pos == 0
+            assert monitor.executions == []
+            assert monitor.logs == []
+            assert monitor.previous_status == 'running'  # Set by _wait_for_work_ready
+            
+            # Verify persistence was created
+            mock_wp.assert_called_once()
+            mock_persistence.work_get.assert_called()
+
+    def test_init_work_not_found_timeout(self, mock_persistence):
+        """Test initialization failure when work is not found."""
+        mock_persistence.work_get.return_value = None
+        
+        with patch('src.presentation.cli.progress_monitor.WorkPersistence') as mock_wp:
+            mock_wp.return_value = mock_persistence
+            
+            # Mock _wait_for_work_ready to return False immediately (timeout)
+            with patch.object(ProgressMonitor, '_wait_for_work_ready', return_value=False):
+                with pytest.raises(ValueError, match="Timeout.*not found"):
+                    ProgressMonitor("nonexistent-work")
+
+    def test_wait_for_work_ready_completed_status(self, mock_persistence):
+        """Test _wait_for_work_ready with completed work status."""
+        mock_persistence.work_get.return_value = {'status': 'completed'}
+        
+        with patch('src.presentation.cli.progress_monitor.WorkPersistence') as mock_wp:
+            mock_wp.return_value = mock_persistence
+            
+            with patch.object(ProgressMonitor, '_wait_for_work_ready'):
+                    monitor = ProgressMonitor("test-work-id")
+            assert monitor.previous_status == 'completed'
+
+    def test_wait_for_work_ready_running_with_progress(self, mock_persistence):
+        """Test _wait_for_work_ready with running work having progress data."""
+        mock_persistence.work_get.return_value = {'status': 'running'}
+        
+        progress_mock = Mock()
+        progress_mock.global_execution = {'Total': 5}
+        mock_persistence.get_work_progress_summary.return_value = progress_mock
+        
+        with patch('src.presentation.cli.progress_monitor.WorkPersistence') as mock_wp:
+            mock_wp.return_value = mock_persistence
+            
+            with patch.object(ProgressMonitor, '_wait_for_work_ready'):
+                    monitor = ProgressMonitor("test-work-id")
+            assert monitor.previous_status == 'running'
+
+    def test_signal_handler_pause_success(self, mock_persistence, mock_work_service):
+        """Test signal handler successfully pauses work."""
+        with patch('src.presentation.cli.progress_monitor.WorkPersistence') as mock_wp:
+            mock_wp.return_value = mock_persistence
+            
+            with patch.object(ProgressMonitor, '_wait_for_work_ready'):
+                    monitor = ProgressMonitor("test-work-id")
+            
+            # Patch the import that happens inside the signal_handler method
+            with patch('src.application.services.work_service.get_work_service') as mock_gws:
+                mock_gws.return_value = mock_work_service
+                
+                # Test signal handler
+                monitor.signal_handler(signal.SIGINT, None)
+                
+                mock_gws.assert_called_once()
+                mock_work_service.pause.assert_called_once_with("test-work-id")
+                assert monitor.running is False
+
+    def test_signal_handler_pause_failure(self, mock_persistence, mock_work_service):
+        """Test signal handler when pause fails."""
+        mock_work_service.pause.return_value = False
+        
+        with patch('src.presentation.cli.progress_monitor.WorkPersistence') as mock_wp:
+            mock_wp.return_value = mock_persistence
+            
+            with patch.object(ProgressMonitor, '_wait_for_work_ready'):
+                    monitor = ProgressMonitor("test-work-id")
+            
+            # Patch the import that happens inside the signal_handler method
+            with patch('src.application.services.work_service.get_work_service') as mock_gws:
+                mock_gws.return_value = mock_work_service
+                
+                # Test signal handler with failure
+                monitor.signal_handler(signal.SIGINT, None)
+                
+                mock_gws.assert_called_once()
+                mock_work_service.pause.assert_called_once_with("test-work-id")
+                assert monitor.running is False
+
+    def test_format_progress_bar_with_percent(self, mock_persistence):
+        """Test progress bar formatting with percentage."""
+        with patch('src.presentation.cli.progress_monitor.WorkPersistence') as mock_wp:
+            mock_wp.return_value = mock_persistence
+            
+            with patch.object(ProgressMonitor, '_wait_for_work_ready'):
+                    monitor = ProgressMonitor("test-work-id")
+            
+            # Test various progress values
+            bar = monitor.format_progress_bar(0.5, 10, show_percent=True)
+            assert "█████─────" in bar
+            assert "50.0%" in bar
+            
+            bar = monitor.format_progress_bar(0.0, 10, show_percent=True)
+            assert "─────────" in bar
+            assert "0.0%" in bar
+            
+            bar = monitor.format_progress_bar(1.0, 10, show_percent=True)
+            assert "██████████" in bar
+            assert "100.0%" in bar
+
+    def test_format_progress_bar_without_percent(self, mock_persistence):
+        """Test progress bar formatting without percentage."""
+        with patch('src.presentation.cli.progress_monitor.WorkPersistence') as mock_wp:
+            mock_wp.return_value = mock_persistence
+            
+            with patch.object(ProgressMonitor, '_wait_for_work_ready'):
+                    monitor = ProgressMonitor("test-work-id")
+            
+            bar = monitor.format_progress_bar(0.75, 8, show_percent=False)
+            assert "██████─" in bar
+            assert "%" not in bar
+
+    def test_format_execution_time_minutes(self, mock_persistence):
+        """Test execution time formatting with minutes."""
+        with patch('src.presentation.cli.progress_monitor.WorkPersistence') as mock_wp:
+            mock_wp.return_value = mock_persistence
+            
+            with patch.object(ProgressMonitor, '_wait_for_work_ready'):
+                    monitor = ProgressMonitor("test-work-id")
+            
+            # Test time with minutes
+            time_str = monitor.format_execution_time(125.456)
+            assert time_str == "02:05.456"
+            
+            # Test time without minutes
+            time_str = monitor.format_execution_time(45.123)
+            assert time_str == "45.123s"
+
+    @mock_curses_decorators
+    def test_draw_header_basic_info(self, mock_persistence, mock_stdscr):
+        """Test header drawing with basic work information."""
+        
+        with patch('src.presentation.cli.progress_monitor.WorkPersistence') as mock_wp:
+            mock_wp.return_value = mock_persistence
+            
+            with patch.object(ProgressMonitor, '_wait_for_work_ready'):
+                    monitor = ProgressMonitor("test-work-id")
+                
+                # Create progress summary
+            progress = Mock(spec=ProgressSummary)
+            progress.global_progress = 0.6
+            progress.global_execution = {'Finished': 60, 'Total': 100}
+            progress.tasks = {'Running': 'Task-1', 'Finished': 0, 'Total': 1}
+            progress.datasets = {'Running': 'Dataset-1', 'Finished': 0, 'Total': 1}
+            progress.configs = {'Running': 'Config-1', 'Finished': 0, 'Total': 1}
+            progress.algorithms = {'Running': 'Algorithm-1', 'Finished': 0, 'Total': 1}
+            progress.execution = {'Finished': 30, 'Running': 1, 'Total': 50}
+            progress.current_combination_details = {
+                'task_id': 'Task-1',
+                'dataset_id': 'Dataset-1', 
+                'preset_id': 'Config-1'
+            }
+            
+            lines_used = monitor.draw_header(mock_stdscr, progress, "running")
+            
+            assert lines_used == 6
+            assert mock_stdscr.addstr.call_count >= 6  # Multiple addstr calls
+
+    @mock_curses_decorators
+    def test_draw_header_no_current_combination(self, mock_persistence, mock_stdscr):
+        """Test header drawing without current combination details."""
+        
+        with patch('src.presentation.cli.progress_monitor.WorkPersistence') as mock_wp:
+            mock_wp.return_value = mock_persistence
+            
+            with patch.object(ProgressMonitor, '_wait_for_work_ready'):
+                    monitor = ProgressMonitor("test-work-id")
+            
+            progress = Mock(spec=ProgressSummary)
+            progress.global_progress = 0.3
+            progress.global_execution = {'Finished': 30, 'Total': 100}
+            progress.tasks = {'Running': None, 'Finished': 0, 'Total': 1}
+            progress.datasets = {'Running': None, 'Finished': 0, 'Total': 1}
+            progress.configs = {'Running': None, 'Finished': 0, 'Total': 1}
+            progress.algorithms = {'Running': None, 'Finished': 0, 'Total': 1}
+            progress.execution = {'Finished': 15, 'Running': 0, 'Total': 30}
+            progress.current_combination_details = None
+            
+            lines_used = monitor.draw_header(mock_stdscr, progress, "queued")
+            
+            assert lines_used == 6
+            mock_stdscr.addstr.assert_called()
+
+    @mock_curses_decorators
+    def test_draw_executions_list_multiple_statuses(self, mock_persistence, mock_stdscr):
+        """Test drawing execution list with different execution statuses."""
+        with patch('src.presentation.cli.progress_monitor.WorkPersistence') as mock_wp:
+            mock_wp.return_value = mock_persistence
+            
+            with patch.object(ProgressMonitor, '_wait_for_work_ready'):
+                    monitor = ProgressMonitor("test-work-id")
+            
+            # Create executions with different statuses
+            exec1 = Mock(spec=ExecutionDetail)
+            exec1.sequencia = 1
+            exec1.algorithm_id = 'CompletedAlgorithm'
+            exec1.status = 'completed'
+            exec1.progress = 1.0
+            exec1.progress_message = 'Finished'
+            exec1.started_at = time.time() - 30
+            exec1.finished_at = time.time() - 5
+            
+            exec2 = Mock(spec=ExecutionDetail)
+            exec2.sequencia = 2
+            exec2.algorithm_id = 'RunningAlgorithm'
+            exec2.status = 'running'
+            exec2.progress = 0.5
+            exec2.progress_message = 'In progress'
+            exec2.started_at = time.time() - 15
+            exec2.finished_at = None
+            
+            exec3 = Mock(spec=ExecutionDetail)
+            exec3.sequencia = 3
+            exec3.algorithm_id = 'FailedAlgorithm'
+            exec3.status = 'failed'
+            exec3.progress = 0.3
+            exec3.progress_message = 'Error occurred'
+            exec3.started_at = time.time() - 20
+            exec3.finished_at = time.time() - 10
+            
+            exec4 = Mock(spec=ExecutionDetail)
+            exec4.sequencia = 4
+            exec4.algorithm_id = 'QueuedAlgorithm'
+            exec4.status = 'queued'
+            exec4.progress = 0.0
+            exec4.progress_message = None
+            exec4.started_at = None
+            exec4.finished_at = None
+            
+            monitor.executions = [exec1, exec2, exec3, exec4]
+            
+            monitor.draw_executions_list(mock_stdscr, 6)
+            
+            # Verify calls were made for each execution
+            assert mock_stdscr.addstr.call_count == 4
+
+    @mock_curses_decorators
+    def test_draw_footer_controls_and_legend(self, mock_persistence, mock_stdscr):
+        """Test footer drawing with controls and legend."""
+        with patch('src.presentation.cli.progress_monitor.WorkPersistence') as mock_wp:
+            mock_wp.return_value = mock_persistence
+            
+            with patch.object(ProgressMonitor, '_wait_for_work_ready'):
+                    monitor = ProgressMonitor("test-work-id")
+            
+            monitor.draw_footer(mock_stdscr)
+            
+            mock_stdscr.addstr.assert_called()
+            # Check that footer was drawn at bottom
+            args = mock_stdscr.addstr.call_args
+            assert args[0][0] == 23  # h - 1, where h = 24
+
+    @mock_curses_decorators
+    def test_draw_log_panel_with_events(self, mock_persistence, mock_stdscr):
+        """Test log panel drawing with recent events."""
+        with patch('src.presentation.cli.progress_monitor.WorkPersistence') as mock_wp:
+            mock_wp.return_value = mock_persistence
+            
+            with patch.object(ProgressMonitor, '_wait_for_work_ready'):
+                    monitor = ProgressMonitor("test-work-id")
+            
+            # Add test logs
+            monitor.logs = [
+                {
+                    'type': 'error',
+                    'timestamp': time.time(),
+                    'message': 'Test error message'
+                },
+                {
+                    'type': 'warning', 
+                    'timestamp': time.time() - 10,
+                    'message': 'Test warning message'
+                }
+            ]
+            
+            monitor.draw_log_panel(mock_stdscr, 18, 4)
+            
+            # Verify panel was drawn
+            assert mock_stdscr.addstr.call_count >= 3  # Title + 2 log entries
+
+    @mock_curses_decorators
+    def test_draw_log_panel_no_logs(self, mock_persistence, mock_stdscr):
+        """Test log panel drawing with no logs."""
+        with patch('src.presentation.cli.progress_monitor.WorkPersistence') as mock_wp:
+            mock_wp.return_value = mock_persistence
+            
+            with patch.object(ProgressMonitor, '_wait_for_work_ready'):
+                    monitor = ProgressMonitor("test-work-id")
+            monitor.logs = []
+            
+            monitor.draw_log_panel(mock_stdscr, 18, 1)
+            
+            # Should not draw anything for empty logs or insufficient height
+            mock_stdscr.addstr.assert_not_called()
+
+    @patch('curses.curs_set')
+    @patch('curses.start_color')
+    @patch('curses.init_pair')
+    def test_run_basic_loop_quit(self, mock_init_pair, mock_start_color, mock_curs_set, 
+                                mock_persistence, mock_stdscr):
+        """Test basic run loop with quit command."""
+        with patch('src.presentation.cli.progress_monitor.WorkPersistence') as mock_wp:
+            mock_wp.return_value = mock_persistence
+            
+            with patch.object(ProgressMonitor, '_wait_for_work_ready'):
+                    monitor = ProgressMonitor("test-work-id")
+            
+            # Simulate 'q' key press
+            mock_stdscr.getch.return_value = ord('q')
+            
+            monitor.run(mock_stdscr)
+            
+            # Verify curses setup
+            mock_curs_set.assert_called_once_with(0)
+            mock_stdscr.nodelay.assert_called_once_with(1)
+            mock_stdscr.timeout.assert_called_once_with(50)
+            mock_start_color.assert_called_once()
+            assert mock_init_pair.call_count == 6  # 6 color pairs
+
+    @patch('curses.curs_set')
+    @patch('curses.start_color')
+    @patch('curses.init_pair')
+    @patch('curses.color_pair', return_value=1)
+    @patch('curses.KEY_UP', 259)
+    @patch('curses.KEY_DOWN', 258)
+    def test_run_scroll_navigation(self, mock_key_down, mock_key_up, mock_color_pair, mock_init_pair, mock_start_color, mock_curs_set,
+                                  mock_persistence, mock_stdscr):
+        """Test scroll navigation in run loop."""
+        with patch('src.presentation.cli.progress_monitor.WorkPersistence') as mock_wp:
+            mock_wp.return_value = mock_persistence
+            
+            with patch.object(ProgressMonitor, '_wait_for_work_ready'):
+                    monitor = ProgressMonitor("test-work-id")            # Add executions to enable scrolling
+            exec_mock = Mock(spec=ExecutionDetail)
+            exec_mock.sequencia = 1
+            exec_mock.status = 'running'
+            monitor.executions = [exec_mock] * 20  # Many executions
+            
+            # Simulate key sequence: UP, DOWN, then quit
+            key_sequence = [259, 258, ord('q')]  # Use actual key codes
+            mock_stdscr.getch.side_effect = key_sequence
+            
+            monitor.run(mock_stdscr)
+            
+            # Verify scroll position was modified
+            assert monitor.scroll_pos >= 0
+
+    @patch('curses.curs_set')
+    @patch('curses.start_color')
+    @patch('curses.init_pair')
+    def test_run_pause_command(self, mock_init_pair, mock_start_color, mock_curs_set,
+                              mock_persistence, mock_stdscr):
+        """Test pause command in run loop."""
+        with patch('src.presentation.cli.progress_monitor.WorkPersistence') as mock_wp:
+            mock_wp.return_value = mock_persistence
+            
+            with patch.object(ProgressMonitor, '_wait_for_work_ready'):
+                    monitor = ProgressMonitor("test-work-id")
+            
+            # Mock handle_pause to set running = False
+            def mock_handle_pause(stdscr):
+                monitor.running = False
+                
+            monitor.handle_pause = Mock(side_effect=mock_handle_pause)
+            
+            # Simulate 'p' key press
+            mock_stdscr.getch.return_value = ord('p')
+            
+            monitor.run(mock_stdscr)
+            
+            monitor.handle_pause.assert_called_once_with(mock_stdscr)
+
+    @mock_curses_decorators
+    def test_handle_pause_confirmation_yes(self, mock_persistence, mock_stdscr, mock_work_service):
+        """Test pause confirmation with yes response."""
+        with patch('src.presentation.cli.progress_monitor.WorkPersistence') as mock_wp:
+            mock_wp.return_value = mock_persistence
+            
+            # Patch the import inside the signal handler method
+            with patch('src.presentation.cli.progress_monitor.get_work_service', create=True) as mock_gws:
+                mock_gws.return_value = mock_work_service
+                
+                # Mock curses.newwin for dialog
+                with patch('curses.newwin') as mock_newwin:
+                    dialog_mock = Mock()
+                    dialog_mock.bkgd = Mock()
+                    dialog_mock.box = Mock()
+                    dialog_mock.addstr = Mock()
+                    dialog_mock.refresh = Mock()
+                    mock_newwin.return_value = dialog_mock
+                    
+            with patch.object(ProgressMonitor, '_wait_for_work_ready'):
+                        monitor = ProgressMonitor("test-work-id")
+                    
+                    # Simulate 'y' key press for confirmation
+                    mock_stdscr.getch.return_value = ord('y')
+                    
+                    monitor.handle_pause(mock_stdscr)
+                    
+                    mock_work_service.pause.assert_called_once_with("test-work-id")
+                    assert monitor.running is False
+
+    @mock_curses_decorators
+    def test_handle_pause_confirmation_no(self, mock_persistence, mock_stdscr):
+        """Test pause confirmation with no response."""
+        with patch('src.presentation.cli.progress_monitor.WorkPersistence') as mock_wp:
+            mock_wp.return_value = mock_persistence
+            
+            # Mock curses.newwin for dialog
+            with patch('curses.newwin') as mock_newwin:
+                dialog_mock = Mock()
+                dialog_mock.bkgd = Mock()
+                dialog_mock.box = Mock()
+                dialog_mock.addstr = Mock()
+                dialog_mock.refresh = Mock()
+                mock_newwin.return_value = dialog_mock
+                
+            with patch.object(ProgressMonitor, '_wait_for_work_ready'):
+                    monitor = ProgressMonitor("test-work-id")
+                original_running = monitor.running
+                
+                # Simulate 'n' key press for no confirmation
+                mock_stdscr.getch.return_value = ord('n')
+                
+                monitor.handle_pause(mock_stdscr)
+                
+                # Should not change running state
+                assert monitor.running == original_running
+
+    @mock_curses_decorators
+    def test_show_paused_confirmation_screen(self, mock_persistence, mock_stdscr):
+        """Test paused confirmation screen display."""
+        with patch('src.presentation.cli.progress_monitor.WorkPersistence') as mock_wp:
+            mock_wp.return_value = mock_persistence
+            
+            with patch.object(ProgressMonitor, '_wait_for_work_ready'):
+                    monitor = ProgressMonitor("test-work-id")
+            
+            # Mock getch to simulate waiting
+            mock_stdscr.getch.return_value = -1
+            
+            monitor.show_paused_confirmation_screen(mock_stdscr)
+            
+            mock_stdscr.clear.assert_called_once()
+            assert mock_stdscr.addstr.call_count >= 3  # Title + messages
+            mock_stdscr.refresh.assert_called()
+
+    @mock_curses_decorators
+    def test_show_paused_screen(self, mock_persistence, mock_stdscr):
+        """Test paused screen display."""
+        with patch('src.presentation.cli.progress_monitor.WorkPersistence') as mock_wp:
+            mock_wp.return_value = mock_persistence
+            
+            with patch.object(ProgressMonitor, '_wait_for_work_ready'):
+                    monitor = ProgressMonitor("test-work-id")
+            
+            progress = Mock(spec=ProgressSummary)
+            progress.global_execution = {'Finished': 25, 'Total': 100}
+            
+            # Mock getch to simulate waiting
+            mock_stdscr.getch.return_value = -1
+            
+            monitor.show_paused_screen(mock_stdscr, "paused", progress)
+            
+            mock_stdscr.clear.assert_called_once()
+            assert mock_stdscr.addstr.call_count >= 4  # Multiple messages
+            mock_stdscr.refresh.assert_called()
+
+    @mock_curses_decorators
+    def test_show_status_change_screen_failed(self, mock_persistence, mock_stdscr):
+        """Test status change screen for failed status."""
+        with patch('src.presentation.cli.progress_monitor.WorkPersistence') as mock_wp:
+            mock_wp.return_value = mock_persistence
+            
+            with patch.object(ProgressMonitor, '_wait_for_work_ready'):
+                    monitor = ProgressMonitor("test-work-id")
+            
+            progress = Mock(spec=ProgressSummary)
+            progress.global_execution = {'Finished': 0, 'Total': 100}
+            
+            # Mock getch to simulate waiting
+            mock_stdscr.getch.return_value = -1
+            
+            monitor.show_status_change_screen(mock_stdscr, "queued", "failed", progress)
+            
+            mock_stdscr.clear.assert_called_once()
+            assert mock_stdscr.addstr.call_count >= 4
+            mock_stdscr.refresh.assert_called()
+
+    @mock_curses_decorators
+    def test_show_status_change_screen_completed(self, mock_persistence, mock_stdscr):
+        """Test status change screen for completed status."""
+        with patch('src.presentation.cli.progress_monitor.WorkPersistence') as mock_wp:
+            mock_wp.return_value = mock_persistence
+            
+            with patch.object(ProgressMonitor, '_wait_for_work_ready'):
+                    monitor = ProgressMonitor("test-work-id")
+            
+            progress = Mock(spec=ProgressSummary)
+            progress.global_execution = {'Finished': 100, 'Total': 100}
+            
+            # Mock getch to simulate waiting
+            mock_stdscr.getch.return_value = -1
+            
+            monitor.show_status_change_screen(mock_stdscr, "queued", "completed", progress)
+            
+            mock_stdscr.clear.assert_called_once()
+            mock_stdscr.refresh.assert_called()
+
+    @mock_curses_decorators
+    def test_show_final_screen_completed(self, mock_persistence, mock_stdscr):
+        """Test final screen for completed work."""
+        with patch('src.presentation.cli.progress_monitor.WorkPersistence') as mock_wp:
+            mock_wp.return_value = mock_persistence
+            
+            with patch.object(ProgressMonitor, '_wait_for_work_ready'):
+                    monitor = ProgressMonitor("test-work-id")
+            
+            progress = Mock(spec=ProgressSummary)
+            progress.global_execution = {'Finished': 100, 'Total': 100}
+            
+            # Mock getch to simulate waiting
+            mock_stdscr.getch.return_value = -1
+            
+            monitor.show_final_screen(mock_stdscr, "completed", progress)
+            
+            mock_stdscr.clear.assert_called_once()
+            assert mock_stdscr.addstr.call_count >= 3
+            mock_stdscr.refresh.assert_called()
+
+    @mock_curses_decorators
+    def test_show_final_screen_failed(self, mock_persistence, mock_stdscr):
+        """Test final screen for failed work."""
+        with patch('src.presentation.cli.progress_monitor.WorkPersistence') as mock_wp:
+            mock_wp.return_value = mock_persistence
+            
+            with patch.object(ProgressMonitor, '_wait_for_work_ready'):
+                    monitor = ProgressMonitor("test-work-id")
+            
+            progress = Mock(spec=ProgressSummary)
+            progress.global_execution = {'Finished': 50, 'Total': 100}
+            
+            # Mock getch to simulate waiting
+            mock_stdscr.getch.return_value = -1
+            
+            monitor.show_final_screen(mock_stdscr, "failed", progress)
+            
+            mock_stdscr.clear.assert_called_once()
+            mock_stdscr.refresh.assert_called()
+
+    @mock_curses_decorators
+    def test_show_action_error_screen(self, mock_persistence, mock_stdscr):
+        """Test action error screen display."""
+        with patch('src.presentation.cli.progress_monitor.WorkPersistence') as mock_wp:
+            mock_wp.return_value = mock_persistence
+            
+            with patch.object(ProgressMonitor, '_wait_for_work_ready'):
+                    monitor = ProgressMonitor("test-work-id")
+            
+            # Mock getch to simulate key press
+            mock_stdscr.getch.return_value = ord(' ')
+            
+            monitor.show_action_error_screen(mock_stdscr, "pause")
+            
+            mock_stdscr.clear.assert_called_once()
+            assert mock_stdscr.addstr.call_count >= 4
+            mock_stdscr.refresh.assert_called()
+            mock_stdscr.getch.assert_called()
+
+    @patch('curses.wrapper')
+    def test_start_success(self, mock_wrapper, mock_persistence):
+        """Test successful monitor start."""
+        with patch('src.presentation.cli.progress_monitor.WorkPersistence') as mock_wp:
+            mock_wp.return_value = mock_persistence
+            
+            with patch('signal.signal') as mock_signal:
+                with patch.object(ProgressMonitor, '_wait_for_work_ready'):
+                        monitor = ProgressMonitor("test-work-id")
+                
+                result = monitor.start()
+                
+                assert result == 0
+                mock_signal.assert_called_once()
+                mock_wrapper.assert_called_once_with(monitor.run)
+                mock_persistence.close.assert_called_once()
+
+    @patch('curses.wrapper')
+    def test_start_work_not_found(self, mock_wrapper, mock_persistence):
+        """Test monitor start when work not found."""
+        mock_persistence.work_get.return_value = None
+        
+        with patch('src.presentation.cli.progress_monitor.WorkPersistence') as mock_wp:
+            mock_wp.return_value = mock_persistence
+            
+            with patch('signal.signal'):
+                with patch.object(ProgressMonitor, '_wait_for_work_ready'):
+                        monitor = ProgressMonitor("test-work-id")
+                    
+                    result = monitor.start()
+                    
+                    assert result == 1
+                    mock_wrapper.assert_not_called()
+
+    @patch('curses.wrapper')
+    def test_start_keyboard_interrupt(self, mock_wrapper, mock_persistence):
+        """Test monitor start with keyboard interrupt."""
+        mock_wrapper.side_effect = KeyboardInterrupt()
+        
+        with patch('src.presentation.cli.progress_monitor.WorkPersistence') as mock_wp:
+            mock_wp.return_value = mock_persistence
+            
+            with patch('signal.signal'):
+                with patch.object(ProgressMonitor, '_wait_for_work_ready'):
+                        monitor = ProgressMonitor("test-work-id")
+                    
+                    result = monitor.start()
+                    
+                    assert result == 0  # KeyboardInterrupt returns 0
+
+    @patch('curses.wrapper')
+    def test_start_exception(self, mock_wrapper, mock_persistence):
+        """Test monitor start with exception."""
+        mock_wrapper.side_effect = Exception("Test error")
+        
+        with patch('src.presentation.cli.progress_monitor.WorkPersistence') as mock_wp:
+            mock_wp.return_value = mock_persistence
+            
+            with patch('signal.signal'):
+                with patch.object(ProgressMonitor, '_wait_for_work_ready'):
+                    monitor = ProgressMonitor("test-work-id")
+                
+                result = monitor.start()
+                
+                assert result == 1
+
+
+class TestMainFunction:
+    """Test suite for main() function."""
+
+    @patch('argparse.ArgumentParser.parse_args')
+    def test_main_successful_execution(self, mock_parse_args):
+        """Test successful main execution."""
+        # Mock command line arguments
+        mock_args = Mock()
+        mock_args.work_id = "test-work-id"
+        mock_parse_args.return_value = mock_args
+        
+        # Mock ProgressMonitor
+        with patch('src.presentation.cli.progress_monitor.ProgressMonitor') as mock_pm:
+            mock_monitor = Mock()
+            mock_monitor.start.return_value = 0
+            mock_pm.return_value = mock_monitor
+            
+            result = main()
+            
+            assert result == 0
+            mock_pm.assert_called_once_with("test-work-id")
+            mock_monitor.start.assert_called_once()
+
+    @patch('argparse.ArgumentParser.parse_args')
+    def test_main_runtime_error_timeout(self, mock_parse_args):
+        """Test main with runtime error containing timeout."""
+        mock_args = Mock()
+        mock_args.work_id = "test-work-id"
+        mock_parse_args.return_value = mock_args
+        
+        with patch('src.presentation.cli.progress_monitor.ProgressMonitor') as mock_pm:
+            mock_pm.side_effect = RuntimeError("Timeout: WorkService not initialized")
+            
+            result = main()
+            
+            assert result == 1
+
+    @patch('argparse.ArgumentParser.parse_args')
+    def test_main_value_error_not_found(self, mock_parse_args):
+        """Test main with value error for work not found."""
+        mock_args = Mock()
+        mock_args.work_id = "nonexistent-work"
+        mock_parse_args.return_value = mock_args
+        
+        with patch('src.presentation.cli.progress_monitor.ProgressMonitor') as mock_pm:
+            mock_pm.side_effect = ValueError("Work 'nonexistent-work' not found")
+            
+            result = main()
+            
+            assert result == 1
+
+    @patch('argparse.ArgumentParser.parse_args')
+    def test_main_value_error_timeout(self, mock_parse_args):
+        """Test main with value error for timeout."""
+        mock_args = Mock()
+        mock_args.work_id = "test-work-id"
+        mock_parse_args.return_value = mock_args
+        
+        with patch('src.presentation.cli.progress_monitor.ProgressMonitor') as mock_pm:
+            mock_pm.side_effect = ValueError("Timeout waiting for work initialization")
+            
+            result = main()
+            
+            assert result == 1
+
+    @patch('argparse.ArgumentParser.parse_args')
+    def test_main_generic_exception(self, mock_parse_args):
+        """Test main with generic exception."""
+        mock_args = Mock()
+        mock_args.work_id = "test-work-id"
+        mock_parse_args.return_value = mock_args
+        
+        with patch('src.presentation.cli.progress_monitor.ProgressMonitor') as mock_pm:
+            mock_pm.side_effect = Exception("Unexpected error")
+            
+            result = main()
+            
+            assert result == 1
+
+    @patch('sys.argv', ['progress_monitor.py', 'test-work-id'])
+    def test_main_entry_point(self):
+        """Test main entry point execution."""
+        with patch('src.presentation.cli.progress_monitor.main') as mock_main:
+            mock_main.return_value = 0
+            
+            # Import to trigger if __name__ == "__main__" block
+            import importlib
+            import src.presentation.cli.progress_monitor as pm_module
+            
+            # Simulate module execution
+            with patch('sys.exit') as mock_exit:
+                # Manually call the main block logic
+                if pm_module.__name__ == "__main__":
+                    mock_exit(mock_main())
+                
+                # Since we're not actually executing as main, just verify the mock exists
+                assert mock_main is not None
+
+
+class TestIntegrationScenarios:
+    """Integration test scenarios for ProgressMonitor."""
+
+    @pytest.fixture
+    def complex_progress_data(self):
+        """Create complex progress data for integration testing."""
+        progress = Mock(spec=ProgressSummary)
+        progress.global_progress = 0.45
+        progress.global_execution = {'Finished': 45, 'Total': 100, 'Running': 2}
+        progress.tasks = {'Running': 'ComplexTask', 'Finished': 1, 'Total': 3}
+        progress.datasets = {'Running': 'LargeDataset', 'Finished': 2, 'Total': 5}
+        progress.configs = {'Running': 'OptimalConfig', 'Finished': 3, 'Total': 8}
+        progress.algorithms = {'Running': 'DeepAlgorithm', 'Finished': 10, 'Total': 25}
+        progress.execution = {'Finished': 120, 'Running': 3, 'Total': 300}
+        progress.current_combination_details = {
+            'combination_id': 'complex-combo-456',
+            'task_id': 'ComplexTask',
+            'dataset_id': 'LargeDataset',
+            'preset_id': 'OptimalConfig'
+        }
+        return progress
+
+    @pytest.fixture
+    def multiple_executions(self):
+        """Create multiple execution details for testing."""
+        executions = []
+        
+        statuses = ['completed', 'running', 'failed', 'queued', 'error']
+        algorithms = ['AlgoA', 'AlgoB', 'AlgoC', 'AlgoD', 'AlgoE']
+        
+        for i, (status, algo) in enumerate(zip(statuses, algorithms)):
+            exec_detail = Mock(spec=ExecutionDetail)
+            exec_detail.sequencia = i + 1
+            exec_detail.algorithm_id = algo
+            exec_detail.status = status
+            exec_detail.progress = 0.8 if status == 'running' else (1.0 if status == 'completed' else 0.2)
+            exec_detail.progress_message = f'Processing {algo}' if status == 'running' else None
+            exec_detail.started_at = time.time() - (20 - i * 3) if status != 'queued' else None
+            exec_detail.finished_at = time.time() - (5 - i) if status in ['completed', 'failed', 'error'] else None
+            executions.append(exec_detail)
+            
+        return executions
+
+    def test_complex_monitoring_scenario(self, mock_stdscr, complex_progress_data, multiple_executions):
+        """Test complex monitoring scenario with multiple executions and events."""
+        mock_persistence = Mock()
+        mock_persistence.work_get.return_value = {'status': 'running', 'id': 'complex-work'}
+        mock_persistence.get_work_progress_summary.return_value = complex_progress_data
+        mock_persistence.get_combination_executions_detail.return_value = multiple_executions
+        mock_persistence.get_events.return_value = [
+            {
+                'event_type': 'error',
+                'message': 'Memory allocation failed',
+                'timestamp': time.time() - 5,
+                'entity_data': {'unit_id': 'unit-error-001'}
+            },
+            {
+                'event_type': 'warning',
+                'message': 'High CPU usage detected',
+                'timestamp': time.time() - 10,
+                'entity_data': {'unit_id': 'unit-warn-002'}
+            },
+            {
+                'event_type': 'info',
+                'message': 'Algorithm optimization started',
+                'timestamp': time.time() - 15,
+                'entity_data': {'unit_id': 'unit-info-003'}
+            }
+        ]
+        mock_persistence.close.return_value = None
+        
+        with patch('src.presentation.cli.progress_monitor.WorkPersistence') as mock_wp:
+            mock_wp.return_value = mock_persistence
+            
+            monitor = ProgressMonitor("complex-work")
+            
+            # Simulate one iteration of monitoring loop
+            monitor.executions = multiple_executions
+            monitor.logs = [
+                {
+                    'type': 'error',
+                    'timestamp': time.time() - 5,
+                    'message': 'Unit unit-err: Memory allocation failed'
+                },
+                {
+                    'type': 'warning',
+                    'timestamp': time.time() - 10,
+                    'message': 'Unit unit-war: High CPU usage detected'
+                }
+            ]
+            
+            # Test all drawing methods together
+            y_pos = monitor.draw_header(mock_stdscr, complex_progress_data, "running")
+            monitor.draw_executions_list(mock_stdscr, y_pos)
+            monitor.draw_log_panel(mock_stdscr, 18, 4)
+            monitor.draw_footer(mock_stdscr)
+            
+            # Verify all components were drawn
+            assert mock_stdscr.addstr.call_count > 15  # Multiple drawing calls
+            assert y_pos == 6  # Header should return 6 lines
+
+    def test_status_transition_scenario(self, mock_stdscr):
+        """Test monitoring during status transitions."""
+        mock_persistence = Mock()
+        
+        # Simulate status progression: queued -> running -> completed
+        statuses = ['queued', 'running', 'completed']
+        call_count = 0
+        
+        def mock_work_get(work_id):
+            nonlocal call_count
+            status = statuses[min(call_count, len(statuses) - 1)]
+            call_count += 1
+            return {'status': status, 'id': work_id}
+        
+        mock_persistence.work_get.side_effect = mock_work_get
+        
+        progress = Mock(spec=ProgressSummary)
+        progress.global_execution = {'Total': 10}
+        mock_persistence.get_work_progress_summary.return_value = progress
+        mock_persistence.close.return_value = None
+        
+        with patch('src.presentation.cli.progress_monitor.WorkPersistence') as mock_wp:
+            mock_wp.return_value = mock_persistence
+            
+            monitor = ProgressMonitor("transition-work")
+            
+            # Test status transition detection
+            assert monitor.previous_status == 'queued'
+            
+            # Simulate status changes
+            work = mock_persistence.work_get("transition-work")
+            if work:
+                new_status = work.get('status')
+                if monitor.previous_status == "queued" and new_status == "completed":
+                    monitor.show_status_change_screen(mock_stdscr, "queued", "completed", progress)
+                    
+            mock_stdscr.clear.assert_called()
+            mock_stdscr.refresh.assert_called()
+
+    def test_error_handling_during_monitoring(self, mock_stdscr):
+        """Test error handling during monitoring operations."""
+        mock_persistence = Mock()
+        mock_persistence.work_get.return_value = {'status': 'running', 'id': 'error-work'}
+        
+        # Simulate error in progress summary
+        mock_persistence.get_work_progress_summary.side_effect = Exception("Database connection failed")
+        mock_persistence.close.return_value = None
+        
+        with patch('src.presentation.cli.progress_monitor.WorkPersistence') as mock_wp:
+            mock_wp.return_value = mock_persistence
+            
+            with patch('curses.curs_set'), patch('curses.start_color'), patch('curses.init_pair'):
+                monitor = ProgressMonitor("error-work")
+                
+                # Simulate one iteration with error
+                mock_stdscr.getch.return_value = ord('q')  # Quit after error
+                
+                monitor.run(mock_stdscr)
+                
+                # Verify error was handled
+                mock_stdscr.clear.assert_called()
+                # Should have drawn error message
+                error_calls = [call for call in mock_stdscr.addstr.call_args_list 
+                              if 'Error:' in str(call)]
+                assert len(error_calls) > 0
+
+    def test_scrolling_with_many_executions(self, mock_stdscr):
+        """Test scrolling behavior with many executions."""
+        mock_persistence = Mock()
+        mock_persistence.work_get.return_value = {'status': 'running', 'id': 'scroll-work'}
+        
+        progress = Mock(spec=ProgressSummary)
+        progress.global_execution = {'Total': 50}
+        mock_persistence.get_work_progress_summary.return_value = progress
+        mock_persistence.close.return_value = None
+        
+        with patch('src.presentation.cli.progress_monitor.WorkPersistence') as mock_wp:
+            mock_wp.return_value = mock_persistence
+            
+            monitor = ProgressMonitor("scroll-work")
+            
+            # Create many executions (more than screen height)
+            many_executions = []
+            for i in range(50):
+                exec_detail = Mock(spec=ExecutionDetail) 
+                exec_detail.sequencia = i + 1
+                exec_detail.algorithm_id = f'Algorithm{i:03d}'
+                exec_detail.status = 'queued' if i > 2 else 'running'
+                exec_detail.progress = 0.5 if i <= 2 else 0.0
+                exec_detail.progress_message = 'Processing' if i <= 2 else None
+                exec_detail.started_at = time.time() - 10 if i <= 2 else None
+                exec_detail.finished_at = None
+                many_executions.append(exec_detail)
+                
+            monitor.executions = many_executions
+            
+            # Test scroll position bounds
+            monitor.scroll_pos = 0
+            mock_stdscr.getmaxyx.return_value = (24, 80)  # 24 lines terminal
+            
+            # Simulate scrolling down
+            initial_scroll = monitor.scroll_pos
+            exec_list_height = 24 - 6 - 1  # screen - header - footer
+            max_scroll = max(0, len(many_executions) - exec_list_height)
+            
+            # Test valid scroll range
+            assert monitor.scroll_pos >= 0
+            assert monitor.scroll_pos <= max_scroll
+            
+            # Test drawing with scroll
+            monitor.draw_executions_list(mock_stdscr, 6)
+            
+            # Should draw up to screen height worth of executions
+            expected_draws = min(exec_list_height, len(many_executions))
+            assert mock_stdscr.addstr.call_count == expected_draws

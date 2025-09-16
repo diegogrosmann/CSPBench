@@ -1,131 +1,74 @@
-"""
-Configuração de Testes para CSPBench
+"""Test configuration and global fixtures.
 
-Este módulo configura pytest e fornece fixtures comuns para todos os testes.
+Provides automatic cleanup of temporary test artifact directories that some
+tests create via environment-variable based path resolution.
+
+Rationale:
+  Certain tests previously used relative paths like ./test_datasets which
+  caused persistent directories (test_datasets, test_batches, test_outputs,
+  test_data, relative) to remain in the repository root after the test run.
+  This fixture removes those directories at the end of the test session to
+  keep the workspace clean.
+
+If you need to inspect these directories after a run, set the environment
+variable KEEP_TEST_ARTIFACTS=1 before running pytest.
 """
 
+from __future__ import annotations
+
+import os
 import shutil
-import tempfile
 from pathlib import Path
-from typing import Any, Dict, Generator, List
 
 import pytest
 
-
-@pytest.fixture
-def sample_sequences() -> List[str]:
-    """Fixture com sequências de exemplo para testes."""
-    return ["ACGTACGT", "AGGTACGT", "ACGTACCT", "ACTTACGT"]
-
-
-@pytest.fixture
-def small_sequences() -> List[str]:
-    """Fixture com sequências pequenas para testes rápidos."""
-    return ["ACGT", "AGCT", "ATCT"]
+_ARTIFACT_DIR_NAMES = [
+    "test_batches",
+    "test_data",
+    "test_datasets",
+    "test_outputs",
+    "relative",  # created by some path normalization tests
+]
 
 
-@pytest.fixture
-def large_sequences() -> List[str]:
-    """Fixture com sequências maiores para testes de performance."""
-    return [
-        "ACGTACGTACGTACGTACGTACGT",
-        "AGGTACGTACGTACGTACGTACGT",
-        "ACGTACCTACGTACGTACGTACGT",
-        "ACTTACGTACGTACGTACGTACGT",
-        "ACGTACGTACCTACGTACGTACGT",
-    ]
+@pytest.fixture(scope="session", autouse=True)
+def _cleanup_test_artifacts():  # pragma: no cover - housekeeping
+    """Session fixture that cleans up known temporary test directories.
+
+    Runs once after the full test session. Safe-guards:
+      * Only deletes directories whose names are in the allowlist above.
+      * Only deletes if located directly under the repository root.
+    """
+
+    yield  # Run tests first
+
+    if os.getenv("KEEP_TEST_ARTIFACTS"):
+        return
+
+    repo_root = Path.cwd()
+    for name in _ARTIFACT_DIR_NAMES:
+        candidate = repo_root / name
+        try:
+            if candidate.exists() and candidate.is_dir():
+                # Extra safety: ensure we are not pointing outside repo
+                if repo_root == candidate.parent:
+                    shutil.rmtree(candidate, ignore_errors=True)
+        except Exception:  # noqa: BLE001
+            # Best effort cleanup; ignore failures
+            pass
 
 
-@pytest.fixture
-def protein_sequences() -> List[str]:
-    """Fixture com sequências de proteínas para testes."""
-    return [
-        "MVLSEGEWQLVLHVWAKVEADVAGHGQDILIRLFKSHPETLEKFDRVKHLKTEAEMKASEDLKKHG",
-        "MVLSEGEWQLVLHVWAKVEADVAGHGQDILIRLFKGHPETLEKFDRVKHLKTEAEMKASEDLKKHG",
-        "MVLSEGEWQLVLHVWAKVEADVAGHGQDILIRLFKSHPETLEKFDRVKHLKTEAEMKASEDLKKHD",
-    ]
+"""Config pytest: garante que diretório raiz esteja no sys.path para importar 'algorithms'."""
 
+import sys
+from pathlib import Path
 
-@pytest.fixture
-def temp_dir() -> Generator[Path, None, None]:
-    """Fixture que cria um diretório temporário para testes."""
-    temp_dir = Path(tempfile.mkdtemp())
-    try:
-        yield temp_dir
-    finally:
-        shutil.rmtree(temp_dir, ignore_errors=True)
+ROOT = Path(__file__).resolve().parent.parent
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
-
-@pytest.fixture
-def sample_fasta_content() -> str:
-    """Fixture com conteúdo FASTA para testes."""
-    return """>seq_1 Test sequence 1
-ACGTACGT
->seq_2 Test sequence 2
-AGGTACGT
->seq_3 Test sequence 3
-ACGTACCT
-"""
-
-
-@pytest.fixture
-def sample_txt_content() -> str:
-    """Fixture com conteúdo texto para testes."""
-    return """ACGTACGT
-AGGTACGT
-ACGTACCT
-ACTTACGT
-"""
-
-
-@pytest.fixture
-def synthetic_params() -> Dict[str, Any]:
-    """Fixture com parâmetros para geração sintética."""
-    return {"n": 10, "L": 20, "alphabet": "ACGT", "noise": 0.15, "seed": 42}
-
-
-@pytest.fixture
-def algorithm_params() -> Dict[str, Any]:
-    """Fixture com parâmetros de algoritmos."""
-    return {
-        "BLF-GA": {
-            "population_size": 50,
-            "max_generations": 100,
-            "mutation_rate": 0.1,
-            "crossover_rate": 0.8,
-        },
-        "CSC": {"n_clusters": 3, "max_iterations": 50},
-        "H3-CSP": {"max_iterations": 100, "early_stopping": True},
-    }
-
-
-@pytest.fixture
-def mock_entrez_params() -> Dict[str, Any]:
-    """Fixture com parâmetros mock para Entrez."""
-    return {
-        "email": "test@example.com",
-        "db": "nucleotide",
-        "term": "test query",
-        "n": 5,
-        "api_key": None,
-    }
-
-
-# Configuração do pytest
-def pytest_configure(config):
-    """Configuração personalizada do pytest."""
-    # Adicionar marcadores customizados
-    config.addinivalue_line("markers", "slow: marca testes que demoram para executar")
-    config.addinivalue_line("markers", "integration: marca testes de integração")
-    config.addinivalue_line("markers", "unit: marca testes unitários")
-    config.addinivalue_line("markers", "network: marca testes que requerem internet")
-
-
-def pytest_collection_modifyitems(config, items):
-    """Modifica itens de teste coletados."""
-    # Adicionar marker 'slow' para testes que demoram
-    for item in items:
-        if "integration" in item.nodeid:
-            item.add_marker(pytest.mark.integration)
-        if "unit" in item.nodeid:
-            item.add_marker(pytest.mark.unit)
+# Força auto-discovery dos algoritmos
+try:
+    import algorithms  # noqa: F401
+except Exception:  # pragma: no cover
+    pass

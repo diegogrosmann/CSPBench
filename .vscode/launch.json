@@ -2,8 +2,8 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Debug CSPBench Main (Interactive)",
-            "type": "python",
+            "name": "Debug CSPBench - Main",
+            "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/main.py",
             "console": "integratedTerminal",
@@ -11,7 +11,11 @@
             "python": "${workspaceFolder}/.venv/bin/python",
             "env": {
                 "PYTHONPATH": "${workspaceFolder}",
-                "PYTHONDONTWRITEBYTECODE": "1"
+                "PYTHONDONTWRITEBYTECODE": "1",
+                "OMP_NUM_THREADS": "1",
+                "MKL_NUM_THREADS": "1",
+                "NUMEXPR_NUM_THREADS": "1",
+                "OPENBLAS_NUM_THREADS": "1"
             },
             "args": [],
             "justMyCode": false,
@@ -20,8 +24,8 @@
             "subProcess": true
         },
         {
-            "name": "Debug CSPBench Web Interface",
-            "type": "python",
+            "name": "Debug CSPBench - Web",
+            "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/main.py",
             "console": "integratedTerminal",
@@ -33,7 +37,7 @@
                 "DEBUG": "true"
             },
             "args": [
-                "--web"
+                "web"
             ],
             "justMyCode": false,
             "stopOnEntry": false,
@@ -41,8 +45,8 @@
             "subProcess": true
         },
         {
-            "name": "Debug CSPBench Test",
-            "type": "python",
+            "name": "Debug CSPBench - Batch Run",
+            "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/main.py",
             "console": "integratedTerminal",
@@ -50,15 +54,83 @@
             "python": "${workspaceFolder}/.venv/bin/python",
             "env": {
                 "PYTHONPATH": "${workspaceFolder}",
-                "PYTHONDONTWRITEBYTECODE": "1"
+                "PYTHONDONTWRITEBYTECODE": "1",
+                "OMP_NUM_THREADS": "1",
+                "MKL_NUM_THREADS": "1",
+                "NUMEXPR_NUM_THREADS": "1",
+                "OPENBLAS_NUM_THREADS": "1"
             },
             "args": [
-                "test"
+                "${input:batchFile}"
             ],
             "justMyCode": false,
             "stopOnEntry": false,
             "showReturnValue": true,
             "subProcess": true
+        },
+        {
+            "name": "Debug CSPBench - Dataset Save",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/main.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "python": "${workspaceFolder}/.venv/bin/python",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}",
+                "PYTHONDONTWRITEBYTECODE": "1",
+                "OMP_NUM_THREADS": "1",
+                "MKL_NUM_THREADS": "1",
+                "NUMEXPR_NUM_THREADS": "1",
+                "OPENBLAS_NUM_THREADS": "1"
+            },
+            "args": [
+                "datasetsave"
+            ],
+            "justMyCode": false,
+            "stopOnEntry": false,
+            "showReturnValue": true,
+            "subProcess": true
+        },
+        {
+            "name": "Debug CSPBench - Work Restart (Dynamic ID)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/main.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "python": "${workspaceFolder}/.venv/bin/python",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}",
+                "PYTHONDONTWRITEBYTECODE": "1",
+                "OMP_NUM_THREADS": "1",
+                "MKL_NUM_THREADS": "1",
+                "NUMEXPR_NUM_THREADS": "1",
+                "OPENBLAS_NUM_THREADS": "1"
+            },
+            "args": [
+                "work",
+                "restart",
+                "${input:workId}"
+            ],
+            "justMyCode": false,
+            "stopOnEntry": false,
+            "showReturnValue": true,
+            "subProcess": true
+        }
+    ],
+    "inputs": [
+        {
+            "id": "workId",
+            "description": "Digite o ID do trabalho para reiniciar:",
+            "default": "",
+            "type": "promptString"
+        },
+        {
+            "id": "batchFile",
+            "description": "Digite o caminho do arquivo batch:",
+            "default": "batches/TEMPLATE.yaml",
+            "type": "promptString"
         }
     ]
 }

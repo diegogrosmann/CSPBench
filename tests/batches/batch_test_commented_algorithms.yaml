@@ -1,0 +1,87 @@
+# ===================================================================
+# TESTE: Algoritmos Comentados - Deve carregar apenas algoritmos não comentados
+# ===================================================================
+metadata:
+  name: "Test Commented Algorithms"
+  description: "Teste para verificar se algoritmos comentados são ignorados"
+  author: "Test"
+  version: "1.0"
+  creation_date: "2025-01-24"
+  tags: ["test", "commented"]
+
+datasets:
+  - id: dataset_test
+    name: "Test Dataset"
+    type: "synthetic"
+    parameters:
+      mode: "random"
+      n: 5
+      L: 10
+      alphabet: "ACGT"
+      seed: 42
+
+algorithms:
+  - id: "test_commented"
+    name: "Configuration with Commented Algorithms"
+    description: "Testing algorithms with some commented out"
+    algorithms:
+#      - "Baseline"                    # Este deve ser ignorado
+      - "BLF-GA"                      # Este deve ser carregado
+#      - "CSC"                         # Este deve ser ignorado
+      - "H2-CSP"                      # Este deve ser carregado
+#      - "DP-CSP"                      # Este deve ser ignorado
+    
+    algorithm_params:
+      "Baseline":
+        tie_break: "lex"
+      "BLF-GA":
+        pop_size: 20
+        max_gens: 50
+        seed: 42
+      "CSC":
+        min_d: 2
+        d_factor: 0.75
+      "H2-CSP":
+        auto_blocks: true
+        seed: 42
+      "DP-CSP":
+        max_d: 3
+        seed: 42
+
+task:
+  type: "experiment"
+
+experiment:
+  tasks:
+    - name: "Test Commented Algorithms"
+      datasets:
+        - "dataset_test"
+      algorithms:
+        - "test_commented"
+      repetitions: 2
+
+output:
+  logging: true
+  results:
+    formats:
+      csv: false
+      json: true
+      parquet: false
+      pickle: false
+    partial_results: false
+
+resources:
+  cpu:
+    exclusive_cores: false
+    max_workers: 1
+    internal_jobs: 1
+  memory:
+    max_memory_gb: null
+  timeouts:
+    timeout_per_item: 60
+    timeout_total_batch: 300
+
+system:
+  global_seed: null
+  distance_method: "hamming"
+  enable_distance_cache: true

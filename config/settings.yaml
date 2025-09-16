@@ -1,63 +1,90 @@
 # ===================================================================
-# CSPBENCH MAIN CONFIGURATION
+# STANDARDIZED SETTINGS CSPBench - v0.8
 # ===================================================================
+# CONFIGURAÇÕES PADRÃO DE EXECUÇÃO - "Como executa por padrão"
+# This file stores execution configurations for CSPBench.
+# Infrastructure settings (paths, directories, cleanup) are in .env
+# 
+# HIERARQUIA DE CONFIGURAÇÕES (ordem de precedência):
+# 1. .env                          ← MAIOR PRIORIDADE (configurações de sistema)
+# 2. batch/*.yaml                  ← Sobrepõe ESTE ARQUIVO e config.py
+# 3. ESTE ARQUIVO (settings.yaml)  ← Sobrepõe apenas algorithms/*/config.py  
+# 4. algorithms/*/config.py        ← MENOR PRIORIDADE
+#
+# Este arquivo contém APENAS configurações padrão de execução.
+# Configurações de infraestrutura estão no arquivo .env
+#
 
-# Application settings
-application:
-  name: "CSPBench"
-  version: "0.1.0"
-  description: "Framework for Closest String Problem"
-
-# Infrastructure settings
-infrastructure:
-  # Dataset repository
-  dataset_repository:
-    type: "FileDatasetRepository"
-    config:
-      base_path: "./datasets"
-      supported_formats: ["fasta", "txt"]
+# =====================================================================
+# SECTION 6: OUTPUT SETTINGS (REQUIRED) - UNIFIED CONFIGURATION
+# =====================================================================
+# UNIFIED CONFIGURATION: All outputs (logs, results, plots) in one location
+# This section consolidates all output configurations for maximum clarity
+output:
   
-  # Algorithm registry
-  algorithm_registry:
-    type: "DomainAlgorithmRegistry"
-    config:
-      auto_register: true
+  logging: true                     # bool: Enable logging (if false, no logs will be saved)
   
-  # Algorithm executor
-  executor:
-    type: "Executor"
-    config:
-      timeout_default: 300
-  
-  # Logging system
-  logging:
-    base_log_dir: "./outputs/logs"
-    session_folder_format: "%Y%m%d_%H%M%S"
-    default_log_level: "INFO"
-    log_filename: "cspbench.log"
-    create_session_folders: true
+  # === RESULTS CONFIGURATION ===
+  results:   
+    # Export formats
+    formats:
+      csv: true                       # bool: Export results in CSV
+      json: true                      # bool: Export results in JSON
+      parquet: true                   # bool: Export in Parquet format (for large volumes)
+      pickle: true                    # bool: Export in Pickle format (Python native)
     
-  # Results system
-  result:
-    base_result_dir: "./outputs/results"
-    save_partial_results: false       # Save partial results during execution
-    session_folder_format: "%Y%m%d_%H%M%S"  # Same format as logs
-    create_session_folders: true      # Create folders per session
-    
-    # Report settings
-    report:
-      save_plots: true
-      plot_format: "png"
-      calculate_statistics: true
-      include_summary: true
-      save_detailed_results: true
-      
-    # Export settings
-    export:
-      export_csv: true
-      export_json: true
+    partial_results: true           # bool: Save partial results during experiment    
 
-  # History system
-  history:
-    save_history: false               # Save detailed history
-    history_frequency: 1              # Save frequency (every N iterations)
+# =====================================================================
+# SECTION 7: RESOURCE SETTINGS (OPTIONAL)
+# =====================================================================
+# Control of computational resource usage
+resources:
+  # CPU limitations
+  cpu:
+    # Do not use the same cores as the main application during tests
+    exclusive_cores: true                # bool: If true, tests do not share cores with the main app
+    max_cores: null                      # int|null: Maximum number of cores to use (null = all available)
+    internal_jobs: 1                  # int: Maximum internal parallel jobs per algorithm
+                                      # Controls internal algorithm parallelism (threads/processes)
+                                      # Suggested value: 4 for CPUs with 8+ cores
+                                      # Relation: max_workers × internal_jobs ≤ CPU_cores
+
+  memory:
+    max_memory_gb: null               # float|null: Maximum memory in GB
+     
+  # Timeouts and limits
+  timeouts:
+    timeout_per_item: 3600       # int: Timeout per individual algorithm execution (seconds)
+                                      # Applied to each algorithm run independently
+                                      # Common values: 1800 (30min), 3600 (1h), 7200 (2h)
+    timeout_total_batch: 86400        # int: Total timeout for entire batch execution (seconds)
+                                      # Applied to the complete batch process
+                                      # Common values: 21600 (6h), 43200 (12h), 86400 (24h)
+    
+# =====================================================================
+# SECTION 8: SYSTEM SETTINGS (OPTIONAL)
+# =====================================================================
+# General system configurations and behavior
+system:
+  # Global seed substitution - overrides all local seeds
+  global_seed: null                   # int|null: Global seed that replaces all algorithm and dataset seeds
+                                      # When set, substitutes ALL seed parameters throughout configuration
+                                      # null = use individual seeds, int = override all with this value
+  
+  seed_increment: true                # bool: Whether to increment seeds for each repetition
+                                      # When true, each repetition uses incremented seeds:
+                                      # - If global_seed is set: repetition_1: global_seed+1, repetition_2: global_seed+2, etc.
+                                      # - If global_seed is null: increments individual algorithm seeds
+                                      # This ensures different seeds while maintaining reproducibility
+                                      # false = all repetitions use the same seeds
+  
+  # Distance calculation method
+  distance_method: "hamming"          # string: Method for distance calculation
+                                      # "hamming" = Hamming distance (current implementation)
+                                      # Future: "levenshtein", "edit", "custom"
+  
+  # Distance calculation cache
+  enable_distance_cache: true         # bool: Enable caching for distance calculations
+                                      # true = cache results for better performance
+                                      # false = calculate distances every time (uses less memory)

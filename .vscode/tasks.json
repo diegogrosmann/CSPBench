@@ -4,167 +4,9 @@
         {
             "label": "Run CSPBench",
             "type": "shell",
-            "command": "python",
-            "args": ["main.py"],
-            "group": "build",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": false,
-                "panel": "shared"
-            },
-            "problemMatcher": []
-        },
-        {
-            "label": "Run Tests",
-            "type": "shell",
-            "command": "pytest",
-            "args": ["tests/", "-v"],
-            "group": "test",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": false,
-                "panel": "shared"
-            },
-            "problemMatcher": []
-        },
-        {
-            "label": "Format Code",
-            "type": "shell",
-            "command": "black",
-            "args": ["."],
-            "group": "build",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": false,
-                "panel": "shared"
-            },
-            "problemMatcher": []
-        },
-        {
-            "label": "Lint Code",
-            "type": "shell", 
-            "command": "ruff",
-            "args": ["check", "."],
-            "group": "build",
-            "presentation": {
-                "echo": true,
-                "reveal": "always", 
-                "focus": false,
-                "panel": "shared"
-            },
-            "problemMatcher": []
-        },
-        {
-            "label": "Type Check",
-            "type": "shell",
-            "command": "mypy",
-            "args": ["src/"],
-            "group": "build",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": false,
-                "panel": "shared"
-            },
-            "problemMatcher": []
-        },
-        {
-            "label": "Run Coverage",
-            "type": "shell",
-            "command": "pytest",
-            "args": ["--cov=src", "--cov-report=html", "tests/"],
-            "group": "test",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": false,
-                "panel": "shared"
-            },
-            "problemMatcher": []
-        },
-        {
-            "label": "Build Docker",
-            "type": "shell",
-            "command": "docker",
-            "args": ["build", "-t", "cspbench:latest", "."],
-            "group": "build",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": false,
-                "panel": "shared"
-            },
-            "problemMatcher": []
-        },
-        {
-            "label": "Start Web Interface",
-            "type": "shell",
-            "command": "uvicorn", 
-            "args": ["src.presentation.web.app:app", "--reload", "--host", "0.0.0.0", "--port", "8000"],
-            "group": "build",
-            "isBackground": true,
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": false,
-                "panel": "shared"
-            },
-            "problemMatcher": []
-        },
-        {
-            "label": "Build Docker Web",
-            "type": "shell",
-            "command": "docker",
-            "args": ["build", "-f", "Dockerfile.web", "-t", "cspbench-web:latest", "."],
-            "group": "build",
-            "presentation": {
-                "echo": true,
-                "reveal": "always", 
-                "focus": false,
-                "panel": "shared"
-            },
-            "problemMatcher": []
-        },
-        {
-            "label": "Run Docker Web",
-            "type": "shell",
-            "command": "docker-compose",
-            "args": ["-f", "docker-compose.web.yml", "up", "-d"],
-            "group": "build",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": false, 
-                "panel": "shared"
-            },
-            "problemMatcher": []
-        },
-        {
-            "label": "Run Docker",
-            "type": "shell",
-            "command": "docker",
-            "args": ["run", "--rm", "-it", "--env-file", ".env", "cspbench:latest"],
-            "group": "build",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": false,
-                "panel": "shared"
-            },
-            "problemMatcher": []
-        },
-        {
-            "label": "Build Cloud Image",
-            "type": "shell",
-            "command": "docker",
+            "command": "${workspaceFolder}/.venv/bin/python",
             "args": [
-                "build",
-                "-t",
-                "cspbench-web:latest",
-                "."
+                "main.py"
             ],
             "group": "build",
             "presentation": {
@@ -173,18 +15,75 @@
                 "focus": false,
                 "panel": "shared"
             },
-            "problemMatcher": []
+            "problemMatcher": [],
+            "options": {
+                "cwd": "${workspaceFolder}",
+                "envFile": "${workspaceFolder}/.env",
+                "env": {
+                    "PYTHONPATH": "${workspaceFolder}",
+                    "PYTHONDONTWRITEBYTECODE": "1"
+                }
+            }
         },
         {
-            "label": "Test Cloud Image",
+            "label": "Generate Docs",
             "type": "shell",
-            "command": "docker",
+            "command": "${workspaceFolder}/.venv/bin/python",
             "args": [
-                "run",
-                "--rm",
-                "-p",
-                "8000:8000",
-                "cspbench-web:latest"
+                "scripts/generate_docs.py"
+            ],
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": [],
+            "options": {
+                "cwd": "${workspaceFolder}",
+                "env": {
+                    "PYTHONPATH": "${workspaceFolder}",
+                    "PYTHONDONTWRITEBYTECODE": "1"
+                }
+            }
+        },
+        {
+            "label": "Serve Docs",
+            "type": "shell",
+            "command": "${workspaceFolder}/.venv/bin/python",
+            "args": [
+                "scripts/generate_docs.py",
+                "--serve",
+                "--port",
+                "8081"
+            ],
+            "group": "build",
+            "isBackground": true,
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": [],
+            "options": {
+                "cwd": "${workspaceFolder}",
+                "env": {
+                    "PYTHONPATH": "${workspaceFolder}",
+                    "PYTHONDONTWRITEBYTECODE": "1"
+                }
+            }
+        },
+        {
+            "label": "Run Tests",
+            "type": "shell",
+            "command": "${workspaceFolder}/.venv/bin/python",
+            "args": [
+                "-m",
+                "pytest",
+                "tests/",
+                "-v"
             ],
             "group": "test",
             "presentation": {
@@ -194,29 +93,49 @@
                 "panel": "shared"
             },
             "problemMatcher": [],
-            "dependsOn": "Build Cloud Image"
+            "options": {
+                "cwd": "${workspaceFolder}",
+                "envFile": "${workspaceFolder}/.env",
+                "env": {
+                    "PYTHONPATH": "${workspaceFolder}",
+                    "PYTHONDONTWRITEBYTECODE": "1"
+                }
+            }
         },
         {
-            "label": "Deploy to Cloud Run (gcloud)",
+            "label": "Start Web Interface",
             "type": "shell",
-            "command": "gcloud",
+            "command": "${workspaceFolder}/.venv/bin/python",
             "args": [
-                "run",
-                "deploy",
-                "cspbench-web",
-                "--source",
-                ".",
-                "--region",
-                "us-central1",
-                "--allow-unauthenticated",
-                "--memory",
-                "2Gi",
-                "--cpu",
-                "1",
-                "--max-instances",
-                "10",
-                "--port",
-                "8000"
+                "main.py",
+                "web"
+            ],
+            "group": "build",
+            "isBackground": true,
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": [],
+            "options": {
+                "cwd": "${workspaceFolder}",
+                "envFile": "${workspaceFolder}/.env",
+                "env": {
+                    "PYTHONPATH": "${workspaceFolder}",
+                    "PYTHONDONTWRITEBYTECODE": "1"
+                }
+            }
+        },
+        {
+            "label": "Format Code",
+            "type": "shell",
+            "command": "${workspaceFolder}/.venv/bin/python",
+            "args": [
+                "-m",
+                "black",
+                "."
             ],
             "group": "build",
             "presentation": {
@@ -225,7 +144,231 @@
                 "focus": false,
                 "panel": "shared"
             },
-            "problemMatcher": []
+            "problemMatcher": [],
+            "options": {
+                "cwd": "${workspaceFolder}",
+                "env": {
+                    "PYTHONPATH": "${workspaceFolder}",
+                    "PYTHONDONTWRITEBYTECODE": "1"
+                }
+            }
+        },
+        {
+            "label": "Lint Code",
+            "type": "shell",
+            "command": "${workspaceFolder}/.venv/bin/python",
+            "args": [
+                "-m",
+                "ruff",
+                "check",
+                "."
+            ],
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": [],
+            "options": {
+                "cwd": "${workspaceFolder}",
+                "env": {
+                    "PYTHONPATH": "${workspaceFolder}",
+                    "PYTHONDONTWRITEBYTECODE": "1"
+                }
+            }
+        },
+        {
+            "label": "Setup Environment",
+            "type": "shell",
+            "command": "${workspaceFolder}/.venv/bin/pip",
+            "args": [
+                "install",
+                "-r",
+                "requirements.txt"
+            ],
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": [],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            }
+        },
+        {
+            "label": "Clean Cache",
+            "type": "shell",
+            "command": "rm",
+            "args": [
+                "-rf",
+                "__pycache__",
+                "*.pyc",
+                "*.pyo",
+                "*/*.pyc",
+                "*/*.pyo",
+                "*/__pycache__",
+                ".pytest_cache",
+                ".coverage",
+                "htmlcov",
+                "logs",
+                "outputs",
+                "cache",
+                "data"
+            ],
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": [],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            }
+        },
+        {
+            "label": "Deploy Cloud Run",
+            "type": "shell",
+            "command": "bash",
+            "args": [
+                "deploy/cloud_run_deploy.sh",
+                "--env-file",
+                "deploy/.env.deploy"
+                // Para preparar bucket na mesma execução, adicione: "--prepare-bucket"
+            ],
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": [],
+            "options": {
+                "cwd": "${workspaceFolder}",
+                "envFile": "${workspaceFolder}/deploy/.env",
+                "env": {
+                    "PYTHONPATH": "${workspaceFolder}",
+                    "PYTHONDONTWRITEBYTECODE": "1"
+                }
+            }
+        },
+        {
+            "label": "Clean Database",
+            "type": "shell",
+            "command": "${workspaceFolder}/.venv/bin/python",
+            "args": [
+                "scripts/clean_database.py"
+            ],
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": [],
+            "options": {
+                "cwd": "${workspaceFolder}",
+                "envFile": "${workspaceFolder}/.env",
+                "env": {
+                    "PYTHONPATH": "${workspaceFolder}",
+                    "PYTHONDONTWRITEBYTECODE": "1"
+                }
+            }
+        },
+        {
+            "label": "Clean Database (Force)",
+            "type": "shell",
+            "command": "${workspaceFolder}/.venv/bin/python",
+            "args": [
+                "scripts/clean_database_force.py"
+            ],
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": [],
+            "options": {
+                "cwd": "${workspaceFolder}",
+                "envFile": "${workspaceFolder}/.env",
+                "env": {
+                    "PYTHONPATH": "${workspaceFolder}",
+                    "PYTHONDONTWRITEBYTECODE": "1"
+                }
+            }
+        },
+        {
+            "label": "Start PostgreSQL",
+            "type": "shell",
+            "command": "sudo",
+            "args": [
+                "service",
+                "postgresql",
+                "start"
+            ],
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": [],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            }
+        },
+        {
+            "label": "Stop PostgreSQL",
+            "type": "shell",
+            "command": "sudo",
+            "args": [
+                "service",
+                "postgresql",
+                "stop"
+            ],
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": [],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            }
+        },
+        {
+            "label": "PostgreSQL Status",
+            "type": "shell",
+            "command": "sudo",
+            "args": [
+                "service",
+                "postgresql",
+                "status"
+            ],
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": [],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            }
         }
     ]
 }

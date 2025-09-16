@@ -27,7 +27,7 @@ IMPLEMENTED ALGORITHMS:
    - Optimality guarantee within resource limits
    - Efficient state modeling
 
-5. **H³-CSP (Hybrid Hierarchical Hamming Search)**:
+5. **H²-CSP (Hybrid Hierarchical Search)**:
    - Three-layer hierarchical approach
    - Adaptive technique selection per block
    - Automatic balancing between quality and efficiency
@@ -48,15 +48,15 @@ for name, cls in global_registry.items():
 
 # Use a specific algorithm
 algorithm_class = global_registry["Baseline"]
-algorithm = algorithm_class(strings=["ATCG", "ATCC"], alphabet="ATCG")
-result_string, max_distance, metadata = algorithm.run()
+algorithm = algorithm_class(strings=["ATCG", "ATCC"], alphabet="ATCG", ....)
+result = algorithm.run()
+result_string, max_distance, metadata = result["center_string"], result["max_distance"], result["metadata"]
 ```
 
 STRUCTURE:
 Each algorithm must be in its own subpackage with:
 - __init__.py: Main class exposure
 - algorithm.py: Wrapper with @register_algorithm decorator
-- implementation.py: Algorithm-specific logic
 - config.py: Configurations and default parameters
 - README.md: Detailed documentation
 """
@@ -86,7 +86,5 @@ def _discover_algorithms():
 
 # Execute auto-discovery on import
 _discover_algorithms()
-
-__all__ = ["global_registry", "register_algorithm"]
 
 __all__ = ["global_registry", "register_algorithm"]

@@ -1,0 +1,642 @@
+{% extends "base.html" %}
+
+{% block title %}Work Monitor - CSPBench{% endblock %}
+
+{% block breadcrumb_items %}
+<li class="breadcrumb-item active" aria-current="page">
+    <i class="bi bi-speedometer2 me-1"></i>Work Monitor
+</li>
+{% endblock %}
+
+{% block header %}
+<!-- Remove o header padrão (CSPBench Web Interface) -->
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .work-monitor {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        padding: 2rem 0;
+    }
+
+    .monitor-container {
+        max-width: 1400px;
+        padding: 0 1rem;
+    }
+
+    .monitor-card {
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        margin-bottom: 2rem;
+        overflow: hidden;
+        transition: all 0.3s ease;
+    }
+
+    .monitor-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+    }
+
+    .card-header {
+        background: #f8f9fa;
+        border-bottom: 1px solid #dee2e6;
+        padding: 1.5rem;
+        font-weight: 600;
+        color: #495057;
+    }
+
+    .refresh-indicator {
+        animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+        0% {
+            transform: rotate(0deg);
+        }
+
+        100% {
+            transform: rotate(360deg);
+        }
+    }
+
+    .status-badge {
+        font-size: 0.75rem;
+        padding: 0.25rem 0.5rem;
+    }
+
+    .table-hover tbody tr:hover {
+        background-color: rgba(0, 0, 0, .025);
+    }
+
+    .work-actions {
+        opacity: 0.7;
+        transition: opacity 0.3s ease;
+    }
+
+    .work-actions:hover {
+        opacity: 1;
+    }
+
+    .stats-card {
+        background: rgba(255, 255, 255, 0.95);
+        border: none;
+        backdrop-filter: blur(10px);
+    }
+
+    .table-responsive {
+        border-radius: 8px;
+        overflow: hidden;
+    }
+
+    .btn-action {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.875rem;
+        margin: 0 0.125rem;
+    }
+
+    .text-truncate-custom {
+        max-width: 200px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .work-id-cell {
+        font-family: 'Courier New', monospace;
+        font-size: 0.875rem;
+        color: #6c757d;
+    }
+
+    .tags-container {
+        max-width: 150px;
+        max-height: 40px;
+        overflow: hidden;
+    }
+
+    .tags-container .badge {
+        font-size: 0.75rem;
+        margin-bottom: 2px;
+    }
+
+    .pagination .page-link {
+        padding: 0.375rem 0.75rem;
+    }
+
+    .pagination .page-item.active .page-link {
+        background-color: #0d6efd;
+        border-color: #0d6efd;
+    }
+
+    #paginationContainer {
+        background-color: #f8f9fa;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="work-monitor">
+    <div class="monitor-container">
+        <!-- Header -->
+        <div class="text-center text-white mb-4">
+            <h1 class="display-4 fw-bold mb-3">
+                <i class="bi bi-speedometer2 me-3"></i>
+                Work Monitor
+            </h1>
+            <p class="lead">
+                Monitor and manage your algorithm executions
+            </p>
+        </div>
+
+        <!-- Works Table with Integrated Filters -->
+        <div class="monitor-card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <div>
+                    <i class="bi bi-list me-2"></i>
+                    Works List
+                </div>
+                <div class="d-flex gap-2 align-items-center">
+                    <button class="btn btn-outline-primary" onclick="refreshWorks()" id="refreshBtn">
+                        <i class="bi bi-arrow-clockwise"></i> Refresh
+                    </button>
+                </div>
+            </div>
+
+            <!-- Integrated Filters -->
+            <div class="p-3 border-bottom">
+                <div class="row g-3 align-items-center">
+                    <div class="col-md-3">
+                        <label class="form-label small mb-1">Search:</label>
+                        <input type="text" class="form-control form-control-sm" id="searchInput"
+                            placeholder="ID, name, author, tags..." onkeyup="debouncedFilter()">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label small mb-1">Status:</label>
+                        <select class="form-select form-select-sm" id="statusFilter" onchange="filterWorks()">
+                            <option value="">All Status</option>
+                            <option value="running">Running</option>
+                            <option value="queued">Queued</option>
+                            <option value="completed">Completed</option>
+                            <option value="failed">Failed</option>
+                            <option value="error">Error</option>
+                            <option value="cancelled">Cancelled</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label small mb-1">Author:</label>
+                        <input type="text" class="form-control form-control-sm" id="authorFilter"
+                            placeholder="Author name..." onkeyup="debouncedFilter()">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small mb-1">Tags:</label>
+                        <input type="text" class="form-control form-control-sm" id="tagsFilter"
+                            placeholder="tag1, tag2..." onkeyup="debouncedFilter()">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label small mb-1">Per page:</label>
+                        <select class="form-select form-select-sm" id="perPageSelect" onchange="changePerPage()">
+                            <option value="10">10</option>
+                            <option value="20" selected>20</option>
+                            <option value="50">50</option>
+                            <option value="100">100</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div class="table-responsive">
+                <!-- Loading placeholder -->
+                <div class="text-center py-5" id="loadingIndicator">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading works...</span>
+                    </div>
+                    <p class="mt-3 text-muted">Loading works...</p>
+                </div>
+
+                <!-- Works table -->
+                <table class="table table-hover mb-0 d-none" id="worksTable">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Nome</th>
+                            <th>ID</th>
+                            <th>Status</th>
+                            <th>Author</th>
+                            <th>Tags</th>
+                            <th>Created</th>
+                            <th>Updated</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="worksTableBody">
+                    </tbody>
+                </table>
+
+                <!-- Pagination -->
+                <div class="d-flex justify-content-between align-items-center p-3 border-top d-none"
+                    id="paginationContainer">
+                    <div class="text-muted small">
+                        Showing <span id="showingRange"></span> of <span id="totalItems"></span> works
+                    </div>
+                    <nav aria-label="Works pagination">
+                        <ul class="pagination pagination-sm mb-0" id="pagination">
+                        </ul>
+                    </nav>
+                </div>
+
+                <!-- Empty state -->
+                <div class="text-center py-5 d-none" id="emptyState">
+                    <div class="text-muted">
+                        <i class="bi bi-inbox display-1"></i>
+                        <h4 class="mt-3">No Works Found</h4>
+                        <p>No algorithm executions have been created yet.</p>
+                        <a href="/batch/manage" class="btn btn-primary">
+                            <i class="bi bi-plus-circle me-2"></i>Create New Batch
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let currentPage = 1;
+    let perPage = 20;
+    let totalPages = 1;
+    let autoRefreshInterval = null;
+    let filterTimeout = null;
+    let cachedWorks = [];
+
+    // Initialize page
+    document.addEventListener('DOMContentLoaded', function () {
+        loadWorks();
+
+        // Start auto-refresh always enabled
+        startAutoRefresh();
+    });
+
+    function debouncedFilter() {
+        clearTimeout(filterTimeout);
+        filterTimeout = setTimeout(filterWorks, 300);
+    }
+
+    function startAutoRefresh() {
+        stopAutoRefresh(); // Clear any existing interval
+        autoRefreshInterval = setInterval(loadWorks, 10000); // Every 10 seconds
+    }
+
+    function stopAutoRefresh() {
+        if (autoRefreshInterval) {
+            clearInterval(autoRefreshInterval);
+            autoRefreshInterval = null;
+        }
+    }
+
+    function getFilterParams() {
+        const statusFilter = document.getElementById('statusFilter').value;
+        const searchInput = document.getElementById('searchInput').value;
+        const authorFilter = document.getElementById('authorFilter').value;
+        const tagsFilter = document.getElementById('tagsFilter').value;
+
+        const params = new URLSearchParams();
+        params.set('page', currentPage);
+        params.set('per_page', perPage);
+
+        if (statusFilter) params.set('status', statusFilter);
+        if (searchInput) params.set('search', searchInput);
+        if (authorFilter) params.set('author', authorFilter);
+        if (tagsFilter) params.set('tags', tagsFilter);
+
+        return params.toString();
+    }
+
+    async function loadWorks() {
+        try {
+            // Show refresh indicator
+            const refreshBtn = document.getElementById('refreshBtn');
+            const refreshIcon = refreshBtn.querySelector('i');
+            refreshIcon.classList.add('refresh-indicator');
+
+            const params = getFilterParams();
+            const response = await window.apiClient.request(`/api/monitor/works?${params}`);
+
+            renderWorks(response);
+
+        } catch (error) {
+            console.error('Failed to load works:', error);
+            showAlert('Failed to load works: ' + error.message, 'danger');
+        } finally {
+            // Hide loading and refresh indicators
+            document.getElementById('loadingIndicator').style.display = 'none';
+            const refreshBtn = document.getElementById('refreshBtn');
+            const refreshIcon = refreshBtn.querySelector('i');
+            refreshIcon.classList.remove('refresh-indicator');
+        }
+    }
+
+    function refreshWorks() {
+        loadWorks();
+    }
+
+    function filterWorks() {
+        currentPage = 1; // Reset to first page when filtering
+        loadWorks();
+    }
+
+    function changePerPage() {
+        perPage = parseInt(document.getElementById('perPageSelect').value);
+        currentPage = 1; // Reset to first page
+        loadWorks();
+    }
+
+    function changePage(page) {
+        currentPage = page;
+        loadWorks();
+    }
+
+    function renderWorks(response) {
+        const table = document.getElementById('worksTable');
+        const tableBody = document.getElementById('worksTableBody');
+        const emptyState = document.getElementById('emptyState');
+        const paginationContainer = document.getElementById('paginationContainer');
+
+        const works = response.works || [];
+        cachedWorks = works; // Cache para uso em outras funções
+
+        if (works.length === 0) {
+            table.classList.add('d-none');
+            paginationContainer.classList.add('d-none');
+            emptyState.classList.remove('d-none');
+            return;
+        }
+
+        emptyState.classList.add('d-none');
+        table.classList.remove('d-none');
+        paginationContainer.classList.remove('d-none');
+
+        // Update pagination info
+        totalPages = response.total_pages || 1;
+        updatePaginationInfo(response);
+        renderPagination(response);
+
+        const html = works.map(work => createWorkRow(work)).join('');
+        tableBody.innerHTML = html;
+    }
+
+    function updatePaginationInfo(response) {
+        const totalItems = response.total || 0;
+        const startItem = totalItems > 0 ? ((currentPage - 1) * perPage) + 1 : 0;
+        const endItem = Math.min(currentPage * perPage, totalItems);
+
+        document.getElementById('showingRange').textContent = `${startItem}-${endItem}`;
+        document.getElementById('totalItems').textContent = totalItems;
+    }
+
+    function renderPagination(response) {
+        const pagination = document.getElementById('pagination');
+        const totalPages = response.total_pages || 1;
+        const hasNext = response.has_next || false;
+        const hasPrev = response.has_prev || false;
+
+        let html = '';
+
+        // Previous button
+        html += `
+        <li class="page-item ${!hasPrev ? 'disabled' : ''}">
+            <a class="page-link" href="#" onclick="${hasPrev ? `changePage(${currentPage - 1})` : 'return false'}" ${!hasPrev ? 'tabindex="-1"' : ''}>
+                <i class="bi bi-chevron-left"></i>
+            </a>
+        </li>
+    `;
+
+        // Page numbers
+        const startPage = Math.max(1, currentPage - 2);
+        const endPage = Math.min(totalPages, currentPage + 2);
+
+        if (startPage > 1) {
+            html += `
+            <li class="page-item">
+                <a class="page-link" href="#" onclick="changePage(1)">1</a>
+            </li>
+        `;
+            if (startPage > 2) {
+                html += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
+            }
+        }
+
+        for (let i = startPage; i <= endPage; i++) {
+            html += `
+            <li class="page-item ${i === currentPage ? 'active' : ''}">
+                <a class="page-link" href="#" onclick="changePage(${i})">${i}</a>
+            </li>
+        `;
+        }
+
+        if (endPage < totalPages) {
+            if (endPage < totalPages - 1) {
+                html += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
+            }
+            html += `
+            <li class="page-item">
+                <a class="page-link" href="#" onclick="changePage(${totalPages})">${totalPages}</a>
+            </li>
+        `;
+        }
+
+        // Next button
+        html += `
+        <li class="page-item ${!hasNext ? 'disabled' : ''}">
+            <a class="page-link" href="#" onclick="${hasNext ? `changePage(${currentPage + 1})` : 'return false'}" ${!hasNext ? 'tabindex="-1"' : ''}>
+                <i class="bi bi-chevron-right"></i>
+            </a>
+        </li>
+    `;
+
+        pagination.innerHTML = html;
+    }
+
+    function createWorkRow(work) {
+        const createdDate = new Date(work.created_at * 1000);
+        const updatedDate = new Date(work.updated_at * 1000);
+        const statusColor = getStatusColor(work.status);
+        const statusIcon = getStatusIcon(work.status);
+
+        // Format tags
+        const tagsHtml = work.config_tags && work.config_tags.length > 0
+            ? work.config_tags.map(tag => `<span class="badge bg-light text-dark me-1">${tag}</span>`).join('')
+            : '<span class="text-muted">-</span>';
+
+        return `
+        <tr data-work-id="${work.id}">
+            <td>
+                <div>
+                    <div class="fw-medium text-truncate-custom" title="${work.config_name}">
+                        ${work.config_name}
+                    </div>
+                    ${work.config_description ? `
+                        <small class="text-muted text-truncate-custom d-block" title="${work.config_description}">
+                            ${work.config_description.length > 50 ?
+                    work.config_description.substring(0, 50) + '...' :
+                    work.config_description}
+                        </small>
+                    ` : ''}
+                    ${work.error ? `
+                        <small class="text-danger d-block">
+                            <i class="bi bi-exclamation-triangle me-1"></i>
+                            ${work.error.length > 50 ? work.error.substring(0, 50) + '...' : work.error}
+                        </small>
+                    ` : ''}
+                </div>
+            </td>
+            <td class="work-id-cell">
+                <div class="text-truncate-custom" title="${work.id}">
+                    ${work.id}
+                </div>
+            </td>
+            <td>
+                <span class="badge bg-${statusColor} status-badge">
+                    <i class="bi bi-${statusIcon} me-1"></i>${work.status}
+                </span>
+            </td>
+            <td>
+                <small class="text-muted">
+                    ${work.config_author || '-'}
+                </small>
+            </td>
+            <td>
+                <div class="tags-container">
+                    ${tagsHtml}
+                </div>
+            </td>
+            <td>
+                <small class="text-muted">
+                    ${createdDate.toLocaleDateString()}<br>
+                    ${createdDate.toLocaleTimeString()}
+                </small>
+            </td>
+            <td>
+                <small class="text-muted">
+                    ${updatedDate.toLocaleDateString()}<br>
+                    ${updatedDate.toLocaleTimeString()}
+                </small>
+            </td>
+            <td>
+                <div class="work-actions d-flex gap-1">
+                    ${work.status === 'running' ? `
+                        <button class="btn btn-sm btn-outline-warning btn-action" 
+                                onclick="workAction('${work.id}', 'pause')" 
+                                title="Pause">
+                            <i class="bi bi-pause"></i>
+                        </button>
+                    ` : ''}
+                    ${work.status === 'paused' ? `
+                        <button class="btn btn-sm btn-outline-success btn-action" 
+                                onclick="workAction('${work.id}', 'restart')" 
+                                title="Restart">
+                            <i class="bi bi-play"></i>
+                        </button>
+                    ` : ''}
+                    <button class="btn btn-sm btn-primary btn-action" 
+                            onclick="monitorWork('${work.id}')"
+                            title="${['running', 'queued'].includes(work.status) ? 'Monitor' : 'View'}">
+                        ${['running', 'queued'].includes(work.status) ?
+                '<i class="bi bi-speedometer2"></i>' :
+                '<i class="bi bi-eye"></i>'}
+                    </button>
+                </div>
+            </td>
+        </tr>
+    `;
+    }
+
+    function getStatusColor(status) {
+        const colors = {
+            'running': 'success',
+            'queued': 'warning',
+            'completed': 'primary',
+            'failed': 'danger',
+            'error': 'danger',
+            'cancelled': 'secondary',
+            'paused': 'info'
+        };
+        return colors[status] || 'secondary';
+    }
+
+    function getStatusIcon(status) {
+        const icons = {
+            'running': 'play-circle-fill',
+            'queued': 'clock',
+            'completed': 'check-circle-fill',
+            'failed': 'x-circle-fill',
+            'error': 'exclamation-triangle-fill',
+            'cancelled': 'dash-circle-fill',
+            'paused': 'pause-circle-fill'
+        };
+        return icons[status] || 'question-circle';
+    }
+
+    function monitorWork(workId) {
+        // Buscar o status do trabalho para decidir o redirecionamento
+        const work = cachedWorks?.find(w => w.id === workId);
+
+        // Se trabalho completado, vai para resultados. Senão, vai para monitor
+        if (work && ['completed', 'failed', 'error', 'cancelled'].includes(work.status)) {
+            window.location.href = `/results#work=${workId}`;
+        } else {
+            window.location.href = `/monitor/work/${workId}`;
+        }
+    }
+
+    async function workAction(workId, action) {
+        try {
+            // Desabilitar o botão durante a ação
+            const actionButtons = document.querySelectorAll(`button[onclick*="'${workId}'"]`);
+            actionButtons.forEach(btn => btn.disabled = true);
+
+            const response = await window.apiClient.request(`/api/monitor/work/${workId}/action/${action}`, {
+                method: 'POST'
+            });
+
+            showAlert(`Work ${action}ed successfully`, 'success');
+
+            // Atualizar imediatamente a tabela para mostrar a mudança de status
+            await loadWorks();
+
+        } catch (error) {
+            console.error(`Failed to ${action} work:`, error);
+            showAlert(`Failed to ${action} work: ${error.message}`, 'danger');
+        } finally {
+            // Reabilitar os botões
+            const actionButtons = document.querySelectorAll(`button[onclick*="'${workId}'"]`);
+            actionButtons.forEach(btn => btn.disabled = false);
+        }
+    }
+
+    function showAlert(message, type = 'info') {
+        // Create alert element
+        const alertId = 'alert-' + Date.now();
+        const alertHtml = `
+        <div class="alert alert-${type} alert-dismissible fade show position-fixed" 
+             role="alert" id="${alertId}" 
+             style="top: 20px; right: 20px; z-index: 1060; max-width: 400px;">
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    `;
+
+        // Add to page
+        document.body.insertAdjacentHTML('beforeend', alertHtml);
+
+        // Auto-remove after 5 seconds
+        setTimeout(() => {
+            const alertElement = document.getElementById(alertId);
+            if (alertElement) {
+                alertElement.remove();
+            }
+        }, 5000);
+    }
+</script>
+{% endblock %}

@@ -1,12 +1,10 @@
 """
 Domain: Dataset
 
-This module contains the main Dataset entity and its operations,
-representing string sequences and associated metadata.
-Pure implementation without external dependencies.
+Conjunto de sequências com metadados. Agora permite comprimentos variados
+quando desejado (ex.: dados do Entrez sem uniformização).
 """
 
-import random
 from typing import Any, Dict, List, Optional
 
 
@@ -15,49 +13,61 @@ class Dataset:
     Dataset entity representing a set of strings for CSP.
 
     Attributes:
+        id: Unique dataset identifier (required)
         sequences: List of dataset strings
         metadata: Dataset metadata (size, origin, etc.)
+        name: Optional dataset name for identification
     """
 
-    def __init__(self, sequences: List[str], metadata: Optional[Dict[str, Any]] = None):
+    def __init__(
+        self,
+        id: str,
+        name: str,
+        sequences: List[str] = [],
+        alphabet: Optional[str] = None,
+    ):
         """
-        Initialize a dataset with sequences and metadata.
+        Initialize a dataset with sequences.
 
         Args:
+            id: Unique dataset identifier (required)
             sequences: List of strings
-            metadata: Dictionary with optional metadata
+            alphabet: Optional alphabet. If None, will be inferred from sequences
+            name: Optional dataset name for identification
         """
-        if not sequences:
-            raise ValueError("Dataset cannot be empty")
+        if not id:
+            raise ValueError("Dataset id is required and cannot be empty")
 
-        # Validate that all strings have the same length
-        length = len(sequences[0])
-        if not all(len(seq) == length for seq in sequences):
-            raise ValueError("All strings must have the same length")
-
+        self.id = id
         self.sequences = sequences
-        self.metadata = metadata or {}
-
-        # Infer basic metadata
-        self.metadata.update(
-            {
-                "n": len(sequences),
-                "L": length,
-                "alphabet": self._infer_alphabet(),
-                "diversity": self._calculate_diversity(),
-            }
-        )
+        self._alphabet = alphabet
+        self.name = name
+        self._statistics_cache = None
+        self._diversity_cache = None
+        self._inferred_alphabet_cache = None
+        if not self.validate():
+            raise ValueError(
+                "Invalid dataset: sequences contain characters not in alphabet"
+            )
 
     def _infer_alphabet(self) -> str:
         """Infer alphabet from sequences."""
+        if self._inferred_alphabet_cache is not None:
+            return self._inferred_alphabet_cache
+
         alphabet_set = set()
         for seq in self.sequences:
             alphabet_set.update(seq)
-        return "".join(sorted(alphabet_set))
+        self._inferred_alphabet_cache = "".join(sorted(alphabet_set))
+        return self._inferred_alphabet_cache
 
     def _calculate_diversity(self) -> float:
         """Calculate average dataset diversity."""
+        if self._diversity_cache is not None:
+            return self._diversity_cache
+
         if len(self.sequences) < 2:
+            self._diversity_cache = 0.0
             return 0.0
 
         total_distance = 0
@@ -73,7 +83,9 @@ class Dataset:
 
         avg_distance = total_distance / total_pairs if total_pairs > 0 else 0
         max_possible = len(self.sequences[0])
-        return avg_distance / max_possible if max_possible > 0 else 0
+        diversity = avg_distance / max_possible if max_possible > 0 else 0
+        self._diversity_cache = diversity
+        return diversity
 
     @property
     def size(self) -> int:
@@ -81,14 +93,33 @@ class Dataset:
         return len(self.sequences)
 
     @property
-    def length(self) -> int:
-        """Return length of sequences."""
-        return len(self.sequences[0]) if self.sequences else 0
+    def min_length(self) -> int:
+        """Return minimum sequence length."""
+        if not self.sequences:
+            return 0
+        return min(len(s) for s in self.sequences)
+
+    @property
+    def max_length(self) -> int:
+        """Return maximum sequence length."""
+        if not self.sequences:
+            return 0
+        return max(len(s) for s in self.sequences)
+
+    @property
+    def average_length(self) -> float:
+        """Return average sequence length."""
+        if not self.sequences:
+            return 0.0
+        total_length = sum(len(s) for s in self.sequences)
+        return total_length / len(self.sequences)
 
     @property
     def alphabet(self) -> str:
         """Return dataset alphabet."""
-        return self.metadata.get("alphabet", "")
+        if self._alphabet is None:
+            return self._infer_alphabet()
+        return self._alphabet
 
     def validate(self) -> bool:
         """
@@ -97,21 +128,21 @@ class Dataset:
         Returns:
             bool: True if dataset is valid
         """
-        if not self.sequences:
-            return False
 
-        # Check uniform lengths
-        length = len(self.sequences[0])
-        if not all(len(seq) == length for seq in self.sequences):
-            return False
-
-        # Check valid characters
-        alphabet_set = set(self.alphabet)
-        for seq in self.sequences:
-            if not all(c in alphabet_set for c in seq):
-                return False
+        # Check valid characters only if alphabet was provided
+        if self._alphabet is not None:
+            alphabet_set = set(self._alphabet)
+            for seq in self.sequences:
+                if not all(c in alphabet_set for c in seq):
+                    return False
 
         return True
+
+    def _invalidate_cache(self) -> None:
+        """Invalidate statistics and diversity cache."""
+        self._statistics_cache = None
+        self._diversity_cache = None
+        self._inferred_alphabet_cache = None
 
     def get_statistics(self) -> Dict[str, Any]:
         """
@@ -120,15 +151,27 @@ class Dataset:
         Returns:
             dict: Dataset statistics
         """
-        return {
+        if self._statistics_cache is not None:
+            return self._statistics_cache
+
+        lengths = [len(s) for s in self.sequences]
+        is_uniform = len(set(lengths)) == 1
+
+        self._statistics_cache = {
             "size": self.size,
-            "length": self.length,
-            "alphabet": self.alphabet,
-            "alphabet_size": len(self.alphabet),
-            "diversity": self.metadata.get("diversity", 0),
-            "total_characters": self.size * self.length,
-            "metadata": self.metadata.copy(),
+            "min_length": self.min_length,
+            "max_length": self.max_length,
+            "average_length": self.average_length,
+            "alphabet": self._infer_alphabet(),
+            "alphabet_size": len(self._infer_alphabet()),
+            "diversity": self._calculate_diversity(),
+            "total_characters": sum(len(s) for s in self.sequences),
+            "uniform_lengths": is_uniform,
+            "lengths": lengths,
+            "n": len(self.sequences),
+            "L": self.max_length,
         }
+        return self._statistics_cache
 
     def to_dict(self) -> Dict[str, Any]:
         """
@@ -137,7 +180,11 @@ class Dataset:
         Returns:
             dict: Dictionary representation
         """
-        return {"sequences": self.sequences.copy(), "metadata": self.metadata.copy()}
+        metadata = self.get_statistics()
+        metadata["id"] = self.id
+        if self.name:
+            metadata["name"] = self.name
+        return {"sequences": self.sequences.copy(), "metadata": metadata}
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Dataset":
@@ -150,7 +197,16 @@ class Dataset:
         Returns:
             Dataset: Created instance
         """
-        return cls(data["sequences"], data.get("metadata"))
+        alphabet = data.get("metadata", {}).get("alphabet")
+        name = data.get("metadata", {}).get("name", "unnamed_dataset")
+        dataset_id = data.get("metadata", {}).get("id")
+
+        if not dataset_id:
+            raise ValueError("Dataset id is required in metadata")
+
+        return cls(
+            id=dataset_id, name=name, sequences=data["sequences"], alphabet=alphabet
+        )
 
     def add_sequence(self, sequence: str) -> None:
         """
@@ -160,17 +216,16 @@ class Dataset:
             sequence: String to be added
 
         Raises:
-            ValueError: If sequence has different length
+            ValueError: If sequence contains invalid characters
         """
-        if len(sequence) != self.length:
-            raise ValueError(f"Sequence must have length {self.length}")
+        # Validate sequence if alphabet is provided
+        if self._alphabet is not None:
+            alphabet_set = set(self._alphabet)
+            if not all(c in alphabet_set for c in sequence):
+                raise ValueError("Sequence contains characters not in alphabet")
 
         self.sequences.append(sequence)
-
-        # Update metadata
-        self.metadata["n"] = len(self.sequences)
-        self.metadata["alphabet"] = self._infer_alphabet()
-        self.metadata["diversity"] = self._calculate_diversity()
+        self._invalidate_cache()
 
     def remove_sequence(self, index: int) -> str:
         """
@@ -189,12 +244,7 @@ class Dataset:
             raise IndexError("Index out of range")
 
         removed = self.sequences.pop(index)
-
-        # Update metadata
-        self.metadata["n"] = len(self.sequences)
-        if self.sequences:
-            self.metadata["diversity"] = self._calculate_diversity()
-
+        self._invalidate_cache()
         return removed
 
     def filter_by_pattern(self, pattern: str, position: int) -> "Dataset":
@@ -209,167 +259,20 @@ class Dataset:
             Dataset: New dataset with filtered sequences
         """
         filtered_sequences = [seq for seq in self.sequences if seq[position] == pattern]
+        filtered_name = f"{self.name}_filtered" if self.name else "filtered_dataset"
+        filtered_id = f"{self.id}_filtered"
+        return Dataset(
+            id=filtered_id,
+            name=filtered_name,
+            sequences=filtered_sequences,
+            alphabet=self._alphabet,
+        )
 
-        new_metadata = self.metadata.copy()
-        new_metadata["filter_applied"] = f"position_{position}={pattern}"
-
-        return Dataset(filtered_sequences, new_metadata)
-
-    def sample(self, n: int, seed: Optional[int] = None) -> "Dataset":
+    def get_sequences(self) -> List[str]:
         """
-        Return random sample from dataset.
-
-        Args:
-            n: Number of sequences in sample
-            seed: Seed for reproducibility
+        Return list of sequences.
 
         Returns:
-            Dataset: New dataset with sample
+            List[str]: Copy of sequences list
         """
-        if n > len(self.sequences):
-            raise ValueError("Sample size larger than dataset")
-
-        rng = random.Random(seed)
-        sampled_sequences = rng.sample(self.sequences, n)
-
-        new_metadata = self.metadata.copy()
-        new_metadata["sampled_from"] = len(self.sequences)
-        new_metadata["sample_seed"] = seed
-
-        return Dataset(sampled_sequences, new_metadata)
-
-
-class SyntheticDatasetGenerator:
-    """Synthetic dataset generator for CSP algorithm testing."""
-
-    @staticmethod
-    def generate_from_center(
-        center: str,
-        n: int,
-        noise_rate: float,
-        alphabet: str,
-        seed: Optional[int] = None,
-    ) -> Dataset:
-        """
-        Generate dataset based on center string with noise.
-
-        Args:
-            center: Center string
-            n: Number of sequences to generate
-            noise_rate: Noise rate (0-1)
-            alphabet: Valid alphabet
-            seed: Seed for reproducibility
-
-        Returns:
-            Dataset: Generated synthetic dataset
-        """
-        rng = random.Random(seed)
-        sequences = []
-
-        for _ in range(n):
-            sequence = list(center)
-
-            # Aplicar ruído
-            for i in range(len(sequence)):
-                if rng.random() < noise_rate:
-                    # Trocar por caractere diferente do alfabeto
-                    available = [c for c in alphabet if c != sequence[i]]
-                    if available:
-                        sequence[i] = rng.choice(available)
-
-            sequences.append("".join(sequence))
-
-        metadata = {
-            "type": "synthetic",
-            "center_string": center,
-            "noise_rate": noise_rate,
-            "generation_seed": seed,
-            "alphabet_used": alphabet,
-        }
-
-        return Dataset(sequences, metadata)
-
-    @staticmethod
-    def generate_random(
-        n: int, length: int, alphabet: str, seed: Optional[int] = None
-    ) -> Dataset:
-        """
-        Generate completely random dataset.
-
-        Args:
-            n: Number of sequences
-            length: Length of sequences
-            alphabet: Valid alphabet
-            seed: Seed for reproducibility
-
-        Returns:
-            Dataset: Generated random dataset
-        """
-        rng = random.Random(seed)
-        sequences = []
-
-        for _ in range(n):
-            sequence = "".join(rng.choice(alphabet) for _ in range(length))
-            sequences.append(sequence)
-
-        metadata = {
-            "type": "random",
-            "generation_seed": seed,
-            "alphabet_used": alphabet,
-        }
-
-        return Dataset(sequences, metadata)
-
-    @staticmethod
-    def generate_clustered(
-        n_clusters: int,
-        sequences_per_cluster: int,
-        length: int,
-        alphabet: str,
-        noise_rate: float = 0.1,
-        seed: Optional[int] = None,
-    ) -> Dataset:
-        """
-        Generate dataset with clusters of similar sequences.
-
-        Args:
-            n_clusters: Number of clusters
-            sequences_per_cluster: Sequences per cluster
-            length: Length of sequences
-            alphabet: Valid alphabet
-            noise_rate: Noise rate within clusters
-            seed: Seed for reproducibility
-
-        Returns:
-            Dataset: Dataset with clusters
-        """
-        rng = random.Random(seed)
-        all_sequences = []
-        cluster_centers = []
-
-        # Generate cluster centers
-        for _ in range(n_clusters):
-            center = "".join(rng.choice(alphabet) for _ in range(length))
-            cluster_centers.append(center)
-
-            # Generate sequences for this cluster
-            cluster_dataset = SyntheticDatasetGenerator.generate_from_center(
-                center,
-                sequences_per_cluster,
-                noise_rate,
-                alphabet,
-                rng.randint(0, 1000000),
-            )
-            all_sequences.extend(cluster_dataset.sequences)
-
-        metadata = {
-            "type": "clustered",
-            "n_clusters": n_clusters,
-            "sequences_per_cluster": sequences_per_cluster,
-            "noise_rate": noise_rate,
-            "cluster_centers": cluster_centers,
-            "generation_seed": seed,
-            "alphabet_used": alphabet,
-        }
-
-        return Dataset(all_sequences, metadata)
+        return self.sequences.copy()
