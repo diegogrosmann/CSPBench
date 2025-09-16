@@ -1,141 +1,210 @@
-# CSPBench - Closest String Problem Benchmark
+# CSPBench# CSPBench
 
-[![CI](https://github.com/diegogrosmann/CSPBench/workflows/CI/badge.svg)](https://github.com/diegogrosmann/CSPBench/actions)
-[![Coverage](https://codecov.io/gh/diegogrosmann/CSPBench/branch/main/graph/badge.svg)](https://codecov.io/gh/diegogrosmann/CSPBench)
-[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.XXXXX.svg)](https://doi.org/10.5281/zenodo.XXXXX)
-[![Python](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 
-A comprehensive framework for benchmarking and analyzing Closest String Problem (CSP) algorithms with clean architecture design and research-grade reproducibility.
 
-## 🔬 Research Context
+[![CI](https://github.com/diegogrosmann/CSPBench/workflows/CI/badge.svg)](https://github.com/diegogrosmann/CSPBench/actions)[![CI](https://github.com/diegogrosmann/CSPBench/workflows/CI/badge.svg)](https://github.com/diegogrosmann/CSPBench/actions)
 
-The Closest String Problem is a fundamental NP-hard optimization problem in computational biology and theoretical computer science. Given a set of strings, the goal is to find a center string that minimizes the maximum Hamming distance to all input strings. This problem has applications in:
+[![Coverage](https://codecov.io/gh/diegogrosmann/CSPBench/branch/main/graph/badge.svg)](https://codecov.io/gh/diegogrosmann/CSPBench)[![Coverage](https://codecov.io/gh/diegogrosmann/CSPBench/branch/main/graph/badge.svg)](https://codecov.io/gh/diegogrosmann/CSPBench)
 
-- **Motif Discovery**: Finding conserved regions in DNA/protein sequences
-- **Consensus Sequence Identification**: Determining representative sequences
-- **Error Correction**: Correcting sequencing errors in biological data
-- **Pattern Recognition**: Identifying common patterns in string data
+[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-## ✨ Key Features
+[![Python](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)[![Python](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 
-- **🏗️ Clean Architecture**: Hexagonal architecture for maintainability and testability
-- **📊 Comprehensive Benchmarking**: Compare multiple CSP algorithms systematically
-- **🧬 Bioinformatics Integration**: Native support for FASTA files and NCBI data
-- **🌐 Web Interface**: User-friendly dashboard for experiment management
-- **📈 Performance Monitoring**: Real-time progress tracking and resource monitoring
-- **🔄 Reproducible Research**: Automated experiment configuration and result archival
-- **📦 Containerized Deployment**: Docker and cloud-ready configurations
-- **🔧 Extensible Design**: Easy algorithm integration and custom metrics
 
-## 🚀 Quick Start
 
-### Installation
+A framework for benchmarking Closest String Problem (CSP) algorithms.A framework for benchmarking Closest String Problem (CSP) algorithms.
 
-#### Option 1: pip (Recommended)
+
+
+## What is CSP?## What is CSP?
+
+
+
+The Closest String Problem finds a center string that minimizes the maximum distance to all input strings. Applications include:The Closest String Problem finds a center string that minimizes the maximum distance to all input strings. Applications include:
+
+- DNA motif discovery- DNA motif discovery
+
+- Consensus sequence identification  - Consensus sequence identification  
+
+- Error correction in biological data- Error correction in biological data
+
+
+
+## Installation## Installation
+
+
+
+```bash```bash
+
+git clone https://github.com/diegogrosmann/CSPBench.gitgit clone https://github.com/diegogrosmann/CSPBench.git
+
+cd CSPBenchcd CSPBench
+
+pip install -e .pip install -e .
+
+``````
+
+
+
+## Usage## Usage
+
+
+
+### Command Line Interface### Command Line Interface
+
+
+
+```bash```bash
+
+# Run single algorithm# Run single algorithm
+
+python main.py run baseline examples/datasets/example.fastapython main.py run baseline examples/datasets/example.fasta
+
+
+
+# Run batch experiments  # Run batch experiments  
+
+python main.py batch examples/batches/experiment_example.yamlpython main.py batch examples/batches/experiment_example.yaml
+
+
+
+# Interactive menu# Interactive menu
+
+python main.pypython main.py
+
+``````
+
+
+
+### Web Interface### Web Interface
+
+
+
+```bash```bash
+
+# Start web server# Start web server
+
+python main.py webpython main.py web
+
+
+
+# Open browser to http://localhost:8000# Open browser to http://localhost:8000
+
+``````
+
+
+
+## Batch Templates## Batch Templates
+
+
+
+Use predefined templates for experiments:Use predefined templates for experiments:
+
+
+
+```bash```bash
+
+# Available templates in examples/batches/:# Available templates in examples/batches/:
+
+# - experiment_example.yaml    # Standard experiment  # - experiment_example.yaml    # Standard experiment  
+
+# - optimizationt_example.yaml # Parameter optimization# - optimizationt_example.yaml # Parameter optimization
+
+# - sensitivityt_example.yaml  # Sensitivity analysis# - sensitivityt_example.yaml  # Sensitivity analysis
+
+# - TEMPLATE.yaml              # Base template# - TEMPLATE.yaml              # Base template
+
+``````
+
+
+
+Copy a template, modify it, and run:Copy a template, modify it, and run:
+
+```bash```bash
+
+cp examples/batches/experiment_example.yaml my_experiment.yamlcp examples/batches/experiment_example.yaml my_experiment.yaml
+
+# Edit my_experiment.yaml# Edit my_experiment.yaml
+
+python main.py batch my_experiment.yamlpython main.py batch my_experiment.yaml
+
+``````
+
+
+
+## Algorithms## Algorithms
+
+
+
+| Algorithm | Type | Reference || Algorithm | Type | Reference |
+
+|-----------|------|-----------||-----------|------|-----------|
+
+| **Baseline** | Brute Force | - || **Baseline** | Brute Force | - |
+
+| **BLF-GA** | Genetic Algorithm | [Blum & Lozano, 2005] || **BLF-GA** | Genetic Algorithm | [Blum & Lozano, 2005] |
+
+| **CSC** | Core String Clustering | [Custom] || **CSC** | Core String Clustering | [Custom] |
+
+| **DP-CSP** | Dynamic Programming | [Custom] || **DP-CSP** | Dynamic Programming | [Custom] |
+
+| **H2-CSP** | Hybrid Heuristic | [Custom] || **H2-CSP** | Hybrid Heuristic | [Custom] |
+
+## Development
+
+## Development
+
 ```bash
-pip install cspbench
-```
 
-#### Option 2: From Source
-```bash
-git clone https://github.com/diegogrosmann/CSPBench.git
-cd CSPBench
-pip install -e .
-```
+```bash# Install dependencies
 
-#### Option 3: Docker
-```bash
-docker run -p 8000:8000 diegogrosmann/cspbench:latest
-```
+# Install dependenciespip install -e ".[dev]"
 
-### Basic Usage
+pip install -e ".[dev]"
 
-#### Command Line Interface
-```bash
-# Run a simple benchmark
-cspbench run --algorithm baseline --dataset examples/data.fasta
+# Run tests
 
-# Web interface
-cspbench web --port 8000
+# Run testspytest
 
-# Generate synthetic datasets
-cspbench dataset generate --sequences 100 --length 50 --alphabet DNA
-```
+pytest
 
-#### Python API
-```python
-from cspbench import CSPBench
-from cspbench.algorithms import BaselineCSP
-from cspbench.datasets import load_fasta
+# Format code
 
-# Load data
-sequences = load_fasta("path/to/sequences.fasta")
+# Format coderuff format .
 
-# Initialize algorithm
-algorithm = BaselineCSP(max_distance=3)
-
-# Run benchmark
-benchmark = CSPBench()
-results = benchmark.run(algorithm, sequences)
-
-print(f"Best solution: {results.center_string}")
-print(f"Max distance: {results.max_distance}")
-print(f"Runtime: {results.execution_time:.2f}s")
-```
-
-## 📚 Documentation
-
-- **[User Guide](https://diegogrosmann.github.io/CSPBench/user-guide/)**: Comprehensive usage instructions
-- **[API Reference](https://diegogrosmann.github.io/CSPBench/api/)**: Complete API documentation
-- **[Algorithm Guide](https://diegogrosmann.github.io/CSPBench/algorithms/)**: Implemented algorithms overview
-- **[Developer Guide](https://diegogrosmann.github.io/CSPBench/contributing/)**: Contributing and extending CSPBench
-
-## 🧪 Included Algorithms
-
-| Algorithm | Type | Time Complexity | Space Complexity | Reference |
-|-----------|------|-----------------|------------------|-----------|
-| **Baseline** | Brute Force | O(k^l \* n \* l) | O(l) | - |
-| **BLF-GA** | Genetic Algorithm | O(g \* p \* n \* l) | O(p \* l) | [Blum & Lozano, 2005] |
-| **CSC** | Core String Clustering | O(n² \* l) | O(n \* l) | [Custom] |
-| **DP-CSP** | Dynamic Programming | O(n \* l \* d) | O(l \* d) | [Custom] |
-| **H2-CSP** | Hybrid Heuristic | O(n \* l \* log(l)) | O(n \* l) | [Custom] |
-
-## 📊 Example Results
-
-```python
-# Benchmark comparison on synthetic data
-results = benchmark.compare_algorithms(
-    algorithms=[BaselineCSP(), BLFGA(), CSC(), DPCSP()],
-    dataset="synthetic_100x20",
-    metrics=["solution_quality", "runtime", "memory_usage"]
-)
-
-# Results automatically saved to outputs/benchmark_TIMESTAMP/
-```
-
-## 🏗️ Architecture
-
-CSPBench follows hexagonal architecture principles:
+ruff format .```
 
 ```
-src/
-├── domain/              # Core business logic
-│   ├── entities/        # Domain entities (Dataset, Algorithm, Result)
-│   ├── repositories/    # Repository interfaces
-│   └── services/        # Domain services
-├── application/         # Use cases and application services
-│   ├── services/        # Application services
-│   └── use_cases/       # Business use cases
-├── infrastructure/      # External concerns
-│   ├── persistence/     # Database implementations
-│   ├── algorithms/      # Algorithm implementations
-│   └── external/        # External service integrations
-└── presentation/        # User interfaces
-    ├── cli/             # Command-line interface
-    ├── web/             # Web interface
-    └── api/             # REST API
+
+## Citation
+
+## Citation
+
+```bibtex
+
+```bibtex@software{grosmann2025cspbench,
+
+@software{grosmann2025cspbench,  title={CSPBench: A Framework for Closest String Problem Benchmarking},
+
+  title={CSPBench: A Framework for Closest String Problem Benchmarking},  author={Grosmann, Diego},
+
+  author={Grosmann, Diego},  year={2025},
+
+  year={2025},  url={https://github.com/diegogrosmann/CSPBench}
+
+  url={https://github.com/diegogrosmann/CSPBench}}
+
+}```
+
 ```
+
+## License
+
+## License
+
+MIT License - see [LICENSE](LICENSE) file.
+
+MIT License - see [LICENSE](LICENSE) file.```
 
 ## 🤝 Contributing
 
@@ -238,9 +307,6 @@ make help-cloud             # Ver todas as opções de cloud deployment
 
 ### CLI
 ```bash
-# Executar algoritmo específico
-python main.py run baseline examples/datasets/example.fasta
-
 # Executar batch de experimentos
 python main.py batch examples/batches/experiment_example.yaml
 
