@@ -26,6 +26,7 @@ cd CSPBench
 python3 -m venv venv
 source venv/bin/activate
 pip install -e .
+cp .env.example .env
 ```
 
 ---
